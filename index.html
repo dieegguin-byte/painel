@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7a3b1f">
+<title>Atendimento — Tapeçaria Bahia</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon.svg">
+<style>
+  :root{
+    --bg:#161210; --bg2:#1e1815; --card:#241d18; --card2:#2b221c;
+    --linha:#3a2d24; --texto:#f2e7dc; --texto2:#c7b4a4; --fraco:#98867a;
+    --marrom:#b4632f; --marrom-claro:#e08a4f; --creme:#f4e4d4;
+    --alta:#e0574f; --media:#e0a23f; --baixa:#5aa06a; --ok:#5aa06a;
+    --raio:16px; --sombra:0 6px 20px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:linear-gradient(180deg,var(--bg),var(--bg2));
+    color:var(--texto);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.45; -webkit-font-smoothing:antialiased;
+    padding:0 0 env(safe-area-inset-bottom);
+    max-width:640px; margin:0 auto;
+  }
+  header{
+    position:sticky; top:0; z-index:10;
+    background:linear-gradient(180deg,#7a3b1f,#5f2d16);
+    padding:calc(14px + env(safe-area-inset-top)) 18px 14px;
+    box-shadow:var(--sombra);
+  }
+  .marca{display:flex; align-items:center; gap:11px}
+  .marca img{width:38px; height:38px; border-radius:10px; flex:0 0 auto}
+  .marca h1{font-size:1.05rem; margin:0; font-weight:700; letter-spacing:.2px}
+  .marca .sub{font-size:.72rem; color:#f4dcc9; opacity:.85; margin-top:1px}
+  .barra-status{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:10px; margin-top:12px; font-size:.76rem; color:#f6e6d8;
+  }
+  .att{display:flex; align-items:center; gap:6px; min-width:0}
+  .att .dot{width:8px; height:8px; border-radius:50%; background:var(--ok); flex:0 0 auto}
+  .att.offline .dot{background:var(--media)}
+  #btnAtualizar{
+    -webkit-appearance:none; appearance:none; border:0; cursor:pointer;
+    background:rgba(255,255,255,.16); color:#fff; font-weight:600;
+    font-size:.78rem; padding:7px 13px; border-radius:999px; flex:0 0 auto;
+    display:flex; align-items:center; gap:6px;
+  }
+  #btnAtualizar:active{transform:scale(.96)}
+  #btnAtualizar.girando svg{animation:girar .8s linear infinite}
+  @keyframes girar{to{transform:rotate(360deg)}}
+
+  main{padding:16px 14px 40px}
+  .selo-leitura{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:.72rem; color:var(--texto2);
+    background:var(--card); border:1px solid var(--linha);
+    padding:6px 11px; border-radius:999px; margin-bottom:16px;
+  }
+  section{margin-bottom:22px}
+  .titulo-sec{
+    display:flex; align-items:center; gap:8px;
+    font-size:.78rem; text-transform:uppercase; letter-spacing:.8px;
+    color:var(--marrom-claro); font-weight:700; margin:0 2px 10px;
+  }
+  .titulo-sec .cont{
+    margin-left:auto; background:var(--card2); color:var(--texto2);
+    font-size:.72rem; padding:1px 9px; border-radius:999px; letter-spacing:0;
+  }
+  .card{
+    background:var(--card); border:1px solid var(--linha);
+    border-radius:var(--raio); padding:14px 15px; box-shadow:var(--sombra);
+  }
+  .resumo{font-size:.98rem; color:var(--texto)}
+
+  .lista{display:flex; flex-direction:column; gap:11px}
+  .item{
+    background:var(--card); border:1px solid var(--linha);
+    border-left:4px solid var(--linha); border-radius:var(--raio);
+    padding:13px 14px;
+  }
+  .item.p-alta{border-left-color:var(--alta)}
+  .item.p-media{border-left-color:var(--media)}
+  .item.p-baixa{border-left-color:var(--baixa)}
+  .item .topo{display:flex; align-items:baseline; gap:8px; justify-content:space-between}
+  .item .nome{font-weight:700; font-size:1rem}
+  .item .tag{
+    font-size:.68rem; padding:2px 8px; border-radius:999px;
+    background:var(--card2); color:var(--texto2); white-space:nowrap; flex:0 0 auto;
+    text-transform:uppercase; letter-spacing:.4px;
+  }
+  .item .servico{color:var(--texto2); font-size:.86rem; margin-top:2px}
+  .item .meta{display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:8px; font-size:.8rem; color:var(--fraco)}
+  .item .meta b{color:var(--texto2); font-weight:600}
+  .item .acao{
+    margin-top:10px; font-size:.9rem; color:var(--texto);
+    background:var(--bg2); border-radius:10px; padding:9px 11px;
+  }
+  .item .acao .lbl{display:block; font-size:.68rem; text-transform:uppercase; letter-spacing:.5px; color:var(--marrom-claro); margin-bottom:2px}
+  .item .rodape{display:flex; align-items:center; gap:12px; margin-top:10px; flex-wrap:wrap}
+  .prazo{font-size:.78rem; color:var(--media); font-weight:600}
+  .prazo.hoje{color:var(--alta)}
+  a.wa{
+    display:inline-flex; align-items:center; gap:6px; text-decoration:none;
+    font-size:.8rem; font-weight:600; color:#fff;
+    background:#1f7a4d; padding:6px 12px; border-radius:999px;
+  }
+  a.wa:active{transform:scale(.97)}
+
+  .alerta{
+    background:linear-gradient(180deg,var(--card2),var(--card));
+    border:1px solid #4a3323; border-left:4px solid var(--media);
+    border-radius:var(--raio); padding:12px 14px;
+  }
+  .alerta.prazo{border-left-color:var(--alta)}
+  .alerta .cab{display:flex; align-items:center; gap:8px; font-weight:700; font-size:.95rem}
+  .alerta .cab .ic{font-size:1rem}
+  .alerta .det{color:var(--texto2); font-size:.85rem; margin-top:5px}
+
+  .agenda-item{display:flex; align-items:center; gap:12px; padding:10px 2px; border-bottom:1px solid var(--linha)}
+  .agenda-item:last-child{border-bottom:0}
+  .agenda-item .hora{font-weight:700; color:var(--marrom-claro); font-variant-numeric:tabular-nums; flex:0 0 auto; width:48px}
+  .agenda-item .desc{font-size:.92rem}
+  .agenda-item .desc .loc{color:var(--fraco); font-size:.78rem}
+
+  .fin-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .fin-cel{background:var(--bg2); border-radius:12px; padding:10px 12px}
+  .fin-cel .rot{font-size:.72rem; color:var(--fraco); text-transform:uppercase; letter-spacing:.4px}
+  .fin-cel .val{font-size:1.12rem; font-weight:700; font-variant-numeric:tabular-nums; margin-top:2px}
+  .val.pos{color:var(--ok)} .val.neg{color:var(--alta)}
+  .fin-ref{font-size:.74rem; color:var(--fraco); margin-top:10px}
+
+  .vazio{color:var(--fraco); font-size:.88rem; text-align:center; padding:14px}
+  .erro{background:#3a201c; border:1px solid #6b3029; color:#f3c9c2; border-radius:var(--raio); padding:14px; font-size:.88rem}
+  .rodape-app{text-align:center; color:var(--fraco); font-size:.72rem; margin-top:8px; padding:0 10px}
+  .esqueleto{height:70px; border-radius:var(--raio); background:linear-gradient(90deg,var(--card),var(--card2),var(--card)); background-size:200% 100%; animation:brilho 1.3s infinite}
+  @keyframes brilho{to{background-position:-200% 0}}
+</style>
+</head>
+<body>
+<header>
+  <div class="marca">
+    <img src="./icon.svg" alt="">
+    <div>
+      <h1>Atendimento</h1>
+      <div class="sub">Tapeçaria e Estofados Bahia · Luziânia-GO</div>
+    </div>
+  </div>
+  <div class="barra-status">
+    <div class="att" id="att"><span class="dot"></span><span id="attTxt">Carregando…</span></div>
+    <button id="btnAtualizar" aria-label="Atualizar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      Atualizar
+    </button>
+  </div>
+</header>
+
+<main>
+  <div class="selo-leitura">🔒 Somente leitura · nada é enviado por aqui</div>
+  <div id="conteudo">
+    <div class="lista">
+      <div class="esqueleto"></div><div class="esqueleto"></div><div class="esqueleto"></div>
+    </div>
+  </div>
+  <div class="rodape-app" id="rodapeApp"></div>
+</main>
+
+<script>
+/* =========================================================================
+   DE ONDE VÊM OS DADOS:
+   - Teste local (localhost): lê o arquivo ao lado.
+   - Publicado (GitHub Pages): lê o Gist SECRETO (link não listado/indexado,
+     CORS liberado). A rotina do Claude escreve os dados e faz git push no
+     Gist toda noite. Nada é enviado por aqui (só leitura).
+   ========================================================================= */
+const EH_LOCAL = ['localhost', '127.0.0.1', ''].includes(location.hostname);
+const FONTE_DADOS = EH_LOCAL
+  ? './dados_atendimento.json'
+  : 'https://gist.githubusercontent.com/dieegguin-byte/e837448593fcd4fcea82096b942d93d4/raw/dados_atendimento.json';
+
+const $ = (s, r=document) => r.querySelector(s);
+const el = (tag, cls, txt) => { const e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; };
+const esc = (s) => (s==null?'':String(s));
+
+function moedaBR(n){
+  if(typeof n!=='number' || isNaN(n)) return '—';
+  return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+}
+function tempoRelativo(iso){
+  const d = new Date(iso); if(isNaN(d)) return esc(iso);
+  const diff = (Date.now()-d.getTime())/1000;
+  const abs = Math.abs(diff);
+  const fmt = new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  let rel;
+  if(abs<90) rel='agora mesmo';
+  else if(abs<3600) rel=`há ${Math.round(abs/60)} min`;
+  else if(abs<86400) rel=`há ${Math.round(abs/3600)} h`;
+  else rel=`há ${Math.round(abs/86400)} dia(s)`;
+  return `${rel} · ${fmt.format(d)}`;
+}
+function dataCurtaBR(iso){
+  if(!iso) return '';
+  const d=new Date(iso+'T00:00:00'); if(isNaN(d)) return esc(iso);
+  return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+}
+function ehHoje(iso){
+  if(!iso) return false;
+  const h=new Date(); const s=`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
+  return iso===s;
+}
+function telParaWa(tel){
+  const num=String(tel||'').replace(/\D/g,'');
+  return num.length>=10 ? 'https://wa.me/'+num : null;
+}
+
+function secao(titulo, count){
+  const s=el('section');
+  const t=el('div','titulo-sec'); t.appendChild(document.createTextNode(titulo));
+  if(count!=null){ const c=el('span','cont',String(count)); t.appendChild(c); }
+  s.appendChild(t);
+  return s;
+}
+
+function render(d){
+  const c = $('#conteudo'); c.innerHTML='';
+
+  // Resumo do dia
+  if(d.resumo_do_dia){
+    const s=secao('Resumo do dia');
+    const card=el('div','card'); const p=el('p','resumo',d.resumo_do_dia); p.style.margin='0';
+    card.appendChild(p); s.appendChild(card); c.appendChild(s);
+  }
+
+  // Alertas
+  const alertas=d.alertas||[];
+  if(alertas.length){
+    const s=secao('Precisa decidir / prazos', alertas.length);
+    const lista=el('div','lista');
+    alertas.forEach(a=>{
+      const box=el('div','alerta'+(a.tipo==='prazo'?' prazo':''));
+      const cab=el('div','cab');
+      cab.appendChild(el('span','ic', a.tipo==='prazo'?'⏰':'✅'));
+      cab.appendChild(el('span',null,a.titulo||''));
+      box.appendChild(cab);
+      if(a.detalhe) box.appendChild(el('div','det',a.detalhe));
+      if(a.prazo){ const p=el('div','prazo'+(ehHoje(a.prazo)?' hoje':''), 'Prazo: '+dataCurtaBR(a.prazo)); p.style.marginTop='6px'; box.appendChild(p); }
+      lista.appendChild(box);
+    });
+    s.appendChild(lista); c.appendChild(s);
+  }
+
+  // Agenda de hoje
+  const agenda=d.agenda_hoje||[];
+  {
+    const s=secao('Agenda de hoje', agenda.length);
+    const card=el('div','card');
+    if(!agenda.length){ card.appendChild(el('div','vazio','Sem compromissos para hoje.')); }
+    else agenda.forEach(a=>{
+      const it=el('div','agenda-item');
+      it.appendChild(el('div','hora',a.hora||'--'));
+      const desc=el('div','desc'); desc.appendChild(el('div',null,a.titulo||''));
+      if(a.local) desc.appendChild(el('div','loc','📍 '+a.local));
+      it.appendChild(desc); card.appendChild(it);
+    });
+    s.appendChild(card); c.appendChild(s);
+  }
+
+  // Precisa de atenção (leads/clientes)
+  const leads=d.precisa_atencao||[];
+  {
+    const ordem={alta:0,media:1,baixa:2};
+    leads.sort((a,b)=>(ordem[a.prioridade]??1)-(ordem[b.prioridade]??1));
+    const s=secao('Clientes / precisa de atenção', leads.length);
+    if(!leads.length){ const card=el('div','card'); card.appendChild(el('div','vazio','Nada aguardando ação. 👏')); s.appendChild(card); }
+    else {
+      const lista=el('div','lista');
+      leads.forEach(l=>{
+        const it=el('div','item p-'+(l.prioridade||'media'));
+        const topo=el('div','topo');
+        topo.appendChild(el('div','nome',l.cliente||'Sem nome'));
+        if(l.status) topo.appendChild(el('div','tag',l.status));
+        it.appendChild(topo);
+        if(l.servico) it.appendChild(el('div','servico',l.servico));
+        const meta=el('div','meta');
+        if(l.cidade){ const m=el('span'); m.innerHTML='<b>Cidade:</b> '+esc(l.cidade); meta.appendChild(m); }
+        if(l.telefone){ const m=el('span'); m.innerHTML='<b>Tel:</b> '+esc(l.telefone); meta.appendChild(m); }
+        if(l.origem){ const m=el('span'); m.innerHTML='<b>Origem:</b> '+esc(l.origem); meta.appendChild(m); }
+        if(meta.childNodes.length) it.appendChild(meta);
+        if(l.proxima_acao){
+          const ac=el('div','acao'); ac.appendChild(el('span','lbl','Próxima ação'));
+          ac.appendChild(document.createTextNode(l.proxima_acao)); it.appendChild(ac);
+        }
+        const rod=el('div','rodape');
+        if(l.prazo){ rod.appendChild(el('span','prazo'+(ehHoje(l.prazo)?' hoje':''), (ehHoje(l.prazo)?'Hoje':'Prazo '+dataCurtaBR(l.prazo)))); }
+        const wa=telParaWa(l.telefone);
+        if(wa){ const a=document.createElement('a'); a.className='wa'; a.href=wa; a.target='_blank'; a.rel='noopener';
+          a.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.5 15.3L2 22l4.8-1.5A10 10 0 1 0 12 2Z"/></svg> Abrir conversa'; rod.appendChild(a); }
+        if(rod.childNodes.length) it.appendChild(rod);
+        lista.appendChild(it);
+      });
+      s.appendChild(lista);
+    }
+    c.appendChild(s);
+  }
+
+  // Financeiro pendente
+  const finPend=d.financeiro_pendente||[];
+  if(finPend.length){
+    const s=secao('Financeiro a confirmar', finPend.length);
+    const lista=el('div','lista');
+    finPend.forEach(f=>{
+      const it=el('div','item p-media');
+      it.appendChild(el('div','servico',f.descricao||''));
+      if(f.status){ const t=el('div','tag',f.status); t.style.marginTop='8px'; t.style.display='inline-block'; it.appendChild(t); }
+      lista.appendChild(it);
+    });
+    s.appendChild(lista); c.appendChild(s);
+  }
+
+  // Resumo financeiro
+  const fr=d.financeiro_resumo;
+  if(fr){
+    const s=secao('Resumo financeiro');
+    const card=el('div','card');
+    const grid=el('div','fin-grid');
+    const cel=(rot,val,cls)=>{ const x=el('div','fin-cel'); x.appendChild(el('div','rot',rot)); x.appendChild(el('div','val'+(cls?' '+cls:''),moedaBR(val))); return x; };
+    grid.appendChild(cel('Entradas',fr.entradas,'pos'));
+    grid.appendChild(cel('Saídas',fr.saidas,'neg'));
+    grid.appendChild(cel('Lucro',fr.lucro, fr.lucro>=0?'pos':'neg'));
+    grid.appendChild(cel('Sobra p/ Diego',fr.sobra_real_diego, fr.sobra_real_diego>=0?'pos':'neg'));
+    card.appendChild(grid);
+    if(fr.referencia) card.appendChild(el('div','fin-ref',fr.referencia));
+    s.appendChild(card); c.appendChild(s);
+  }
+
+  // atualizado em
+  const att=$('#att'), attTxt=$('#attTxt');
+  att.classList.remove('offline');
+  attTxt.textContent = d.meta && d.meta.atualizado_em ? 'Atualizado '+tempoRelativo(d.meta.atualizado_em) : 'Atualizado';
+  $('#rodapeApp').textContent = (d.meta && d.meta.gerado_por ? d.meta.gerado_por+' · ' : '') + 'Painel de leitura · v'+((d.meta&&d.meta.versao_dados)||1);
+}
+
+function mostrarErro(msg, temCache){
+  const c=$('#conteudo'); c.innerHTML='';
+  const e=el('div','erro'); e.innerHTML='⚠️ '+esc(msg)+(temCache?'':'<br><br>Toque em <b>Atualizar</b> para tentar de novo.');
+  c.appendChild(e);
+  const att=$('#att'); att.classList.add('offline'); $('#attTxt').textContent='Sem conexão com os dados';
+}
+
+async function carregar(){
+  const btn=$('#btnAtualizar'); btn.classList.add('girando');
+  try{
+    const url = FONTE_DADOS + (FONTE_DADOS.includes('?')?'&':'?') + 't=' + Date.now();
+    const resp = await fetch(url, {cache:'no-store'});
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const dados = await resp.json();
+    render(dados);
+  }catch(err){
+    // tenta cache do service worker
+    try{
+      const resp = await fetch(FONTE_DADOS);
+      const dados = await resp.json();
+      render(dados);
+      $('#att').classList.add('offline'); $('#attTxt').textContent='Offline · mostrando última versão salva';
+    }catch(e2){
+      mostrarErro('Não consegui carregar os dados ('+err.message+').');
+    }
+  }finally{
+    btn.classList.remove('girando');
+  }
+}
+
+$('#btnAtualizar').addEventListener('click', carregar);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) carregar(); });
+window.addEventListener('online', carregar);
+window.addEventListener('offline', ()=>{ $('#att').classList.add('offline'); $('#attTxt').textContent='Sem internet'; });
+
+carregar();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js').catch(()=>{}) );
+}
+</script>
+</body>
+</html>

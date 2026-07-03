@@ -1,0 +1,16 @@
+{
+  "name": "Atendimento — Tapeçaria Bahia",
+  "short_name": "Atendimento TB",
+  "description": "Painel de leitura do WhatsApp: leads, pendências e agenda da Tapeçaria e Estofados Bahia.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1b1410",
+  "theme_color": "#7a3b1f",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
