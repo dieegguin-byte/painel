@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#7a3b1f">
-<meta name="tb-versao" content="3.0">
+<meta name="tb-versao" content="3.1">
 <title>Atendimento — Tapeçaria Bahia</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -181,6 +181,47 @@
   nav.tabs button .ic{font-size:1.2rem}
   nav.tabs button.ativo{color:var(--marrom-claro)}
 
+  /* urgente (inicio) */
+  .urgente-item{display:flex; align-items:flex-start; gap:10px; padding:10px 2px; border-bottom:1px solid var(--linha); font-size:.86rem}
+  .urgente-item:last-child{border-bottom:0}
+  .urgente-item .ic{font-size:1.05rem; flex:0 0 auto}
+  .urgente-item .txt{flex:1}
+  .urgente-item .txt b{color:var(--texto)}
+  .urgente-item .txt .sub{color:var(--fraco); font-size:.78rem}
+
+  /* modal */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200;
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  .modal-box{
+    background:var(--bg2); border-radius:20px 20px 0 0; width:100%; max-width:640px;
+    max-height:88vh; overflow-y:auto; padding:16px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+  .modal-cab{display:flex; align-items:center; gap:10px; margin-bottom:14px}
+  .modal-cab h2{font-size:1.05rem; margin:0; flex:1}
+  .modal-fechar{background:var(--card2); border:0; color:var(--texto2); width:32px; height:32px; border-radius:50%; font-size:1rem; cursor:pointer}
+  .guia-bloco{margin-bottom:16px}
+  .guia-bloco h3{font-size:.85rem; color:var(--marrom-claro); margin:0 0 6px}
+  .guia-bloco textarea{width:100%; min-height:100px; background:var(--card); border:1px solid var(--linha); color:var(--texto); border-radius:10px; padding:10px 12px}
+  .btn-header-icon{background:rgba(255,255,255,.16); border:0; color:#fff; width:32px; height:32px; border-radius:50%; font-size:1rem; cursor:pointer; margin-left:6px; flex:0 0 auto}
+
+  /* ficha de cliente */
+  .ficha-campo{margin-bottom:10px}
+  .ficha-campo .rot{font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:var(--fraco)}
+  .ficha-campo .val{font-size:.95rem}
+  .foto-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px}
+  .foto-grid .foto{position:relative; aspect-ratio:1; border-radius:10px; overflow:hidden; background:var(--card)}
+  .foto-grid .foto img{width:100%; height:100%; object-fit:cover}
+  .foto-grid .foto .rm{position:absolute; top:4px; right:4px; background:rgba(0,0,0,.6); border:0; color:#fff; width:22px; height:22px; border-radius:50%; font-size:.7rem; cursor:pointer}
+  .foto-grid .foto .tipo-tag{position:absolute; bottom:4px; left:4px; background:rgba(0,0,0,.6); color:#fff; font-size:.62rem; padding:1px 6px; border-radius:999px}
+  .upload-label{display:flex; align-items:center; justify-content:center; gap:6px; aspect-ratio:1; border:1.5px dashed var(--linha); border-radius:10px; color:var(--fraco); font-size:.72rem; cursor:pointer}
+
+  /* dizimo */
+  .dizimo-card{background:var(--bg2); border-radius:12px; padding:10px 12px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center}
+  .dizimo-card .rot{font-size:.78rem; color:var(--texto2)}
+  .dizimo-card .val{font-size:1rem; font-weight:700; color:var(--marrom-claro)}
+
   #toast{
     position:fixed; left:50%; bottom:calc(76px + env(safe-area-inset-bottom)); transform:translateX(-50%) translateY(16px);
     background:#2c5e3f; color:#eafff3; padding:10px 18px; border-radius:999px; font-size:.85rem; font-weight:600;
@@ -234,6 +275,7 @@
     <div class="marca">
       <img src="./icon.svg" alt="">
       <div><h1>Atendimento</h1><div class="sub">Tapeçaria e Estofados Bahia · Luziânia-GO</div></div>
+      <button class="btn-header-icon" id="btnGuia" title="Guia da IA" style="margin-left:auto">📖</button>
       <button class="sair" id="btnSair">Sair</button>
     </div>
   </header>
@@ -253,6 +295,31 @@
     <button data-tab="financeiro"><span class="ic">💰</span>Financeiro</button>
     <button data-tab="estoque"><span class="ic">📦</span>Estoque</button>
   </nav>
+</div>
+
+<!-- MODAL: Guia da IA -->
+<div id="modalGuia" class="modal-overlay oculto">
+  <div class="modal-box">
+    <div class="modal-cab">
+      <h2>📖 Guia da IA</h2>
+      <button class="modal-fechar" id="btnFecharGuia">✕</button>
+    </div>
+    <p style="color:var(--fraco); font-size:.82rem; margin:0 0 14px">
+      É o que a IA lê antes de mexer no app: contexto da empresa e como agir. Edite à vontade.
+    </p>
+    <div id="guiaConteudo"></div>
+  </div>
+</div>
+
+<!-- MODAL: Ficha do cliente -->
+<div id="modalFicha" class="modal-overlay oculto">
+  <div class="modal-box">
+    <div class="modal-cab">
+      <h2 id="fichaNome">Cliente</h2>
+      <button class="modal-fechar" id="btnFecharFicha">✕</button>
+    </div>
+    <div id="fichaConteudo"></div>
+  </div>
 </div>
 
 <script>
@@ -422,6 +489,10 @@ function entrarNoApp(){
    NAVEGAÇÃO POR ABAS
    ========================================================================= */
 const PAINEIS = ['inicio','leads','agenda','financeiro','estoque'];
+function irPara(tab){
+  const btn = $$('nav.tabs button').find(b=>b.dataset.tab===tab);
+  if(btn) btn.click();
+}
 $$('nav.tabs button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     $$('nav.tabs button').forEach(b=>b.classList.remove('ativo'));
@@ -429,6 +500,102 @@ $$('nav.tabs button').forEach(btn=>{
     PAINEIS.forEach(p=> $('#painel'+p[0].toUpperCase()+p.slice(1)).classList.toggle('oculto', p!==btn.dataset.tab));
   });
 });
+
+/* =========================================================================
+   GUIA DA IA
+   ========================================================================= */
+const SECAO_LABEL = {empresa:'Sobre a empresa', como_agir:'Como a IA deve agir', regras:'Regras invioláveis'};
+$('#btnGuia').addEventListener('click', abrirGuia);
+$('#btnFecharGuia').addEventListener('click', ()=> $('#modalGuia').classList.add('oculto'));
+
+async function abrirGuia(){
+  const cont = $('#guiaConteudo'); cont.innerHTML = '<p class="vazio">Carregando…</p>';
+  $('#modalGuia').classList.remove('oculto');
+  const { data, error } = await sb.from('guia_ia').select('*').order('secao');
+  cont.innerHTML = '';
+  if(error){ cont.appendChild(el('div','vazio','Erro: '+error.message)); return; }
+  ['empresa','como_agir','regras'].forEach(sec=>{
+    const item = (data||[]).find(d=>d.secao===sec) || {secao:sec, titulo:SECAO_LABEL[sec], conteudo:''};
+    const bloco = el('div','guia-bloco');
+    bloco.appendChild(el('h3',null, SECAO_LABEL[sec]));
+    const ta = document.createElement('textarea');
+    ta.value = item.conteudo || '';
+    bloco.appendChild(ta);
+    const bSalvar = el('button','botao b-ok','Salvar');
+    bSalvar.style.marginTop='6px';
+    bSalvar.addEventListener('click', async ()=>{
+      const { error: err2 } = await sb.from('guia_ia').upsert({ secao: sec, titulo: SECAO_LABEL[sec], conteudo: ta.value, atualizado_em: new Date().toISOString() }, {onConflict:'secao'});
+      if(err2){ toast('Erro: '+err2.message); return; }
+      toast('✔ Guia atualizado');
+    });
+    bloco.appendChild(bSalvar);
+    cont.appendChild(bloco);
+  });
+}
+
+/* =========================================================================
+   FICHA DO CLIENTE (com histórico + fotos)
+   ========================================================================= */
+$('#btnFecharFicha').addEventListener('click', ()=> $('#modalFicha').classList.add('oculto'));
+
+async function abrirFicha(clienteId){
+  if(!clienteId) return;
+  $('#modalFicha').classList.remove('oculto');
+  const cont = $('#fichaConteudo'); cont.innerHTML = '<p class="vazio">Carregando…</p>';
+  const [{data:cli, error:e1}, {data:servicos, error:e2}, {data:fotos, error:e3}] = await Promise.all([
+    sb.from('clientes').select('*').eq('id', clienteId).single(),
+    sb.from('servicos').select('*').eq('cliente_id', clienteId).order('criado_em',{ascending:false}),
+    sb.from('fotos').select('*').eq('cliente_id', clienteId).order('criado_em',{ascending:false}),
+  ]);
+  cont.innerHTML = '';
+  if(e1){ cont.appendChild(el('div','vazio','Erro: '+e1.message)); return; }
+  $('#fichaNome').textContent = cli.nome || 'Cliente';
+
+  const campo=(rot,val)=>{ if(!val) return null; const d=el('div','ficha-campo'); d.appendChild(el('div','rot',rot)); d.appendChild(el('div','val',val)); return d; };
+  [campo('Telefone', cli.telefone), campo('Cidade', cli.cidade), campo('Endereço', cli.endereco), campo('Observações', cli.obs)]
+    .filter(Boolean).forEach(c=>cont.appendChild(c));
+
+  cont.appendChild(el('h3',null,'Histórico de serviços'));
+  if(e2 || !servicos.length){ cont.appendChild(el('div','vazio', e2? 'Erro: '+e2.message : 'Nenhum serviço registrado.')); }
+  else { const lst=el('div','lista'); servicos.forEach(s=>{
+    const it=el('div','item p-'+(s.prioridade||'media'));
+    it.appendChild(el('div','nome', s.titulo));
+    it.appendChild(el('div','servico', STATUS_LABEL[s.status]+(s.valor_orcamento?' · '+moedaBR(Number(s.valor_orcamento)):'')));
+    lst.appendChild(it);
+  }); cont.appendChild(lst); }
+
+  cont.appendChild(el('h3',null,'Fotos'));
+  const grid = el('div','foto-grid');
+  if(!e3) fotos.forEach(f=>{
+    const box = el('div','foto');
+    const img = document.createElement('img'); img.src = f.url; box.appendChild(img);
+    if(f.tipo) box.appendChild(el('div','tipo-tag', f.tipo));
+    const bRm = el('button','rm','✕');
+    bRm.addEventListener('click', async ()=>{
+      if(!confirm('Remover esta foto?')) return;
+      await sb.from('fotos').delete().eq('id', f.id);
+      abrirFicha(clienteId);
+    });
+    box.appendChild(bRm);
+    grid.appendChild(box);
+  });
+  const label = document.createElement('label'); label.className='upload-label'; label.textContent='+ Foto';
+  const input = document.createElement('input'); input.type='file'; input.accept='image/*'; input.capture='environment'; input.style.display='none';
+  input.addEventListener('change', async ()=>{
+    const file = input.files[0]; if(!file) return;
+    label.textContent = 'Enviando…';
+    const caminho = clienteId+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+    const { error: upErr } = await sb.storage.from('fotos-servicos').upload(caminho, file);
+    if(upErr){ toast('Erro no upload: '+upErr.message); label.textContent='+ Foto'; return; }
+    const { data: urlData } = await sb.storage.from('fotos-servicos').createSignedUrl(caminho, 60*60*24*365);
+    await sb.from('fotos').insert({ cliente_id: clienteId, url: urlData.signedUrl, tipo: 'outro' });
+    toast('✔ Foto adicionada');
+    abrirFicha(clienteId);
+  });
+  label.appendChild(input);
+  grid.appendChild(label);
+  cont.appendChild(grid);
+}
 
 /* =========================================================================
    SEÇÕES RECOLHÍVEIS (utilitário)
@@ -458,9 +625,48 @@ async function carregarTudo(){
   await Promise.all([renderInicio(), renderLeads(), renderAgenda(), renderFinanceiro(), renderEstoque()]);
 }
 
-/* ---------- INÍCIO: chat de entrada + resumo rápido ---------- */
+/* ---------- INÍCIO: urgente + chat de entrada + resumo ---------- */
 async function renderInicio(){
   const c = $('#painelInicio'); c.innerHTML='';
+
+  // precisa de atenção agora (prioridade)
+  const hojeStr = (()=>{ const h=new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })();
+  const [{data:leadsUrg}, {data:agUrg}, {data:finUrg}] = await Promise.all([
+    sb.from('servicos').select('id,titulo,prioridade,prazo,status,clientes(nome)').not('status','in','(pago,perdido)'),
+    sb.from('agenda').select('id,titulo,data,hora').eq('status','planejado').lte('data', hojeStr),
+    sb.from('financeiro').select('id,descricao,valor,status,data').in('status',['a_pagar','a_receber']).lte('data', hojeStr),
+  ]);
+  const urgentes = [];
+  (leadsUrg||[]).forEach(s=>{
+    const venceu = s.prazo && s.prazo <= hojeStr;
+    if(s.prioridade==='alta' || venceu){
+      urgentes.push({ ic: venceu?'⏰':'🔴', ordem: venceu?0:1,
+        txt: (s.clientes?.nome||'Cliente')+' — '+s.titulo,
+        sub: venceu ? 'Prazo: '+dataCurtaBR(s.prazo) : 'Prioridade alta', acao:()=>irPara('leads') });
+    }
+  });
+  (agUrg||[]).forEach(a=>{
+    urgentes.push({ ic:'📅', ordem: ehHoje(a.data)?0:0, txt:a.titulo, sub: ehHoje(a.data)?'Hoje '+(a.hora||''):'Atrasado: '+dataCurtaBR(a.data), acao:()=>irPara('agenda') });
+  });
+  (finUrg||[]).forEach(f=>{
+    urgentes.push({ ic:'💰', ordem:1, txt:(f.descricao||'Lançamento')+' — '+moedaBR(Number(f.valor)), sub: f.status==='a_pagar'?'A pagar':'A receber', acao:()=>irPara('financeiro') });
+  });
+  urgentes.sort((a,b)=>a.ordem-b.ordem);
+
+  if(urgentes.length){
+    const sUrg = secao('⚡ Precisa de atenção agora', urgentes.length);
+    const card = el('div','card');
+    urgentes.forEach(u=>{
+      const it = el('div','urgente-item');
+      it.style.cursor='pointer';
+      it.appendChild(el('div','ic',u.ic));
+      const txt = el('div','txt'); txt.appendChild(el('b',null,u.txt)); txt.appendChild(el('div','sub',u.sub));
+      it.appendChild(txt);
+      it.addEventListener('click', u.acao);
+      card.appendChild(it);
+    });
+    sUrg.appendChild(card); c.appendChild(sUrg);
+  }
 
   // chat de entrada
   const sChat = secao('Chat de entrada');
@@ -549,7 +755,9 @@ async function renderLeads(){
     const cli = s.clientes || {};
     const it = el('div','item p-'+(s.prioridade||'media'));
     const topo = el('div','topo');
-    topo.appendChild(el('div','nome', cli.nome || 'Sem cliente'));
+    const nomeEl = el('div','nome', cli.nome || 'Sem cliente');
+    if(s.cliente_id){ nomeEl.style.cursor='pointer'; nomeEl.style.textDecoration='underline dotted'; nomeEl.addEventListener('click', ()=>abrirFicha(s.cliente_id)); }
+    topo.appendChild(nomeEl);
     const sel = document.createElement('select'); sel.className='status';
     STATUS_ORDEM.forEach(st=>{ const o=document.createElement('option'); o.value=st; o.textContent=STATUS_LABEL[st]; if(st===s.status) o.selected=true; sel.appendChild(o); });
     sel.addEventListener('change', async ()=>{
@@ -669,17 +877,35 @@ async function renderFinanceiro(){
   else {
     const entradas = data.filter(f=>f.tipo==='entrada').reduce((a,f)=>a+Number(f.valor),0);
     const saidas = data.filter(f=>f.tipo==='saida').reduce((a,f)=>a+Number(f.valor),0);
+    const lucro = entradas - saidas;
     const grid = el('div','fin-grid');
     const cel=(rot,val,cls)=>{ const x=el('div','fin-cel'); x.appendChild(el('div','rot',rot)); x.appendChild(el('div','val'+(cls?' '+cls:''),moedaBR(val))); return x; };
     grid.appendChild(cel('Entradas', entradas, 'pos'));
     grid.appendChild(cel('Saídas', saidas, 'neg'));
-    grid.appendChild(cel('Saldo', entradas-saidas, entradas-saidas>=0?'pos':'neg'));
+    grid.appendChild(cel('Saldo', lucro, lucro>=0?'pos':'neg'));
     card.appendChild(grid);
 
+    const dizimo = el('div','dizimo-card');
+    dizimo.appendChild(el('div','rot','Dízimo (10% do saldo, se positivo)'));
+    dizimo.appendChild(el('div','val', moedaBR(lucro>0 ? lucro*0.1 : 0)));
+    card.appendChild(dizimo);
+
+    const pendentes = data.filter(f=>f.status && f.status!=='pago');
+    if(pendentes.length){
+      card.appendChild(el('h3',null,'A confirmar'));
+      pendentes.forEach(f=>{
+        const linha = el('div','fin-item');
+        linha.appendChild(el('div','d', (f.descricao||f.categoria||'')+' · '+(f.status==='a_pagar'?'a pagar':'a receber')));
+        linha.appendChild(el('div','v '+f.tipo, moedaBR(Number(f.valor))));
+        card.appendChild(linha);
+      });
+    }
+
+    card.appendChild(el('h3',null,'Lançamentos'));
     if(!data.length){ card.appendChild(el('div','vazio','Nenhum lançamento ainda.')); }
     else data.forEach(f=>{
       const linha = el('div','fin-item');
-      const d = el('div','d'); d.textContent = (f.descricao||f.categoria||'') + ' · ' + dataCurtaBR(f.data);
+      const d = el('div','d'); d.textContent = (f.descricao||'')+(f.categoria?' · '+f.categoria:'') + ' · ' + dataCurtaBR(f.data);
       const v = el('div','v '+f.tipo, (f.tipo==='saida'?'-':'+') + moedaBR(Number(f.valor)));
       linha.appendChild(d); linha.appendChild(v);
       const bRm = el('button',null,'🗑'); bRm.style.cssText='background:none;border:0;color:var(--fraco);cursor:pointer';
@@ -689,6 +915,7 @@ async function renderFinanceiro(){
     });
   }
 
+  const CATEGORIAS = ['Materiais','Ferramentas','Frete','Combustível','Pessoal','Serviço de terceiro','Venda/Serviço prestado','Outro'];
   const form = el('div','form');
   form.innerHTML = `
     <div class="linha2">
@@ -696,6 +923,10 @@ async function renderFinanceiro(){
       <input type="number" step="0.01" id="finValor" placeholder="Valor (R$)">
     </div>
     <input type="text" id="finDescricao" placeholder="Descrição">
+    <div class="linha2">
+      <select id="finCategoria">${CATEGORIAS.map(c=>`<option>${c}</option>`).join('')}</select>
+      <select id="finStatus"><option value="pago">Pago/recebido</option><option value="a_pagar">A pagar</option><option value="a_receber">A receber</option></select>
+    </div>
     <input type="date" id="finData">
   `;
   const bAdd = el('button','botao b-add','+ Adicionar lançamento');
@@ -705,10 +936,12 @@ async function renderFinanceiro(){
     const { error } = await sb.from('financeiro').insert({
       tipo: $('#finTipo').value, escopo: escopoFin, valor,
       descricao: $('#finDescricao').value.trim() || null,
+      categoria: $('#finCategoria').value,
+      status: $('#finStatus').value,
       data: $('#finData').value || new Date().toISOString().slice(0,10),
     });
     if(error){ toast('Erro: '+error.message); return; }
-    toast('✔ Lançado'); renderFinanceiro();
+    toast('✔ Lançado'); renderFinanceiro(); renderInicio();
   });
   form.appendChild(bAdd);
   card.appendChild(form);
