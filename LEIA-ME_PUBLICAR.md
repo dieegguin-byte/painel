@@ -1,58 +1,48 @@
-# Painel de Atendimento (PWA) — como funciona e como publicar
+# Painel de Atendimento (PWA) — v2, NO AR
 
-Site/PWA de **leitura** do WhatsApp da Tapeçaria e Estofados Bahia. Mostra no
-celular: resumo do dia, prazos/decisões, agenda, clientes que precisam de
-atenção e resumo financeiro. **Nunca envia nada** — só mostra.
+URL: **https://dieegguin-byte.github.io/painel/** (adicionar à tela inicial do celular).
 
-## Arquitetura (decidida com Diego em 03/07/2026 — opção B: GitHub Pages)
+## Arquitetura real (como está funcionando)
 
 ```
-Claude (PC, à noite)  ->  escreve dados_atendimento.json (Write local, sem permissão)
-                      ->  git add + commit + push   (ÚNICO comando aprovado 1 vez)
-GitHub Pages          ->  serve o painel E o dados_atendimento.json (mesmo site)
-PWA (celular)         ->  abre a URL, lê os dados (mesma origem, sem CORS), instala na tela
+Claude (PC, à noite) -> escreve dados_atendimento.json em ../app_dados_gist/ (Write local)
+                     -> git add/commit/push no GIST SECRETO (permissão salva no settings.json)
+GitHub Pages         -> serve o painel (repo público dieegguin-byte/painel, SEM dados de cliente)
+Gist secreto         -> serve os dados (id e837448593fcd4fcea82096b942d93d4, CORS liberado)
+Celular (PWA)        -> lê o Gist e mostra; Diego conclui/anota itens
+Meu Vivo (WhatsApp)  -> os botões ✔/✏️ mandam comandos "PAINEL ..." pro Meu Vivo (compartilhar);
+                        a varredura noturna (23h30) lê e dá baixa no sistema
 ```
 
-Por que GitHub Pages: 1 conta resolve hospedagem + dados; dados no mesmo site
-(sem CORS, sem proxy, sem fragilidade do OneDrive); o git já está instalado no
-PC. O OneDrive deixou de ser necessário para a leitura (o link de
-"Compartilhar" do OneDrive consumidor não entrega o arquivo cru para um
-programa — só abre a página de visualização; testado em 03/07).
+## O que a v2 faz (05/07/2026)
 
-## Arquivos
+- **✔ Concluir** qualquer item (cliente, alerta, agenda, financeiro pendente): some da
+  lista na hora (fica salvo no aparelho) e abre o compartilhar com o texto
+  `PAINEL ✔ Concluído: ...` para mandar ao "Meu Vivo" — a rotina noturna dá baixa.
+- **✏️ Anotar/corrigir**: manda `PAINEL ✏️ item: ...` pro Meu Vivo do mesmo jeito.
+- **Seção "Concluídos por você"** com Desfazer e reenvio (📤).
+- **Filtros** (Todos / Alta / Com prazo) quando há mais de 1 cliente.
+- **📞 Ligar** e **WhatsApp** direto do item.
+- **Financeiro borrado por padrão** (👁 Mostrar valores) — privacidade se alguém pegar o celular.
+- **Aviso de dados velhos**: banner se `atualizado_em` > 26h (rotina falhou/pausada); crítico > 50h.
+- Service worker v2: página network-first (atualiza sozinha), offline continua funcionando.
 
-- `index.html` — o painel (PWA completa, funciona offline, um arquivo só).
-- `manifest.webmanifest`, `sw.js`, `icon.svg`, `icon-maskable.svg` — PWA/instalação.
-- `dados_atendimento.json` — os dados que o painel mostra (escritos pela rotina).
-- `.nojekyll` — faz o GitHub Pages servir os arquivos como estão.
+## Limites conhecidos (honestos)
 
-## Passos para publicar (uma vez, com o Diego presente)
+- Conclusões ficam **no aparelho** (localStorage) até a rotina noturna processar o
+  comando no Meu Vivo. Trocou de celular/limpou o navegador = marcas locais somem
+  (o sistema real continua certo, pois a baixa oficial é via rotina).
+- O HTML público contém a URL do Gist: quem tiver o link do painel consegue ler os
+  dados (Diego aceitou esse trade-off em 03/07). Upgrade possível: criptografar o
+  JSON com PIN (WebCrypto) — fase futura.
+- Edição em tempo real (mexer no dado e todo mundo ver na hora) exigiria backend
+  (ex.: Supabase grátis) — é a ideia de v3, se o Diego quiser.
 
-[D] = só o Diego faz (conta/login). O resto o Claude conduz/executa.
+## Regras operacionais
 
-1. **[D] Criar conta grátis no GitHub** (github.com) — e-mail + senha + verificar
-   e-mail. (Se já tiver conta, é só usar.)
-2. Claude transforma a pasta `app_atendimento` em repositório git e cria o
-   repositório no GitHub.
-3. **[D] Primeiro `git push`**: o Git abre uma janelinha do navegador pra você
-   entrar no GitHub uma vez (Git Credential Manager). Depois disso fica salvo e
-   os próximos pushes (inclusive os da rotina noturna) acontecem sozinhos.
-4. Claude liga o **GitHub Pages** no repositório (Settings > Pages) — gera a URL
-   pública `https://SEU-USUARIO.github.io/REPO/`.
-5. **[D] No celular**: abrir a URL -> menu do navegador -> "Adicionar à tela inicial".
-6. Testar: o painel abre, mostra os dados, o "Atualizar" funciona.
-
-## O "1 comando aprovado" (item 4)
-
-A rotina noturna, além de atualizar o `PENDENCIAS.md`, passa a:
-1. escrever `dados_atendimento.json` na pasta do repositório (Write local);
-2. rodar `git -C <pasta> add/commit/push` para publicar.
-
-Esse `git push` é aprovado **uma vez** (fica salvo em `~/.claude/settings.json`)
-e nunca mais pede confirmação — não depende do Diego estar presente de noite.
-
-## Regras/observações
-
-- A rotina só ADICIONA/atualiza o arquivo de dados; nunca mexe no resto do repo.
-- Se o painel um dia parar de atualizar, checar: (a) o PC estava ligado/online de
-  noite; (b) `git push` funcionou (credencial do GitHub ainda válida).
+- A rotina SEMPRE SOBRESCREVE `../app_dados_gist/dados_atendimento.json` (nunca
+  apagar+recriar) e dá `git push origin HEAD` — permissões `Bash(git push:*)`,
+  `git add`, `git commit` já salvas em `~/.claude/settings.json` (testadas 05/07).
+- O repo público só recebe código do painel — NUNCA dados de cliente.
+- Se o painel parar de atualizar: checar se o PC ficou ligado/online, se a rotina
+  varredura (23h30) está ativa, e se o `git push` do gist funcionou.
