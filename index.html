@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#7a3b1f">
-<meta name="tb-versao" content="2.0">
+<meta name="tb-versao" content="2.1">
 <title>Atendimento — Tapeçaria Bahia</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -73,10 +73,24 @@
     font-size:.78rem; text-transform:uppercase; letter-spacing:.8px;
     color:var(--marrom-claro); font-weight:700; margin:0 2px 10px;
   }
+  .titulo-sec{cursor:pointer; user-select:none}
+  .titulo-sec .tit-txt{flex:1}
   .titulo-sec .cont{
-    margin-left:auto; background:var(--card2); color:var(--texto2);
+    background:var(--card2); color:var(--texto2);
     font-size:.72rem; padding:1px 9px; border-radius:999px; letter-spacing:0;
   }
+  .titulo-sec .chev{color:var(--fraco); font-size:1rem; transition:transform .2s; line-height:1}
+  section.recolhida .titulo-sec .chev{transform:rotate(-90deg)}
+  section.recolhida > :not(.titulo-sec){display:none}
+  .b-copy{background:#3a2f12; color:#f0cf9a; border:1px solid #5a4a1e}
+  #toast{
+    position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom));
+    transform:translateX(-50%) translateY(16px);
+    background:#2c5e3f; color:#eafff3; padding:10px 18px; border-radius:999px;
+    font-size:.85rem; font-weight:600; opacity:0; pointer-events:none;
+    transition:.25s; z-index:100; box-shadow:var(--sombra);
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
   .card{
     background:var(--card); border:1px solid var(--linha);
     border-radius:var(--raio); padding:14px 15px; box-shadow:var(--sombra);
@@ -244,6 +258,20 @@ async function compartilhar(texto){
   catch(e){ prompt('Copie e cole no Meu Vivo:', texto); }
 }
 
+function toast(msg){
+  let t=document.getElementById('toast');
+  if(!t){ t=document.createElement('div'); t.id='toast'; document.body.appendChild(t); }
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'), 1900);
+}
+async function copiarTexto(txt){
+  try{ await navigator.clipboard.writeText(txt); toast('📋 Sugestão copiada'); }
+  catch(e){
+    try{ if(navigator.share){ await navigator.share({text:txt}); return; } }catch(e2){ if(e2&&e2.name==='AbortError') return; }
+    prompt('Copie o texto:', txt);
+  }
+}
+
 function moedaBR(n){
   if(typeof n!=='number' || isNaN(n)) return '—';
   return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -278,10 +306,21 @@ function telParaLigar(tel){
   return num.length>=10 ? 'tel:+'+num : null;
 }
 
+function lerColapsadas(){ try{ return JSON.parse(localStorage.getItem('tb_colapsadas'))||{} }catch(e){ return {} } }
+function salvarColapsadas(d){ try{ localStorage.setItem('tb_colapsadas', JSON.stringify(d)) }catch(e){} }
 function secao(titulo, count){
   const s=el('section');
-  const t=el('div','titulo-sec'); t.appendChild(document.createTextNode(titulo));
+  const t=el('div','titulo-sec');
+  t.appendChild(el('span','tit-txt',titulo));
   if(count!=null){ const c=el('span','cont',String(count)); t.appendChild(c); }
+  t.appendChild(el('span','chev','⌄'));
+  if(lerColapsadas()[titulo]) s.classList.add('recolhida');
+  t.addEventListener('click',()=>{
+    s.classList.toggle('recolhida');
+    const d=lerColapsadas();
+    if(s.classList.contains('recolhida')) d[titulo]=true; else delete d[titulo];
+    salvarColapsadas(d);
+  });
   s.appendChild(t);
   return s;
 }
@@ -333,7 +372,7 @@ function render(d){
       const rod=el('div','rodape');
       if(a.prazo) rod.appendChild(el('span','prazo'+(ehHoje(a.prazo)?' hoje':''),'Prazo: '+dataCurtaBR(a.prazo)));
       rod.appendChild(botao('b-ok','✔ Concluir',()=>marcar(k, a.titulo||'alerta')));
-      rod.appendChild(botao('b-nota','✏️ Anotar',()=>compartilhar('PAINEL ✏️ '+(a.titulo||'')+': ')));
+      if(a.detalhe) rod.appendChild(botao('b-copy','📋 Copiar',()=>copiarTexto(a.detalhe)));
       box.appendChild(rod);
       lista.appendChild(box);
     });
@@ -409,9 +448,11 @@ function render(d){
         const rod=el('div','rodape');
         if(l.prazo) rod.appendChild(el('span','prazo'+(ehHoje(l.prazo)?' hoje':''),(ehHoje(l.prazo)?'Hoje':'Prazo '+dataCurtaBR(l.prazo))));
         rod.appendChild(botao('b-ok','✔',()=>marcar(k,rotulo)));
-        const wa=telParaWa(l.telefone); if(wa) rod.appendChild(linkBotao('b-wa','WhatsApp',wa));
+        const sugestao = l.sugestao_resposta || l.proxima_acao || '';
+        if(sugestao) rod.appendChild(botao('b-copy','📋 Copiar sugestão',()=>copiarTexto(sugestao)));
+        const wa=telParaWa(l.telefone);
+        if(wa){ const href = sugestao ? wa+'?text='+encodeURIComponent(sugestao) : wa; rod.appendChild(linkBotao('b-wa','WhatsApp',href)); }
         const tel=telParaLigar(l.telefone); if(tel){ const a=linkBotao('b-tel','📞 Ligar',tel); a.removeAttribute('target'); rod.appendChild(a); }
-        rod.appendChild(botao('b-nota','✏️',()=>compartilhar('PAINEL ✏️ '+rotulo+': ')));
         it.appendChild(rod);
         lista.appendChild(it);
       });

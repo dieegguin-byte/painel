@@ -4,7 +4,7 @@
    - Dados (dados_atendimento.json): network-first, cai pro cache se offline,
      para o painel sempre tentar o mais novo mas nunca ficar em branco.
 */
-const VERSAO = 'tb-atendimento-v2';
+const VERSAO = 'tb-atendimento-v2-1';
 const SHELL = [
   './',
   './index.html',
