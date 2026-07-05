@@ -1,10 +1,10 @@
-/* Service worker do Painel de Atendimento - Tapeçaria Bahia
-   Estratégia:
-   - Shell do app (HTML/CSS/JS/ícones): cache-first (funciona offline).
-   - Dados (dados_atendimento.json): network-first, cai pro cache se offline,
-     para o painel sempre tentar o mais novo mas nunca ficar em branco.
+/* Service worker do Painel de Atendimento - Tapeçaria Bahia (v3)
+   Estrategia: shell (HTML/CSS/JS/icones) em network-first, cai pro cache se
+   offline - garante que o app sempre tenta a versao mais nova primeiro.
+   Os dados (Supabase) NAO passam pelo service worker - sao chamadas fetch
+   feitas pelo proprio JS da pagina direto pra API do Supabase.
 */
-const VERSAO = 'tb-atendimento-v2-1';
+const VERSAO = 'tb-atendimento-v3';
 const SHELL = [
   './',
   './index.html',
@@ -29,21 +29,13 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // network-first também para navegação (index.html): o app pega versão nova
-  // no primeiro carregamento com internet, e cai pro cache se estiver offline.
-  const ehDados = url.pathname.endsWith('dados_atendimento.json') || req.mode === 'navigate';
+  if (url.origin !== location.origin) return; // deixa passar direto (Supabase, CDN do supabase-js)
 
-  if (ehDados) {
-    // network-first para os dados
-    e.respondWith(
-      fetch(req).then((resp) => {
-        const copia = resp.clone();
-        caches.open(VERSAO).then((c) => c.put(req, copia));
-        return resp;
-      }).catch(() => caches.match(req))
-    );
-  } else {
-    // cache-first para o shell
-    e.respondWith(caches.match(req).then((hit) => hit || fetch(req)));
-  }
+  e.respondWith(
+    fetch(req).then((resp) => {
+      const copia = resp.clone();
+      caches.open(VERSAO).then((c) => c.put(req, copia));
+      return resp;
+    }).catch(() => caches.match(req))
+  );
 });
