@@ -1,7 +1,7 @@
 {
   "name": "Atendimento — Tapeçaria Bahia",
   "short_name": "Atendimento TB",
-  "description": "Painel de leitura do WhatsApp: leads, pendências e agenda da Tapeçaria e Estofados Bahia.",
+  "description": "Hub de atendimento da Tapeçaria e Estofados Bahia: leads, agenda, financeiro e estoque.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
