@@ -4,7 +4,7 @@
    - Dados (dados_atendimento.json): network-first, cai pro cache se offline,
      para o painel sempre tentar o mais novo mas nunca ficar em branco.
 */
-const VERSAO = 'tb-atendimento-v1';
+const VERSAO = 'tb-atendimento-v2';
 const SHELL = [
   './',
   './index.html',
@@ -29,7 +29,9 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  const ehDados = url.pathname.endsWith('dados_atendimento.json');
+  // network-first também para navegação (index.html): o app pega versão nova
+  // no primeiro carregamento com internet, e cai pro cache se estiver offline.
+  const ehDados = url.pathname.endsWith('dados_atendimento.json') || req.mode === 'navigate';
 
   if (ehDados) {
     // network-first para os dados
