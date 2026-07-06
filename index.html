@@ -74,6 +74,7 @@
   .marca img{width:34px; height:34px; border-radius:9px; flex:0 0 auto}
   .marca h1{font-size:1rem; margin:0; font-weight:700}
   .marca .sub{font-size:.7rem; color:#f4dcc9; opacity:.85}
+  .marca .sessao{font-size:.68rem; color:#f7e9dd; opacity:.9; margin-top:2px}
   .marca .sair{margin-left:auto; background:rgba(255,255,255,.16); border:0; color:#fff; font-size:.72rem; padding:6px 11px; border-radius:999px; cursor:pointer}
 
   main{flex:1; padding:14px 14px 90px; overflow-y:auto}
@@ -118,10 +119,12 @@
   .item .meta{display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:8px; font-size:.8rem; color:var(--fraco)}
   .item .meta b{color:var(--texto2); font-weight:600}
   .item .acao{margin-top:10px; font-size:.9rem; color:var(--texto); background:var(--bg2); border-radius:10px; padding:9px 11px}
+  .item .alerta{margin-top:10px; font-size:.8rem; color:#ffd6c8; background:rgba(224,87,79,.12); border:1px solid rgba(224,87,79,.28); border-radius:10px; padding:8px 10px}
   .item .acao .lbl{display:block; font-size:.68rem; text-transform:uppercase; letter-spacing:.5px; color:var(--marrom-claro); margin-bottom:2px}
   .item .rodape{display:flex; align-items:center; gap:8px; margin-top:11px; flex-wrap:wrap}
   .prazo{font-size:.78rem; color:var(--media); font-weight:600; margin-right:auto}
   .prazo.hoje{color:var(--alta)}
+  .prazo.atrasado{color:var(--alta)}
   .botao{-webkit-appearance:none; border:0; cursor:pointer; display:inline-flex; align-items:center; gap:6px; text-decoration:none; font-size:.8rem; font-weight:600; padding:7px 13px; border-radius:999px}
   .botao:active{transform:scale(.96)}
   .b-ok{background:#2c5e3f; color:#dff2e5}
@@ -152,6 +155,51 @@
   .fin-item:last-child{border-bottom:0}
   .fin-item .d{color:var(--texto2)} .fin-item .v{font-weight:700; font-variant-numeric:tabular-nums}
   .fin-item .v.entrada{color:var(--ok)} .fin-item .v.saida{color:var(--alta)}
+
+  /* resumos operacionais */
+  .resumo-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .resumo-card{
+    background:var(--card); border:1px solid var(--linha); border-radius:14px; padding:12px 13px;
+    box-shadow:var(--sombra);
+  }
+  .resumo-card .rot{font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; color:var(--fraco)}
+  .resumo-card .num{font-size:1.35rem; font-weight:800; margin-top:3px}
+  .resumo-card .sub{font-size:.8rem; color:var(--texto2); margin-top:4px}
+  .resumo-card.alerta .num{color:var(--alta)}
+  .resumo-card.ok .num{color:var(--ok)}
+  .resumo-card.warn .num{color:var(--media)}
+  .resumo-card.neutro .num{color:var(--marrom-claro)}
+
+  .bloco-destaque{
+    background:linear-gradient(180deg, rgba(180,99,47,.18), rgba(43,34,28,.9));
+    border:1px solid rgba(224,138,79,.32);
+    border-radius:var(--raio);
+    padding:14px 15px;
+    box-shadow:var(--sombra);
+    margin-bottom:16px;
+  }
+  .bloco-destaque .rot{font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; color:var(--creme)}
+  .bloco-destaque .tit{font-size:1rem; font-weight:800; margin-top:4px}
+  .bloco-destaque .txt{font-size:.88rem; color:var(--texto2); margin-top:6px}
+  .bloco-destaque .acoes{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
+
+  .lead-stack{display:flex; flex-direction:column; gap:8px; margin-top:12px}
+  .lead-mini{
+    background:var(--bg2); border:1px solid var(--linha); border-radius:12px; padding:10px 11px;
+    display:flex; align-items:flex-start; gap:10px;
+  }
+  .lead-mini .ordem{
+    width:24px; height:24px; border-radius:50%; background:var(--card2); color:var(--marrom-claro);
+    display:flex; align-items:center; justify-content:center; font-size:.76rem; font-weight:800; flex:0 0 auto;
+  }
+  .lead-mini .txt{flex:1}
+  .lead-mini .txt b{display:block; font-size:.88rem}
+  .lead-mini .txt .sub{font-size:.78rem; color:var(--fraco); margin-top:3px}
+
+  .meta .tag{
+    display:inline-flex; align-items:center; gap:4px; padding:3px 8px;
+    border:1px solid var(--linha); border-radius:999px; background:var(--card2);
+  }
 
   /* estoque */
   .estoque-item{display:flex; align-items:center; gap:10px; padding:9px 2px; border-bottom:1px solid var(--linha); font-size:.88rem}
@@ -274,7 +322,11 @@
   <header>
     <div class="marca">
       <img src="./icon.svg" alt="">
-      <div><h1>Atendimento</h1><div class="sub">Tapeçaria e Estofados Bahia · Luziânia-GO</div></div>
+      <div>
+        <h1>Atendimento</h1>
+        <div class="sub">Tapeçaria e Estofados Bahia · Luziânia-GO</div>
+        <div class="sessao oculto" id="sessaoInfo"></div>
+      </div>
       <button class="btn-header-icon" id="btnGuia" title="Guia da IA" style="margin-left:auto">📖</button>
       <button class="sair" id="btnSair">Sair</button>
     </div>
@@ -336,10 +388,22 @@ const el = (tag, cls, txt) => { const e=document.createElement(tag); if(cls)e.cl
 const esc = (s) => (s==null?'':String(s));
 const mostrar = (id) => $('#'+id).classList.remove('oculto');
 const esconder = (id) => $('#'+id).classList.add('oculto');
+const hojeISO = () => {
+  const h = new Date();
+  return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
+};
 
 function moedaBR(n){ if(typeof n!=='number'||isNaN(n)) return 'R$ 0,00'; return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
 function dataCurtaBR(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); if(isNaN(d)) return esc(iso); return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}); }
 function ehHoje(iso){ if(!iso) return false; const h=new Date(); const s=`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; return iso===s; }
+function ehAtrasado(iso){ return !!iso && iso < hojeISO(); }
+function prioridadePeso(prio){ return ({alta:0, media:1, baixa:2}[prio] ?? 1); }
+function textoPrazo(iso){
+  if(!iso) return 'Sem prazo';
+  if(ehAtrasado(iso)) return 'Atrasado ' + dataCurtaBR(iso);
+  if(ehHoje(iso)) return 'Hoje';
+  return 'Prazo ' + dataCurtaBR(iso);
+}
 function telParaWa(tel){ const num=String(tel||'').replace(/\D/g,''); return num.length>=10 ? 'https://wa.me/'+num : null; }
 function telParaLigar(tel){ const num=String(tel||'').replace(/\D/g,''); return num.length>=10 ? 'tel:+'+num : null; }
 async function sha256(txt){ const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt)); return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''); }
@@ -355,6 +419,40 @@ async function copiarTexto(txt){
 const STATUS_LABEL = {lead:'Novo lead', orcamento:'Orçamento', agendado:'Agendado', producao:'Em produção', entregue:'Entregue', pago:'Pago', perdido:'Perdido'};
 const STATUS_ORDEM = ['lead','orcamento','agendado','producao','entregue','pago','perdido'];
 
+function lerErroAuthDaUrl(){
+  const hash = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
+  const params = new URLSearchParams(hash);
+  const code = params.get('error_code');
+  const desc = params.get('error_description');
+  if(!code && !desc) return null;
+  if(code === 'otp_expired') return 'Esse link expirou. Peça um novo e abra assim que chegar.';
+  if(desc) return desc.replace(/\+/g, ' ');
+  return 'Não foi possível concluir sua entrada. Tente pedir um novo link.';
+}
+
+function limparHashAuth(){
+  if(!location.hash) return;
+  const hash = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
+  const params = new URLSearchParams(hash);
+  const sinaisAuth = ['access_token','refresh_token','expires_at','token_type','type','error','error_code','error_description','sb'];
+  const temSinal = sinaisAuth.some(chave => params.has(chave));
+  if(!temSinal) return;
+  history.replaceState(null, '', location.pathname + location.search);
+}
+
+function atualizarInfoSessao(session){
+  const alvo = $('#sessaoInfo');
+  if(!alvo) return;
+  const email = session?.user?.email;
+  if(!email){
+    alvo.textContent = '';
+    alvo.classList.add('oculto');
+    return;
+  }
+  alvo.textContent = `Sessão pronta para operar · ${email}`;
+  alvo.classList.remove('oculto');
+}
+
 /* =========================================================================
    AUTENTICAÇÃO
    ========================================================================= */
@@ -362,8 +460,12 @@ async function iniciar(){
   const { data: { session } } = await sb.auth.getSession();
   if(!session){
     esconder('telaCarregando'); mostrar('telaLogin');
+    const erroAuth = lerErroAuthDaUrl();
+    if(erroAuth) $('#erroLogin').textContent = erroAuth;
     return;
   }
+  atualizarInfoSessao(session);
+  limparHashAuth();
   await verificarPin();
 }
 
@@ -381,6 +483,8 @@ $('#btnEnviarLink').addEventListener('click', async ()=>{
 
 sb.auth.onAuthStateChange((event, session) => {
   if(event === 'SIGNED_IN' && session){
+    atualizarInfoSessao(session);
+    limparHashAuth();
     esconder('telaLogin');
     verificarPin();
   }
@@ -481,6 +585,7 @@ async function validarPin(){
 
 function entrarNoApp(){
   esconder('telaDefinirPin'); esconder('telaPin'); esconder('telaLogin'); esconder('telaCarregando');
+  limparHashAuth();
   $('#app').classList.remove('oculto');
   carregarTudo();
 }
@@ -629,26 +734,86 @@ async function carregarTudo(){
 async function renderInicio(){
   const c = $('#painelInicio'); c.innerHTML='';
 
-  // precisa de atenção agora (prioridade)
-  const hojeStr = (()=>{ const h=new Date(); return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; })();
-  const [{data:leadsUrg}, {data:agUrg}, {data:finUrg}] = await Promise.all([
-    sb.from('servicos').select('id,titulo,prioridade,prazo,status,clientes(nome)').not('status','in','(pago,perdido)'),
+  const hojeStr = hojeISO();
+  const [{data:leadsUrg}, {data:agUrg}, {data:finUrg}, {data:caixaPend}] = await Promise.all([
+    sb.from('servicos').select('id,titulo,prioridade,prazo,status,proxima_acao,clientes(nome)').not('status','in','(pago,perdido)'),
     sb.from('agenda').select('id,titulo,data,hora').eq('status','planejado').lte('data', hojeStr),
     sb.from('financeiro').select('id,descricao,valor,status,data').in('status',['a_pagar','a_receber']).lte('data', hojeStr),
+    sb.from('caixa_entrada').select('id', { count:'exact' }).eq('processado', false),
   ]);
+  const leadsAbertos = leadsUrg || [];
+  const agendaPendente = agUrg || [];
+  const financeiroPendente = finUrg || [];
+  const qtdSemProximaAcao = leadsAbertos.filter(s=>!s.proxima_acao).length;
+  const qtdAtrasados = leadsAbertos.filter(s=>ehAtrasado(s.prazo)).length;
+  const qtdAltos = leadsAbertos.filter(s=>s.prioridade==='alta').length;
+  const qtdAgendaHojeOuAtrasada = agendaPendente.length;
+  const qtdCaixaEntrada = caixaPend?.length || 0;
+
+  const resumoGrid = el('div','resumo-grid');
+  const mkResumo = (rot, num, sub, cls='neutro') => {
+    const box = el('div','resumo-card '+cls);
+    box.appendChild(el('div','rot', rot));
+    box.appendChild(el('div','num', String(num)));
+    box.appendChild(el('div','sub', sub));
+    return box;
+  };
+  resumoGrid.appendChild(mkResumo('Leads ativos', leadsAbertos.length, qtdAltos ? `${qtdAltos} em alta prioridade` : 'Sem urgência alta agora', qtdAltos ? 'alerta' : 'ok'));
+  resumoGrid.appendChild(mkResumo('Sem próxima ação', qtdSemProximaAcao, qtdSemProximaAcao ? 'Vale decidir o próximo passo' : 'Tudo com direção definida', qtdSemProximaAcao ? 'warn' : 'ok'));
+  resumoGrid.appendChild(mkResumo('Agenda pendente', qtdAgendaHojeOuAtrasada, qtdAgendaHojeOuAtrasada ? 'Hoje ou atrasada' : 'Dia organizado', qtdAgendaHojeOuAtrasada ? 'warn' : 'ok'));
+  resumoGrid.appendChild(mkResumo('Chat de entrada', qtdCaixaEntrada, qtdCaixaEntrada ? 'Anotações aguardando triagem' : 'Nada pendente', qtdCaixaEntrada ? 'neutro' : 'ok'));
+  c.appendChild(resumoGrid);
+
+  const filaOperacional = [...leadsAbertos]
+    .sort((a,b)=>{
+      const pesoA = (ehAtrasado(a.prazo)?0:1)*10 + prioridadePeso(a.prioridade);
+      const pesoB = (ehAtrasado(b.prazo)?0:1)*10 + prioridadePeso(b.prioridade);
+      return pesoA - pesoB;
+    })
+    .slice(0,3);
+  if(filaOperacional.length){
+    const destaque = el('div','bloco-destaque');
+    destaque.appendChild(el('div','rot','Foco do momento'));
+    const principal = filaOperacional[0];
+    destaque.appendChild(el('div','tit',(principal.clientes?.nome || 'Cliente') + ' — ' + (principal.titulo || 'Serviço')));
+    destaque.appendChild(el('div','txt', principal.proxima_acao || 'Esse item ainda não tem próxima ação definida.'));
+    const acoes = el('div','acoes');
+    const bAbrirLeads = el('button','botao b-ok','Abrir leads');
+    bAbrirLeads.addEventListener('click', ()=>irPara('leads'));
+    acoes.appendChild(bAbrirLeads);
+    if(qtdSemProximaAcao){
+      const bSemAcao = el('button','botao b-rm','Ver sem próxima ação');
+      bSemAcao.addEventListener('click', ()=>{ filtroStatus='todos'; renderLeads(); irPara('leads'); });
+      acoes.appendChild(bSemAcao);
+    }
+    destaque.appendChild(acoes);
+    const stack = el('div','lead-stack');
+    filaOperacional.forEach((item, idx)=>{
+      const mini = el('div','lead-mini');
+      mini.appendChild(el('div','ordem', String(idx+1)));
+      const txt = el('div','txt');
+      txt.appendChild(el('b',null,(item.clientes?.nome || 'Cliente') + ' — ' + (item.titulo || 'Serviço')));
+      txt.appendChild(el('div','sub', (item.proxima_acao || 'Sem próxima ação definida') + ' · ' + textoPrazo(item.prazo)));
+      mini.appendChild(txt);
+      stack.appendChild(mini);
+    });
+    destaque.appendChild(stack);
+    c.appendChild(destaque);
+  }
+
   const urgentes = [];
-  (leadsUrg||[]).forEach(s=>{
+  leadsAbertos.forEach(s=>{
     const venceu = s.prazo && s.prazo <= hojeStr;
     if(s.prioridade==='alta' || venceu){
       urgentes.push({ ic: venceu?'⏰':'🔴', ordem: venceu?0:1,
         txt: (s.clientes?.nome||'Cliente')+' — '+s.titulo,
-        sub: venceu ? 'Prazo: '+dataCurtaBR(s.prazo) : 'Prioridade alta', acao:()=>irPara('leads') });
+        sub: (venceu ? 'Prazo: '+dataCurtaBR(s.prazo) : 'Prioridade alta') + (s.proxima_acao ? ' · ' + s.proxima_acao : ''), acao:()=>irPara('leads') });
     }
   });
-  (agUrg||[]).forEach(a=>{
+  agendaPendente.forEach(a=>{
     urgentes.push({ ic:'📅', ordem: ehHoje(a.data)?0:0, txt:a.titulo, sub: ehHoje(a.data)?'Hoje '+(a.hora||''):'Atrasado: '+dataCurtaBR(a.data), acao:()=>irPara('agenda') });
   });
-  (finUrg||[]).forEach(f=>{
+  financeiroPendente.forEach(f=>{
     urgentes.push({ ic:'💰', ordem:1, txt:(f.descricao||'Lançamento')+' — '+moedaBR(Number(f.valor)), sub: f.status==='a_pagar'?'A pagar':'A receber', acao:()=>irPara('financeiro') });
   });
   urgentes.sort((a,b)=>a.ordem-b.ordem);
@@ -716,11 +881,13 @@ async function renderInicio(){
   carregarCaixaEntrada();
 
   // resumo rápido: leads em aberto + agenda de hoje
-  const { data: servicos } = await sb.from('servicos').select('id,status,prazo').not('status','in','(pago,perdido)');
+  const { data: servicos } = await sb.from('servicos').select('id,status,prazo,proxima_acao').not('status','in','(pago,perdido)');
   const { data: agendaHoje } = await sb.from('agenda').select('id').eq('status','planejado');
   const sResumo = secao('Resumo rápido');
   const card = el('div','card');
-  card.innerHTML = `<p style="margin:0 0 8px">Você tem <b>${servicos?servicos.length:0}</b> serviço(s) em aberto e <b>${agendaHoje?agendaHoje.length:0}</b> compromisso(s) planejado(s).</p>`;
+  const pendSemAcao = (servicos||[]).filter(s=>!s.proxima_acao).length;
+  card.innerHTML = `<p style="margin:0 0 8px">Você tem <b>${servicos?servicos.length:0}</b> serviço(s) em aberto e <b>${agendaHoje?agendaHoje.length:0}</b> compromisso(s) planejado(s).</p>
+  <p style="margin:0; color:var(--texto2)">${pendSemAcao ? `<b>${pendSemAcao}</b> lead(s) ainda sem próxima ação.` : 'Todos os leads abertos já têm próximo passo definido.'}</p>`;
   sResumo.appendChild(card);
   c.appendChild(sResumo);
 }
@@ -747,8 +914,28 @@ async function renderLeads(){
   if(error){ c.appendChild(el('div','erro','Erro: '+error.message)); return; }
   if(!data.length){ const card=el('div','card'); card.appendChild(el('div','vazio','Nada aqui. 👏')); c.appendChild(card); return; }
 
-  const ordemPrio = {alta:0, media:1, baixa:2};
-  data.sort((a,b)=>(ordemPrio[a.prioridade]??1)-(ordemPrio[b.prioridade]??1));
+  const semAcao = data.filter(s=>!s.proxima_acao).length;
+  const atrasados = data.filter(s=>ehAtrasado(s.prazo)).length;
+  const alta = data.filter(s=>s.prioridade==='alta').length;
+  const resumo = el('div','resumo-grid');
+  const mkResumo = (rot, num, sub, cls='neutro') => {
+    const box = el('div','resumo-card '+cls);
+    box.appendChild(el('div','rot', rot));
+    box.appendChild(el('div','num', String(num)));
+    box.appendChild(el('div','sub', sub));
+    return box;
+  };
+  resumo.appendChild(mkResumo('Neste filtro', data.length, 'Itens visíveis agora', 'neutro'));
+  resumo.appendChild(mkResumo('Sem próxima ação', semAcao, semAcao ? 'Vale decidir o próximo passo' : 'Tudo com direção', semAcao ? 'warn' : 'ok'));
+  resumo.appendChild(mkResumo('Atrasados', atrasados, atrasados ? 'Pedem ação primeiro' : 'Nenhum vencido', atrasados ? 'alerta' : 'ok'));
+  resumo.appendChild(mkResumo('Alta prioridade', alta, alta ? 'Pedidos mais sensíveis' : 'Sem urgência alta', alta ? 'alerta' : 'ok'));
+  c.appendChild(resumo);
+
+  data.sort((a,b)=>{
+    const pesoA = (ehAtrasado(a.prazo)?0:1)*100 + prioridadePeso(a.prioridade)*10 + (a.proxima_acao?0:-5);
+    const pesoB = (ehAtrasado(b.prazo)?0:1)*100 + prioridadePeso(b.prioridade)*10 + (b.proxima_acao?0:-5);
+    return pesoA - pesoB;
+  });
 
   const lista = el('div','lista');
   data.forEach(s=>{
@@ -769,16 +956,23 @@ async function renderLeads(){
     it.appendChild(topo);
     if(s.titulo) it.appendChild(el('div','servico', s.titulo));
     const meta = el('div','meta');
-    if(cli.cidade){ const m=el('span'); m.innerHTML='<b>Cidade:</b> '+esc(cli.cidade); meta.appendChild(m); }
-    if(cli.telefone){ const m=el('span'); m.innerHTML='<b>Tel:</b> '+esc(cli.telefone); meta.appendChild(m); }
-    if(s.valor_orcamento){ const m=el('span'); m.innerHTML='<b>Valor:</b> '+moedaBR(Number(s.valor_orcamento)); meta.appendChild(m); }
+    if(cli.cidade){ const m=el('span','tag'); m.innerHTML='<b>Cidade:</b> '+esc(cli.cidade); meta.appendChild(m); }
+    if(cli.telefone){ const m=el('span','tag'); m.innerHTML='<b>Tel:</b> '+esc(cli.telefone); meta.appendChild(m); }
+    if(s.valor_orcamento){ const m=el('span','tag'); m.innerHTML='<b>Valor:</b> '+moedaBR(Number(s.valor_orcamento)); meta.appendChild(m); }
+    const mStatus = el('span','tag'); mStatus.innerHTML = '<b>Status:</b> ' + esc(STATUS_LABEL[s.status] || s.status || 'Sem status'); meta.appendChild(mStatus);
     if(meta.childNodes.length) it.appendChild(meta);
     if(s.proxima_acao){
       const ac = el('div','acao'); ac.appendChild(el('span','lbl','Próxima ação'));
       ac.appendChild(document.createTextNode(s.proxima_acao)); it.appendChild(ac);
+    } else {
+      it.appendChild(el('div','alerta','Falta definir a próxima ação. Esse lead fica mais difícil para você e para a IA conduzirem.'));
     }
     const rod = el('div','rodape');
-    if(s.prazo) rod.appendChild(el('span','prazo'+(ehHoje(s.prazo)?' hoje':''), (ehHoje(s.prazo)?'Hoje':'Prazo '+dataCurtaBR(s.prazo))));
+    if(s.prazo){
+      const prazoClasse = ehAtrasado(s.prazo) ? ' atrasado' : (ehHoje(s.prazo) ? ' hoje' : '');
+      const prazoRotulo = textoPrazo(s.prazo);
+      rod.appendChild(el('span','prazo'+prazoClasse, prazoRotulo));
+    }
     const sugestao = s.sugestao_resposta || s.proxima_acao || '';
     if(sugestao) rod.appendChild((()=>{ const b=el('button','botao b-copy','📋'); b.addEventListener('click',()=>copiarTexto(sugestao)); return b; })());
     const wa = telParaWa(cli.telefone);
