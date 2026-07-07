@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#7a3b1f">
-<meta name="tb-versao" content="3.2">
+<meta name="tb-versao" content="3.3">
 <title>Atendimento — Tapeçaria Bahia</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -264,6 +264,19 @@
   .foto-grid .foto .rm{position:absolute; top:4px; right:4px; background:rgba(0,0,0,.6); border:0; color:#fff; width:22px; height:22px; border-radius:50%; font-size:.7rem; cursor:pointer}
   .foto-grid .foto .tipo-tag{position:absolute; bottom:4px; left:4px; background:rgba(0,0,0,.6); color:#fff; font-size:.62rem; padding:1px 6px; border-radius:999px}
   .upload-label{display:flex; align-items:center; justify-content:center; gap:6px; aspect-ratio:1; border:1.5px dashed var(--linha); border-radius:10px; color:var(--fraco); font-size:.72rem; cursor:pointer}
+  .entrada-ajuda{margin:0 0 10px; color:var(--texto2); font-size:.82rem; line-height:1.45}
+  .chat-tools{display:flex; align-items:center; gap:8px; margin-top:8px; flex-wrap:wrap}
+  .chat-upload{display:inline-flex; align-items:center; gap:6px; padding:8px 12px; border:1px dashed var(--linha); border-radius:999px; color:var(--fraco); font-size:.78rem; cursor:pointer; background:var(--card)}
+  .chat-upload input{display:none}
+  .chat-preview{margin-top:8px; background:var(--card); border:1px solid var(--linha); border-radius:12px; padding:10px}
+  .chat-preview img{width:100%; max-height:220px; object-fit:cover; border-radius:10px; display:block}
+  .chat-preview .meta{margin-top:6px; font-size:.76rem; color:var(--fraco)}
+  .chat-item{display:grid; grid-template-columns:1fr auto auto; gap:10px; align-items:start}
+  .chat-item .txt{white-space:pre-wrap; line-height:1.45}
+  .chat-item .thumb{margin-top:8px; width:100%; max-width:220px; border-radius:10px; display:block; border:1px solid var(--linha)}
+  .chat-item .tag{display:inline-flex; align-items:center; gap:6px; font-size:.72rem; color:var(--marrom-claro); margin-bottom:6px}
+  .chat-item .acoes{display:flex; flex-direction:column; gap:6px}
+  .chat-item .acoes button{background:var(--card2); border:1px solid var(--linha); color:var(--texto2); border-radius:8px; padding:6px 8px; cursor:pointer}
 
   /* dizimo */
   .dizimo-card{background:var(--bg2); border-radius:12px; padding:10px 12px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center}
@@ -416,6 +429,39 @@ async function copiarTexto(txt){
   catch(e){ prompt('Copie o texto:', txt); }
 }
 
+function montarTextoCaixa(payload={}){
+  const texto = String(payload.texto || '').trim();
+  const imagemUrl = String(payload.imagemUrl || '').trim();
+  const nomeArquivo = String(payload.nomeArquivo || '').trim();
+  if(!imagemUrl) return texto;
+  return [
+    '[[TB_INBOX_IMG]]'+imagemUrl,
+    '[[TB_INBOX_FILE]]'+(nomeArquivo || 'print'),
+    '[[TB_INBOX_NOTE]]'+texto
+  ].join('\n');
+}
+function lerRegistroCaixa(texto=''){
+  const bruto = String(texto || '');
+  const imagem = bruto.match(/\[\[TB_INBOX_IMG\]\](.*)/);
+  const arquivo = bruto.match(/\[\[TB_INBOX_FILE\]\](.*)/);
+  const nota = bruto.match(/\[\[TB_INBOX_NOTE\]\]([\s\S]*)$/);
+  if(!imagem) return { texto: bruto.trim(), imagemUrl:'', nomeArquivo:'', temImagem:false };
+  return {
+    texto: (nota?.[1] || '').trim(),
+    imagemUrl: (imagem?.[1] || '').trim(),
+    nomeArquivo: (arquivo?.[1] || '').trim(),
+    temImagem: true
+  };
+}
+async function subirPrintCaixa(file){
+  const nomeSeguro = (file.name || 'print').replace(/[^a-zA-Z0-9._-]/g,'_');
+  const caminho = 'caixa-entrada/' + Date.now() + '_' + nomeSeguro;
+  const { error: upErr } = await sb.storage.from('fotos-servicos').upload(caminho, file);
+  if(upErr) throw upErr;
+  const { data: urlData, error: urlErr } = await sb.storage.from('fotos-servicos').createSignedUrl(caminho, 60*60*24*365);
+  if(urlErr) throw urlErr;
+  return { url: urlData.signedUrl, nomeArquivo: nomeSeguro };
+}
 const STATUS_LABEL = {lead:'Novo lead', orcamento:'Orçamento', agendado:'Agendado', producao:'Em produção', entregue:'Entregue', pago:'Pago', perdido:'Perdido'};
 const STATUS_ORDEM = ['lead','orcamento','agendado','producao','entregue','pago','perdido'];
 
@@ -833,27 +879,80 @@ async function renderInicio(){
     sUrg.appendChild(card); c.appendChild(sUrg);
   }
 
-  // chat de entrada
-  const sChat = secao('Chat de entrada');
+  // caixa de entrada
+  const sChat = secao('Caixa de entrada', qtdCaixaEntrada);
   const caixaWrap = el('div');
+  caixaWrap.appendChild(el('p','entrada-ajuda','Cole a mensagem do cliente ou suba um print do WhatsApp. A ideia aqui é virar isso em ficha, lead e próxima ação sem depender de API.'));
   const box = el('div','chat-box');
-  const ta = document.createElement('textarea'); ta.rows=1; ta.placeholder='Joga aqui qualquer coisa… eu organizo depois';
+  const ta = document.createElement('textarea'); ta.rows=2; ta.placeholder='Cole a mensagem do cliente ou descreva o atendimento...';
   const btnEnv = el('button','chat-send','➤');
   box.appendChild(ta); box.appendChild(btnEnv);
   caixaWrap.appendChild(box);
+  const ferramentas = el('div','chat-tools');
+  const labelUpload = document.createElement('label'); labelUpload.className='chat-upload'; labelUpload.textContent='🖼 Adicionar print';
+  const inputPrint = document.createElement('input'); inputPrint.type='file'; inputPrint.accept='image/*';
+  labelUpload.appendChild(inputPrint);
+  ferramentas.appendChild(labelUpload);
+  const dicaUpload = el('div',null,'Pode ser print da conversa, foto enviada pelo cliente ou qualquer imagem do caso.');
+  dicaUpload.style.color='var(--fraco)';
+  dicaUpload.style.fontSize='.76rem';
+  ferramentas.appendChild(dicaUpload);
+  caixaWrap.appendChild(ferramentas);
+  const preview = el('div','chat-preview oculto');
+  const previewImg = document.createElement('img');
+  const previewMeta = el('div','meta','');
+  preview.appendChild(previewImg);
+  preview.appendChild(previewMeta);
+  caixaWrap.appendChild(preview);
   const listaChat = el('div','card'); listaChat.style.marginTop='10px';
   caixaWrap.appendChild(listaChat);
   sChat.appendChild(caixaWrap);
   c.appendChild(sChat);
+  c.insertBefore(sChat, c.firstChild);
+
+  let arquivoPrint = null;
+  function limparPreviewPrint(){
+    arquivoPrint = null;
+    inputPrint.value = '';
+    preview.classList.add('oculto');
+    previewImg.removeAttribute('src');
+    previewMeta.textContent = '';
+    labelUpload.textContent = '🖼 Adicionar print';
+    labelUpload.appendChild(inputPrint);
+  }
+  inputPrint.addEventListener('change', ()=>{
+    const file = inputPrint.files[0];
+    if(!file){ limparPreviewPrint(); return; }
+    arquivoPrint = file;
+    previewImg.src = URL.createObjectURL(file);
+    previewMeta.textContent = file.name + ' · ' + Math.round(file.size/1024) + ' KB';
+    preview.classList.remove('oculto');
+    labelUpload.textContent = '🖼 Trocar print';
+    labelUpload.appendChild(inputPrint);
+  });
 
   async function enviarNota(){
     const texto = ta.value.trim();
-    if(!texto) return;
+    if(!texto && !arquivoPrint) return;
     btnEnv.disabled = true;
-    const { error } = await sb.from('caixa_entrada').insert({ texto });
+    labelUpload.style.pointerEvents = 'none';
+    let payload = texto;
+    try{
+      if(arquivoPrint){
+        const up = await subirPrintCaixa(arquivoPrint);
+        payload = montarTextoCaixa({ texto, imagemUrl: up.url, nomeArquivo: up.nomeArquivo });
+      }
+    }catch(err){
+      btnEnv.disabled = false;
+      labelUpload.style.pointerEvents = '';
+      toast('Erro no print: '+err.message);
+      return;
+    }
+    const { error } = await sb.from('caixa_entrada').insert({ texto: payload });
     btnEnv.disabled = false;
+    labelUpload.style.pointerEvents = '';
     if(error){ toast('Erro: '+error.message); return; }
-    ta.value=''; toast('✔ Anotado'); carregarCaixaEntrada();
+    ta.value=''; limparPreviewPrint(); toast('✔ Entrada anotada'); carregarCaixaEntrada();
   }
   btnEnv.addEventListener('click', enviarNota);
   ta.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); enviarNota(); } });
@@ -862,19 +961,46 @@ async function renderInicio(){
     const { data, error } = await sb.from('caixa_entrada').select('*').eq('processado', false).order('criado_em', {ascending:false});
     listaChat.innerHTML='';
     if(error){ listaChat.appendChild(el('div','vazio','Erro: '+error.message)); return; }
-    if(!data.length){ listaChat.appendChild(el('div','vazio','Nada pendente. Escreva algo acima.')); return; }
+    if(!data.length){ listaChat.appendChild(el('div','vazio','Nada pendente. Cole uma mensagem ou suba um print acima.')); return; }
     data.forEach(item=>{
+      const registro = lerRegistroCaixa(item.texto);
       const linha = el('div','chat-item');
-      linha.appendChild(el('div','txt', item.texto));
+      const txt = el('div','txt');
+      if(registro.temImagem) txt.appendChild(el('div','tag','Print recebido'));
+      txt.appendChild(el('div',null, registro.texto || (registro.temImagem ? 'Print sem anotação escrita.' : 'Sem texto.')));
+      if(registro.imagemUrl){
+        const img = document.createElement('img');
+        img.src = registro.imagemUrl;
+        img.alt = registro.nomeArquivo || 'Print da conversa';
+        img.className = 'thumb';
+        txt.appendChild(img);
+      }
+      linha.appendChild(txt);
       const d = new Date(item.criado_em);
       linha.appendChild(el('div','hora', d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})));
+      const acoes = el('div','acoes');
+      const btnEditar = el('button',null,'Editar');
+      btnEditar.addEventListener('click', async ()=>{
+        const novoTexto = prompt('Editar anotação:', registro.texto || '');
+        if(novoTexto===null) return;
+        const payload = montarTextoCaixa({ texto: novoTexto, imagemUrl: registro.imagemUrl, nomeArquivo: registro.nomeArquivo });
+        const { error: errEdit } = await sb.from('caixa_entrada').update({ texto: payload }).eq('id', item.id);
+        if(errEdit){ toast('Erro: '+errEdit.message); return; }
+        toast('✔ Anotação atualizada');
+        carregarCaixaEntrada();
+      });
+      acoes.appendChild(btnEditar);
+      const btnCopiar = el('button',null,'Copiar');
+      btnCopiar.addEventListener('click', ()=>copiarTexto(registro.texto || item.texto || ''));
+      acoes.appendChild(btnCopiar);
       const btnDel = el('button',null,'🗑');
       btnDel.addEventListener('click', async ()=>{
         if(!confirm('Remover esta anotação?')) return;
         await sb.from('caixa_entrada').delete().eq('id', item.id);
         carregarCaixaEntrada();
       });
-      linha.appendChild(btnDel);
+      acoes.appendChild(btnDel);
+      linha.appendChild(acoes);
       listaChat.appendChild(linha);
     });
   }
@@ -979,13 +1105,40 @@ async function renderLeads(){
     if(wa){ const a=document.createElement('a'); a.className='botao b-wa'; a.textContent='WhatsApp'; a.target='_blank'; a.rel='noopener'; a.href = sugestao ? wa+'?text='+encodeURIComponent(sugestao) : wa; rod.appendChild(a); }
     const tel = telParaLigar(cli.telefone);
     if(tel){ const a=document.createElement('a'); a.className='botao b-tel'; a.textContent='📞'; a.href=tel; rod.appendChild(a); }
-    const bConcluir = el('button','botao b-ok','✔ Concluir');
-    bConcluir.addEventListener('click', async ()=>{
-      await sb.from('servicos').update({status:'pago'}).eq('id', s.id);
-      await sb.from('historico').insert({o_que:`"${s.titulo}" concluído`, por:'diego'});
-      toast('Concluído'); renderLeads(); renderInicio();
+    const bConcluirAcao = el('button','botao b-ok','✔ Concluir ação');
+    bConcluirAcao.addEventListener('click', async ()=>{
+      const proximo = prompt('O que foi feito agora? (fica no histórico)', s.proxima_acao || '');
+      if(proximo === null) return;
+      const novaAcao = prompt('Qual a PRÓXIMA ação? (deixe em branco se está aguardando resposta do cliente)', '');
+      if(novaAcao === null) return;
+      let novoPrazo = s.prazo;
+      if(!novaAcao.trim()){
+        const dataRevisao = prompt('Aguardando resposta — revisar em que data? (AAAA-MM-DD, opcional)', '');
+        if(dataRevisao && /^\d{4}-\d{2}-\d{2}$/.test(dataRevisao.trim())) novoPrazo = dataRevisao.trim();
+      }
+      await sb.from('servicos').update({ proxima_acao: novaAcao.trim() || null, prazo: novoPrazo, atualizado_em: new Date().toISOString() }).eq('id', s.id);
+      await sb.from('historico').insert({o_que:`"${s.titulo}": ${proximo || 'ação concluída'}`, por:'diego', detalhe: novaAcao.trim() ? 'Próxima ação: '+novaAcao.trim() : 'Aguardando resposta do cliente'});
+      toast('✔ Ação registrada — lead continua aberto'); renderLeads(); renderInicio();
     });
-    rod.appendChild(bConcluir);
+    rod.appendChild(bConcluirAcao);
+    const bEncerrarPago = el('button','botao b-ok','🏁 Pago');
+    bEncerrarPago.addEventListener('click', async ()=>{
+      if(!confirm(`Encerrar "${s.titulo}" como PAGO/finalizado? Isso tira o lead da lista ativa.`)) return;
+      const motivo = prompt('Motivo/observação do encerramento (opcional):', '') || '';
+      await sb.from('servicos').update({status:'pago'}).eq('id', s.id);
+      await sb.from('historico').insert({o_que:`"${s.titulo}" encerrado como PAGO`, por:'diego', detalhe: motivo});
+      toast('Lead encerrado (pago)'); renderLeads(); renderInicio();
+    });
+    rod.appendChild(bEncerrarPago);
+    const bEncerrarPerdido = el('button','botao b-rm','❌ Perdido');
+    bEncerrarPerdido.addEventListener('click', async ()=>{
+      if(!confirm(`Encerrar "${s.titulo}" como PERDIDO? Isso tira o lead da lista ativa.`)) return;
+      const motivo = prompt('Motivo do lead perdido (opcional):', '') || '';
+      await sb.from('servicos').update({status:'perdido'}).eq('id', s.id);
+      await sb.from('historico').insert({o_que:`"${s.titulo}" encerrado como PERDIDO`, por:'diego', detalhe: motivo});
+      toast('Lead marcado como perdido'); renderLeads(); renderInicio();
+    });
+    rod.appendChild(bEncerrarPerdido);
     const bRemover = el('button','botao b-rm','🗑 Remover');
     bRemover.addEventListener('click', async ()=>{
       if(!confirm('Remover ESTE serviço/lead completamente? Não dá pra desfazer.')) return;
