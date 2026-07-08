@@ -629,7 +629,10 @@ async function validarPin(){
   }
 }
 
+let entradaNoAppIniciada = false;
 function entrarNoApp(){
+  if(entradaNoAppIniciada) return;
+  entradaNoAppIniciada = true;
   esconder('telaDefinirPin'); esconder('telaPin'); esconder('telaLogin'); esconder('telaCarregando');
   limparHashAuth();
   $('#app').classList.remove('oculto');
@@ -777,7 +780,9 @@ async function carregarTudo(){
 }
 
 /* ---------- INÍCIO: urgente + chat de entrada + resumo ---------- */
+let geracaoRenderInicio = 0;
 async function renderInicio(){
+  const minhaGeracao = ++geracaoRenderInicio;
   const c = $('#painelInicio'); c.innerHTML='';
 
   const hojeStr = hojeISO();
@@ -787,6 +792,7 @@ async function renderInicio(){
     sb.from('financeiro').select('id,descricao,valor,status,data').in('status',['a_pagar','a_receber']).lte('data', hojeStr),
     sb.from('caixa_entrada').select('id', { count:'exact' }).eq('processado', false),
   ]);
+  if(minhaGeracao !== geracaoRenderInicio) return;
   const leadsAbertos = leadsUrg || [];
   const agendaPendente = agUrg || [];
   const financeiroPendente = finUrg || [];
@@ -979,6 +985,56 @@ async function renderInicio(){
       const d = new Date(item.criado_em);
       linha.appendChild(el('div','hora', d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})));
       const acoes = el('div','acoes');
+      const btnCriarFicha = el('button',null,'Criar ficha/lead');
+      btnCriarFicha.addEventListener('click', async ()=>{
+        const nome = prompt('Nome do cliente:');
+        if(!nome || !nome.trim()) return;
+        const telefone = prompt('Telefone/WhatsApp do cliente (opcional):', '') || '';
+        const tituloSugerido = (registro.texto || '').split('\n').find(l=>l.trim()) || 'Atendimento recebido';
+        const titulo = prompt('Qual serviço ou pedido deste cliente?', tituloSugerido.slice(0,80));
+        if(!titulo || !titulo.trim()) return;
+        const proximaAcao = prompt('Qual é a próxima ação?', 'Responder o cliente e confirmar os detalhes') || '';
+        btnCriarFicha.disabled = true;
+        btnCriarFicha.textContent = 'Criando…';
+        try{
+          let cliente = null;
+          if(telefone.trim()){
+            const { data: existentes, error: erroBusca } = await sb.from('clientes').select('id,nome').eq('telefone', telefone.trim()).limit(1);
+            if(erroBusca) throw erroBusca;
+            cliente = existentes?.[0] || null;
+          }
+          if(!cliente){
+            const { data: novoCliente, error: erroCliente } = await sb.from('clientes').insert({
+              nome: nome.trim(), telefone: telefone.trim() || null, obs: registro.texto || null
+            }).select('id,nome').single();
+            if(erroCliente) throw erroCliente;
+            cliente = novoCliente;
+          }
+          const { error: erroServico } = await sb.from('servicos').insert({
+            cliente_id: cliente.id, titulo: titulo.trim(), status: 'lead', prioridade: 'media',
+            proxima_acao: proximaAcao.trim() || null
+          });
+          if(erroServico) throw erroServico;
+          if(registro.imagemUrl){
+            const { error: erroFoto } = await sb.from('fotos').insert({
+              cliente_id: cliente.id, url: registro.imagemUrl, tipo: 'outro'
+            });
+            if(erroFoto) throw erroFoto;
+          }
+          const { error: erroCaixa } = await sb.from('caixa_entrada').update({processado:true}).eq('id', item.id);
+          if(erroCaixa) throw erroCaixa;
+          await sb.from('historico').insert({
+            o_que:`Ficha/lead criado para ${cliente.nome || nome.trim()}`, por:'diego', detalhe:titulo.trim()
+          });
+          toast('✔ Ficha e lead criados');
+          carregarCaixaEntrada(); renderLeads(); renderInicio();
+        }catch(err){
+          toast('Erro ao criar ficha: '+err.message);
+          btnCriarFicha.disabled = false;
+          btnCriarFicha.textContent = 'Criar ficha/lead';
+        }
+      });
+      acoes.appendChild(btnCriarFicha);
       const btnEditar = el('button',null,'Editar');
       btnEditar.addEventListener('click', async ()=>{
         const novoTexto = prompt('Editar anotação:', registro.texto || '');
@@ -1008,7 +1064,9 @@ async function renderInicio(){
 
   // resumo rápido: leads em aberto + agenda de hoje
   const { data: servicos } = await sb.from('servicos').select('id,status,prazo,proxima_acao').not('status','in','(pago,perdido)');
+  if(minhaGeracao !== geracaoRenderInicio) return;
   const { data: agendaHoje } = await sb.from('agenda').select('id').eq('status','planejado');
+  if(minhaGeracao !== geracaoRenderInicio) return;
   const sResumo = secao('Resumo rápido');
   const card = el('div','card');
   const pendSemAcao = (servicos||[]).filter(s=>!s.proxima_acao).length;
@@ -1022,6 +1080,57 @@ async function renderInicio(){
 let filtroStatus = 'todos';
 async function renderLeads(){
   const c = $('#painelLeads'); c.innerHTML='';
+
+  const buscaClientes = el('div','card');
+  const formBusca = el('div','form');
+  const linhaBusca = el('div','linha2');
+  const campoBusca = document.createElement('input');
+  campoBusca.type = 'search';
+  campoBusca.placeholder = 'Pesquisar cliente por nome, telefone ou cidade';
+  const btnBuscarCliente = el('button','botao b-ok','Pesquisar');
+  linhaBusca.appendChild(campoBusca);
+  linhaBusca.appendChild(btnBuscarCliente);
+  formBusca.appendChild(linhaBusca);
+  const resultadosBusca = el('div','lista');
+  formBusca.appendChild(resultadosBusca);
+  buscaClientes.appendChild(formBusca);
+  c.appendChild(buscaClientes);
+
+  async function pesquisarClientes(){
+    const termo = campoBusca.value.trim().toLocaleLowerCase('pt-BR');
+    resultadosBusca.innerHTML = '';
+    if(!termo){
+      resultadosBusca.appendChild(el('div','vazio','Digite um nome, telefone ou cidade.'));
+      return;
+    }
+    btnBuscarCliente.disabled = true;
+    btnBuscarCliente.textContent = 'Buscando…';
+    const { data: clientes, error: erroBusca } = await sb.from('clientes')
+      .select('id,nome,telefone,cidade').order('nome').limit(500);
+    btnBuscarCliente.disabled = false;
+    btnBuscarCliente.textContent = 'Pesquisar';
+    if(erroBusca){ resultadosBusca.appendChild(el('div','erro','Erro: '+erroBusca.message)); return; }
+    const encontrados = (clientes || []).filter(cli=>
+      [cli.nome,cli.telefone,cli.cidade].some(valor=>(valor || '').toLocaleLowerCase('pt-BR').includes(termo))
+    ).slice(0,20);
+    if(!encontrados.length){
+      resultadosBusca.appendChild(el('div','vazio','Nenhum cliente encontrado.'));
+      return;
+    }
+    encontrados.forEach(cli=>{
+      const item = el('div','item');
+      item.appendChild(el('div','nome',cli.nome || 'Cliente sem nome'));
+      item.appendChild(el('div','servico',[cli.telefone,cli.cidade].filter(Boolean).join(' · ') || 'Sem telefone ou cidade'));
+      const abrir = el('button','botao b-ok','Abrir ficha');
+      abrir.addEventListener('click',()=>abrirFicha(cli.id));
+      item.appendChild(abrir);
+      resultadosBusca.appendChild(item);
+    });
+  }
+  btnBuscarCliente.addEventListener('click', pesquisarClientes);
+  campoBusca.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); pesquisarClientes(); }
+  });
 
   const filtros = el('div','filtros');
   const opcoes = [['todos','Todos'], ...STATUS_ORDEM.filter(s=>s!=='pago'&&s!=='perdido').map(s=>[s,STATUS_LABEL[s]])];
