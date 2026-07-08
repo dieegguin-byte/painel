@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#7a3b1f">
-<meta name="tb-versao" content="3.3">
+<meta name="tb-versao" content="4.0">
 <title>Atendimento — Tapeçaria Bahia</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -289,6 +289,64 @@
     opacity:0; pointer-events:none; transition:.25s; z-index:100; box-shadow:var(--sombra);
   }
   #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+  /* ---------- interface moderna v7 ---------- */
+  :root{
+    --bg:#0f1115; --bg2:#15181e; --card:#1b1f27; --card2:#222732;
+    --linha:rgba(255,255,255,.085); --texto:#f7f3ef; --texto2:#c9c2bc; --fraco:#8f8a86;
+    --marrom:#c96d32; --marrom-claro:#f0a263; --creme:#fff0df;
+    --raio:18px; --sombra:0 12px 36px rgba(0,0,0,.28);
+  }
+  body{max-width:1080px;background:
+    radial-gradient(circle at 20% -10%,rgba(201,109,50,.18),transparent 34%),
+    linear-gradient(180deg,#101217 0%,#14171d 100%);background-attachment:fixed}
+  header{background:rgba(32,22,18,.84);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 8px 28px rgba(0,0,0,.22)}
+  .marca img{width:40px;height:40px;border-radius:12px;box-shadow:0 7px 20px rgba(0,0,0,.3)}
+  .marca h1{font-size:1.06rem;letter-spacing:-.01em}.marca .sub{font-size:.72rem}
+  main{padding:20px 18px 112px;scroll-behavior:smooth}
+  .card,.item,.resumo-card,.bloco-destaque,.chat-box{box-shadow:0 10px 28px rgba(0,0,0,.18);transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+  .card,.item,.resumo-card{background:linear-gradient(145deg,rgba(30,35,44,.96),rgba(24,28,35,.96));border-color:rgba(255,255,255,.08)}
+  .item:hover,.resumo-card:hover{border-color:rgba(240,162,99,.25);transform:translateY(-1px);box-shadow:0 14px 36px rgba(0,0,0,.24)}
+  .titulo-sec{font-size:.72rem;letter-spacing:1.15px;color:#f2ab70;margin-bottom:11px}
+  .titulo-sec .cont{background:rgba(240,162,99,.12);color:#ffc08c;border:1px solid rgba(240,162,99,.14)}
+  .painel-cab{margin:2px 2px 18px;display:flex;gap:12px;align-items:center}
+  .painel-cab .icone{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,rgba(201,109,50,.28),rgba(201,109,50,.1));border:1px solid rgba(240,162,99,.2);font-size:1.2rem}
+  .painel-cab h2{margin:0;font-size:1.28rem;letter-spacing:-.025em}.painel-cab p{margin:2px 0 0;color:var(--fraco);font-size:.82rem}
+  .botao{min-height:34px;transition:transform .15s ease,filter .15s ease,box-shadow .15s ease}
+  .botao:hover{filter:brightness(1.1);box-shadow:0 6px 18px rgba(0,0,0,.18)}
+  .b-ok{background:linear-gradient(135deg,#34734b,#285d3d)}
+  .b-add,.chat-send,.botao-primario{background:linear-gradient(135deg,#d37738,#a94d24);box-shadow:0 8px 22px rgba(177,82,35,.25)}
+  .chip{background:rgba(255,255,255,.035);backdrop-filter:blur(8px);padding:8px 13px}
+  .chip.ativo{background:linear-gradient(135deg,#d37738,#a94d24);box-shadow:0 6px 16px rgba(177,82,35,.22)}
+  .form input,.form select,.form textarea,.campo{background:#12151a;border-color:rgba(255,255,255,.1);min-height:46px;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease}
+  .form input:focus,.form select:focus,.form textarea:focus,.campo:focus{outline:0;border-color:#e68c50;background:#161a20;box-shadow:0 0 0 3px rgba(230,140,80,.14)}
+  .chat-box:focus-within{border-color:#e68c50;box-shadow:0 0 0 3px rgba(230,140,80,.12),0 12px 32px rgba(0,0,0,.2)}
+  .chat-item{background:rgba(255,255,255,.025);border:1px solid var(--linha);border-radius:14px;padding:12px;margin-top:8px}
+  .status-trilha{display:flex;align-items:center;overflow-x:auto;gap:0;margin:12px 0 2px;padding:3px 1px 6px;scrollbar-width:none}
+  .status-trilha::-webkit-scrollbar{display:none}
+  .status-passo{position:relative;display:flex;align-items:center;background:none;border:0;color:var(--fraco);font-size:.64rem;padding:0 7px 0 0;cursor:pointer;white-space:nowrap}
+  .status-passo:not(:last-child)::after{content:"";width:17px;height:2px;background:var(--linha);margin-left:5px}
+  .status-passo .ponto{width:17px;height:17px;border-radius:50%;display:grid;place-items:center;background:#2a2f39;border:1px solid var(--linha);margin-right:4px;font-size:.58rem}
+  .status-passo.feito{color:#81c995}.status-passo.feito .ponto{background:#2d6843;color:#fff;border-color:#3f895b}
+  .status-passo.atual{color:#ffc08c;font-weight:700}.status-passo.atual .ponto{background:#c96d32;color:#fff;border-color:#ec975c;box-shadow:0 0 0 4px rgba(201,109,50,.14)}
+  nav.tabs{left:50%;right:auto;bottom:12px;transform:translateX(-50%);width:calc(100% - 20px);max-width:850px;border:1px solid rgba(255,255,255,.1);border-radius:20px;background:rgba(22,25,31,.9);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding:7px 7px calc(7px + env(safe-area-inset-bottom));box-shadow:0 16px 45px rgba(0,0,0,.38);overflow-x:auto;scrollbar-width:none;z-index:50}
+  nav.tabs::-webkit-scrollbar{display:none}nav.tabs button{min-width:78px;border-radius:14px;transition:background .18s ease,color .18s ease,transform .18s ease}
+  nav.tabs button.ativo{background:rgba(201,109,50,.14);color:#ffb77d;transform:translateY(-1px)}
+  nav.tabs button .ic{font-size:1.12rem;transition:transform .18s ease}nav.tabs button.ativo .ic{transform:scale(1.08)}
+  .modal-overlay{background:rgba(4,5,7,.74);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);animation:fadeIn .18s ease}
+  .modal-box{background:linear-gradient(180deg,#1c2028,#14171d);border:1px solid rgba(255,255,255,.09);box-shadow:0 -20px 60px rgba(0,0,0,.45);animation:subir .22s ease}
+  .modal-cab{position:sticky;top:-16px;z-index:3;background:rgba(26,30,37,.94);backdrop-filter:blur(16px);padding:15px 0 12px;margin-top:-1px;border-bottom:1px solid rgba(255,255,255,.06)}
+  .modal-cab h2{font-size:1.2rem;letter-spacing:-.02em}
+  .foto-grid .foto{border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.2)}
+  #toast{bottom:calc(98px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,.1);box-shadow:0 15px 35px rgba(0,0,0,.34)}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes subir{from{opacity:.5;transform:translateY(22px)}to{opacity:1;transform:none}}
+  @media(min-width:760px){
+    header{border-radius:0 0 20px 20px}.marca{max-width:980px;margin:auto}main{padding:26px 28px 120px}
+    .lista{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.modal-box .lista{display:flex}
+    .resumo-grid{grid-template-columns:repeat(4,1fr)}.modal-overlay{align-items:center;padding:24px}.modal-box{max-width:760px;border-radius:24px;max-height:90vh;padding:18px 22px 24px}.modal-cab{top:-18px}
+    #modalOrcamento .modal-box{max-width:900px}.foto-grid{grid-template-columns:repeat(4,1fr)}
+  }
+  @media(max-width:480px){.form .linha2{grid-template-columns:1fr}.resumo-grid{gap:8px}.resumo-card{padding:11px}.item{padding:13px}.painel-cab h2{font-size:1.15rem}}
   .oculto{display:none !important}
 </style>
 </head>
@@ -389,6 +447,42 @@
   </div>
 </div>
 
+<!-- MODAL: Orçamento profissional -->
+<div id="modalOrcamento" class="modal-overlay oculto">
+  <div class="modal-box">
+    <div class="modal-cab">
+      <h2>Orçamento profissional</h2>
+      <button class="modal-fechar" id="btnFecharOrcamento">✕</button>
+    </div>
+    <div class="form">
+      <input id="orcServico" type="text" placeholder="Serviço proposto">
+      <textarea id="orcDescricao" rows="4" placeholder="Descrição detalhada do serviço"></textarea>
+      <div class="linha2">
+        <input id="orcMedidas" type="text" placeholder="Medidas / quantidade">
+        <input id="orcMaterial" type="text" placeholder="Tecido, material e acabamento">
+      </div>
+      <div class="linha2">
+        <input id="orcValor" type="number" step="0.01" placeholder="Valor total (R$)">
+        <input id="orcPrazo" type="text" placeholder="Prazo de produção (ex.: 20 dias)">
+      </div>
+      <textarea id="orcPagamento" rows="2" placeholder="Condição de pagamento"></textarea>
+      <div class="linha2">
+        <input id="orcValidade" type="number" min="1" max="90" value="10" placeholder="Validade em dias">
+        <input id="orcGarantia" type="text" value="Garantia do serviço conforme condições apresentadas" placeholder="Garantia">
+      </div>
+      <textarea id="orcObservacoes" rows="3" placeholder="Observações adicionais"></textarea>
+      <label style="display:flex;gap:8px;align-items:center;font-size:.82rem;color:var(--texto2)">
+        <input id="orcIncluirFotos" type="checkbox" checked style="width:auto"> Incluir fotos da ficha no orçamento
+      </label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="botao b-ok" id="btnGerarOrcamento">Gerar PDF / imprimir</button>
+        <button class="botao b-copy" id="btnCopiarMsgOrcamento">Copiar mensagem</button>
+        <button class="botao b-wa" id="btnWhatsappOrcamento">Abrir WhatsApp</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 /* =========================================================================
    CONFIG
@@ -400,7 +494,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const el = (tag, cls, txt) => { const e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; };
-const esc = (s) => (s==null?'':String(s));
+const esc = (s) => (s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
 const mostrar = (id) => $('#'+id).classList.remove('oculto');
 const esconder = (id) => $('#'+id).classList.add('oculto');
 const hojeISO = () => {
@@ -466,6 +560,30 @@ async function subirPrintCaixa(file){
 }
 const STATUS_LABEL = {lead:'Novo lead', orcamento:'Orçamento', agendado:'Agendado', producao:'Em produção', entregue:'Entregue', pago:'Pago', perdido:'Perdido'};
 const STATUS_ORDEM = ['lead','orcamento','agendado','producao','entregue','pago','perdido'];
+const STATUS_FLUXO = ['lead','orcamento','agendado','producao','entregue','pago'];
+
+function cabecalhoPainel(icone,titulo,subtitulo){
+  const cab=el('div','painel-cab');
+  cab.appendChild(el('div','icone',icone));
+  const txt=el('div'); txt.appendChild(el('h2',null,titulo)); txt.appendChild(el('p',null,subtitulo));
+  cab.appendChild(txt); return cab;
+}
+
+function montarFluxoStatus(statusAtual,onEscolher){
+  const trilha=el('div','status-trilha');
+  const indice=STATUS_FLUXO.indexOf(statusAtual);
+  STATUS_FLUXO.forEach((st,i)=>{
+    const classe=i<indice?' feito':i===indice?' atual':'';
+    const b=el('button','status-passo'+classe);
+    b.type='button'; b.title='Mudar para '+STATUS_LABEL[st];
+    b.appendChild(el('span','ponto',i<indice?'✓':String(i+1)));
+    b.appendChild(document.createTextNode(STATUS_LABEL[st]));
+    if(onEscolher) b.addEventListener('click',()=>{ if(st!==statusAtual) onEscolher(st); });
+    trilha.appendChild(b);
+  });
+  if(statusAtual==='perdido') trilha.appendChild(el('span','status-passo atual','Perdido'));
+  return trilha;
+}
 
 function lerErroAuthDaUrl(){
   const hash = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
@@ -668,6 +786,8 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - Pagamento 50/50 gera entrada paga e saldo a receber na entrega.
 - Cada parte pode ser Pix, dinheiro, transferência ou cartão parcelado.
 - Cartão aprovado é considerado pago; registrar também a quantidade de parcelas.
+- Gerar orçamento transforma apenas Novo lead em Orçamento; não cria financeiro.
+- O PDF deve ser revisado antes de ser enviado e nunca deve ser enviado automaticamente.
 - Marcar serviço como Pago atualiza os lançamentos vinculados, sem duplicar.
 - Nunca excluir ficha, foto, serviço ou lançamento sem confirmação humana.
 - Antes de criar cliente, procurar telefone existente para evitar duplicidade.
@@ -709,6 +829,89 @@ async function abrirGuia(){
    FICHA DO CLIENTE (com histórico + fotos)
    ========================================================================= */
 $('#btnFecharFicha').addEventListener('click', ()=> $('#modalFicha').classList.add('oculto'));
+$('#btnFecharOrcamento').addEventListener('click', ()=> $('#modalOrcamento').classList.add('oculto'));
+
+let orcamentoAtual = null;
+function abrirOrcamento(cliente,servico,fotos=[]){
+  orcamentoAtual={cliente,servico,fotos};
+  $('#orcServico').value=servico.titulo||'';
+  $('#orcDescricao').value=servico.proxima_acao ? `Serviço solicitado: ${servico.titulo}.\nDetalhes atuais: ${servico.proxima_acao}` : `Serviço solicitado: ${servico.titulo||''}.`;
+  $('#orcMedidas').value=''; $('#orcMaterial').value='';
+  $('#orcValor').value=servico.valor_orcamento||'';
+  $('#orcPrazo').value=servico.prazo ? `Previsão até ${dataCurtaBR(servico.prazo)}` : '';
+  $('#orcPagamento').value='50% na aprovação e 50% na entrega. Pix, dinheiro, transferência ou cartão, conforme combinado.';
+  $('#orcValidade').value='10';
+  $('#orcGarantia').value='Garantia do serviço conforme condições apresentadas';
+  $('#orcObservacoes').value=cliente.obs||'';
+  $('#orcIncluirFotos').checked=true;
+  $('#modalOrcamento').classList.remove('oculto');
+}
+
+function dadosOrcamento(){
+  if(!orcamentoAtual) return null;
+  const valor=Number($('#orcValor').value||0);
+  return {
+    ...orcamentoAtual,
+    titulo:$('#orcServico').value.trim(), descricao:$('#orcDescricao').value.trim(),
+    medidas:$('#orcMedidas').value.trim(), material:$('#orcMaterial').value.trim(), valor,
+    prazo:$('#orcPrazo').value.trim(), pagamento:$('#orcPagamento').value.trim(),
+    validade:Math.max(1,parseInt($('#orcValidade').value,10)||10),
+    garantia:$('#orcGarantia').value.trim(), observacoes:$('#orcObservacoes').value.trim(),
+    incluirFotos:$('#orcIncluirFotos').checked
+  };
+}
+
+function mensagemOrcamento(d){
+  return `Olá, ${d.cliente.nome||'tudo bem'}! Preparei seu orçamento personalizado para ${d.titulo||'o serviço solicitado'}.\n\nValor: ${moedaBR(d.valor)}\nPrazo: ${d.prazo||'a combinar'}\nCondição: ${d.pagamento||'a combinar'}\n\nNo PDF estão todos os detalhes da proposta. Qualquer dúvida, estou à disposição.\n\nTapeçaria e Estofados Bahia`;
+}
+
+async function registrarOrcamentoGerado(d){
+  const atualizacao={
+    titulo:d.titulo||d.servico.titulo,
+    valor_orcamento:d.valor||null,
+    sugestao_resposta:mensagemOrcamento(d),
+    atualizado_em:new Date().toISOString()
+  };
+  if(d.servico.status==='lead') atualizacao.status='orcamento';
+  const { error }=await sb.from('servicos').update(atualizacao).eq('id',d.servico.id);
+  if(error) throw error;
+  await sb.from('historico').insert({
+    o_que:`Orçamento gerado para ${d.cliente.nome||'cliente'}`, por:'diego',
+    detalhe:`${d.titulo} · ${moedaBR(d.valor)} · validade ${d.validade} dias`
+  });
+}
+
+function htmlOrcamento(d){
+  const numero='ORC-'+String(d.servico.id).slice(0,8).toUpperCase();
+  const hoje=new Date(); const validade=new Date(hoje); validade.setDate(validade.getDate()+d.validade);
+  const dataFmt=x=>x.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const logo=new URL('./icon.svg',location.href).href;
+  const fotos=d.incluirFotos ? (d.fotos||[]).slice(0,3).filter(f=>/^https?:/i.test(f.url||'')).map(f=>`<img src="${esc(f.url)}" alt="Foto do serviço">`).join('') : '';
+  const linha=(rot,val)=>val?`<div class="linha"><div class="rot">${rot}</div><div>${esc(val)}</div></div>`:'';
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${numero} - ${esc(d.cliente.nome||'Cliente')}</title><style>
+  *{box-sizing:border-box} body{margin:0;background:#eef1f4;color:#25201d;font-family:Arial,sans-serif} .pagina{width:210mm;min-height:297mm;margin:10mm auto;background:#fff;padding:17mm 17mm 14mm;box-shadow:0 3px 20px #0002;position:relative}.topo{display:flex;align-items:center;border-bottom:3px solid #b48a45;padding-bottom:12px}.logo{width:70px;height:70px;margin-right:14px}.marca h1{margin:0;color:#35251f;font-size:24px}.marca p{margin:4px 0 0;color:#745a4b}.numero{margin-left:auto;text-align:right}.numero b{display:block;color:#b48a45;font-size:17px}.cliente,.proposta,.condicoes{margin-top:20px}.titulo{font-size:12px;letter-spacing:1.3px;text-transform:uppercase;color:#9a7339;font-weight:bold;margin-bottom:8px}.grade{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}.linha{border-bottom:1px solid #eadfd6;padding:7px 0;font-size:13px}.rot{font-size:10px;text-transform:uppercase;color:#8a766b;margin-bottom:3px}.descricao{background:#faf7f3;border-left:4px solid #b48a45;padding:14px;line-height:1.55;font-size:14px;white-space:pre-wrap}.fotos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.fotos img{width:100%;height:125px;object-fit:cover;border-radius:6px}.valor{margin-top:18px;padding:15px;background:#35251f;color:#fff;display:flex;align-items:center;justify-content:space-between;border-radius:7px}.valor span{font-size:12px;text-transform:uppercase;letter-spacing:1px}.valor b{font-size:25px;color:#f1d39b}.beneficios{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}.beneficio{padding:10px;background:#faf7f3;text-align:center;font-size:12px;border-radius:5px}.rodape{position:absolute;left:17mm;right:17mm;bottom:12mm;border-top:1px solid #ddd;padding-top:8px;font-size:10px;color:#777;display:flex;justify-content:space-between}.acoes{position:fixed;top:10px;right:10px}.acoes button{padding:10px 14px;border:0;border-radius:5px;background:#35251f;color:white;cursor:pointer}@media print{body{background:#fff}.pagina{margin:0;box-shadow:none}.acoes{display:none}}@page{size:A4;margin:0}
+  </style></head><body><div class="acoes"><button onclick="window.print()">Imprimir / salvar PDF</button></div><main class="pagina">
+  <header class="topo"><img class="logo" src="${logo}" alt="Tapeçaria Bahia"><div class="marca"><h1>Tapeçaria e Estofados Bahia</h1><p>Reforma, conforto e acabamento cuidadoso · Luziânia-GO</p></div><div class="numero"><b>ORÇAMENTO</b><span>${numero}</span><br><small>${dataFmt(hoje)}</small></div></header>
+  <section class="cliente"><div class="titulo">Preparado especialmente para</div><div class="grade">${linha('Cliente',d.cliente.nome)}${linha('Telefone',d.cliente.telefone)}${linha('Cidade',d.cliente.cidade)}${linha('Endereço',d.cliente.endereco)}</div></section>
+  <section class="proposta"><div class="titulo">Proposta de serviço</div><h2>${esc(d.titulo||'Serviço personalizado')}</h2><div class="descricao">${esc(d.descricao||'Serviço conforme avaliação e alinhamento com o cliente.')}</div>${linha('Medidas / quantidade',d.medidas)}${linha('Material e acabamento',d.material)}<div class="fotos">${fotos}</div><div class="valor"><span>Investimento total</span><b>${moedaBR(d.valor)}</b></div></section>
+  <section class="condicoes"><div class="titulo">Condições da proposta</div><div class="grade">${linha('Prazo',d.prazo||'A combinar')}${linha('Validade',`${d.validade} dias - até ${dataFmt(validade)}`)}${linha('Pagamento',d.pagamento||'A combinar')}${linha('Garantia',d.garantia)}</div>${d.observacoes?`<div class="descricao" style="margin-top:12px">${esc(d.observacoes)}</div>`:''}</section>
+  <div class="beneficios"><div class="beneficio"><b>Atendimento personalizado</b><br>Proposta pensada para o seu móvel</div><div class="beneficio"><b>Acabamento cuidadoso</b><br>Atenção aos detalhes do serviço</div><div class="beneficio"><b>Acompanhamento</b><br>Contato durante as etapas combinadas</div></div>
+  <footer class="rodape"><span>Tapeçaria e Estofados Bahia</span><span>WhatsApp: (61) 99403-7524</span></footer></main></body></html>`;
+}
+
+$('#btnGerarOrcamento').addEventListener('click',async ()=>{
+  const d=dadosOrcamento(); if(!d||!d.titulo||!d.valor){ toast('Preencha serviço e valor'); return; }
+  const janela=window.open('','_blank'); if(!janela){ toast('Permita pop-ups para gerar o PDF'); return; }
+  try{ await registrarOrcamentoGerado(d); }catch(err){ janela.close(); toast('Erro ao salvar orçamento: '+err.message); return; }
+  janela.document.open(); janela.document.write(htmlOrcamento(d)); janela.document.close();
+  toast('Orçamento pronto para imprimir ou salvar em PDF'); renderLeads(); renderClientes();
+});
+$('#btnCopiarMsgOrcamento').addEventListener('click',()=>{ const d=dadosOrcamento(); if(d) copiarTexto(mensagemOrcamento(d)); });
+$('#btnWhatsappOrcamento').addEventListener('click',()=>{
+  const d=dadosOrcamento(); if(!d) return; const wa=telParaWa(d.cliente.telefone);
+  if(!wa){ toast('Cliente sem telefone válido'); return; }
+  window.open(wa+'?text='+encodeURIComponent(mensagemOrcamento(d)),'_blank','noopener');
+});
 
 async function sincronizarFinanceiroServico(servico, cliente){
   const valor = Number(servico.valor_orcamento || 0);
@@ -860,6 +1063,7 @@ async function abrirFicha(clienteId){
       try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('Status salvo; financeiro: '+err.message); }
       toast('✔ Status atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
     });
+    it.appendChild(montarFluxoStatus(s.status,st=>{ status.value=st; status.dispatchEvent(new Event('change')); }));
     acoes.appendChild(status);
     const bEditarServico=el('button','botao b-tel','Editar serviço');
     bEditarServico.addEventListener('click', async ()=>{
@@ -877,6 +1081,9 @@ async function abrirFicha(clienteId){
       toast('✔ Serviço atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
     });
     acoes.appendChild(bEditarServico);
+    const bOrcamento=el('button','botao b-copy','Orçamento PDF');
+    bOrcamento.addEventListener('click',()=>abrirOrcamento(cli,s,fotos||[]));
+    acoes.appendChild(bOrcamento);
     const bPagamento=el('button','botao b-ok','Pagamento');
     bPagamento.addEventListener('click',async ()=>{
       const opcao=prompt('Forma de pagamento:\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo pago agora','1');
@@ -1159,7 +1366,7 @@ async function renderInicio(){
       const d = new Date(item.criado_em);
       linha.appendChild(el('div','hora', d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})));
       const acoes = el('div','acoes');
-      const btnCriarFicha = el('button',null,'Criar ficha/lead');
+      const btnCriarFicha = el('button',null,'Criar ficha/orçamento');
       btnCriarFicha.addEventListener('click', async ()=>{
         const nome = prompt('Nome do cliente:');
         if(!nome || !nome.trim()) return;
@@ -1215,10 +1422,11 @@ async function renderInicio(){
           });
           toast('✔ Ficha e lead criados');
           carregarCaixaEntrada(); renderClientes(); renderLeads(); renderInicio();
+          if(status==='orcamento') abrirOrcamento(cliente,servicoCriado,registro.imagemUrl?[{url:registro.imagemUrl}]:[]);
         }catch(err){
           toast('Erro ao criar ficha: '+err.message);
           btnCriarFicha.disabled = false;
-          btnCriarFicha.textContent = 'Criar ficha/lead';
+          btnCriarFicha.textContent = 'Criar ficha/orçamento';
         }
       });
       acoes.appendChild(btnCriarFicha);
@@ -1266,6 +1474,7 @@ async function renderInicio(){
 /* ---------- LEADS / FUNIL ---------- */
 async function renderClientes(){
   const c = $('#painelClientes'); c.innerHTML='';
+  c.appendChild(cabecalhoPainel('📇','Clientes','Fichas, histórico, fotos e orçamentos em um só lugar'));
   const topo = el('div','card');
   const form = el('div','form');
   const campo = document.createElement('input');
@@ -1292,6 +1501,7 @@ async function renderClientes(){
 let filtroStatus = 'todos';
 async function renderLeads(){
   const c = $('#painelLeads'); c.innerHTML='';
+  c.appendChild(cabecalhoPainel('👥','Leads e produção','Acompanhe cada serviço do primeiro contato até o pagamento'));
 
   const buscaClientes = el('div','card');
   const formBusca = el('div','form');
@@ -1404,6 +1614,7 @@ async function renderLeads(){
     topo.appendChild(sel);
     it.appendChild(topo);
     if(s.titulo) it.appendChild(el('div','servico', s.titulo));
+    it.appendChild(montarFluxoStatus(s.status,st=>{ sel.value=st; sel.dispatchEvent(new Event('change')); }));
     const meta = el('div','meta');
     if(cli.cidade){ const m=el('span','tag'); m.innerHTML='<b>Cidade:</b> '+esc(cli.cidade); meta.appendChild(m); }
     if(cli.telefone){ const m=el('span','tag'); m.innerHTML='<b>Tel:</b> '+esc(cli.telefone); meta.appendChild(m); }
@@ -1480,6 +1691,7 @@ async function renderLeads(){
 /* ---------- AGENDA ---------- */
 async function renderAgenda(){
   const c = $('#painelAgenda'); c.innerHTML='';
+  c.appendChild(cabecalhoPainel('📅','Agenda','Compromissos, visitas, retiradas e entregas'));
   const s = secao('Compromissos');
   const card = el('div','card');
 
@@ -1532,6 +1744,7 @@ async function renderAgenda(){
 let escopoFin = 'empresa';
 async function renderFinanceiro(){
   const c = $('#painelFinanceiro'); c.innerHTML='';
+  c.appendChild(cabecalhoPainel('💰','Financeiro','Recebidos, valores pendentes e despesas da operação'));
 
   const toggle = el('div','toggle2');
   const bEmp = el('button', escopoFin==='empresa'?'ativo':'', '🏢 Empresa');
@@ -1636,6 +1849,7 @@ async function renderFinanceiro(){
 /* ---------- ESTOQUE ---------- */
 async function renderEstoque(){
   const c = $('#painelEstoque'); c.innerHTML='';
+  c.appendChild(cabecalhoPainel('📦','Estoque e materiais','Controle rápido do que existe e do que precisa comprar'));
   const s = secao('Estoque e materiais');
   const card = el('div','card');
 
@@ -1682,7 +1896,7 @@ async function renderEstoque(){
 iniciar();
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=5').catch(()=>{}) );
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=7').catch(()=>{}) );
 }
 </script>
 </body>
