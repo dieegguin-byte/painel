@@ -701,8 +701,14 @@ async function sincronizarFinanceiroServico(servico, cliente){
   const { data: existentes, error: erroBusca } = await sb.from('financeiro').select('*').like('descricao', marcador+'%');
   if(erroBusca) throw erroBusca;
   if(!existentes?.length){
-    if(!['agendado','producao','entregue','pago'].includes(servico.status)) return;
-    await configurarPagamentoServico(servico,cliente,'entrega');
+    if(!['producao','entregue','pago'].includes(servico.status)) return;
+    let plano='entrega';
+    if(servico.status==='producao'){
+      const opcao=prompt('O serviço entrou em produção. Como foi combinado o pagamento?\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo no cartão','1');
+      if(opcao===null) return;
+      plano=opcao.trim()==='1'?'50':opcao.trim()==='3'?'cartao':'entrega';
+    }else if(servico.status==='pago') plano='cartao';
+    await configurarPagamentoServico(servico,cliente,plano);
     return;
   }
   for(const f of existentes){
@@ -1119,7 +1125,7 @@ async function renderInicio(){
         const valorTexto = prompt('Valor do orçamento (R$, opcional):', '') || '';
         const valorOrcamento = Number(valorTexto.replace(',','.')) || null;
         let planoPagamento = null;
-        if(valorOrcamento){
+        if(valorOrcamento && ['producao','entregue','pago'].includes(status)){
           const opcaoPagamento = prompt('Forma de pagamento:\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo no cartão', '1');
           if(opcaoPagamento!==null) planoPagamento = opcaoPagamento.trim()==='1'?'50':opcaoPagamento.trim()==='3'?'cartao':'entrega';
         }
