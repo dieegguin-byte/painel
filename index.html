@@ -700,6 +700,22 @@ async function sincronizarFinanceiroServico(servico, cliente){
   const marcador = `[Serviço #${servico.id}]`;
   const { data: existentes, error: erroBusca } = await sb.from('financeiro').select('*').like('descricao', marcador+'%');
   if(erroBusca) throw erroBusca;
+  if(['lead','orcamento','agendado','perdido'].includes(servico.status)){
+    if(existentes?.length){
+      const { error }=await sb.from('financeiro').delete().like('descricao',marcador+'%');
+      if(error) throw error;
+    }
+    return;
+  }
+  const lancamentoLegado=(existentes||[]).some(f=>{
+    const d=f.descricao||'';
+    return !d.includes('Entrada 50%') && !d.includes('Saldo 50%') && !d.includes('Total na entrega') && !d.includes('Total no cartão');
+  });
+  if(servico.status==='producao' && lancamentoLegado){
+    const { error }=await sb.from('financeiro').delete().like('descricao',marcador+'%');
+    if(error) throw error;
+    existentes.length=0;
+  }
   if(!existentes?.length){
     if(!['producao','entregue','pago'].includes(servico.status)) return;
     let plano='entrega';
@@ -1124,11 +1140,6 @@ async function renderInicio(){
         const prioridade = ['baixa','media','alta'].includes(prioridadeInformada) ? prioridadeInformada : 'media';
         const valorTexto = prompt('Valor do orçamento (R$, opcional):', '') || '';
         const valorOrcamento = Number(valorTexto.replace(',','.')) || null;
-        let planoPagamento = null;
-        if(valorOrcamento && ['producao','entregue','pago'].includes(status)){
-          const opcaoPagamento = prompt('Forma de pagamento:\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo no cartão', '1');
-          if(opcaoPagamento!==null) planoPagamento = opcaoPagamento.trim()==='1'?'50':opcaoPagamento.trim()==='3'?'cartao':'entrega';
-        }
         const proximaAcao = prompt('Qual é a próxima ação?', 'Responder o cliente e confirmar os detalhes') || '';
         const prazoInformado = (prompt('Prazo da próxima ação (AAAA-MM-DD, opcional):', '') || '').trim();
         const prazo = /^\d{4}-\d{2}-\d{2}$/.test(prazoInformado) ? prazoInformado : null;
@@ -1154,7 +1165,7 @@ async function renderInicio(){
             proxima_acao: proximaAcao.trim() || null, prazo, valor_orcamento:valorOrcamento
           }).select('*').single();
           if(erroServico) throw erroServico;
-          if(planoPagamento) await configurarPagamentoServico(servicoCriado, cliente, planoPagamento);
+          if(['producao','entregue','pago'].includes(status)) await sincronizarFinanceiroServico(servicoCriado, cliente);
           if(registro.imagemUrl){
             const { error: erroFoto } = await sb.from('fotos').insert({
               cliente_id: cliente.id, url: registro.imagemUrl, tipo: 'outro'
@@ -1495,6 +1506,18 @@ async function renderFinanceiro(){
   c.appendChild(toggle);
 
   const { data, error } = await sb.from('financeiro').select('*').eq('escopo', escopoFin).order('data',{ascending:false});
+  if(!error && data?.length && escopoFin==='empresa'){
+    const ids=[...new Set(data.map(f=>(f.descricao||'').match(/^\[Serviço #([^\]]+)\]/)?.[1]).filter(Boolean))];
+    if(ids.length){
+      const { data: ligados }=await sb.from('servicos').select('id,status').in('id',ids);
+      const prematuros=new Set((ligados||[]).filter(s=>['lead','orcamento','agendado','perdido'].includes(s.status)).map(s=>String(s.id)));
+      for(const id of prematuros) await sb.from('financeiro').delete().like('descricao',`[Serviço #${id}]%`);
+      for(let i=data.length-1;i>=0;i--){
+        const id=(data[i].descricao||'').match(/^\[Serviço #([^\]]+)\]/)?.[1];
+        if(id && prematuros.has(String(id))) data.splice(i,1);
+      }
+    }
+  }
   const s = secao(escopoFin==='empresa' ? 'Financeiro da empresa' : 'Pró-labore / pessoal');
   const card = el('div','card');
 
