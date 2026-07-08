@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#7a3b1f">
-<meta name="tb-versao" content="3.3">
+<meta name="tb-versao" content="4.0">
 <title>Atendimento — Tapeçaria Bahia</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -289,6 +289,64 @@
     opacity:0; pointer-events:none; transition:.25s; z-index:100; box-shadow:var(--sombra);
   }
   #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+  /* ---------- interface moderna v7 ---------- */
+  :root{
+    --bg:#0f1115; --bg2:#15181e; --card:#1b1f27; --card2:#222732;
+    --linha:rgba(255,255,255,.085); --texto:#f7f3ef; --texto2:#c9c2bc; --fraco:#8f8a86;
+    --marrom:#c96d32; --marrom-claro:#f0a263; --creme:#fff0df;
+    --raio:18px; --sombra:0 12px 36px rgba(0,0,0,.28);
+  }
+  body{max-width:1080px;background:
+    radial-gradient(circle at 20% -10%,rgba(201,109,50,.18),transparent 34%),
+    linear-gradient(180deg,#101217 0%,#14171d 100%);background-attachment:fixed}
+  header{background:rgba(32,22,18,.84);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.08);box-shadow:0 8px 28px rgba(0,0,0,.22)}
+  .marca img{width:40px;height:40px;border-radius:12px;box-shadow:0 7px 20px rgba(0,0,0,.3)}
+  .marca h1{font-size:1.06rem;letter-spacing:-.01em}.marca .sub{font-size:.72rem}
+  main{padding:20px 18px 112px;scroll-behavior:smooth}
+  .card,.item,.resumo-card,.bloco-destaque,.chat-box{box-shadow:0 10px 28px rgba(0,0,0,.18);transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease}
+  .card,.item,.resumo-card{background:linear-gradient(145deg,rgba(30,35,44,.96),rgba(24,28,35,.96));border-color:rgba(255,255,255,.08)}
+  .item:hover,.resumo-card:hover{border-color:rgba(240,162,99,.25);transform:translateY(-1px);box-shadow:0 14px 36px rgba(0,0,0,.24)}
+  .titulo-sec{font-size:.72rem;letter-spacing:1.15px;color:#f2ab70;margin-bottom:11px}
+  .titulo-sec .cont{background:rgba(240,162,99,.12);color:#ffc08c;border:1px solid rgba(240,162,99,.14)}
+  .painel-cab{margin:2px 2px 18px;display:flex;gap:12px;align-items:center}
+  .painel-cab .icone{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(145deg,rgba(201,109,50,.28),rgba(201,109,50,.1));border:1px solid rgba(240,162,99,.2);font-size:1.2rem}
+  .painel-cab h2{margin:0;font-size:1.28rem;letter-spacing:-.025em}.painel-cab p{margin:2px 0 0;color:var(--fraco);font-size:.82rem}
+  .botao{min-height:34px;transition:transform .15s ease,filter .15s ease,box-shadow .15s ease}
+  .botao:hover{filter:brightness(1.1);box-shadow:0 6px 18px rgba(0,0,0,.18)}
+  .b-ok{background:linear-gradient(135deg,#34734b,#285d3d)}
+  .b-add,.chat-send,.botao-primario{background:linear-gradient(135deg,#d37738,#a94d24);box-shadow:0 8px 22px rgba(177,82,35,.25)}
+  .chip{background:rgba(255,255,255,.035);backdrop-filter:blur(8px);padding:8px 13px}
+  .chip.ativo{background:linear-gradient(135deg,#d37738,#a94d24);box-shadow:0 6px 16px rgba(177,82,35,.22)}
+  .form input,.form select,.form textarea,.campo{background:#12151a;border-color:rgba(255,255,255,.1);min-height:46px;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease}
+  .form input:focus,.form select:focus,.form textarea:focus,.campo:focus{outline:0;border-color:#e68c50;background:#161a20;box-shadow:0 0 0 3px rgba(230,140,80,.14)}
+  .chat-box:focus-within{border-color:#e68c50;box-shadow:0 0 0 3px rgba(230,140,80,.12),0 12px 32px rgba(0,0,0,.2)}
+  .chat-item{background:rgba(255,255,255,.025);border:1px solid var(--linha);border-radius:14px;padding:12px;margin-top:8px}
+  .status-trilha{display:flex;align-items:center;overflow-x:auto;gap:0;margin:12px 0 2px;padding:3px 1px 6px;scrollbar-width:none}
+  .status-trilha::-webkit-scrollbar{display:none}
+  .status-passo{position:relative;display:flex;align-items:center;background:none;border:0;color:var(--fraco);font-size:.64rem;padding:0 7px 0 0;cursor:pointer;white-space:nowrap}
+  .status-passo:not(:last-child)::after{content:"";width:17px;height:2px;background:var(--linha);margin-left:5px}
+  .status-passo .ponto{width:17px;height:17px;border-radius:50%;display:grid;place-items:center;background:#2a2f39;border:1px solid var(--linha);margin-right:4px;font-size:.58rem}
+  .status-passo.feito{color:#81c995}.status-passo.feito .ponto{background:#2d6843;color:#fff;border-color:#3f895b}
+  .status-passo.atual{color:#ffc08c;font-weight:700}.status-passo.atual .ponto{background:#c96d32;color:#fff;border-color:#ec975c;box-shadow:0 0 0 4px rgba(201,109,50,.14)}
+  nav.tabs{left:50%;right:auto;bottom:12px;transform:translateX(-50%);width:calc(100% - 20px);max-width:850px;border:1px solid rgba(255,255,255,.1);border-radius:20px;background:rgba(22,25,31,.9);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding:7px 7px calc(7px + env(safe-area-inset-bottom));box-shadow:0 16px 45px rgba(0,0,0,.38);overflow-x:auto;scrollbar-width:none;z-index:50}
+  nav.tabs::-webkit-scrollbar{display:none}nav.tabs button{min-width:78px;border-radius:14px;transition:background .18s ease,color .18s ease,transform .18s ease}
+  nav.tabs button.ativo{background:rgba(201,109,50,.14);color:#ffb77d;transform:translateY(-1px)}
+  nav.tabs button .ic{font-size:1.12rem;transition:transform .18s ease}nav.tabs button.ativo .ic{transform:scale(1.08)}
+  .modal-overlay{background:rgba(4,5,7,.74);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);animation:fadeIn .18s ease}
+  .modal-box{background:linear-gradient(180deg,#1c2028,#14171d);border:1px solid rgba(255,255,255,.09);box-shadow:0 -20px 60px rgba(0,0,0,.45);animation:subir .22s ease}
+  .modal-cab{position:sticky;top:-16px;z-index:3;background:rgba(26,30,37,.94);backdrop-filter:blur(16px);padding:15px 0 12px;margin-top:-1px;border-bottom:1px solid rgba(255,255,255,.06)}
+  .modal-cab h2{font-size:1.2rem;letter-spacing:-.02em}
+  .foto-grid .foto{border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.2)}
+  #toast{bottom:calc(98px + env(safe-area-inset-bottom));border:1px solid rgba(255,255,255,.1);box-shadow:0 15px 35px rgba(0,0,0,.34)}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}@keyframes subir{from{opacity:.5;transform:translateY(22px)}to{opacity:1;transform:none}}
+  @media(min-width:760px){
+    header{border-radius:0 0 20px 20px}.marca{max-width:980px;margin:auto}main{padding:26px 28px 120px}
+    .lista{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.modal-box .lista{display:flex}
+    .resumo-grid{grid-template-columns:repeat(4,1fr)}.modal-overlay{align-items:center;padding:24px}.modal-box{max-width:760px;border-radius:24px;max-height:90vh;padding:18px 22px 24px}.modal-cab{top:-18px}
+    #modalOrcamento .modal-box{max-width:900px}.foto-grid{grid-template-columns:repeat(4,1fr)}
+  }
+  @media(max-width:480px){.form .linha2{grid-template-columns:1fr}.resumo-grid{gap:8px}.resumo-card{padding:11px}.item{padding:13px}.painel-cab h2{font-size:1.15rem}}
   .oculto{display:none !important}
 </style>
 </head>
@@ -347,6 +405,7 @@
 
   <main>
     <div id="painelInicio"></div>
+    <div id="painelClientes" class="oculto"></div>
     <div id="painelLeads" class="oculto"></div>
     <div id="painelAgenda" class="oculto"></div>
     <div id="painelFinanceiro" class="oculto"></div>
@@ -355,6 +414,7 @@
 
   <nav class="tabs">
     <button data-tab="inicio" class="ativo"><span class="ic">🏠</span>Início</button>
+    <button data-tab="clientes"><span class="ic">📇</span>Clientes</button>
     <button data-tab="leads"><span class="ic">👥</span>Leads</button>
     <button data-tab="agenda"><span class="ic">📅</span>Agenda</button>
     <button data-tab="financeiro"><span class="ic">💰</span>Financeiro</button>
@@ -387,6 +447,49 @@
   </div>
 </div>
 
+<!-- MODAL: Orçamento profissional -->
+<div id="modalOrcamento" class="modal-overlay oculto">
+  <div class="modal-box">
+    <div class="modal-cab">
+      <h2>Orçamento profissional</h2>
+      <button class="modal-fechar" id="btnFecharOrcamento">✕</button>
+    </div>
+    <div class="form">
+      <div class="titulo-sec" style="margin-top:2px">Dados da empresa no PDF</div>
+      <div class="linha2">
+        <input id="orcEmpresaCnpj" type="text" placeholder="CNPJ confirmado">
+        <input id="orcEmpresaWhats" type="text" placeholder="WhatsApp da empresa">
+      </div>
+      <input id="orcEmpresaEndereco" type="text" placeholder="Endereço completo da empresa">
+      <div class="titulo-sec" style="margin-top:8px">Proposta para o cliente</div>
+      <input id="orcServico" type="text" placeholder="Serviço proposto">
+      <textarea id="orcDescricao" rows="4" placeholder="Descrição detalhada do serviço"></textarea>
+      <div class="linha2">
+        <input id="orcMedidas" type="text" placeholder="Medidas / quantidade">
+        <input id="orcMaterial" type="text" placeholder="Tecido, material e acabamento">
+      </div>
+      <div class="linha2">
+        <input id="orcValor" type="number" step="0.01" placeholder="Valor total (R$)">
+        <input id="orcPrazo" type="text" placeholder="Prazo de produção (ex.: 20 dias)">
+      </div>
+      <textarea id="orcPagamento" rows="2" placeholder="Condição de pagamento"></textarea>
+      <div class="linha2">
+        <input id="orcValidade" type="number" min="1" max="90" value="10" placeholder="Validade em dias">
+        <input id="orcGarantia" type="text" value="Garantia do serviço conforme condições apresentadas" placeholder="Garantia">
+      </div>
+      <textarea id="orcObservacoes" rows="3" placeholder="Observações adicionais"></textarea>
+      <label style="display:flex;gap:8px;align-items:center;font-size:.82rem;color:var(--texto2)">
+        <input id="orcIncluirFotos" type="checkbox" checked style="width:auto"> Incluir fotos da ficha no orçamento
+      </label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="botao b-ok" id="btnGerarOrcamento">Gerar PDF / imprimir</button>
+        <button class="botao b-copy" id="btnCopiarMsgOrcamento">Copiar mensagem</button>
+        <button class="botao b-wa" id="btnWhatsappOrcamento">Abrir WhatsApp</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 /* =========================================================================
    CONFIG
@@ -398,7 +501,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = (s, r=document) => r.querySelector(s);
 const $$ = (s, r=document) => [...r.querySelectorAll(s)];
 const el = (tag, cls, txt) => { const e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; };
-const esc = (s) => (s==null?'':String(s));
+const esc = (s) => (s==null?'':String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])));
 const mostrar = (id) => $('#'+id).classList.remove('oculto');
 const esconder = (id) => $('#'+id).classList.add('oculto');
 const hojeISO = () => {
@@ -426,7 +529,61 @@ function toast(msg){
 }
 async function copiarTexto(txt){
   try{ await navigator.clipboard.writeText(txt); toast('📋 Copiado'); }
-  catch(e){ prompt('Copie o texto:', txt); }
+  catch(e){ await askText('Copie o texto:', txt); }
+}
+
+/* ---------- modais em página (substituem prompt()/confirm() nativos) ---------- */
+function _modalBase(){
+  const fundo=el('div','modal-fundo');
+  fundo.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
+  const caixa=el('div','modal-caixa');
+  caixa.style.cssText='background:var(--card,#241d18);border:1px solid var(--linha,#3a2d24);border-radius:16px;padding:20px;max-width:360px;width:100%;box-shadow:0 6px 20px rgba(0,0,0,.35)';
+  fundo.appendChild(caixa);
+  document.body.appendChild(fundo);
+  return {fundo,caixa};
+}
+function askText(mensagem, valorPadrao=''){
+  return new Promise(resolve=>{
+    const {fundo,caixa}=_modalBase();
+    const msg=el('div',null,mensagem); msg.style.cssText='white-space:pre-wrap;margin-bottom:12px;font-size:.95rem';
+    caixa.appendChild(msg);
+    const input=document.createElement(mensagem && mensagem.length>60 ? 'textarea' : 'input');
+    if(input.tagName==='INPUT') input.type='text';
+    input.value=valorPadrao||''; input.className='campo';
+    input.style.cssText='width:100%;margin-bottom:14px;text-align:left';
+    if(input.tagName==='TEXTAREA') input.rows=3;
+    caixa.appendChild(input);
+    const linha=el('div'); linha.style.cssText='display:flex;gap:10px;justify-content:flex-end';
+    const bCancelar=el('button','botao b-rm','Cancelar'); bCancelar.type='button';
+    const bOk=el('button','botao b-ok','OK'); bOk.type='button';
+    linha.appendChild(bCancelar); linha.appendChild(bOk); caixa.appendChild(linha);
+    const fechar=(valor)=>{ fundo.remove(); resolve(valor); };
+    bCancelar.addEventListener('click', ()=>fechar(null));
+    bOk.addEventListener('click', ()=>fechar(input.value));
+    input.addEventListener('keydown', e=>{
+      if(e.key==='Enter' && input.tagName==='INPUT'){ e.preventDefault(); fechar(input.value); }
+      if(e.key==='Escape') fechar(null);
+    });
+    fundo.addEventListener('mousedown', e=>{ if(e.target===fundo) fechar(null); });
+    setTimeout(()=>{ input.focus(); input.select && input.select(); }, 0);
+  });
+}
+function askConfirm(mensagem){
+  return new Promise(resolve=>{
+    const {fundo,caixa}=_modalBase();
+    const msg=el('div',null,mensagem); msg.style.cssText='white-space:pre-wrap;margin-bottom:16px;font-size:.95rem';
+    caixa.appendChild(msg);
+    const linha=el('div'); linha.style.cssText='display:flex;gap:10px;justify-content:flex-end';
+    const bCancelar=el('button','botao b-rm','Cancelar'); bCancelar.type='button';
+    const bOk=el('button','botao b-ok','Confirmar'); bOk.type='button';
+    linha.appendChild(bCancelar); linha.appendChild(bOk); caixa.appendChild(linha);
+    const fechar=(valor)=>{ fundo.remove(); resolve(valor); };
+    bCancelar.addEventListener('click', ()=>fechar(false));
+    bOk.addEventListener('click', ()=>fechar(true));
+    fundo.addEventListener('mousedown', e=>{ if(e.target===fundo) fechar(false); });
+    document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ fechar(false); document.removeEventListener('keydown',esc);} }, {once:true});
+    setTimeout(()=>{ bOk.focus(); }, 0);
+  });
 }
 
 function montarTextoCaixa(payload={}){
@@ -464,6 +621,30 @@ async function subirPrintCaixa(file){
 }
 const STATUS_LABEL = {lead:'Novo lead', orcamento:'Orçamento', agendado:'Agendado', producao:'Em produção', entregue:'Entregue', pago:'Pago', perdido:'Perdido'};
 const STATUS_ORDEM = ['lead','orcamento','agendado','producao','entregue','pago','perdido'];
+const STATUS_FLUXO = ['lead','orcamento','agendado','producao','entregue','pago'];
+
+function cabecalhoPainel(icone,titulo,subtitulo){
+  const cab=el('div','painel-cab');
+  cab.appendChild(el('div','icone',icone));
+  const txt=el('div'); txt.appendChild(el('h2',null,titulo)); txt.appendChild(el('p',null,subtitulo));
+  cab.appendChild(txt); return cab;
+}
+
+function montarFluxoStatus(statusAtual,onEscolher){
+  const trilha=el('div','status-trilha');
+  const indice=STATUS_FLUXO.indexOf(statusAtual);
+  STATUS_FLUXO.forEach((st,i)=>{
+    const classe=i<indice?' feito':i===indice?' atual':'';
+    const b=el('button','status-passo'+classe);
+    b.type='button'; b.title='Mudar para '+STATUS_LABEL[st];
+    b.appendChild(el('span','ponto',i<indice?'✓':String(i+1)));
+    b.appendChild(document.createTextNode(STATUS_LABEL[st]));
+    if(onEscolher) b.addEventListener('click',()=>{ if(st!==statusAtual) onEscolher(st); });
+    trilha.appendChild(b);
+  });
+  if(statusAtual==='perdido') trilha.appendChild(el('span','status-passo atual','Perdido'));
+  return trilha;
+}
 
 function lerErroAuthDaUrl(){
   const hash = location.hash.startsWith('#') ? location.hash.slice(1) : location.hash;
@@ -537,7 +718,7 @@ sb.auth.onAuthStateChange((event, session) => {
 });
 
 $('#btnSair').addEventListener('click', async ()=>{
-  if(!confirm('Sair do app?')) return;
+  if(!await askConfirm('Sair do app?')) return;
   await sb.auth.signOut();
   sessionStorage.removeItem('tb_pin_ok');
   location.reload();
@@ -629,7 +810,10 @@ async function validarPin(){
   }
 }
 
+let entradaNoAppIniciada = false;
 function entrarNoApp(){
+  if(entradaNoAppIniciada) return;
+  entradaNoAppIniciada = true;
   esconder('telaDefinirPin'); esconder('telaPin'); esconder('telaLogin'); esconder('telaCarregando');
   limparHashAuth();
   $('#app').classList.remove('oculto');
@@ -639,7 +823,7 @@ function entrarNoApp(){
 /* =========================================================================
    NAVEGAÇÃO POR ABAS
    ========================================================================= */
-const PAINEIS = ['inicio','leads','agenda','financeiro','estoque'];
+const PAINEIS = ['inicio','clientes','leads','agenda','financeiro','estoque'];
 function irPara(tab){
   const btn = $$('nav.tabs button').find(b=>b.dataset.tab===tab);
   if(btn) btn.click();
@@ -656,6 +840,20 @@ $$('nav.tabs button').forEach(btn=>{
    GUIA DA IA
    ========================================================================= */
 const SECAO_LABEL = {empresa:'Sobre a empresa', como_agir:'Como a IA deve agir', regras:'Regras invioláveis'};
+const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
+- Novo lead, orçamento e agendado não geram lançamento financeiro.
+- O valor informado nesses status é apenas valor de orçamento.
+- Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
+- Pagamento 50/50 gera entrada paga e saldo a receber na entrega.
+- Cada parte pode ser Pix, dinheiro, transferência ou cartão parcelado.
+- Cartão aprovado é considerado pago; registrar também a quantidade de parcelas.
+- Gerar orçamento transforma apenas Novo lead em Orçamento; não cria financeiro.
+- O PDF deve ser revisado antes de ser enviado e nunca deve ser enviado automaticamente.
+- Nunca preencher CNPJ sem confirmação; usar somente dado cadastral atual e correto.
+- Marcar serviço como Pago atualiza os lançamentos vinculados, sem duplicar.
+- Nunca excluir ficha, foto, serviço ou lançamento sem confirmação humana.
+- Antes de criar cliente, procurar telefone existente para evitar duplicidade.
+- Alterações de valor, pagamento, prazo e status devem ser resumidas ao usuário.`;
 $('#btnGuia').addEventListener('click', abrirGuia);
 $('#btnFecharGuia').addEventListener('click', ()=> $('#modalGuia').classList.add('oculto'));
 
@@ -665,8 +863,13 @@ async function abrirGuia(){
   const { data, error } = await sb.from('guia_ia').select('*').order('secao');
   cont.innerHTML = '';
   if(error){ cont.appendChild(el('div','vazio','Erro: '+error.message)); return; }
+  const regrasAtuais=el('div','guia-bloco');
+  regrasAtuais.appendChild(el('h3',null,'Regras automáticas vigentes'));
+  const textoRegras=el('div',null,REGRAS_SISTEMA_ATUAIS);
+  textoRegras.style.whiteSpace='pre-line'; textoRegras.style.fontSize='.82rem'; textoRegras.style.color='var(--texto2)';
+  regrasAtuais.appendChild(textoRegras); cont.appendChild(regrasAtuais);
   ['empresa','como_agir','regras'].forEach(sec=>{
-    const item = (data||[]).find(d=>d.secao===sec) || {secao:sec, titulo:SECAO_LABEL[sec], conteudo:''};
+    const item = (data||[]).find(d=>d.secao===sec) || {secao:sec, titulo:SECAO_LABEL[sec], conteudo:sec==='regras'?REGRAS_SISTEMA_ATUAIS:''};
     const bloco = el('div','guia-bloco');
     bloco.appendChild(el('h3',null, SECAO_LABEL[sec]));
     const ta = document.createElement('textarea');
@@ -688,6 +891,184 @@ async function abrirGuia(){
    FICHA DO CLIENTE (com histórico + fotos)
    ========================================================================= */
 $('#btnFecharFicha').addEventListener('click', ()=> $('#modalFicha').classList.add('oculto'));
+$('#btnFecharOrcamento').addEventListener('click', ()=> $('#modalOrcamento').classList.add('oculto'));
+
+let orcamentoAtual = null;
+function abrirOrcamento(cliente,servico,fotos=[]){
+  orcamentoAtual={cliente,servico,fotos};
+  let empresa={}; try{ empresa=JSON.parse(localStorage.getItem('tb_dados_empresa_orcamento')||'{}'); }catch(e){}
+  $('#orcEmpresaCnpj').value=empresa.cnpj||'';
+  $('#orcEmpresaWhats').value=empresa.whatsapp||'(61) 99403-7524';
+  $('#orcEmpresaEndereco').value=empresa.endereco||'Rua Raquel de Queiroz, Qd 118 Lote 20 - Parque Estrela Dalva 1, Luziânia-GO, CEP 72820-150';
+  $('#orcServico').value=servico.titulo||'';
+  $('#orcDescricao').value=servico.proxima_acao ? `Serviço solicitado: ${servico.titulo}.\nDetalhes atuais: ${servico.proxima_acao}` : `Serviço solicitado: ${servico.titulo||''}.`;
+  $('#orcMedidas').value=''; $('#orcMaterial').value='';
+  $('#orcValor').value=servico.valor_orcamento||'';
+  $('#orcPrazo').value=servico.prazo ? `Previsão até ${dataCurtaBR(servico.prazo)}` : '';
+  $('#orcPagamento').value='50% na aprovação e 50% na entrega. Pix, dinheiro, transferência ou cartão, conforme combinado.';
+  $('#orcValidade').value='10';
+  $('#orcGarantia').value='Garantia do serviço conforme condições apresentadas';
+  $('#orcObservacoes').value=cliente.obs||'';
+  $('#orcIncluirFotos').checked=true;
+  $('#modalOrcamento').classList.remove('oculto');
+}
+
+function dadosOrcamento(){
+  if(!orcamentoAtual) return null;
+  const valor=Number($('#orcValor').value||0);
+  const d={
+    ...orcamentoAtual,
+    empresa:{cnpj:$('#orcEmpresaCnpj').value.trim(),whatsapp:$('#orcEmpresaWhats').value.trim(),endereco:$('#orcEmpresaEndereco').value.trim()},
+    titulo:$('#orcServico').value.trim(), descricao:$('#orcDescricao').value.trim(),
+    medidas:$('#orcMedidas').value.trim(), material:$('#orcMaterial').value.trim(), valor,
+    prazo:$('#orcPrazo').value.trim(), pagamento:$('#orcPagamento').value.trim(),
+    validade:Math.max(1,parseInt($('#orcValidade').value,10)||10),
+    garantia:$('#orcGarantia').value.trim(), observacoes:$('#orcObservacoes').value.trim(),
+    incluirFotos:$('#orcIncluirFotos').checked
+  };
+  try{ localStorage.setItem('tb_dados_empresa_orcamento',JSON.stringify(d.empresa)); }catch(e){}
+  return d;
+}
+
+function mensagemOrcamento(d){
+  return `Olá, ${d.cliente.nome||'tudo bem'}! Preparei seu orçamento personalizado para ${d.titulo||'o serviço solicitado'}.\n\nValor: ${moedaBR(d.valor)}\nPrazo: ${d.prazo||'a combinar'}\nCondição: ${d.pagamento||'a combinar'}\n\nNo PDF estão todos os detalhes da proposta. Qualquer dúvida, estou à disposição.\n\nTapeçaria e Estofados Bahia`;
+}
+
+async function registrarOrcamentoGerado(d){
+  const atualizacao={
+    titulo:d.titulo||d.servico.titulo,
+    valor_orcamento:d.valor||null,
+    sugestao_resposta:mensagemOrcamento(d),
+    atualizado_em:new Date().toISOString()
+  };
+  if(d.servico.status==='lead') atualizacao.status='orcamento';
+  const { error }=await sb.from('servicos').update(atualizacao).eq('id',d.servico.id);
+  if(error) throw error;
+  await sb.from('historico').insert({
+    o_que:`Orçamento gerado para ${d.cliente.nome||'cliente'}`, por:'diego',
+    detalhe:`${d.titulo} · ${moedaBR(d.valor)} · validade ${d.validade} dias`
+  });
+}
+
+function htmlOrcamento(d){
+  const numero='ORC-'+String(d.servico.id).slice(0,8).toUpperCase();
+  const hoje=new Date(); const validade=new Date(hoje); validade.setDate(validade.getDate()+d.validade);
+  const dataFmt=x=>x.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const logo=new URL('./icon.svg',location.href).href;
+  const fotos=d.incluirFotos ? (d.fotos||[]).slice(0,3).filter(f=>/^https?:/i.test(f.url||'')).map(f=>`<img src="${esc(f.url)}" alt="Foto do serviço">`).join('') : '';
+  const linha=(rot,val)=>val?`<div class="linha"><div class="rot">${rot}</div><div>${esc(val)}</div></div>`:'';
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${numero} - ${esc(d.cliente.nome||'Cliente')}</title><style>
+  *{box-sizing:border-box} body{margin:0;background:#eef1f4;color:#25201d;font-family:Arial,sans-serif} .pagina{width:210mm;min-height:297mm;margin:10mm auto;background:#fff;padding:17mm 17mm 14mm;box-shadow:0 3px 20px #0002;position:relative}.topo{display:flex;align-items:center;border-bottom:3px solid #b48a45;padding-bottom:12px}.logo{width:70px;height:70px;margin-right:14px}.marca h1{margin:0;color:#35251f;font-size:24px}.marca p{margin:4px 0 0;color:#745a4b}.numero{margin-left:auto;text-align:right}.numero b{display:block;color:#b48a45;font-size:17px}.cliente,.proposta,.condicoes{margin-top:20px}.titulo{font-size:12px;letter-spacing:1.3px;text-transform:uppercase;color:#9a7339;font-weight:bold;margin-bottom:8px}.grade{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}.linha{border-bottom:1px solid #eadfd6;padding:7px 0;font-size:13px}.rot{font-size:10px;text-transform:uppercase;color:#8a766b;margin-bottom:3px}.descricao{background:#faf7f3;border-left:4px solid #b48a45;padding:14px;line-height:1.55;font-size:14px;white-space:pre-wrap}.fotos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.fotos img{width:100%;height:125px;object-fit:cover;border-radius:6px}.valor{margin-top:18px;padding:15px;background:#35251f;color:#fff;display:flex;align-items:center;justify-content:space-between;border-radius:7px}.valor span{font-size:12px;text-transform:uppercase;letter-spacing:1px}.valor b{font-size:25px;color:#f1d39b}.beneficios{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}.beneficio{padding:10px;background:#faf7f3;text-align:center;font-size:12px;border-radius:5px}.rodape{position:absolute;left:17mm;right:17mm;bottom:12mm;border-top:1px solid #ddd;padding-top:8px;font-size:10px;color:#777;display:flex;justify-content:space-between}.acoes{position:fixed;top:10px;right:10px}.acoes button{padding:10px 14px;border:0;border-radius:5px;background:#35251f;color:white;cursor:pointer}@media print{body{background:#fff}.pagina{margin:0;box-shadow:none}.acoes{display:none}}@page{size:A4;margin:0}
+  </style></head><body><div class="acoes"><button onclick="window.print()">Imprimir / salvar PDF</button></div><main class="pagina">
+  <header class="topo"><img class="logo" src="${logo}" alt="Tapeçaria Bahia"><div class="marca"><h1>Tapeçaria e Estofados Bahia</h1><p>Reforma, conforto e acabamento cuidadoso · Luziânia-GO</p>${d.empresa.cnpj?`<p>CNPJ: ${esc(d.empresa.cnpj)}</p>`:''}</div><div class="numero"><b>ORÇAMENTO</b><span>${numero}</span><br><small>${dataFmt(hoje)}</small></div></header>
+  <div style="font-size:11px;color:#745a4b;margin-top:8px;line-height:1.5">${esc(d.empresa.endereco)}${d.empresa.whatsapp?`<br>WhatsApp: ${esc(d.empresa.whatsapp)}`:''}</div>
+  <section class="cliente"><div class="titulo">Preparado especialmente para</div><div class="grade">${linha('Cliente',d.cliente.nome)}${linha('Telefone',d.cliente.telefone)}${linha('Cidade',d.cliente.cidade)}${linha('Endereço',d.cliente.endereco)}</div></section>
+  <section class="proposta"><div class="titulo">Proposta de serviço</div><h2>${esc(d.titulo||'Serviço personalizado')}</h2><div class="descricao">${esc(d.descricao||'Serviço conforme avaliação e alinhamento com o cliente.')}</div>${linha('Medidas / quantidade',d.medidas)}${linha('Material e acabamento',d.material)}<div class="fotos">${fotos}</div><div class="valor"><span>Investimento total</span><b>${moedaBR(d.valor)}</b></div></section>
+  <section class="condicoes"><div class="titulo">Condições da proposta</div><div class="grade">${linha('Prazo',d.prazo||'A combinar')}${linha('Validade',`${d.validade} dias - até ${dataFmt(validade)}`)}${linha('Pagamento',d.pagamento||'A combinar')}${linha('Garantia',d.garantia)}</div>${d.observacoes?`<div class="descricao" style="margin-top:12px">${esc(d.observacoes)}</div>`:''}</section>
+  <div class="beneficios"><div class="beneficio"><b>Atendimento personalizado</b><br>Proposta pensada para o seu móvel</div><div class="beneficio"><b>Acabamento cuidadoso</b><br>Atenção aos detalhes do serviço</div><div class="beneficio"><b>Acompanhamento</b><br>Contato durante as etapas combinadas</div></div>
+  <footer class="rodape"><span>${d.empresa.cnpj?'CNPJ: '+esc(d.empresa.cnpj):'Tapeçaria e Estofados Bahia'}</span><span>WhatsApp: ${esc(d.empresa.whatsapp||'(61) 99403-7524')}</span></footer></main></body></html>`;
+}
+
+$('#btnGerarOrcamento').addEventListener('click',async ()=>{
+  const d=dadosOrcamento(); if(!d||!d.titulo||!d.valor){ toast('Preencha serviço e valor'); return; }
+  if(!d.empresa.cnpj && !await askConfirm('O CNPJ da empresa não foi preenchido. Gerar o orçamento mesmo assim?')) return;
+  const janela=window.open('','_blank'); if(!janela){ toast('Permita pop-ups para gerar o PDF'); return; }
+  try{ await registrarOrcamentoGerado(d); }catch(err){ janela.close(); toast('Erro ao salvar orçamento: '+err.message); return; }
+  janela.document.open(); janela.document.write(htmlOrcamento(d)); janela.document.close();
+  toast('Orçamento pronto para imprimir ou salvar em PDF'); renderLeads(); renderClientes();
+});
+$('#btnCopiarMsgOrcamento').addEventListener('click',()=>{ const d=dadosOrcamento(); if(d) copiarTexto(mensagemOrcamento(d)); });
+$('#btnWhatsappOrcamento').addEventListener('click',()=>{
+  const d=dadosOrcamento(); if(!d) return; const wa=telParaWa(d.cliente.telefone);
+  if(!wa){ toast('Cliente sem telefone válido'); return; }
+  window.open(wa+'?text='+encodeURIComponent(mensagemOrcamento(d)),'_blank','noopener');
+});
+
+async function sincronizarFinanceiroServico(servico, cliente){
+  const valor = Number(servico.valor_orcamento || 0);
+  if(!valor || valor <= 0) return;
+  const marcador = `[Serviço #${servico.id}]`;
+  const { data: existentes, error: erroBusca } = await sb.from('financeiro').select('*').like('descricao', marcador+'%');
+  if(erroBusca) throw erroBusca;
+  if(['lead','orcamento','agendado','perdido'].includes(servico.status)){
+    if(existentes?.length){
+      const { error }=await sb.from('financeiro').delete().like('descricao',marcador+'%');
+      if(error) throw error;
+    }
+    return;
+  }
+  const lancamentoLegado=(existentes||[]).some(f=>{
+    const d=f.descricao||'';
+    return !d.includes('Entrada 50%') && !d.includes('Saldo 50%') && !d.includes('Total na entrega') && !d.includes('Total recebido');
+  });
+  if(servico.status==='producao' && lancamentoLegado){
+    const { error }=await sb.from('financeiro').delete().like('descricao',marcador+'%');
+    if(error) throw error;
+    existentes.length=0;
+  }
+  if(!existentes?.length){
+    if(!['producao','entregue','pago'].includes(servico.status)) return;
+    let plano='entrega';
+    if(servico.status==='producao'){
+      const opcao=await askText('O serviço entrou em produção. Como foi combinado o pagamento?\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo pago agora','1');
+      if(opcao===null) return;
+      plano=opcao.trim()==='1'?'50':opcao.trim()==='3'?'agora':'entrega';
+    }else if(servico.status==='pago') plano='agora';
+    await configurarPagamentoServico(servico,cliente,plano);
+    return;
+  }
+  for(const f of existentes){
+    let novoValor=valor;
+    if((f.descricao||'').includes('50%')) novoValor=valor/2;
+    const mudanca={valor:novoValor};
+    if(servico.status==='pago') mudanca.status='pago';
+    const { error }=await sb.from('financeiro').update(mudanca).eq('id',f.id);
+    if(error) throw error;
+  }
+}
+
+async function configurarPagamentoServico(servico,cliente,plano){
+  const valor=Number(servico.valor_orcamento||0);
+  if(!valor || valor<=0) throw new Error('Informe primeiro o valor do orçamento.');
+  const marcador=`[Serviço #${servico.id}]`;
+  const nome=cliente.nome||'Cliente';
+  const hoje=new Date().toISOString().slice(0,10);
+  const base={tipo:'entrada',escopo:'empresa',categoria:'Venda/Serviço prestado',data:hoje};
+  const forma=async rotulo=>{
+    const digitada=await askText(`Forma de pagamento ${rotulo}: pix, dinheiro, cartão ou transferência`,'cartão');
+    if(digitada===null) return null;
+    const normalizada=digitada.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const nomes={pix:'Pix',dinheiro:'Dinheiro',cartao:'Cartão',transferencia:'Transferência'};
+    const nomeForma=nomes[normalizada]||digitada.trim()||'Não informada';
+    if(normalizada==='cartao'){
+      const parcelasTexto=await askText(`Em quantas parcelas no cartão ${rotulo}?`,'12');
+      if(parcelasTexto===null) return null;
+      const parcelas=Math.max(1,Math.min(24,parseInt(parcelasTexto,10)||1));
+      return `Cartão ${parcelas}x`;
+    }
+    return nomeForma;
+  };
+  let lancamentos=[];
+  if(plano==='50'){
+    const formaEntrada=await forma('da entrada'); if(!formaEntrada) return false;
+    const formaSaldo=await forma('previsto para o saldo na entrega'); if(!formaSaldo) return false;
+    lancamentos=[
+      {...base,valor:valor/2,status:'pago',descricao:`${marcador} Entrada 50% (${formaEntrada}) — ${servico.titulo} — ${nome}`},
+      {...base,valor:valor/2,status:'a_receber',descricao:`${marcador} Saldo 50% na entrega (${formaSaldo}) — ${servico.titulo} — ${nome}`}
+    ];
+  }else if(plano==='agora'){
+    const formaTotal=await forma('do valor total'); if(!formaTotal) return false;
+    lancamentos=[{...base,valor,status:'pago',descricao:`${marcador} Total recebido (${formaTotal}) — ${servico.titulo} — ${nome}`}];
+  }else{
+    const formaEntrega=await forma('previsto para a entrega'); if(!formaEntrega) return false;
+    lancamentos=[{...base,valor,status:'a_receber',descricao:`${marcador} Total na entrega (${formaEntrega}) — ${servico.titulo} — ${nome}`}];
+  }
+  const { error:erroLimpar }=await sb.from('financeiro').delete().like('descricao',marcador+'%');
+  if(erroLimpar) throw erroLimpar;
+  const { error }=await sb.from('financeiro').insert(lancamentos);
+  if(error) throw error;
+  return true;
+}
 
 async function abrirFicha(clienteId){
   if(!clienteId) return;
@@ -702,6 +1083,37 @@ async function abrirFicha(clienteId){
   if(e1){ cont.appendChild(el('div','vazio','Erro: '+e1.message)); return; }
   $('#fichaNome').textContent = cli.nome || 'Cliente';
 
+  const bEditarCliente = el('button','botao b-tel','Editar dados do cliente');
+  bEditarCliente.addEventListener('click', async ()=>{
+    const nome = await askText('Nome:', cli.nome || ''); if(nome===null || !nome.trim()) return;
+    const telefone = await askText('Telefone/WhatsApp:', cli.telefone || ''); if(telefone===null) return;
+    const cidade = await askText('Cidade:', cli.cidade || ''); if(cidade===null) return;
+    const endereco = await askText('Endereço:', cli.endereco || ''); if(endereco===null) return;
+    const obs = await askText('Observações:', cli.obs || ''); if(obs===null) return;
+    const { error } = await sb.from('clientes').update({
+      nome:nome.trim(), telefone:telefone.trim()||null, cidade:cidade.trim()||null,
+      endereco:endereco.trim()||null, obs:obs.trim()||null
+    }).eq('id', clienteId);
+    if(error){ toast('Erro: '+error.message); return; }
+    toast('✔ Ficha atualizada'); renderClientes(); renderLeads(); abrirFicha(clienteId);
+  });
+  cont.appendChild(bEditarCliente);
+  const bExcluirCliente = el('button','botao b-rm','Excluir ficha');
+  bExcluirCliente.style.marginLeft='6px';
+  bExcluirCliente.addEventListener('click', async ()=>{
+    if(!await askConfirm(`Excluir definitivamente a ficha de ${cli.nome || 'este cliente'}, seus serviços e fotos?`)) return;
+    if(!await askConfirm('Essa ação não pode ser desfeita. Confirma a exclusão?')) return;
+    try{
+      for(const s of (servicos||[])) await sb.from('financeiro').delete().like('descricao',`[Serviço #${s.id}]%`);
+      const { error:eFotos }=await sb.from('fotos').delete().eq('cliente_id',clienteId); if(eFotos) throw eFotos;
+      const { error:eServicos }=await sb.from('servicos').delete().eq('cliente_id',clienteId); if(eServicos) throw eServicos;
+      const { error:eCliente }=await sb.from('clientes').delete().eq('id',clienteId); if(eCliente) throw eCliente;
+      $('#modalFicha').classList.add('oculto');
+      toast('Ficha excluída'); renderClientes(); renderLeads(); renderFinanceiro(); renderInicio();
+    }catch(err){ toast('Erro ao excluir: '+err.message); }
+  });
+  cont.appendChild(bExcluirCliente);
+
   const campo=(rot,val)=>{ if(!val) return null; const d=el('div','ficha-campo'); d.appendChild(el('div','rot',rot)); d.appendChild(el('div','val',val)); return d; };
   [campo('Telefone', cli.telefone), campo('Cidade', cli.cidade), campo('Endereço', cli.endereco), campo('Observações', cli.obs)]
     .filter(Boolean).forEach(c=>cont.appendChild(c));
@@ -712,6 +1124,49 @@ async function abrirFicha(clienteId){
     const it=el('div','item p-'+(s.prioridade||'media'));
     it.appendChild(el('div','nome', s.titulo));
     it.appendChild(el('div','servico', STATUS_LABEL[s.status]+(s.valor_orcamento?' · '+moedaBR(Number(s.valor_orcamento)):'')));
+    const acoes = el('div','rodape');
+    const status = document.createElement('select'); status.className='status';
+    STATUS_ORDEM.forEach(st=>{ const o=document.createElement('option'); o.value=st; o.textContent=STATUS_LABEL[st]; o.selected=st===s.status; status.appendChild(o); });
+    status.addEventListener('change', async ()=>{
+      const { error } = await sb.from('servicos').update({status:status.value,atualizado_em:new Date().toISOString()}).eq('id',s.id);
+      if(error){ toast('Erro: '+error.message); status.value=s.status; return; }
+      s.status=status.value;
+      try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('Status salvo; financeiro: '+err.message); }
+      toast('✔ Status atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
+    });
+    it.appendChild(montarFluxoStatus(s.status,st=>{ status.value=st; status.dispatchEvent(new Event('change')); }));
+    acoes.appendChild(status);
+    const bEditarServico=el('button','botao b-tel','Editar serviço');
+    bEditarServico.addEventListener('click', async ()=>{
+      const titulo=await askText('Serviço:',s.titulo||''); if(titulo===null || !titulo.trim()) return;
+      const valorTexto=await askText('Valor do orçamento (R$):',s.valor_orcamento||''); if(valorTexto===null) return;
+      const prioridade=(await askText('Prioridade: baixa, media ou alta',s.prioridade||'media')||'media').toLowerCase();
+      const proxima=await askText('Próxima ação:',s.proxima_acao||''); if(proxima===null) return;
+      const prazo=await askText('Prazo (AAAA-MM-DD, opcional):',s.prazo||''); if(prazo===null) return;
+      const valor=Number(String(valorTexto).replace(',','.'))||null;
+      const alterado={titulo:titulo.trim(),valor_orcamento:valor,prioridade:['baixa','media','alta'].includes(prioridade)?prioridade:'media',proxima_acao:proxima.trim()||null,prazo:/^\d{4}-\d{2}-\d{2}$/.test(prazo)?prazo:null,atualizado_em:new Date().toISOString()};
+      const { error }=await sb.from('servicos').update(alterado).eq('id',s.id);
+      if(error){ toast('Erro: '+error.message); return; }
+      Object.assign(s,alterado);
+      try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('Serviço salvo; financeiro: '+err.message); }
+      toast('✔ Serviço atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
+    });
+    acoes.appendChild(bEditarServico);
+    const bOrcamento=el('button','botao b-copy','Orçamento PDF');
+    bOrcamento.addEventListener('click',()=>abrirOrcamento(cli,s,fotos||[]));
+    acoes.appendChild(bOrcamento);
+    const bPagamento=el('button','botao b-ok','Pagamento');
+    bPagamento.addEventListener('click',async ()=>{
+      const opcao=await askText('Forma de pagamento:\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo pago agora','1');
+      if(opcao===null) return;
+      const plano=opcao.trim()==='1'?'50':opcao.trim()==='3'?'agora':'entrega';
+      try{
+        const salvo=await configurarPagamentoServico(s,cli,plano);
+        if(!salvo) return;
+        toast('✔ Financeiro atualizado'); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
+      }catch(err){ toast('Erro no financeiro: '+err.message); }
+    });
+    acoes.appendChild(bPagamento); it.appendChild(acoes);
     lst.appendChild(it);
   }); cont.appendChild(lst); }
 
@@ -723,7 +1178,7 @@ async function abrirFicha(clienteId){
     if(f.tipo) box.appendChild(el('div','tipo-tag', f.tipo));
     const bRm = el('button','rm','✕');
     bRm.addEventListener('click', async ()=>{
-      if(!confirm('Remover esta foto?')) return;
+      if(!await askConfirm('Remover esta foto?')) return;
       await sb.from('fotos').delete().eq('id', f.id);
       abrirFicha(clienteId);
     });
@@ -773,11 +1228,13 @@ function secao(titulo, count){
    CARREGAR TUDO
    ========================================================================= */
 async function carregarTudo(){
-  await Promise.all([renderInicio(), renderLeads(), renderAgenda(), renderFinanceiro(), renderEstoque()]);
+  await Promise.all([renderInicio(), renderClientes(), renderLeads(), renderAgenda(), renderFinanceiro(), renderEstoque()]);
 }
 
 /* ---------- INÍCIO: urgente + chat de entrada + resumo ---------- */
+let geracaoRenderInicio = 0;
 async function renderInicio(){
+  const minhaGeracao = ++geracaoRenderInicio;
   const c = $('#painelInicio'); c.innerHTML='';
 
   const hojeStr = hojeISO();
@@ -787,6 +1244,7 @@ async function renderInicio(){
     sb.from('financeiro').select('id,descricao,valor,status,data').in('status',['a_pagar','a_receber']).lte('data', hojeStr),
     sb.from('caixa_entrada').select('id', { count:'exact' }).eq('processado', false),
   ]);
+  if(minhaGeracao !== geracaoRenderInicio) return;
   const leadsAbertos = leadsUrg || [];
   const agendaPendente = agUrg || [];
   const financeiroPendente = finUrg || [];
@@ -979,9 +1437,73 @@ async function renderInicio(){
       const d = new Date(item.criado_em);
       linha.appendChild(el('div','hora', d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})));
       const acoes = el('div','acoes');
+      const btnCriarFicha = el('button',null,'Criar ficha/orçamento');
+      btnCriarFicha.addEventListener('click', async ()=>{
+        const nome = await askText('Nome do cliente:');
+        if(!nome || !nome.trim()) return;
+        const telefone = await askText('Telefone/WhatsApp do cliente (opcional):', '') || '';
+        const cidade = await askText('Cidade do cliente (opcional):', '') || '';
+        const endereco = await askText('Endereço do cliente (opcional):', '') || '';
+        const tituloSugerido = (registro.texto || '').split('\n').find(l=>l.trim()) || 'Atendimento recebido';
+        const titulo = await askText('Qual serviço ou pedido deste cliente?', tituloSugerido.slice(0,80));
+        if(!titulo || !titulo.trim()) return;
+        const statusDigitado = (await askText('Status inicial: lead, orçamento, agendado ou produção', 'lead') || 'lead').trim().toLowerCase();
+        const statusInformado = statusDigitado.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+        const status = ['lead','orcamento','agendado','producao'].includes(statusInformado) ? statusInformado : 'lead';
+        const prioridadeInformada = (await askText('Prioridade: baixa, media ou alta', 'media') || 'media').trim().toLowerCase();
+        const prioridade = ['baixa','media','alta'].includes(prioridadeInformada) ? prioridadeInformada : 'media';
+        const valorTexto = await askText('Valor do orçamento (R$, opcional):', '') || '';
+        const valorOrcamento = Number(valorTexto.replace(',','.')) || null;
+        const proximaAcao = await askText('Qual é a próxima ação?', 'Responder o cliente e confirmar os detalhes') || '';
+        const prazoInformado = (await askText('Prazo da próxima ação (AAAA-MM-DD, opcional):', '') || '').trim();
+        const prazo = /^\d{4}-\d{2}-\d{2}$/.test(prazoInformado) ? prazoInformado : null;
+        btnCriarFicha.disabled = true;
+        btnCriarFicha.textContent = 'Criando…';
+        try{
+          let cliente = null;
+          if(telefone.trim()){
+            const { data: existentes, error: erroBusca } = await sb.from('clientes').select('id,nome').eq('telefone', telefone.trim()).limit(1);
+            if(erroBusca) throw erroBusca;
+            cliente = existentes?.[0] || null;
+          }
+          if(!cliente){
+            const { data: novoCliente, error: erroCliente } = await sb.from('clientes').insert({
+              nome: nome.trim(), telefone: telefone.trim() || null, cidade: cidade.trim() || null,
+              endereco: endereco.trim() || null, obs: registro.texto || null
+            }).select('id,nome').single();
+            if(erroCliente) throw erroCliente;
+            cliente = novoCliente;
+          }
+          const { data: servicoCriado, error: erroServico } = await sb.from('servicos').insert({
+            cliente_id: cliente.id, titulo: titulo.trim(), status, prioridade,
+            proxima_acao: proximaAcao.trim() || null, prazo, valor_orcamento:valorOrcamento
+          }).select('*').single();
+          if(erroServico) throw erroServico;
+          if(['producao','entregue','pago'].includes(status)) await sincronizarFinanceiroServico(servicoCriado, cliente);
+          if(registro.imagemUrl){
+            const { error: erroFoto } = await sb.from('fotos').insert({
+              cliente_id: cliente.id, url: registro.imagemUrl, tipo: 'outro'
+            });
+            if(erroFoto) throw erroFoto;
+          }
+          const { error: erroCaixa } = await sb.from('caixa_entrada').update({processado:true}).eq('id', item.id);
+          if(erroCaixa) throw erroCaixa;
+          await sb.from('historico').insert({
+            o_que:`Ficha/lead criado para ${cliente.nome || nome.trim()}`, por:'diego', detalhe:titulo.trim()
+          });
+          toast('✔ Ficha e lead criados');
+          carregarCaixaEntrada(); renderClientes(); renderLeads(); renderInicio();
+          if(status==='orcamento') abrirOrcamento(cliente,servicoCriado,registro.imagemUrl?[{url:registro.imagemUrl}]:[]);
+        }catch(err){
+          toast('Erro ao criar ficha: '+err.message);
+          btnCriarFicha.disabled = false;
+          btnCriarFicha.textContent = 'Criar ficha/orçamento';
+        }
+      });
+      acoes.appendChild(btnCriarFicha);
       const btnEditar = el('button',null,'Editar');
       btnEditar.addEventListener('click', async ()=>{
-        const novoTexto = prompt('Editar anotação:', registro.texto || '');
+        const novoTexto = await askText('Editar anotação:', registro.texto || '');
         if(novoTexto===null) return;
         const payload = montarTextoCaixa({ texto: novoTexto, imagemUrl: registro.imagemUrl, nomeArquivo: registro.nomeArquivo });
         const { error: errEdit } = await sb.from('caixa_entrada').update({ texto: payload }).eq('id', item.id);
@@ -995,7 +1517,7 @@ async function renderInicio(){
       acoes.appendChild(btnCopiar);
       const btnDel = el('button',null,'🗑');
       btnDel.addEventListener('click', async ()=>{
-        if(!confirm('Remover esta anotação?')) return;
+        if(!await askConfirm('Remover esta anotação?')) return;
         await sb.from('caixa_entrada').delete().eq('id', item.id);
         carregarCaixaEntrada();
       });
@@ -1008,7 +1530,9 @@ async function renderInicio(){
 
   // resumo rápido: leads em aberto + agenda de hoje
   const { data: servicos } = await sb.from('servicos').select('id,status,prazo,proxima_acao').not('status','in','(pago,perdido)');
+  if(minhaGeracao !== geracaoRenderInicio) return;
   const { data: agendaHoje } = await sb.from('agenda').select('id').eq('status','planejado');
+  if(minhaGeracao !== geracaoRenderInicio) return;
   const sResumo = secao('Resumo rápido');
   const card = el('div','card');
   const pendSemAcao = (servicos||[]).filter(s=>!s.proxima_acao).length;
@@ -1019,9 +1543,87 @@ async function renderInicio(){
 }
 
 /* ---------- LEADS / FUNIL ---------- */
+async function renderClientes(){
+  const c = $('#painelClientes'); c.innerHTML='';
+  c.appendChild(cabecalhoPainel('📇','Clientes','Fichas, histórico, fotos e orçamentos em um só lugar'));
+  const topo = el('div','card');
+  const form = el('div','form');
+  const campo = document.createElement('input');
+  campo.type='search'; campo.placeholder='Pesquisar por nome, telefone ou cidade';
+  form.appendChild(campo); topo.appendChild(form); c.appendChild(topo);
+  const lista = el('div','lista'); c.appendChild(lista);
+  const { data, error } = await sb.from('clientes').select('id,nome,telefone,cidade,endereco,obs').order('nome');
+  if(error){ lista.appendChild(el('div','erro','Erro: '+error.message)); return; }
+  function mostrar(){
+    const termo=campo.value.trim().toLocaleLowerCase('pt-BR'); lista.innerHTML='';
+    const filtrados=(data||[]).filter(cli=>!termo || [cli.nome,cli.telefone,cli.cidade].some(v=>(v||'').toLocaleLowerCase('pt-BR').includes(termo)));
+    if(!filtrados.length){ lista.appendChild(el('div','vazio','Nenhum cliente encontrado.')); return; }
+    filtrados.slice(0,100).forEach(cli=>{
+      const item=el('div','item');
+      item.appendChild(el('div','nome',cli.nome||'Cliente sem nome'));
+      item.appendChild(el('div','servico',[cli.telefone,cli.cidade,cli.endereco].filter(Boolean).join(' · ')||'Cadastro sem contato'));
+      const b=el('button','botao b-ok','Abrir ficha'); b.addEventListener('click',()=>abrirFicha(cli.id)); item.appendChild(b);
+      lista.appendChild(item);
+    });
+  }
+  campo.addEventListener('input',mostrar); mostrar();
+}
+
 let filtroStatus = 'todos';
 async function renderLeads(){
   const c = $('#painelLeads'); c.innerHTML='';
+  c.appendChild(cabecalhoPainel('👥','Leads e produção','Acompanhe cada serviço do primeiro contato até o pagamento'));
+
+  const buscaClientes = el('div','card');
+  const formBusca = el('div','form');
+  const linhaBusca = el('div','linha2');
+  const campoBusca = document.createElement('input');
+  campoBusca.type = 'search';
+  campoBusca.placeholder = 'Pesquisar cliente por nome, telefone ou cidade';
+  const btnBuscarCliente = el('button','botao b-ok','Pesquisar');
+  linhaBusca.appendChild(campoBusca);
+  linhaBusca.appendChild(btnBuscarCliente);
+  formBusca.appendChild(linhaBusca);
+  const resultadosBusca = el('div','lista');
+  formBusca.appendChild(resultadosBusca);
+  buscaClientes.appendChild(formBusca);
+  c.appendChild(buscaClientes);
+
+  async function pesquisarClientes(){
+    const termo = campoBusca.value.trim().toLocaleLowerCase('pt-BR');
+    resultadosBusca.innerHTML = '';
+    if(!termo){
+      resultadosBusca.appendChild(el('div','vazio','Digite um nome, telefone ou cidade.'));
+      return;
+    }
+    btnBuscarCliente.disabled = true;
+    btnBuscarCliente.textContent = 'Buscando…';
+    const { data: clientes, error: erroBusca } = await sb.from('clientes')
+      .select('id,nome,telefone,cidade').order('nome').limit(500);
+    btnBuscarCliente.disabled = false;
+    btnBuscarCliente.textContent = 'Pesquisar';
+    if(erroBusca){ resultadosBusca.appendChild(el('div','erro','Erro: '+erroBusca.message)); return; }
+    const encontrados = (clientes || []).filter(cli=>
+      [cli.nome,cli.telefone,cli.cidade].some(valor=>(valor || '').toLocaleLowerCase('pt-BR').includes(termo))
+    ).slice(0,20);
+    if(!encontrados.length){
+      resultadosBusca.appendChild(el('div','vazio','Nenhum cliente encontrado.'));
+      return;
+    }
+    encontrados.forEach(cli=>{
+      const item = el('div','item');
+      item.appendChild(el('div','nome',cli.nome || 'Cliente sem nome'));
+      item.appendChild(el('div','servico',[cli.telefone,cli.cidade].filter(Boolean).join(' · ') || 'Sem telefone ou cidade'));
+      const abrir = el('button','botao b-ok','Abrir ficha');
+      abrir.addEventListener('click',()=>abrirFicha(cli.id));
+      item.appendChild(abrir);
+      resultadosBusca.appendChild(item);
+    });
+  }
+  btnBuscarCliente.addEventListener('click', pesquisarClientes);
+  campoBusca.addEventListener('keydown', e=>{
+    if(e.key==='Enter'){ e.preventDefault(); pesquisarClientes(); }
+  });
 
   const filtros = el('div','filtros');
   const opcoes = [['todos','Todos'], ...STATUS_ORDEM.filter(s=>s!=='pago'&&s!=='perdido').map(s=>[s,STATUS_LABEL[s]])];
@@ -1075,12 +1677,15 @@ async function renderLeads(){
     STATUS_ORDEM.forEach(st=>{ const o=document.createElement('option'); o.value=st; o.textContent=STATUS_LABEL[st]; if(st===s.status) o.selected=true; sel.appendChild(o); });
     sel.addEventListener('change', async ()=>{
       await sb.from('servicos').update({status:sel.value, atualizado_em:new Date().toISOString()}).eq('id', s.id);
+      s.status = sel.value;
+      try{ await sincronizarFinanceiroServico(s, cli); }catch(err){ toast('Status salvo; financeiro: '+err.message); }
       await sb.from('historico').insert({o_que:`Status de "${s.titulo}" mudou para ${STATUS_LABEL[sel.value]}`, por:'diego'});
-      toast('Status atualizado'); renderLeads();
+      toast('Status atualizado'); renderLeads(); renderFinanceiro();
     });
     topo.appendChild(sel);
     it.appendChild(topo);
     if(s.titulo) it.appendChild(el('div','servico', s.titulo));
+    it.appendChild(montarFluxoStatus(s.status,st=>{ sel.value=st; sel.dispatchEvent(new Event('change')); }));
     const meta = el('div','meta');
     if(cli.cidade){ const m=el('span','tag'); m.innerHTML='<b>Cidade:</b> '+esc(cli.cidade); meta.appendChild(m); }
     if(cli.telefone){ const m=el('span','tag'); m.innerHTML='<b>Tel:</b> '+esc(cli.telefone); meta.appendChild(m); }
@@ -1107,13 +1712,13 @@ async function renderLeads(){
     if(tel){ const a=document.createElement('a'); a.className='botao b-tel'; a.textContent='📞'; a.href=tel; rod.appendChild(a); }
     const bConcluirAcao = el('button','botao b-ok','✔ Concluir ação');
     bConcluirAcao.addEventListener('click', async ()=>{
-      const proximo = prompt('O que foi feito agora? (fica no histórico)', s.proxima_acao || '');
+      const proximo = await askText('O que foi feito agora? (fica no histórico)', s.proxima_acao || '');
       if(proximo === null) return;
-      const novaAcao = prompt('Qual a PRÓXIMA ação? (deixe em branco se está aguardando resposta do cliente)', '');
+      const novaAcao = await askText('Qual a PRÓXIMA ação? (deixe em branco se está aguardando resposta do cliente)', '');
       if(novaAcao === null) return;
       let novoPrazo = s.prazo;
       if(!novaAcao.trim()){
-        const dataRevisao = prompt('Aguardando resposta — revisar em que data? (AAAA-MM-DD, opcional)', '');
+        const dataRevisao = await askText('Aguardando resposta — revisar em que data? (AAAA-MM-DD, opcional)', '');
         if(dataRevisao && /^\d{4}-\d{2}-\d{2}$/.test(dataRevisao.trim())) novoPrazo = dataRevisao.trim();
       }
       await sb.from('servicos').update({ proxima_acao: novaAcao.trim() || null, prazo: novoPrazo, atualizado_em: new Date().toISOString() }).eq('id', s.id);
@@ -1123,17 +1728,19 @@ async function renderLeads(){
     rod.appendChild(bConcluirAcao);
     const bEncerrarPago = el('button','botao b-ok','🏁 Pago');
     bEncerrarPago.addEventListener('click', async ()=>{
-      if(!confirm(`Encerrar "${s.titulo}" como PAGO/finalizado? Isso tira o lead da lista ativa.`)) return;
-      const motivo = prompt('Motivo/observação do encerramento (opcional):', '') || '';
+      if(!await askConfirm(`Encerrar "${s.titulo}" como PAGO/finalizado? Isso tira o lead da lista ativa.`)) return;
+      const motivo = await askText('Motivo/observação do encerramento (opcional):', '') || '';
       await sb.from('servicos').update({status:'pago'}).eq('id', s.id);
+      s.status='pago';
+      try{ await sincronizarFinanceiroServico(s, cli); }catch(err){ toast('Serviço pago; financeiro: '+err.message); }
       await sb.from('historico').insert({o_que:`"${s.titulo}" encerrado como PAGO`, por:'diego', detalhe: motivo});
-      toast('Lead encerrado (pago)'); renderLeads(); renderInicio();
+      toast('Lead encerrado (pago)'); renderLeads(); renderFinanceiro(); renderInicio();
     });
     rod.appendChild(bEncerrarPago);
     const bEncerrarPerdido = el('button','botao b-rm','❌ Perdido');
     bEncerrarPerdido.addEventListener('click', async ()=>{
-      if(!confirm(`Encerrar "${s.titulo}" como PERDIDO? Isso tira o lead da lista ativa.`)) return;
-      const motivo = prompt('Motivo do lead perdido (opcional):', '') || '';
+      if(!await askConfirm(`Encerrar "${s.titulo}" como PERDIDO? Isso tira o lead da lista ativa.`)) return;
+      const motivo = await askText('Motivo do lead perdido (opcional):', '') || '';
       await sb.from('servicos').update({status:'perdido'}).eq('id', s.id);
       await sb.from('historico').insert({o_que:`"${s.titulo}" encerrado como PERDIDO`, por:'diego', detalhe: motivo});
       toast('Lead marcado como perdido'); renderLeads(); renderInicio();
@@ -1141,7 +1748,7 @@ async function renderLeads(){
     rod.appendChild(bEncerrarPerdido);
     const bRemover = el('button','botao b-rm','🗑 Remover');
     bRemover.addEventListener('click', async ()=>{
-      if(!confirm('Remover ESTE serviço/lead completamente? Não dá pra desfazer.')) return;
+      if(!await askConfirm('Remover ESTE serviço/lead completamente? Não dá pra desfazer.')) return;
       await sb.from('servicos').delete().eq('id', s.id);
       toast('Removido'); renderLeads(); renderInicio();
     });
@@ -1155,6 +1762,7 @@ async function renderLeads(){
 /* ---------- AGENDA ---------- */
 async function renderAgenda(){
   const c = $('#painelAgenda'); c.innerHTML='';
+  c.appendChild(cabecalhoPainel('📅','Agenda','Compromissos, visitas, retiradas e entregas'));
   const s = secao('Compromissos');
   const card = el('div','card');
 
@@ -1174,7 +1782,7 @@ async function renderAgenda(){
       item.appendChild(b);
     }
     const bRm = el('button','botao b-rm','🗑');
-    bRm.addEventListener('click', async ()=>{ if(!confirm('Remover este compromisso?')) return; await sb.from('agenda').delete().eq('id',a.id); renderAgenda(); });
+    bRm.addEventListener('click', async ()=>{ if(!await askConfirm('Remover este compromisso?')) return; await sb.from('agenda').delete().eq('id',a.id); renderAgenda(); });
     item.appendChild(bRm);
     card.appendChild(item);
   });
@@ -1207,6 +1815,7 @@ async function renderAgenda(){
 let escopoFin = 'empresa';
 async function renderFinanceiro(){
   const c = $('#painelFinanceiro'); c.innerHTML='';
+  c.appendChild(cabecalhoPainel('💰','Financeiro','Recebidos, valores pendentes e despesas da operação'));
 
   const toggle = el('div','toggle2');
   const bEmp = el('button', escopoFin==='empresa'?'ativo':'', '🏢 Empresa');
@@ -1217,13 +1826,25 @@ async function renderFinanceiro(){
   c.appendChild(toggle);
 
   const { data, error } = await sb.from('financeiro').select('*').eq('escopo', escopoFin).order('data',{ascending:false});
+  if(!error && data?.length && escopoFin==='empresa'){
+    const ids=[...new Set(data.map(f=>(f.descricao||'').match(/^\[Serviço #([^\]]+)\]/)?.[1]).filter(Boolean))];
+    if(ids.length){
+      const { data: ligados }=await sb.from('servicos').select('id,status').in('id',ids);
+      const prematuros=new Set((ligados||[]).filter(s=>['lead','orcamento','agendado','perdido'].includes(s.status)).map(s=>String(s.id)));
+      for(const id of prematuros) await sb.from('financeiro').delete().like('descricao',`[Serviço #${id}]%`);
+      for(let i=data.length-1;i>=0;i--){
+        const id=(data[i].descricao||'').match(/^\[Serviço #([^\]]+)\]/)?.[1];
+        if(id && prematuros.has(String(id))) data.splice(i,1);
+      }
+    }
+  }
   const s = secao(escopoFin==='empresa' ? 'Financeiro da empresa' : 'Pró-labore / pessoal');
   const card = el('div','card');
 
   if(error){ card.appendChild(el('div','vazio','Erro: '+error.message)); }
   else {
-    const entradas = data.filter(f=>f.tipo==='entrada').reduce((a,f)=>a+Number(f.valor),0);
-    const saidas = data.filter(f=>f.tipo==='saida').reduce((a,f)=>a+Number(f.valor),0);
+    const entradas = data.filter(f=>f.tipo==='entrada' && (!f.status || f.status==='pago')).reduce((a,f)=>a+Number(f.valor),0);
+    const saidas = data.filter(f=>f.tipo==='saida' && (!f.status || f.status==='pago')).reduce((a,f)=>a+Number(f.valor),0);
     const lucro = entradas - saidas;
     const grid = el('div','fin-grid');
     const cel=(rot,val,cls)=>{ const x=el('div','fin-cel'); x.appendChild(el('div','rot',rot)); x.appendChild(el('div','val'+(cls?' '+cls:''),moedaBR(val))); return x; };
@@ -1256,7 +1877,7 @@ async function renderFinanceiro(){
       const v = el('div','v '+f.tipo, (f.tipo==='saida'?'-':'+') + moedaBR(Number(f.valor)));
       linha.appendChild(d); linha.appendChild(v);
       const bRm = el('button',null,'🗑'); bRm.style.cssText='background:none;border:0;color:var(--fraco);cursor:pointer';
-      bRm.addEventListener('click', async ()=>{ if(!confirm('Remover este lançamento?')) return; await sb.from('financeiro').delete().eq('id',f.id); renderFinanceiro(); });
+      bRm.addEventListener('click', async ()=>{ if(!await askConfirm('Remover este lançamento?')) return; await sb.from('financeiro').delete().eq('id',f.id); renderFinanceiro(); });
       linha.appendChild(bRm);
       card.appendChild(linha);
     });
@@ -1299,6 +1920,7 @@ async function renderFinanceiro(){
 /* ---------- ESTOQUE ---------- */
 async function renderEstoque(){
   const c = $('#painelEstoque'); c.innerHTML='';
+  c.appendChild(cabecalhoPainel('📦','Estoque e materiais','Controle rápido do que existe e do que precisa comprar'));
   const s = secao('Estoque e materiais');
   const card = el('div','card');
 
@@ -1312,7 +1934,7 @@ async function renderEstoque(){
     const bComprar = el('button','botao '+(it.comprar?'b-ok':'b-tel'), it.comprar?'✔ Comprado':'Marcar p/ comprar');
     bComprar.addEventListener('click', async ()=>{ await sb.from('estoque').update({comprar: !it.comprar}).eq('id',it.id); renderEstoque(); });
     linha.appendChild(bComprar);
-    const bRm = el('button','botao b-rm','🗑'); bRm.addEventListener('click', async ()=>{ if(!confirm('Remover?')) return; await sb.from('estoque').delete().eq('id',it.id); renderEstoque(); });
+    const bRm = el('button','botao b-rm','🗑'); bRm.addEventListener('click', async ()=>{ if(!await askConfirm('Remover?')) return; await sb.from('estoque').delete().eq('id',it.id); renderEstoque(); });
     linha.appendChild(bRm);
     card.appendChild(linha);
   });
@@ -1345,7 +1967,7 @@ async function renderEstoque(){
 iniciar();
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js').catch(()=>{}) );
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=8').catch(()=>{}) );
 }
 </script>
 </body>
