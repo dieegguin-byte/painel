@@ -697,24 +697,46 @@ $('#btnFecharFicha').addEventListener('click', ()=> $('#modalFicha').classList.a
 async function sincronizarFinanceiroServico(servico, cliente){
   const valor = Number(servico.valor_orcamento || 0);
   if(!valor || valor <= 0) return;
-  if(!['agendado','producao','entregue','pago'].includes(servico.status)) return;
   const marcador = `[Serviço #${servico.id}]`;
-  const descricao = `${marcador} ${servico.titulo} — ${cliente.nome || 'Cliente'}`;
-  const { data: existentes, error: erroBusca } = await sb.from('financeiro').select('id').like('descricao', marcador+'%').limit(1);
+  const { data: existentes, error: erroBusca } = await sb.from('financeiro').select('*').like('descricao', marcador+'%');
   if(erroBusca) throw erroBusca;
-  const lancamento = {
-    tipo:'entrada', escopo:'empresa', valor, descricao,
-    categoria:'Venda/Serviço prestado',
-    status: servico.status==='pago' ? 'pago' : 'a_receber',
-    data: new Date().toISOString().slice(0,10)
-  };
-  if(existentes?.length){
-    const { error } = await sb.from('financeiro').update(lancamento).eq('id', existentes[0].id);
-    if(error) throw error;
-  } else {
-    const { error } = await sb.from('financeiro').insert(lancamento);
+  if(!existentes?.length){
+    if(!['agendado','producao','entregue','pago'].includes(servico.status)) return;
+    await configurarPagamentoServico(servico,cliente,'entrega');
+    return;
+  }
+  for(const f of existentes){
+    let novoValor=valor;
+    if((f.descricao||'').includes('50%')) novoValor=valor/2;
+    const mudanca={valor:novoValor};
+    if(servico.status==='pago') mudanca.status='pago';
+    const { error }=await sb.from('financeiro').update(mudanca).eq('id',f.id);
     if(error) throw error;
   }
+}
+
+async function configurarPagamentoServico(servico,cliente,plano){
+  const valor=Number(servico.valor_orcamento||0);
+  if(!valor || valor<=0) throw new Error('Informe primeiro o valor do orçamento.');
+  const marcador=`[Serviço #${servico.id}]`;
+  const nome=cliente.nome||'Cliente';
+  const hoje=new Date().toISOString().slice(0,10);
+  const base={tipo:'entrada',escopo:'empresa',categoria:'Venda/Serviço prestado',data:hoje};
+  const { error:erroLimpar }=await sb.from('financeiro').delete().like('descricao',marcador+'%');
+  if(erroLimpar) throw erroLimpar;
+  let lancamentos=[];
+  if(plano==='50'){
+    lancamentos=[
+      {...base,valor:valor/2,status:'pago',descricao:`${marcador} Entrada 50% — ${servico.titulo} — ${nome}`},
+      {...base,valor:valor/2,status:'a_receber',descricao:`${marcador} Saldo 50% na entrega — ${servico.titulo} — ${nome}`}
+    ];
+  }else if(plano==='cartao'){
+    lancamentos=[{...base,valor,status:'pago',descricao:`${marcador} Total no cartão — ${servico.titulo} — ${nome}`}];
+  }else{
+    lancamentos=[{...base,valor,status:'a_receber',descricao:`${marcador} Total na entrega — ${servico.titulo} — ${nome}`}];
+  }
+  const { error }=await sb.from('financeiro').insert(lancamentos);
+  if(error) throw error;
 }
 
 async function abrirFicha(clienteId){
@@ -745,6 +767,21 @@ async function abrirFicha(clienteId){
     toast('✔ Ficha atualizada'); renderClientes(); renderLeads(); abrirFicha(clienteId);
   });
   cont.appendChild(bEditarCliente);
+  const bExcluirCliente = el('button','botao b-rm','Excluir ficha');
+  bExcluirCliente.style.marginLeft='6px';
+  bExcluirCliente.addEventListener('click', async ()=>{
+    if(!confirm(`Excluir definitivamente a ficha de ${cli.nome || 'este cliente'}, seus serviços e fotos?`)) return;
+    if(!confirm('Essa ação não pode ser desfeita. Confirma a exclusão?')) return;
+    try{
+      for(const s of (servicos||[])) await sb.from('financeiro').delete().like('descricao',`[Serviço #${s.id}]%`);
+      const { error:eFotos }=await sb.from('fotos').delete().eq('cliente_id',clienteId); if(eFotos) throw eFotos;
+      const { error:eServicos }=await sb.from('servicos').delete().eq('cliente_id',clienteId); if(eServicos) throw eServicos;
+      const { error:eCliente }=await sb.from('clientes').delete().eq('id',clienteId); if(eCliente) throw eCliente;
+      $('#modalFicha').classList.add('oculto');
+      toast('Ficha excluída'); renderClientes(); renderLeads(); renderFinanceiro(); renderInicio();
+    }catch(err){ toast('Erro ao excluir: '+err.message); }
+  });
+  cont.appendChild(bExcluirCliente);
 
   const campo=(rot,val)=>{ if(!val) return null; const d=el('div','ficha-campo'); d.appendChild(el('div','rot',rot)); d.appendChild(el('div','val',val)); return d; };
   [campo('Telefone', cli.telefone), campo('Cidade', cli.cidade), campo('Endereço', cli.endereco), campo('Observações', cli.obs)]
@@ -782,7 +819,18 @@ async function abrirFicha(clienteId){
       try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('Serviço salvo; financeiro: '+err.message); }
       toast('✔ Serviço atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
     });
-    acoes.appendChild(bEditarServico); it.appendChild(acoes);
+    acoes.appendChild(bEditarServico);
+    const bPagamento=el('button','botao b-ok','Pagamento');
+    bPagamento.addEventListener('click',async ()=>{
+      const opcao=prompt('Forma de pagamento:\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo no cartão','1');
+      if(opcao===null) return;
+      const plano=opcao.trim()==='1'?'50':opcao.trim()==='3'?'cartao':'entrega';
+      try{
+        await configurarPagamentoServico(s,cli,plano);
+        toast('✔ Financeiro atualizado'); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
+      }catch(err){ toast('Erro no financeiro: '+err.message); }
+    });
+    acoes.appendChild(bPagamento); it.appendChild(acoes);
     lst.appendChild(it);
   }); cont.appendChild(lst); }
 
@@ -1070,6 +1118,11 @@ async function renderInicio(){
         const prioridade = ['baixa','media','alta'].includes(prioridadeInformada) ? prioridadeInformada : 'media';
         const valorTexto = prompt('Valor do orçamento (R$, opcional):', '') || '';
         const valorOrcamento = Number(valorTexto.replace(',','.')) || null;
+        let planoPagamento = null;
+        if(valorOrcamento){
+          const opcaoPagamento = prompt('Forma de pagamento:\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo no cartão', '1');
+          if(opcaoPagamento!==null) planoPagamento = opcaoPagamento.trim()==='1'?'50':opcaoPagamento.trim()==='3'?'cartao':'entrega';
+        }
         const proximaAcao = prompt('Qual é a próxima ação?', 'Responder o cliente e confirmar os detalhes') || '';
         const prazoInformado = (prompt('Prazo da próxima ação (AAAA-MM-DD, opcional):', '') || '').trim();
         const prazo = /^\d{4}-\d{2}-\d{2}$/.test(prazoInformado) ? prazoInformado : null;
@@ -1095,7 +1148,7 @@ async function renderInicio(){
             proxima_acao: proximaAcao.trim() || null, prazo, valor_orcamento:valorOrcamento
           }).select('*').single();
           if(erroServico) throw erroServico;
-          await sincronizarFinanceiroServico(servicoCriado, cliente);
+          if(planoPagamento) await configurarPagamentoServico(servicoCriado, cliente, planoPagamento);
           if(registro.imagemUrl){
             const { error: erroFoto } = await sb.from('fotos').insert({
               cliente_id: cliente.id, url: registro.imagemUrl, tipo: 'outro'
@@ -1441,8 +1494,8 @@ async function renderFinanceiro(){
 
   if(error){ card.appendChild(el('div','vazio','Erro: '+error.message)); }
   else {
-    const entradas = data.filter(f=>f.tipo==='entrada').reduce((a,f)=>a+Number(f.valor),0);
-    const saidas = data.filter(f=>f.tipo==='saida').reduce((a,f)=>a+Number(f.valor),0);
+    const entradas = data.filter(f=>f.tipo==='entrada' && (!f.status || f.status==='pago')).reduce((a,f)=>a+Number(f.valor),0);
+    const saidas = data.filter(f=>f.tipo==='saida' && (!f.status || f.status==='pago')).reduce((a,f)=>a+Number(f.valor),0);
     const lucro = entradas - saidas;
     const grid = el('div','fin-grid');
     const cel=(rot,val,cls)=>{ const x=el('div','fin-cel'); x.appendChild(el('div','rot',rot)); x.appendChild(el('div','val'+(cls?' '+cls:''),moedaBR(val))); return x; };
@@ -1564,7 +1617,7 @@ async function renderEstoque(){
 iniciar();
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js').catch(()=>{}) );
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=4').catch(()=>{}) );
 }
 </script>
 </body>
