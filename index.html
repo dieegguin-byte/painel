@@ -694,6 +694,29 @@ async function abrirGuia(){
    ========================================================================= */
 $('#btnFecharFicha').addEventListener('click', ()=> $('#modalFicha').classList.add('oculto'));
 
+async function sincronizarFinanceiroServico(servico, cliente){
+  const valor = Number(servico.valor_orcamento || 0);
+  if(!valor || valor <= 0) return;
+  if(!['agendado','producao','entregue','pago'].includes(servico.status)) return;
+  const marcador = `[Serviço #${servico.id}]`;
+  const descricao = `${marcador} ${servico.titulo} — ${cliente.nome || 'Cliente'}`;
+  const { data: existentes, error: erroBusca } = await sb.from('financeiro').select('id').like('descricao', marcador+'%').limit(1);
+  if(erroBusca) throw erroBusca;
+  const lancamento = {
+    tipo:'entrada', escopo:'empresa', valor, descricao,
+    categoria:'Venda/Serviço prestado',
+    status: servico.status==='pago' ? 'pago' : 'a_receber',
+    data: new Date().toISOString().slice(0,10)
+  };
+  if(existentes?.length){
+    const { error } = await sb.from('financeiro').update(lancamento).eq('id', existentes[0].id);
+    if(error) throw error;
+  } else {
+    const { error } = await sb.from('financeiro').insert(lancamento);
+    if(error) throw error;
+  }
+}
+
 async function abrirFicha(clienteId){
   if(!clienteId) return;
   $('#modalFicha').classList.remove('oculto');
@@ -707,6 +730,22 @@ async function abrirFicha(clienteId){
   if(e1){ cont.appendChild(el('div','vazio','Erro: '+e1.message)); return; }
   $('#fichaNome').textContent = cli.nome || 'Cliente';
 
+  const bEditarCliente = el('button','botao b-tel','Editar dados do cliente');
+  bEditarCliente.addEventListener('click', async ()=>{
+    const nome = prompt('Nome:', cli.nome || ''); if(nome===null || !nome.trim()) return;
+    const telefone = prompt('Telefone/WhatsApp:', cli.telefone || ''); if(telefone===null) return;
+    const cidade = prompt('Cidade:', cli.cidade || ''); if(cidade===null) return;
+    const endereco = prompt('Endereço:', cli.endereco || ''); if(endereco===null) return;
+    const obs = prompt('Observações:', cli.obs || ''); if(obs===null) return;
+    const { error } = await sb.from('clientes').update({
+      nome:nome.trim(), telefone:telefone.trim()||null, cidade:cidade.trim()||null,
+      endereco:endereco.trim()||null, obs:obs.trim()||null
+    }).eq('id', clienteId);
+    if(error){ toast('Erro: '+error.message); return; }
+    toast('✔ Ficha atualizada'); renderClientes(); renderLeads(); abrirFicha(clienteId);
+  });
+  cont.appendChild(bEditarCliente);
+
   const campo=(rot,val)=>{ if(!val) return null; const d=el('div','ficha-campo'); d.appendChild(el('div','rot',rot)); d.appendChild(el('div','val',val)); return d; };
   [campo('Telefone', cli.telefone), campo('Cidade', cli.cidade), campo('Endereço', cli.endereco), campo('Observações', cli.obs)]
     .filter(Boolean).forEach(c=>cont.appendChild(c));
@@ -717,6 +756,33 @@ async function abrirFicha(clienteId){
     const it=el('div','item p-'+(s.prioridade||'media'));
     it.appendChild(el('div','nome', s.titulo));
     it.appendChild(el('div','servico', STATUS_LABEL[s.status]+(s.valor_orcamento?' · '+moedaBR(Number(s.valor_orcamento)):'')));
+    const acoes = el('div','rodape');
+    const status = document.createElement('select'); status.className='status';
+    STATUS_ORDEM.forEach(st=>{ const o=document.createElement('option'); o.value=st; o.textContent=STATUS_LABEL[st]; o.selected=st===s.status; status.appendChild(o); });
+    status.addEventListener('change', async ()=>{
+      const { error } = await sb.from('servicos').update({status:status.value,atualizado_em:new Date().toISOString()}).eq('id',s.id);
+      if(error){ toast('Erro: '+error.message); status.value=s.status; return; }
+      s.status=status.value;
+      try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('Status salvo; financeiro: '+err.message); }
+      toast('✔ Status atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
+    });
+    acoes.appendChild(status);
+    const bEditarServico=el('button','botao b-tel','Editar serviço');
+    bEditarServico.addEventListener('click', async ()=>{
+      const titulo=prompt('Serviço:',s.titulo||''); if(titulo===null || !titulo.trim()) return;
+      const valorTexto=prompt('Valor do orçamento (R$):',s.valor_orcamento||''); if(valorTexto===null) return;
+      const prioridade=(prompt('Prioridade: baixa, media ou alta',s.prioridade||'media')||'media').toLowerCase();
+      const proxima=prompt('Próxima ação:',s.proxima_acao||''); if(proxima===null) return;
+      const prazo=prompt('Prazo (AAAA-MM-DD, opcional):',s.prazo||''); if(prazo===null) return;
+      const valor=Number(String(valorTexto).replace(',','.'))||null;
+      const alterado={titulo:titulo.trim(),valor_orcamento:valor,prioridade:['baixa','media','alta'].includes(prioridade)?prioridade:'media',proxima_acao:proxima.trim()||null,prazo:/^\d{4}-\d{2}-\d{2}$/.test(prazo)?prazo:null,atualizado_em:new Date().toISOString()};
+      const { error }=await sb.from('servicos').update(alterado).eq('id',s.id);
+      if(error){ toast('Erro: '+error.message); return; }
+      Object.assign(s,alterado);
+      try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('Serviço salvo; financeiro: '+err.message); }
+      toast('✔ Serviço atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
+    });
+    acoes.appendChild(bEditarServico); it.appendChild(acoes);
     lst.appendChild(it);
   }); cont.appendChild(lst); }
 
@@ -997,10 +1063,13 @@ async function renderInicio(){
         const tituloSugerido = (registro.texto || '').split('\n').find(l=>l.trim()) || 'Atendimento recebido';
         const titulo = prompt('Qual serviço ou pedido deste cliente?', tituloSugerido.slice(0,80));
         if(!titulo || !titulo.trim()) return;
-        const statusInformado = (prompt('Status inicial: lead, orcamento, agendado ou producao', 'lead') || 'lead').trim().toLowerCase();
+        const statusDigitado = (prompt('Status inicial: lead, orçamento, agendado ou produção', 'lead') || 'lead').trim().toLowerCase();
+        const statusInformado = statusDigitado.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
         const status = ['lead','orcamento','agendado','producao'].includes(statusInformado) ? statusInformado : 'lead';
         const prioridadeInformada = (prompt('Prioridade: baixa, media ou alta', 'media') || 'media').trim().toLowerCase();
         const prioridade = ['baixa','media','alta'].includes(prioridadeInformada) ? prioridadeInformada : 'media';
+        const valorTexto = prompt('Valor do orçamento (R$, opcional):', '') || '';
+        const valorOrcamento = Number(valorTexto.replace(',','.')) || null;
         const proximaAcao = prompt('Qual é a próxima ação?', 'Responder o cliente e confirmar os detalhes') || '';
         const prazoInformado = (prompt('Prazo da próxima ação (AAAA-MM-DD, opcional):', '') || '').trim();
         const prazo = /^\d{4}-\d{2}-\d{2}$/.test(prazoInformado) ? prazoInformado : null;
@@ -1021,11 +1090,12 @@ async function renderInicio(){
             if(erroCliente) throw erroCliente;
             cliente = novoCliente;
           }
-          const { error: erroServico } = await sb.from('servicos').insert({
+          const { data: servicoCriado, error: erroServico } = await sb.from('servicos').insert({
             cliente_id: cliente.id, titulo: titulo.trim(), status, prioridade,
-            proxima_acao: proximaAcao.trim() || null, prazo
-          });
+            proxima_acao: proximaAcao.trim() || null, prazo, valor_orcamento:valorOrcamento
+          }).select('*').single();
           if(erroServico) throw erroServico;
+          await sincronizarFinanceiroServico(servicoCriado, cliente);
           if(registro.imagemUrl){
             const { error: erroFoto } = await sb.from('fotos').insert({
               cliente_id: cliente.id, url: registro.imagemUrl, tipo: 'outro'
@@ -1220,8 +1290,10 @@ async function renderLeads(){
     STATUS_ORDEM.forEach(st=>{ const o=document.createElement('option'); o.value=st; o.textContent=STATUS_LABEL[st]; if(st===s.status) o.selected=true; sel.appendChild(o); });
     sel.addEventListener('change', async ()=>{
       await sb.from('servicos').update({status:sel.value, atualizado_em:new Date().toISOString()}).eq('id', s.id);
+      s.status = sel.value;
+      try{ await sincronizarFinanceiroServico(s, cli); }catch(err){ toast('Status salvo; financeiro: '+err.message); }
       await sb.from('historico').insert({o_que:`Status de "${s.titulo}" mudou para ${STATUS_LABEL[sel.value]}`, por:'diego'});
-      toast('Status atualizado'); renderLeads();
+      toast('Status atualizado'); renderLeads(); renderFinanceiro();
     });
     topo.appendChild(sel);
     it.appendChild(topo);
@@ -1271,8 +1343,10 @@ async function renderLeads(){
       if(!confirm(`Encerrar "${s.titulo}" como PAGO/finalizado? Isso tira o lead da lista ativa.`)) return;
       const motivo = prompt('Motivo/observação do encerramento (opcional):', '') || '';
       await sb.from('servicos').update({status:'pago'}).eq('id', s.id);
+      s.status='pago';
+      try{ await sincronizarFinanceiroServico(s, cli); }catch(err){ toast('Serviço pago; financeiro: '+err.message); }
       await sb.from('historico').insert({o_que:`"${s.titulo}" encerrado como PAGO`, por:'diego', detalhe: motivo});
-      toast('Lead encerrado (pago)'); renderLeads(); renderInicio();
+      toast('Lead encerrado (pago)'); renderLeads(); renderFinanceiro(); renderInicio();
     });
     rod.appendChild(bEncerrarPago);
     const bEncerrarPerdido = el('button','botao b-rm','❌ Perdido');
