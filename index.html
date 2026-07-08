@@ -347,6 +347,7 @@
 
   <main>
     <div id="painelInicio"></div>
+    <div id="painelClientes" class="oculto"></div>
     <div id="painelLeads" class="oculto"></div>
     <div id="painelAgenda" class="oculto"></div>
     <div id="painelFinanceiro" class="oculto"></div>
@@ -355,6 +356,7 @@
 
   <nav class="tabs">
     <button data-tab="inicio" class="ativo"><span class="ic">🏠</span>Início</button>
+    <button data-tab="clientes"><span class="ic">📇</span>Clientes</button>
     <button data-tab="leads"><span class="ic">👥</span>Leads</button>
     <button data-tab="agenda"><span class="ic">📅</span>Agenda</button>
     <button data-tab="financeiro"><span class="ic">💰</span>Financeiro</button>
@@ -642,7 +644,7 @@ function entrarNoApp(){
 /* =========================================================================
    NAVEGAÇÃO POR ABAS
    ========================================================================= */
-const PAINEIS = ['inicio','leads','agenda','financeiro','estoque'];
+const PAINEIS = ['inicio','clientes','leads','agenda','financeiro','estoque'];
 function irPara(tab){
   const btn = $$('nav.tabs button').find(b=>b.dataset.tab===tab);
   if(btn) btn.click();
@@ -776,7 +778,7 @@ function secao(titulo, count){
    CARREGAR TUDO
    ========================================================================= */
 async function carregarTudo(){
-  await Promise.all([renderInicio(), renderLeads(), renderAgenda(), renderFinanceiro(), renderEstoque()]);
+  await Promise.all([renderInicio(), renderClientes(), renderLeads(), renderAgenda(), renderFinanceiro(), renderEstoque()]);
 }
 
 /* ---------- INÍCIO: urgente + chat de entrada + resumo ---------- */
@@ -990,10 +992,18 @@ async function renderInicio(){
         const nome = prompt('Nome do cliente:');
         if(!nome || !nome.trim()) return;
         const telefone = prompt('Telefone/WhatsApp do cliente (opcional):', '') || '';
+        const cidade = prompt('Cidade do cliente (opcional):', '') || '';
+        const endereco = prompt('Endereço do cliente (opcional):', '') || '';
         const tituloSugerido = (registro.texto || '').split('\n').find(l=>l.trim()) || 'Atendimento recebido';
         const titulo = prompt('Qual serviço ou pedido deste cliente?', tituloSugerido.slice(0,80));
         if(!titulo || !titulo.trim()) return;
+        const statusInformado = (prompt('Status inicial: lead, orcamento, agendado ou producao', 'lead') || 'lead').trim().toLowerCase();
+        const status = ['lead','orcamento','agendado','producao'].includes(statusInformado) ? statusInformado : 'lead';
+        const prioridadeInformada = (prompt('Prioridade: baixa, media ou alta', 'media') || 'media').trim().toLowerCase();
+        const prioridade = ['baixa','media','alta'].includes(prioridadeInformada) ? prioridadeInformada : 'media';
         const proximaAcao = prompt('Qual é a próxima ação?', 'Responder o cliente e confirmar os detalhes') || '';
+        const prazoInformado = (prompt('Prazo da próxima ação (AAAA-MM-DD, opcional):', '') || '').trim();
+        const prazo = /^\d{4}-\d{2}-\d{2}$/.test(prazoInformado) ? prazoInformado : null;
         btnCriarFicha.disabled = true;
         btnCriarFicha.textContent = 'Criando…';
         try{
@@ -1005,14 +1015,15 @@ async function renderInicio(){
           }
           if(!cliente){
             const { data: novoCliente, error: erroCliente } = await sb.from('clientes').insert({
-              nome: nome.trim(), telefone: telefone.trim() || null, obs: registro.texto || null
+              nome: nome.trim(), telefone: telefone.trim() || null, cidade: cidade.trim() || null,
+              endereco: endereco.trim() || null, obs: registro.texto || null
             }).select('id,nome').single();
             if(erroCliente) throw erroCliente;
             cliente = novoCliente;
           }
           const { error: erroServico } = await sb.from('servicos').insert({
-            cliente_id: cliente.id, titulo: titulo.trim(), status: 'lead', prioridade: 'media',
-            proxima_acao: proximaAcao.trim() || null
+            cliente_id: cliente.id, titulo: titulo.trim(), status, prioridade,
+            proxima_acao: proximaAcao.trim() || null, prazo
           });
           if(erroServico) throw erroServico;
           if(registro.imagemUrl){
@@ -1027,7 +1038,7 @@ async function renderInicio(){
             o_que:`Ficha/lead criado para ${cliente.nome || nome.trim()}`, por:'diego', detalhe:titulo.trim()
           });
           toast('✔ Ficha e lead criados');
-          carregarCaixaEntrada(); renderLeads(); renderInicio();
+          carregarCaixaEntrada(); renderClientes(); renderLeads(); renderInicio();
         }catch(err){
           toast('Erro ao criar ficha: '+err.message);
           btnCriarFicha.disabled = false;
@@ -1077,6 +1088,31 @@ async function renderInicio(){
 }
 
 /* ---------- LEADS / FUNIL ---------- */
+async function renderClientes(){
+  const c = $('#painelClientes'); c.innerHTML='';
+  const topo = el('div','card');
+  const form = el('div','form');
+  const campo = document.createElement('input');
+  campo.type='search'; campo.placeholder='Pesquisar por nome, telefone ou cidade';
+  form.appendChild(campo); topo.appendChild(form); c.appendChild(topo);
+  const lista = el('div','lista'); c.appendChild(lista);
+  const { data, error } = await sb.from('clientes').select('id,nome,telefone,cidade,endereco,obs').order('nome');
+  if(error){ lista.appendChild(el('div','erro','Erro: '+error.message)); return; }
+  function mostrar(){
+    const termo=campo.value.trim().toLocaleLowerCase('pt-BR'); lista.innerHTML='';
+    const filtrados=(data||[]).filter(cli=>!termo || [cli.nome,cli.telefone,cli.cidade].some(v=>(v||'').toLocaleLowerCase('pt-BR').includes(termo)));
+    if(!filtrados.length){ lista.appendChild(el('div','vazio','Nenhum cliente encontrado.')); return; }
+    filtrados.slice(0,100).forEach(cli=>{
+      const item=el('div','item');
+      item.appendChild(el('div','nome',cli.nome||'Cliente sem nome'));
+      item.appendChild(el('div','servico',[cli.telefone,cli.cidade,cli.endereco].filter(Boolean).join(' · ')||'Cadastro sem contato'));
+      const b=el('button','botao b-ok','Abrir ficha'); b.addEventListener('click',()=>abrirFicha(cli.id)); item.appendChild(b);
+      lista.appendChild(item);
+    });
+  }
+  campo.addEventListener('input',mostrar); mostrar();
+}
+
 let filtroStatus = 'todos';
 async function renderLeads(){
   const c = $('#painelLeads'); c.innerHTML='';
