@@ -455,13 +455,6 @@
       <button class="modal-fechar" id="btnFecharOrcamento">✕</button>
     </div>
     <div class="form">
-      <div class="titulo-sec" style="margin-top:2px">Dados da empresa no PDF</div>
-      <div class="linha2">
-        <input id="orcEmpresaCnpj" type="text" placeholder="CNPJ confirmado">
-        <input id="orcEmpresaWhats" type="text" placeholder="WhatsApp da empresa">
-      </div>
-      <input id="orcEmpresaEndereco" type="text" placeholder="Endereço completo da empresa">
-      <div class="titulo-sec" style="margin-top:8px">Proposta para o cliente</div>
       <input id="orcServico" type="text" placeholder="Serviço proposto">
       <textarea id="orcDescricao" rows="4" placeholder="Descrição detalhada do serviço"></textarea>
       <div class="linha2">
@@ -849,7 +842,6 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - Cartão aprovado é considerado pago; registrar também a quantidade de parcelas.
 - Gerar orçamento transforma apenas Novo lead em Orçamento; não cria financeiro.
 - O PDF deve ser revisado antes de ser enviado e nunca deve ser enviado automaticamente.
-- Nunca preencher CNPJ sem confirmação; usar somente dado cadastral atual e correto.
 - Marcar serviço como Pago atualiza os lançamentos vinculados, sem duplicar.
 - Nunca excluir ficha, foto, serviço ou lançamento sem confirmação humana.
 - Antes de criar cliente, procurar telefone existente para evitar duplicidade.
@@ -896,10 +888,6 @@ $('#btnFecharOrcamento').addEventListener('click', ()=> $('#modalOrcamento').cla
 let orcamentoAtual = null;
 function abrirOrcamento(cliente,servico,fotos=[]){
   orcamentoAtual={cliente,servico,fotos};
-  let empresa={}; try{ empresa=JSON.parse(localStorage.getItem('tb_dados_empresa_orcamento')||'{}'); }catch(e){}
-  $('#orcEmpresaCnpj').value=empresa.cnpj||'';
-  $('#orcEmpresaWhats').value=empresa.whatsapp||'(61) 99403-7524';
-  $('#orcEmpresaEndereco').value=empresa.endereco||'Rua Raquel de Queiroz, Qd 118 Lote 20 - Parque Estrela Dalva 1, Luziânia-GO, CEP 72820-150';
   $('#orcServico').value=servico.titulo||'';
   $('#orcDescricao').value=servico.proxima_acao ? `Serviço solicitado: ${servico.titulo}.\nDetalhes atuais: ${servico.proxima_acao}` : `Serviço solicitado: ${servico.titulo||''}.`;
   $('#orcMedidas').value=''; $('#orcMaterial').value='';
@@ -916,9 +904,8 @@ function abrirOrcamento(cliente,servico,fotos=[]){
 function dadosOrcamento(){
   if(!orcamentoAtual) return null;
   const valor=Number($('#orcValor').value||0);
-  const d={
+  return {
     ...orcamentoAtual,
-    empresa:{cnpj:$('#orcEmpresaCnpj').value.trim(),whatsapp:$('#orcEmpresaWhats').value.trim(),endereco:$('#orcEmpresaEndereco').value.trim()},
     titulo:$('#orcServico').value.trim(), descricao:$('#orcDescricao').value.trim(),
     medidas:$('#orcMedidas').value.trim(), material:$('#orcMaterial').value.trim(), valor,
     prazo:$('#orcPrazo').value.trim(), pagamento:$('#orcPagamento').value.trim(),
@@ -926,8 +913,6 @@ function dadosOrcamento(){
     garantia:$('#orcGarantia').value.trim(), observacoes:$('#orcObservacoes').value.trim(),
     incluirFotos:$('#orcIncluirFotos').checked
   };
-  try{ localStorage.setItem('tb_dados_empresa_orcamento',JSON.stringify(d.empresa)); }catch(e){}
-  return d;
 }
 
 function mensagemOrcamento(d){
@@ -960,18 +945,16 @@ function htmlOrcamento(d){
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${numero} - ${esc(d.cliente.nome||'Cliente')}</title><style>
   *{box-sizing:border-box} body{margin:0;background:#eef1f4;color:#25201d;font-family:Arial,sans-serif} .pagina{width:210mm;min-height:297mm;margin:10mm auto;background:#fff;padding:17mm 17mm 14mm;box-shadow:0 3px 20px #0002;position:relative}.topo{display:flex;align-items:center;border-bottom:3px solid #b48a45;padding-bottom:12px}.logo{width:70px;height:70px;margin-right:14px}.marca h1{margin:0;color:#35251f;font-size:24px}.marca p{margin:4px 0 0;color:#745a4b}.numero{margin-left:auto;text-align:right}.numero b{display:block;color:#b48a45;font-size:17px}.cliente,.proposta,.condicoes{margin-top:20px}.titulo{font-size:12px;letter-spacing:1.3px;text-transform:uppercase;color:#9a7339;font-weight:bold;margin-bottom:8px}.grade{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}.linha{border-bottom:1px solid #eadfd6;padding:7px 0;font-size:13px}.rot{font-size:10px;text-transform:uppercase;color:#8a766b;margin-bottom:3px}.descricao{background:#faf7f3;border-left:4px solid #b48a45;padding:14px;line-height:1.55;font-size:14px;white-space:pre-wrap}.fotos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.fotos img{width:100%;height:125px;object-fit:cover;border-radius:6px}.valor{margin-top:18px;padding:15px;background:#35251f;color:#fff;display:flex;align-items:center;justify-content:space-between;border-radius:7px}.valor span{font-size:12px;text-transform:uppercase;letter-spacing:1px}.valor b{font-size:25px;color:#f1d39b}.beneficios{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}.beneficio{padding:10px;background:#faf7f3;text-align:center;font-size:12px;border-radius:5px}.rodape{position:absolute;left:17mm;right:17mm;bottom:12mm;border-top:1px solid #ddd;padding-top:8px;font-size:10px;color:#777;display:flex;justify-content:space-between}.acoes{position:fixed;top:10px;right:10px}.acoes button{padding:10px 14px;border:0;border-radius:5px;background:#35251f;color:white;cursor:pointer}@media print{body{background:#fff}.pagina{margin:0;box-shadow:none}.acoes{display:none}}@page{size:A4;margin:0}
   </style></head><body><div class="acoes"><button onclick="window.print()">Imprimir / salvar PDF</button></div><main class="pagina">
-  <header class="topo"><img class="logo" src="${logo}" alt="Tapeçaria Bahia"><div class="marca"><h1>Tapeçaria e Estofados Bahia</h1><p>Reforma, conforto e acabamento cuidadoso · Luziânia-GO</p>${d.empresa.cnpj?`<p>CNPJ: ${esc(d.empresa.cnpj)}</p>`:''}</div><div class="numero"><b>ORÇAMENTO</b><span>${numero}</span><br><small>${dataFmt(hoje)}</small></div></header>
-  <div style="font-size:11px;color:#745a4b;margin-top:8px;line-height:1.5">${esc(d.empresa.endereco)}${d.empresa.whatsapp?`<br>WhatsApp: ${esc(d.empresa.whatsapp)}`:''}</div>
+  <header class="topo"><img class="logo" src="${logo}" alt="Tapeçaria Bahia"><div class="marca"><h1>Tapeçaria e Estofados Bahia</h1><p>Reforma, conforto e acabamento cuidadoso · Luziânia-GO</p></div><div class="numero"><b>ORÇAMENTO</b><span>${numero}</span><br><small>${dataFmt(hoje)}</small></div></header>
   <section class="cliente"><div class="titulo">Preparado especialmente para</div><div class="grade">${linha('Cliente',d.cliente.nome)}${linha('Telefone',d.cliente.telefone)}${linha('Cidade',d.cliente.cidade)}${linha('Endereço',d.cliente.endereco)}</div></section>
   <section class="proposta"><div class="titulo">Proposta de serviço</div><h2>${esc(d.titulo||'Serviço personalizado')}</h2><div class="descricao">${esc(d.descricao||'Serviço conforme avaliação e alinhamento com o cliente.')}</div>${linha('Medidas / quantidade',d.medidas)}${linha('Material e acabamento',d.material)}<div class="fotos">${fotos}</div><div class="valor"><span>Investimento total</span><b>${moedaBR(d.valor)}</b></div></section>
   <section class="condicoes"><div class="titulo">Condições da proposta</div><div class="grade">${linha('Prazo',d.prazo||'A combinar')}${linha('Validade',`${d.validade} dias - até ${dataFmt(validade)}`)}${linha('Pagamento',d.pagamento||'A combinar')}${linha('Garantia',d.garantia)}</div>${d.observacoes?`<div class="descricao" style="margin-top:12px">${esc(d.observacoes)}</div>`:''}</section>
   <div class="beneficios"><div class="beneficio"><b>Atendimento personalizado</b><br>Proposta pensada para o seu móvel</div><div class="beneficio"><b>Acabamento cuidadoso</b><br>Atenção aos detalhes do serviço</div><div class="beneficio"><b>Acompanhamento</b><br>Contato durante as etapas combinadas</div></div>
-  <footer class="rodape"><span>${d.empresa.cnpj?'CNPJ: '+esc(d.empresa.cnpj):'Tapeçaria e Estofados Bahia'}</span><span>WhatsApp: ${esc(d.empresa.whatsapp||'(61) 99403-7524')}</span></footer></main></body></html>`;
+  <footer class="rodape"><span>Tapeçaria e Estofados Bahia</span><span>WhatsApp: (61) 99403-7524</span></footer></main></body></html>`;
 }
 
 $('#btnGerarOrcamento').addEventListener('click',async ()=>{
   const d=dadosOrcamento(); if(!d||!d.titulo||!d.valor){ toast('Preencha serviço e valor'); return; }
-  if(!d.empresa.cnpj && !await askConfirm('O CNPJ da empresa não foi preenchido. Gerar o orçamento mesmo assim?')) return;
   const janela=window.open('','_blank'); if(!janela){ toast('Permita pop-ups para gerar o PDF'); return; }
   try{ await registrarOrcamentoGerado(d); }catch(err){ janela.close(); toast('Erro ao salvar orçamento: '+err.message); return; }
   janela.document.open(); janela.document.write(htmlOrcamento(d)); janela.document.close();
@@ -1967,7 +1950,7 @@ async function renderEstoque(){
 iniciar();
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=8').catch(()=>{}) );
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=7').catch(()=>{}) );
 }
 </script>
 </body>
