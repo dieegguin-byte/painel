@@ -1,10 +1,10 @@
-/* Service worker do Painel de Atendimento - Tapeçaria Bahia (v3)
+/* Service worker do Painel de Atendimento - Tapeçaria Bahia (v5)
    Estrategia: shell (HTML/CSS/JS/icones) em network-first, cai pro cache se
    offline - garante que o app sempre tenta a versao mais nova primeiro.
    Os dados (Supabase) NAO passam pelo service worker - sao chamadas fetch
    feitas pelo proprio JS da pagina direto pra API do Supabase.
 */
-const VERSAO = 'tb-atendimento-v3';
+const VERSAO = 'tb-atendimento-v5';
 const SHELL = [
   './',
   './index.html',

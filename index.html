@@ -661,6 +661,17 @@ $$('nav.tabs button').forEach(btn=>{
    GUIA DA IA
    ========================================================================= */
 const SECAO_LABEL = {empresa:'Sobre a empresa', como_agir:'Como a IA deve agir', regras:'Regras invioláveis'};
+const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
+- Novo lead, orçamento e agendado não geram lançamento financeiro.
+- O valor informado nesses status é apenas valor de orçamento.
+- Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
+- Pagamento 50/50 gera entrada paga e saldo a receber na entrega.
+- Cada parte pode ser Pix, dinheiro, transferência ou cartão parcelado.
+- Cartão aprovado é considerado pago; registrar também a quantidade de parcelas.
+- Marcar serviço como Pago atualiza os lançamentos vinculados, sem duplicar.
+- Nunca excluir ficha, foto, serviço ou lançamento sem confirmação humana.
+- Antes de criar cliente, procurar telefone existente para evitar duplicidade.
+- Alterações de valor, pagamento, prazo e status devem ser resumidas ao usuário.`;
 $('#btnGuia').addEventListener('click', abrirGuia);
 $('#btnFecharGuia').addEventListener('click', ()=> $('#modalGuia').classList.add('oculto'));
 
@@ -670,8 +681,13 @@ async function abrirGuia(){
   const { data, error } = await sb.from('guia_ia').select('*').order('secao');
   cont.innerHTML = '';
   if(error){ cont.appendChild(el('div','vazio','Erro: '+error.message)); return; }
+  const regrasAtuais=el('div','guia-bloco');
+  regrasAtuais.appendChild(el('h3',null,'Regras automáticas vigentes'));
+  const textoRegras=el('div',null,REGRAS_SISTEMA_ATUAIS);
+  textoRegras.style.whiteSpace='pre-line'; textoRegras.style.fontSize='.82rem'; textoRegras.style.color='var(--texto2)';
+  regrasAtuais.appendChild(textoRegras); cont.appendChild(regrasAtuais);
   ['empresa','como_agir','regras'].forEach(sec=>{
-    const item = (data||[]).find(d=>d.secao===sec) || {secao:sec, titulo:SECAO_LABEL[sec], conteudo:''};
+    const item = (data||[]).find(d=>d.secao===sec) || {secao:sec, titulo:SECAO_LABEL[sec], conteudo:sec==='regras'?REGRAS_SISTEMA_ATUAIS:''};
     const bloco = el('div','guia-bloco');
     bloco.appendChild(el('h3',null, SECAO_LABEL[sec]));
     const ta = document.createElement('textarea');
@@ -709,7 +725,7 @@ async function sincronizarFinanceiroServico(servico, cliente){
   }
   const lancamentoLegado=(existentes||[]).some(f=>{
     const d=f.descricao||'';
-    return !d.includes('Entrada 50%') && !d.includes('Saldo 50%') && !d.includes('Total na entrega') && !d.includes('Total no cartão');
+    return !d.includes('Entrada 50%') && !d.includes('Saldo 50%') && !d.includes('Total na entrega') && !d.includes('Total recebido');
   });
   if(servico.status==='producao' && lancamentoLegado){
     const { error }=await sb.from('financeiro').delete().like('descricao',marcador+'%');
@@ -720,10 +736,10 @@ async function sincronizarFinanceiroServico(servico, cliente){
     if(!['producao','entregue','pago'].includes(servico.status)) return;
     let plano='entrega';
     if(servico.status==='producao'){
-      const opcao=prompt('O serviço entrou em produção. Como foi combinado o pagamento?\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo no cartão','1');
+      const opcao=prompt('O serviço entrou em produção. Como foi combinado o pagamento?\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo pago agora','1');
       if(opcao===null) return;
-      plano=opcao.trim()==='1'?'50':opcao.trim()==='3'?'cartao':'entrega';
-    }else if(servico.status==='pago') plano='cartao';
+      plano=opcao.trim()==='1'?'50':opcao.trim()==='3'?'agora':'entrega';
+    }else if(servico.status==='pago') plano='agora';
     await configurarPagamentoServico(servico,cliente,plano);
     return;
   }
@@ -744,21 +760,40 @@ async function configurarPagamentoServico(servico,cliente,plano){
   const nome=cliente.nome||'Cliente';
   const hoje=new Date().toISOString().slice(0,10);
   const base={tipo:'entrada',escopo:'empresa',categoria:'Venda/Serviço prestado',data:hoje};
-  const { error:erroLimpar }=await sb.from('financeiro').delete().like('descricao',marcador+'%');
-  if(erroLimpar) throw erroLimpar;
+  const forma=rotulo=>{
+    const digitada=prompt(`Forma de pagamento ${rotulo}: pix, dinheiro, cartão ou transferência`,'cartão');
+    if(digitada===null) return null;
+    const normalizada=digitada.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const nomes={pix:'Pix',dinheiro:'Dinheiro',cartao:'Cartão',transferencia:'Transferência'};
+    const nomeForma=nomes[normalizada]||digitada.trim()||'Não informada';
+    if(normalizada==='cartao'){
+      const parcelasTexto=prompt(`Em quantas parcelas no cartão ${rotulo}?`,'12');
+      if(parcelasTexto===null) return null;
+      const parcelas=Math.max(1,Math.min(24,parseInt(parcelasTexto,10)||1));
+      return `Cartão ${parcelas}x`;
+    }
+    return nomeForma;
+  };
   let lancamentos=[];
   if(plano==='50'){
+    const formaEntrada=forma('da entrada'); if(!formaEntrada) return false;
+    const formaSaldo=forma('previsto para o saldo na entrega'); if(!formaSaldo) return false;
     lancamentos=[
-      {...base,valor:valor/2,status:'pago',descricao:`${marcador} Entrada 50% — ${servico.titulo} — ${nome}`},
-      {...base,valor:valor/2,status:'a_receber',descricao:`${marcador} Saldo 50% na entrega — ${servico.titulo} — ${nome}`}
+      {...base,valor:valor/2,status:'pago',descricao:`${marcador} Entrada 50% (${formaEntrada}) — ${servico.titulo} — ${nome}`},
+      {...base,valor:valor/2,status:'a_receber',descricao:`${marcador} Saldo 50% na entrega (${formaSaldo}) — ${servico.titulo} — ${nome}`}
     ];
-  }else if(plano==='cartao'){
-    lancamentos=[{...base,valor,status:'pago',descricao:`${marcador} Total no cartão — ${servico.titulo} — ${nome}`}];
+  }else if(plano==='agora'){
+    const formaTotal=forma('do valor total'); if(!formaTotal) return false;
+    lancamentos=[{...base,valor,status:'pago',descricao:`${marcador} Total recebido (${formaTotal}) — ${servico.titulo} — ${nome}`}];
   }else{
-    lancamentos=[{...base,valor,status:'a_receber',descricao:`${marcador} Total na entrega — ${servico.titulo} — ${nome}`}];
+    const formaEntrega=forma('previsto para a entrega'); if(!formaEntrega) return false;
+    lancamentos=[{...base,valor,status:'a_receber',descricao:`${marcador} Total na entrega (${formaEntrega}) — ${servico.titulo} — ${nome}`}];
   }
+  const { error:erroLimpar }=await sb.from('financeiro').delete().like('descricao',marcador+'%');
+  if(erroLimpar) throw erroLimpar;
   const { error }=await sb.from('financeiro').insert(lancamentos);
   if(error) throw error;
+  return true;
 }
 
 async function abrirFicha(clienteId){
@@ -844,11 +879,12 @@ async function abrirFicha(clienteId){
     acoes.appendChild(bEditarServico);
     const bPagamento=el('button','botao b-ok','Pagamento');
     bPagamento.addEventListener('click',async ()=>{
-      const opcao=prompt('Forma de pagamento:\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo no cartão','1');
+      const opcao=prompt('Forma de pagamento:\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo pago agora','1');
       if(opcao===null) return;
-      const plano=opcao.trim()==='1'?'50':opcao.trim()==='3'?'cartao':'entrega';
+      const plano=opcao.trim()==='1'?'50':opcao.trim()==='3'?'agora':'entrega';
       try{
-        await configurarPagamentoServico(s,cli,plano);
+        const salvo=await configurarPagamentoServico(s,cli,plano);
+        if(!salvo) return;
         toast('✔ Financeiro atualizado'); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
       }catch(err){ toast('Erro no financeiro: '+err.message); }
     });
@@ -1646,7 +1682,7 @@ async function renderEstoque(){
 iniciar();
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=4').catch(()=>{}) );
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=5').catch(()=>{}) );
 }
 </script>
 </body>
