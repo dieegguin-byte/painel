@@ -994,27 +994,43 @@ const JANELAS_SEMANA = {
   5: [['08:00','11:00'],['13:00','18:00']],
   6: [['08:00','21:00']],
 };
-function todosHorariosLivres(dataISO, horariosOcupados){
+/* Compromisso remoto (ligar, mandar mensagem, pedir material) não disputa
+   hora com nada — o Diego pode "fazer" várias tarefas remotas no mesmo
+   horário (ex: mandar 3 mensagens às 09:00). Por isso a janela é ampla
+   (07h-22h, todo dia da semana) e NUNCA remove horário por já estar
+   ocupado — só presencial bloqueia horário repetido. */
+const JANELA_REMOTO = ['07:00','22:00'];
+
+function gerarSlots(ini, fim){
+  const slots=[];
+  let [h,m] = ini.split(':').map(Number);
+  const [hf,mf] = fim.split(':').map(Number);
+  while(h<hf || (h===hf && m<mf)){
+    slots.push(String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'));
+    m+=60; if(m>=60){ m-=60; h+=1; }
+  }
+  return slots;
+}
+/* Horários disponíveis pro tipo de compromisso. Presencial: respeita a
+   rotina semanal e pula horário já ocupado (só um presencial por vez).
+   Remoto: janela fixa 07h-22h, mostra todos os horários mesmo que já
+   tenha outra tarefa remota marcada ali — não é exclusivo. */
+function horariosParaTipo(dataISO, tipo, horariosOcupados){
+  if(tipo==='remoto') return gerarSlots(JANELA_REMOTO[0], JANELA_REMOTO[1]);
   const diaSemana = new Date(dataISO+'T00:00:00').getDay();
   const ocupados = new Set((horariosOcupados||[]).filter(Boolean).map(h=>h.slice(0,5)));
   const livres=[];
   for(const [ini,fim] of (JANELAS_SEMANA[diaSemana]||[])){
-    let [h,m] = ini.split(':').map(Number);
-    const [hf,mf] = fim.split(':').map(Number);
-    while(h<hf || (h===hf && m<mf)){
-      const hhmm = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
-      if(!ocupados.has(hhmm)) livres.push(hhmm);
-      m+=60; if(m>=60){ m-=60; h+=1; }
-    }
+    gerarSlots(ini,fim).forEach(h=>{ if(!ocupados.has(h)) livres.push(h); });
   }
   return livres;
 }
-function proximoHorarioLivre(dataISO, horariosOcupados){
-  return todosHorariosLivres(dataISO, horariosOcupados)[0] || null;
-}
-/* Mostra o dia inteiro (ocupado x horários livres, com cidade) antes de
-   confirmar um novo compromisso — em vez de um texto corrido de conflito. */
-function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHorario, novoTipo, horariosLivres){
+
+/* Mostra o dia inteiro (ocupado + horários possíveis, com cidade) antes de
+   confirmar um novo compromisso. Os horários são clicáveis — toca pra
+   escolher outro em vez do sugerido automaticamente. Resolve com o
+   horário escolhido (string) ou null se cancelou. */
+function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHorario, novoTipo, horariosDisponiveis){
   return new Promise(resolve=>{
     const {fundo,caixa}=_modalBase();
     caixa.style.maxWidth='400px';
@@ -1033,33 +1049,49 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
       livre.style.cssText='padding:8px 10px;border-radius:8px;background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a);margin-bottom:6px;font-size:.88rem';
       caixa.appendChild(livre);
     }
-    if(horariosLivres?.length){
-      const rotLivres = el('div',null,'Horários livres nesse dia:');
-      rotLivres.style.cssText='font-size:.78rem;color:var(--texto2,#c7b4a4);margin:10px 0 4px';
-      caixa.appendChild(rotLivres);
-      const chips = el('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
-      horariosLivres.forEach(h=>{
-        const chip = el('div',null,h);
-        const escolhido = h===novoHorario;
-        chip.style.cssText='padding:4px 9px;border-radius:20px;font-size:.8rem;'
-          + (escolhido ? 'background:var(--marrom,#b4632f);color:#fff;font-weight:700'
-                       : 'background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a)');
-        chips.appendChild(chip);
-      });
-      caixa.appendChild(chips);
-    }
-    const icNovo = novoTipo==='remoto' ? '💬' : '📍';
-    const novo = el('div',null, `➕ Novo (${icNovo} ${novoTipo}): ${novoHorario?novoHorario+' — ':''}${novoTitulo}${novaCidade?' 🏙 '+novaCidade:''}${!novoHorario?' (sem horário livre na sua rotina esse dia — revisar)':''}`);
+    let escolhido = novoHorario;
+    const rotLivres = el('div',null,'Toque pra escolher o horário:');
+    rotLivres.style.cssText='font-size:.78rem;color:var(--texto2,#c7b4a4);margin:10px 0 4px';
+    caixa.appendChild(rotLivres);
+    const chips = el('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
+    const novo = el('div');
     novo.style.cssText='padding:8px 10px;border-radius:8px;background:var(--marrom,#b4632f);color:#fff;margin:10px 0;font-size:.88rem';
+    const icNovo = novoTipo==='remoto' ? '💬' : '📍';
+    const atualizarNovo = ()=>{
+      novo.textContent = `➕ Novo (${icNovo} ${novoTipo}): ${escolhido?escolhido+' — ':''}${novoTitulo}${novaCidade?' 🏙 '+novaCidade:''}${!escolhido?' (sem horário disponível — escolha um acima ou cancele)':''}`;
+    };
+    (horariosDisponiveis||[]).forEach(h=>{
+      const chip = document.createElement('button');
+      chip.type='button'; chip.textContent=h;
+      const pintarChip = ()=>{
+        chip.style.cssText='padding:6px 12px;border-radius:20px;font-size:.85rem;border:0;cursor:pointer;min-height:32px;'
+          + (h===escolhido ? 'background:var(--marrom,#b4632f);color:#fff;font-weight:700'
+                            : 'background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a)');
+      };
+      pintarChip();
+      chip.addEventListener('click', ()=>{
+        escolhido = h;
+        chips.querySelectorAll('button').forEach(b=>{
+          const h2=b.textContent;
+          b.style.cssText='padding:6px 12px;border-radius:20px;font-size:.85rem;border:0;cursor:pointer;min-height:32px;'
+            + (h2===escolhido ? 'background:var(--marrom,#b4632f);color:#fff;font-weight:700'
+                               : 'background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a)');
+        });
+        atualizarNovo();
+      });
+      chips.appendChild(chip);
+    });
+    caixa.appendChild(chips);
+    atualizarNovo();
     caixa.appendChild(novo);
     const linhaBtn = el('div'); linhaBtn.style.cssText='display:flex;gap:10px;justify-content:flex-end';
     const bCancelar=el('button','botao b-rm','Cancelar'); bCancelar.type='button';
     const bOk=el('button','botao b-ok','Confirmar'); bOk.type='button';
     linhaBtn.appendChild(bCancelar); linhaBtn.appendChild(bOk); caixa.appendChild(linhaBtn);
     const fechar=(valor)=>{ fundo.remove(); resolve(valor); };
-    bCancelar.addEventListener('click', ()=>fechar(false));
-    bOk.addEventListener('click', ()=>fechar(true));
-    fundo.addEventListener('mousedown', e=>{ if(e.target===fundo) fechar(false); });
+    bCancelar.addEventListener('click', ()=>fechar(null));
+    bOk.addEventListener('click', ()=>fechar(escolhido));
+    fundo.addEventListener('mousedown', e=>{ if(e.target===fundo) fechar(null); });
   });
 }
 
@@ -1096,10 +1128,11 @@ async function sincronizarAgendaServico(servico, cliente, tipo){
   if(!tipo) return;
   const { data: doDia } = await sb.from('agenda').select('titulo,hora,cidade,tipo').eq('data', servico.prazo).eq('status','planejado');
   const novoTitulo = `${cliente?.nome||'Cliente'} — ${servico.titulo}`;
-  const livres = todosHorariosLivres(servico.prazo, (doDia||[]).map(a=>a.hora));
-  const horario = livres[0] || null;
+  const disponiveis = horariosParaTipo(servico.prazo, tipo, (doDia||[]).map(a=>a.hora));
+  const sugestao = disponiveis[0] || null;
   const cidadeNova = tipo==='presencial' ? (cliente?.cidade||null) : null;
-  if(!await confirmarComDiaVisivel(servico.prazo, doDia||[], novoTitulo, cidadeNova, horario, tipo, livres)) return;
+  const horario = await confirmarComDiaVisivel(servico.prazo, doDia||[], novoTitulo, cidadeNova, sugestao, tipo, disponiveis);
+  if(!horario) return;
   const { error } = await sb.from('agenda').insert({
     titulo: novoTitulo, data: servico.prazo, hora: horario, tipo,
     status:'planejado', servico_id: servico.id, cidade: cidadeNova
