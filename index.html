@@ -2050,7 +2050,14 @@ async function renderAgenda(){
     const titulo = $('#agTitulo').value.trim();
     const data = $('#agData').value;
     if(!titulo || !data){ toast('Preencha ao menos título e data'); return; }
-    const { error } = await sb.from('agenda').insert({ titulo, data, hora: $('#agHora').value || null, local: $('#agLocal').value.trim() || null, cidade: $('#agCidade').value.trim() || null });
+    let hora = $('#agHora').value || null;
+    if(!hora){
+      const { data: doDia } = await sb.from('agenda').select('hora').eq('data', data).eq('status','planejado');
+      hora = horariosParaTipo(data, 'presencial', (doDia||[]).map(a=>a.hora))[0] || null;
+      if(!hora){ toast('Nenhum compromisso pode ficar sem horário, e não sobrou horário livre nesse dia. Escolha outro dia ou informe a hora manualmente.'); return; }
+      toast('🕐 Sem horário informado — usado '+hora+' (primeiro livre do dia)');
+    }
+    const { error } = await sb.from('agenda').insert({ titulo, data, hora, local: $('#agLocal').value.trim() || null, cidade: $('#agCidade').value.trim() || null });
     if(error){ toast('Erro: '+error.message); return; }
     toast('✔ Adicionado'); renderAgenda(); renderInicio();
   });
