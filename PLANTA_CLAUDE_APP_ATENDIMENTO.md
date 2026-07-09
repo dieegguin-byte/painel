@@ -291,57 +291,63 @@ tem que aparecer **dentro do app**, não numa conversa separada. O app é o pont
 de encontro assíncrono entre o Diego e a IA — ele joga coisas cruas na Caixa de
 Entrada, a IA processa e devolve dúvidas ali, ele responde quando puder.
 
-### Como funciona hoje (implementado)
+### Versão 1 (08/07/2026 manhã, superada) — marcador na ficha
 
-- A ficha É criada mesmo com informação faltando — a IA nunca deixa de criar
-  por falta de dado.
-- Quando há uma dúvida real (não um detalhe cosmético), a IA grava em
-  `proxima_acao` do serviço o texto: `❓ AGUARDANDO VOCÊ: <pergunta objetiva>`
-  — usando o marcador `MARCADOR_AGUARDANDO` definido em `index.html`.
-- A tela Início ganha uma seção **"🟠 Aguardando você"**, acima de "Precisa de
-  atenção agora", listando todo serviço ativo cuja `proxima_acao` comece com
-  esse marcador. Tocar no item abre a ficha do cliente direto.
-- Tem também um card de resumo "Aguardando você" no topo da Início.
-- Quando o Diego responde (edita a próxima ação da ficha removendo o `❓` e
-  escrevendo o que decidiu), o item some sozinho da seção — não precisa de
-  campo novo no banco, é só o prefixo do texto.
-- **Não foi feita nenhuma alteração de schema no Supabase** — de propósito,
-  pra não depender de rodar SQL manual no dashboard. Tudo roda em cima do
-  campo `proxima_acao` que já existia.
+Primeira tentativa: gravar `❓ AGUARDANDO VOCÊ: <pergunta>` em `proxima_acao`
+do serviço. Funcionou, mas só cobria dúvida sobre cliente/serviço — itens sem
+ficha (ex: nota administrativa) ficavam sem canal, e no mesmo dia a IA ainda
+assim perguntou fora do app (no chat de conversa com o Diego) porque não tinha
+onde registrar a dúvida. **Esse mecanismo foi removido do código** em favor da
+versão 2, que resolve os dois problemas de uma vez.
 
-### O que NÃO foi implementado (proposto e descartado por enquanto)
+### Versão 2 (08/07/2026 noite, atual) — canal único na Caixa de Entrada
 
-Chegou a se cogitar transformar a Caixa de Entrada num chat de verdade (bolhas
-de mensagem, cor diferente pra IA e pro Diego, histórico da conversa). Decisão:
-adiar. Primeiro rodar o fluxo simples (`❓ AGUARDANDO VOCÊ` na próxima ação) no
-dia a dia real, ver que tipo de pergunta se repete (presencial/WhatsApp? prazo?
-medida? valor?), e só then desenhar uma UI de chat se o padrão mostrar que vale
-a pena. Não adivinhar o design agora.
+A raiz do problema da v1 não era "onde perguntar" — era que qualquer dúvida
+resolvida só dentro da sessão de chat com o Claude morre junto com a sessão
+(o PC nem fica ligado) e nenhuma IA futura sabe que ela existiu. A regra
+definitiva: **nenhuma decisão pode ficar pendente só no chat da sessão.**
+Toda dúvida em aberto tem que estar escrita no app antes da sessão terminar.
+
+Implementação: **cada item da `caixa_entrada` virou uma conversa curta com
+estado**, em vez de só texto solto. Colunas novas na tabela (Supabase, sem
+migrar dados existentes):
+
+- `status` (text, default `'novo'`): `novo` → IA ainda não olhou · `aguardando_voce`
+  → IA perguntou, é a vez do Diego · `respondido` → Diego respondeu, é a vez da
+  IA agir · `resolvido` → encerrado (equivalente a `processado:true`, os dois
+  campos são mantidos em sincronia).
+- `conversa` (jsonb, default `[]`): array de `{de:'ia'|'diego', texto, em}`.
+
+No app (`index.html`, dentro de `carregarCaixaEntrada`):
+
+- Cada item mostra a conversa como bolhas — IA à esquerda (cor neutra), Diego
+  à direita (cor da marca). Não precisou de tabela nova nem de front separado.
+- Botão **"❓ Perguntar"** (visível quando `status !== 'aguardando_voce'`): a
+  IA escreve a dúvida, o app grava em `conversa` e muda `status` para
+  `aguardando_voce`.
+- Quando `status === 'aguardando_voce'`, aparece um campo de resposta direto
+  no item — o Diego responde ali (como WhatsApp), sem abrir ficha nenhuma. Ao
+  enviar, grava em `conversa` e muda `status` para `respondido`.
+- Tela Início: card "Aguardando você" (conta itens com `status='aguardando_voce'`)
+  e seção "🟠 Aguardando você" que leva direto pra Caixa de Entrada.
+- Esse canal serve pra **qualquer item**, com ou sem cliente — a nota tipo
+  "conta da Vivo com duplicidade" cabe aqui sem precisar virar ficha forçada.
 
 ### Regra pra qualquer IA operando o app
 
-- Antes de inventar um dado que muda o resultado prático (endereço/medida real
-  não importa tanto; **presencial vs. remoto, prazo prometido, valor combinado
-  importam**), prefira marcar como "Aguardando você" a chutar.
-- Não é para toda ficha ter uma pergunta — só quando a dúvida é real e o Diego
-  precisa decidir. Ficha simples e completa não precisa de marcador nenhum.
-- Ao processar a Caixa de Entrada numa sessão futura, sempre checar a seção
-  "Aguardando você" primeiro: se o Diego já respondeu (a próxima ação não tem
-  mais o `❓`), está resolvido; se ainda tem `❓`, ainda está esperando.
-- **"Aguardando você" só existe dentro de uma ficha (`proxima_acao` de um
-  `servico`).** Se o item da Caixa de Entrada não é sobre cliente/serviço —
-  ex: nota administrativa tipo "conta da Vivo, ver duplicidade" — não force
-  a criação de uma ficha só pra caber a pergunta.
-- **Antes de perguntar qualquer coisa (aqui ou como "Aguardando você"), a IA
-  tem que primeiro tentar resolver sozinha olhando o que já existe no app**
-  (Financeiro, Clientes, Leads, Agenda, Estoque). Só vira pergunta se, depois
-  de checar, a informação realmente não está lá. Errado (aconteceu em
-  08/07/2026): a nota da Caixa de Entrada dizia "conta da Vivo com
-  duplicidade, pode excluir uma" — a IA perguntou ao Diego em vez de abrir o
-  Financeiro primeiro; ao checar depois, viu que já estava tudo consolidado
-  num lançamento só, nada pra excluir. A pergunta era desnecessária.
-- Se, mesmo depois de checar o app, a dúvida for real e o item não é sobre
-  cliente/serviço (não tem onde anexar o `❓`), **deixe o item parado na
-  Caixa de Entrada** (não processar, não apagar) até o Diego resolver
-  sozinho ou dar mais contexto. Se a dúvida for sobre um cliente/serviço,
-  use "Aguardando você" na ficha em vez de perguntar no chat de conversa.
+- **Nunca perguntar no chat de conversa da sessão.** Qualquer dúvida vira
+  `❓ Perguntar` no item da Caixa de Entrada — não importa se o item tem
+  cliente/ficha ou não.
+- **Antes de perguntar qualquer coisa, tentar resolver sozinha olhando o que
+  já existe no app** (Financeiro, Clientes, Leads, Agenda, Estoque). Só vira
+  pergunta se, depois de checar, a informação realmente não está lá. Errado
+  (aconteceu em 08/07/2026): a nota "conta da Vivo com duplicidade, pode
+  excluir uma" virou pergunta direto, sem checar o Financeiro primeiro — que
+  já mostrava tudo consolidado num lançamento só, nada pra excluir.
+- A ficha do cliente É criada mesmo com informação faltando quando o dado que
+  falta é cosmético (endereço, medida exata). Só vira `❓ Perguntar` quando o
+  dado muda o resultado prático: presencial vs. remoto, prazo prometido, valor
+  combinado.
+- Ao abrir o app numa sessão nova, ler primeiro os itens **novo** e
+  **respondido** da Caixa de Entrada (é a vez da IA agir neles). Itens
+  **aguardando_voce** são a vez do Diego — não mexer, só esperar.
