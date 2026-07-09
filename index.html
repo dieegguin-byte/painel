@@ -1026,6 +1026,24 @@ function horariosParaTipo(dataISO, tipo, horariosOcupados){
   return livres;
 }
 
+/* Remaneja sozinha, sem perguntar nada — o Diego só clica "Reagendar" e a
+   IA acha o próximo horário livre (hoje mesmo se ainda sobrar horário na
+   rotina, senão o primeiro horário livre dos próximos dias). Olha até 14
+   dias à frente pra não ficar num loop infinito se a rotina não tiver
+   janela nenhuma (ex: tentando cair sempre num domingo). */
+async function proximoSlotAutomatico(tipo, cidade){
+  const hoje = new Date();
+  for(let i=0;i<14;i++){
+    const d = new Date(hoje); d.setDate(d.getDate()+i);
+    const dataISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const { data: doDia } = await sb.from('agenda').select('hora,cidade,tipo').eq('data', dataISO).eq('status','planejado');
+    const ocupados = tipo==='presencial' ? (doDia||[]).filter(a=>a.tipo==='presencial' && cidadeChave(a.cidade)===cidadeChave(cidade)).map(a=>a.hora) : [];
+    const livres = horariosParaTipo(dataISO, tipo, ocupados);
+    if(livres.length) return { data: dataISO, hora: livres[0] };
+  }
+  return null;
+}
+
 /* Mostra o dia inteiro (ocupado + horários possíveis, com cidade) antes de
    confirmar um novo compromisso. Os horários são clicáveis — toca pra
    escolher outro em vez do sugerido automaticamente. Resolve com o
@@ -1145,6 +1163,20 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
     bOk.addEventListener('click', ()=>fechar(escolhido));
     fundo.addEventListener('mousedown', e=>{ if(e.target===fundo) fechar(null); });
   });
+}
+
+/* Nenhuma ficha ativa pode ficar sem próxima data — sem isso o lead vira
+   uma dívida que ninguém nunca mais volta pra pagar (aconteceu de verdade
+   em 09/07: Julia e Priscilla ficaram "aguardando resposta" sem data
+   nenhuma marcada). Não preenche sozinha: TRAVA, pergunta de novo até vir
+   uma data válida, e se cancelar, quem chamou tem que abortar o salvamento. */
+async function exigirPrazo(valorAtual, contexto){
+  let digitado = valorAtual || '';
+  while(true){
+    digitado = await askText(`Toda ficha precisa de uma próxima data de ação. Qual a data pra "${contexto}"? (AAAA-MM-DD)`, digitado);
+    if(digitado===null) return null;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(digitado.trim())) return digitado.trim();
+  }
 }
 
 /* Pergunta o tipo de compromisso (presencial/remoto) — chamar isso JUNTO com
@@ -1371,20 +1403,17 @@ async function abrirFicha(clienteId){
       const valorTexto=await askText('Valor do orçamento (R$):',s.valor_orcamento||''); if(valorTexto===null) return;
       const prioridade=(await askText('Prioridade: baixa, media ou alta',s.prioridade||'media')||'media').toLowerCase();
       let proxima=await askText('Próxima ação:',s.proxima_acao||''); if(proxima===null) return;
-      const prazo=await askText('Prazo (AAAA-MM-DD, opcional):',s.prazo||''); if(prazo===null) return;
+      let prazo=await askText('Prazo (AAAA-MM-DD):',s.prazo||''); if(prazo===null) return;
       let prazoValido = /^\d{4}-\d{2}-\d{2}$/.test(prazo) ? prazo : null;
+      /* Nenhuma ficha ativa pode ficar sem próxima data — não preenche
+         sozinha, TRAVA e obriga a perguntar até vir uma data válida. */
+      if(!prazoValido && !['pago','perdido'].includes(s.status)){
+        prazoValido = await exigirPrazo(prazo, titulo.trim());
+        if(!prazoValido){ toast('Prazo é obrigatório — serviço não foi salvo.'); return; }
+      }
       let tipoAgenda = null;
       const jaVinculada = await jaTemAgendaVinculada(s.id);
       if(prazoValido && !jaVinculada) tipoAgenda = await perguntarTipoAgenda(prazoValido, titulo.trim());
-      /* Mesma regra da criação: orçamento sem prazo de retomada não pode
-         ficar em aberto — a IA agenda um lembrete remoto pra daqui 3 dias
-         sozinha, sem perguntar. */
-      if(s.status==='orcamento' && !prazoValido && !jaVinculada){
-        const d=new Date(); d.setDate(d.getDate()+3);
-        prazoValido = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-        tipoAgenda = 'remoto';
-        if(!proxima.trim()) proxima = 'Cobrar resposta do orçamento';
-      }
       const valor=Number(String(valorTexto).replace(',','.'))||null;
       const alterado={titulo:titulo.trim(),valor_orcamento:valor,prioridade:['baixa','media','alta'].includes(prioridade)?prioridade:'media',proxima_acao:proxima.trim()||null,prazo:prazoValido,atualizado_em:new Date().toISOString()};
       const { error }=await sb.from('servicos').update(alterado).eq('id',s.id);
@@ -1481,9 +1510,11 @@ async function renderInicio(){
   const c = $('#painelInicio'); c.innerHTML='';
 
   const hojeStr = hojeISO();
+  const horizonteD = new Date(); horizonteD.setDate(horizonteD.getDate()+30);
+  const horizonteStr = `${horizonteD.getFullYear()}-${String(horizonteD.getMonth()+1).padStart(2,'0')}-${String(horizonteD.getDate()).padStart(2,'0')}`;
   const [{data:leadsUrg}, {data:agUrg}, {data:finUrg}, {data:caixaPend}] = await Promise.all([
     sb.from('servicos').select('id,cliente_id,titulo,prioridade,prazo,status,proxima_acao,clientes(nome)').not('status','in','(pago,perdido)'),
-    sb.from('agenda').select('id,titulo,data,hora,cidade,tipo').eq('status','planejado').lte('data', hojeStr),
+    sb.from('agenda').select('id,titulo,data,hora,cidade,tipo,servico_id').eq('status','planejado').lte('data', horizonteStr),
     sb.from('financeiro').select('id,descricao,valor,status,data').in('status',['a_pagar','a_receber']).lte('data', hojeStr),
     sb.from('caixa_entrada').select('id,status').eq('processado', false),
   ]);
@@ -1495,7 +1526,7 @@ async function renderInicio(){
   const qtdSemProximaAcao = leadsAbertos.filter(s=>!s.proxima_acao).length;
   const qtdAtrasados = leadsAbertos.filter(s=>ehAtrasado(s.prazo)).length;
   const qtdAltos = leadsAbertos.filter(s=>s.prioridade==='alta').length;
-  const qtdAgendaHojeOuAtrasada = agendaPendente.length;
+  const qtdAgendaHojeOuAtrasada = agendaPendente.filter(a=>a.data<=hojeStr).length;
   const qtdCaixaEntrada = caixaAtiva.length;
   const qtdAguardandoVoce = caixaAtiva.filter(i=>i.status==='aguardando_voce').length;
 
@@ -1514,76 +1545,91 @@ async function renderInicio(){
   resumoGrid.appendChild(mkResumo('Aguardando você', qtdAguardandoVoce, qtdAguardandoVoce ? 'A IA tem dúvida nesses leads' : 'Nada pendente de resposta', qtdAguardandoVoce ? 'alerta' : 'ok'));
   c.appendChild(resumoGrid);
 
-  /* Compromissos de hoje (e atrasados) direto na Início — antes só dava pra
-     ver/concluir compromisso abrindo a aba Agenda separada. Agora aparece
-     aqui com os mesmos botões (✔ Concluir / Reagendar) que a Agenda tem. */
-  const agendaHojeOuAtraso = [...agendaPendente].sort((a,b)=>(a.data+((a.hora||'99:99'))).localeCompare(b.data+(b.hora||'99:99')));
-  if(agendaHojeOuAtraso.length){
-    const sAgenda = secao('📅 Compromissos de hoje', agendaHojeOuAtraso.length);
-    const cardAgenda = el('div','card');
-    agendaHojeOuAtraso.forEach(a=>{
-      const atrasado = a.data < hojeStr;
-      const item = el('div','agenda-item');
-      const ic = a.tipo==='remoto' ? '💬' : '📍';
-      item.appendChild(el('div','hora', (atrasado?'⏰ ':'')+(a.hora?a.hora.slice(0,5):'--')));
-      const desc = el('div','desc');
-      desc.appendChild(el('div',null, `${ic} ${a.titulo}${atrasado?' — atrasado ('+dataCurtaBR(a.data)+')':''}`));
-      if(a.cidade) desc.appendChild(el('div','loc','🏙 '+a.cidade));
-      item.appendChild(desc);
-      const bOk = el('button','botao b-ok','✔ Concluir');
-      bOk.addEventListener('click', async ()=>{ await sb.from('agenda').update({status:'feito'}).eq('id',a.id); toast('✔ Compromisso concluído'); renderInicio(); });
-      item.appendChild(bOk);
-      const bReag = el('button','botao b-tel','Reagendar');
-      bReag.addEventListener('click', async ()=>{
-        const novaData = await askText('Nova data (AAAA-MM-DD):', a.data || '');
-        if(!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData.trim())){ if(novaData!==null) toast('Data inválida'); return; }
-        const novaHora = await askText('Novo horário (HH:MM, opcional):', (a.hora||'').slice(0,5));
-        if(novaHora===null) return;
-        const { error } = await sb.from('agenda').update({ data: novaData.trim(), hora: novaHora.trim()||null }).eq('id',a.id);
-        if(error){ toast('Erro: '+error.message); return; }
-        toast('✔ Reagendado'); renderInicio();
-      });
-      item.appendChild(bReag);
-      cardAgenda.appendChild(item);
-    });
-    sAgenda.appendChild(cardAgenda); c.appendChild(sAgenda);
-  }
-
-  const filaOperacional = [...leadsAbertos]
-    .sort((a,b)=>{
-      const pesoA = (ehAtrasado(a.prazo)?0:1)*10 + prioridadePeso(a.prioridade);
-      const pesoB = (ehAtrasado(b.prazo)?0:1)*10 + prioridadePeso(b.prioridade);
-      return pesoA - pesoB;
-    })
-    .slice(0,3);
-  if(filaOperacional.length){
-    const destaque = el('div','bloco-destaque');
-    destaque.appendChild(el('div','rot','Foco do momento'));
-    const principal = filaOperacional[0];
-    destaque.appendChild(el('div','tit',(principal.clientes?.nome || 'Cliente') + ' — ' + (principal.titulo || 'Serviço')));
-    destaque.appendChild(el('div','txt', principal.proxima_acao || 'Esse item ainda não tem próxima ação definida.'));
-    const acoes = el('div','acoes');
-    const bAbrirLeads = el('button','botao b-ok','Abrir leads');
-    bAbrirLeads.addEventListener('click', ()=>irPara('leads'));
-    acoes.appendChild(bAbrirLeads);
-    if(qtdSemProximaAcao){
-      const bSemAcao = el('button','botao b-rm','Ver sem próxima ação');
-      bSemAcao.addEventListener('click', ()=>{ filtroStatus='todos'; renderLeads(); irPara('leads'); });
-      acoes.appendChild(bSemAcao);
-    }
-    destaque.appendChild(acoes);
-    const stack = el('div','lead-stack');
-    filaOperacional.forEach((item, idx)=>{
-      const mini = el('div','lead-mini');
-      mini.appendChild(el('div','ordem', String(idx+1)));
+  /* Lista única de prioridades, em semáforo, substituindo o que antes eram
+     3 seções separadas perguntando basicamente a mesma coisa ("o que fazer
+     agora?"): Compromissos de hoje + Foco do momento + Precisa de atenção
+     agora. Decisão do Diego em 09/07/2026: era "bagunça" ter 3 listas.
+     🔴 atrasado · 🟡 hoje/alta prioridade · 🟢 futuro (já agendado, só
+     acompanhar — nada fica "sem data" porque isso agora é travado na
+     criação/edição da ficha, ver exigirPrazo()).
+     Cada linha é clicável e abre a ficha do cliente (que já tem o botão de
+     WhatsApp com a sugestão de mensagem) — não duplica isso aqui pra não
+     inchar a lista. Compromissos de agenda ganham botões próprios de
+     Concluído/Reagendar (reagendar é automático, só clica). */
+  const idsServicoComAgenda = new Set(agendaPendente.map(a=>a.servico_id).filter(Boolean));
+  const prioridades = [];
+  agendaPendente.forEach(a=>{
+    const tier = a.data<hojeStr ? 'atrasado' : (a.data===hojeStr ? 'hoje' : 'futuro');
+    prioridades.push({ tipoItem:'agenda', agenda:a, tier, chave:a.data+(a.hora||'99:99') });
+  });
+  leadsAbertos.forEach(s=>{
+    if(idsServicoComAgenda.has(s.id)) return; // já aparece como item de agenda
+    if(!s.prazo) return; // não deveria acontecer mais, mas por segurança
+    let tier = ehAtrasado(s.prazo) ? 'atrasado' : (s.prazo===hojeStr ? 'hoje' : 'futuro');
+    if(tier==='futuro' && s.prioridade==='alta') tier='hoje';
+    prioridades.push({ tipoItem:'lead', lead:s, tier, chave:s.prazo+'00:00' });
+  });
+  financeiroPendente.forEach(f=>{
+    const tier = f.data<hojeStr ? 'atrasado' : 'hoje';
+    prioridades.push({ tipoItem:'financeiro', fin:f, tier, chave:f.data+'50:00' });
+  });
+  const ORDEM_TIER = {atrasado:0, hoje:1, futuro:2};
+  prioridades.sort((a,b)=> ORDEM_TIER[a.tier]-ORDEM_TIER[b.tier] || a.chave.localeCompare(b.chave));
+  if(prioridades.length){
+    const sPrior = secao('🚦 Prioridades', prioridades.length);
+    const cardPrior = el('div','card');
+    const CORES_TIER = {atrasado:{ic:'🔴',bg:'rgba(224,87,79,.12)',bd:'var(--alta,#e0574f)'}, hoje:{ic:'🟡',bg:'rgba(224,162,63,.12)',bd:'var(--media,#e0a23f)'}, futuro:{ic:'🟢',bg:'rgba(90,160,106,.10)',bd:'var(--baixa,#5aa06a)'}};
+    prioridades.forEach(p=>{
+      const cor = CORES_TIER[p.tier];
+      const item = el('div','urgente-item');
+      item.style.cssText='border-left:3px solid '+cor.bd+';background:'+cor.bg+';border-radius:8px;margin-bottom:6px;cursor:pointer';
+      item.appendChild(el('div','ic',cor.ic));
       const txt = el('div','txt');
-      txt.appendChild(el('b',null,(item.clientes?.nome || 'Cliente') + ' — ' + (item.titulo || 'Serviço')));
-      txt.appendChild(el('div','sub', (item.proxima_acao || 'Sem próxima ação definida') + ' · ' + textoPrazo(item.prazo)));
-      mini.appendChild(txt);
-      stack.appendChild(mini);
+      if(p.tipoItem==='agenda'){
+        const a=p.agenda; const icTipo=a.tipo==='remoto'?'💬':'📍';
+        const atrasado = p.tier==='atrasado';
+        txt.appendChild(el('b',null, `${a.hora?a.hora.slice(0,5)+' — ':''}${icTipo} ${a.titulo}`));
+        txt.appendChild(el('div','sub', (atrasado?'Atrasado desde '+dataCurtaBR(a.data):dataCurtaBR(a.data)) + (a.cidade?' · 🏙 '+a.cidade:'')));
+      } else if(p.tipoItem==='lead'){
+        const s=p.lead;
+        txt.appendChild(el('b',null, (s.clientes?.nome||'Cliente')+' — '+s.titulo));
+        txt.appendChild(el('div','sub', (s.proxima_acao||'Sem próxima ação definida')+' · '+textoPrazo(s.prazo)));
+      } else {
+        const f=p.fin;
+        txt.appendChild(el('b',null, (f.descricao||'Lançamento')+' — '+moedaBR(Number(f.valor))));
+        txt.appendChild(el('div','sub', (f.status==='a_pagar'?'A pagar':'A receber')+' · '+dataCurtaBR(f.data)));
+      }
+      item.appendChild(txt);
+      if(p.tipoItem==='agenda'){
+        const acoesAg = el('div'); acoesAg.style.cssText='display:flex;gap:6px;flex:none';
+        const bOk = el('button','botao b-ok','✔');
+        bOk.addEventListener('click', async (e)=>{ e.stopPropagation(); await sb.from('agenda').update({status:'feito'}).eq('id',p.agenda.id); toast('✔ Compromisso concluído'); renderInicio(); });
+        acoesAg.appendChild(bOk);
+        const bReag = el('button','botao b-tel','↻');
+        bReag.title='Reagendar (a IA acha o próximo horário livre sozinha)';
+        bReag.addEventListener('click', async (e)=>{
+          e.stopPropagation();
+          const proximo = await proximoSlotAutomatico(p.agenda.tipo, p.agenda.cidade);
+          if(!proximo){ toast('Não achei horário livre nos próximos 14 dias.'); return; }
+          const { error } = await sb.from('agenda').update({ data: proximo.data, hora: proximo.hora }).eq('id',p.agenda.id);
+          if(error){ toast('Erro: '+error.message); return; }
+          toast(`✔ Remanejado pra ${dataCurtaBR(proximo.data)} às ${proximo.hora}`); renderInicio();
+        });
+        acoesAg.appendChild(bReag);
+        item.appendChild(acoesAg);
+        item.addEventListener('click', async ()=>{
+          if(!p.agenda.servico_id) return;
+          const { data:serv } = await sb.from('servicos').select('cliente_id').eq('id',p.agenda.servico_id).single();
+          if(serv?.cliente_id) abrirFicha(serv.cliente_id);
+        });
+      } else if(p.tipoItem==='lead'){
+        item.addEventListener('click', ()=>abrirFicha(p.lead.cliente_id));
+      } else {
+        item.addEventListener('click', ()=>irPara('financeiro'));
+      }
+      cardPrior.appendChild(item);
     });
-    destaque.appendChild(stack);
-    c.appendChild(destaque);
+    sPrior.appendChild(cardPrior); c.appendChild(sPrior);
   }
 
   if(qtdAguardandoVoce){
@@ -1601,37 +1647,6 @@ async function renderInicio(){
     sAgu.appendChild(card); c.appendChild(sAgu);
   }
 
-  const urgentes = [];
-  leadsAbertos.forEach(s=>{
-    const venceu = s.prazo && s.prazo <= hojeStr;
-    if(s.prioridade==='alta' || venceu){
-      urgentes.push({ ic: venceu?'⏰':'🔴', ordem: venceu?0:1,
-        txt: (s.clientes?.nome||'Cliente')+' — '+s.titulo,
-        sub: (venceu ? 'Prazo: '+dataCurtaBR(s.prazo) : 'Prioridade alta') + (s.proxima_acao ? ' · ' + s.proxima_acao : ''), acao:()=>irPara('leads') });
-    }
-  });
-  agendaPendente.forEach(a=>{
-    urgentes.push({ ic:'📅', ordem: ehHoje(a.data)?0:0, txt:a.titulo, sub: ehHoje(a.data)?'Hoje '+(a.hora||''):'Atrasado: '+dataCurtaBR(a.data), acao:()=>irPara('agenda') });
-  });
-  financeiroPendente.forEach(f=>{
-    urgentes.push({ ic:'💰', ordem:1, txt:(f.descricao||'Lançamento')+' — '+moedaBR(Number(f.valor)), sub: f.status==='a_pagar'?'A pagar':'A receber', acao:()=>irPara('financeiro') });
-  });
-  urgentes.sort((a,b)=>a.ordem-b.ordem);
-
-  if(urgentes.length){
-    const sUrg = secao('⚡ Precisa de atenção agora', urgentes.length);
-    const card = el('div','card');
-    urgentes.forEach(u=>{
-      const it = el('div','urgente-item');
-      it.style.cursor='pointer';
-      it.appendChild(el('div','ic',u.ic));
-      const txt = el('div','txt'); txt.appendChild(el('b',null,u.txt)); txt.appendChild(el('div','sub',u.sub));
-      it.appendChild(txt);
-      it.addEventListener('click', u.acao);
-      card.appendChild(it);
-    });
-    sUrg.appendChild(card); c.appendChild(sUrg);
-  }
 
   // caixa de entrada
   const sChat = secao('Caixa de entrada', qtdCaixaEntrada);
@@ -1794,20 +1809,13 @@ async function renderInicio(){
         const valorTexto = await askText('Valor do orçamento (R$, opcional):', '') || '';
         const valorOrcamento = Number(valorTexto.replace(',','.')) || null;
         let proximaAcao = await askText('Qual é a próxima ação?', 'Responder o cliente e confirmar os detalhes') || '';
-        const prazoInformado = (await askText('Prazo da próxima ação (AAAA-MM-DD, opcional):', '') || '').trim();
+        const prazoInformado = (await askText('Prazo da próxima ação (AAAA-MM-DD):', '') || '').trim();
         let prazo = /^\d{4}-\d{2}-\d{2}$/.test(prazoInformado) ? prazoInformado : null;
-        let tipoAgenda = prazo ? await perguntarTipoAgenda(prazo, titulo.trim()) : null;
-        /* Orçamento enviado sem prazo de retomada é dívida que ninguém volta
-           pra pagar (aconteceu de verdade em 09/07: Julia e Priscilla
-           ficaram "aguardando resposta" sem data nenhuma marcada pra
-           cobrar). Em vez de deixar em aberto, a própria IA já agenda um
-           lembrete remoto pra daqui 3 dias — não pergunta, decide sozinha. */
-        if(status==='orcamento' && !prazo){
-          const d=new Date(); d.setDate(d.getDate()+3);
-          prazo = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-          tipoAgenda = 'remoto';
-          if(!proximaAcao.trim()) proximaAcao = 'Cobrar resposta do orçamento';
+        if(!prazo){
+          prazo = await exigirPrazo(prazoInformado, titulo.trim());
+          if(!prazo){ toast('Prazo é obrigatório — ficha não foi criada.'); btnCriarFicha.disabled=false; btnCriarFicha.textContent='Criar ficha/orçamento'; return; }
         }
+        const tipoAgenda = await perguntarTipoAgenda(prazo, titulo.trim());
         btnCriarFicha.disabled = true;
         btnCriarFicha.textContent = 'Criando…';
         try{
