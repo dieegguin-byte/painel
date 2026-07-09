@@ -1044,6 +1044,63 @@ async function proximoSlotAutomatico(tipo, cidade){
   return null;
 }
 
+/* Reagendamento com o Diego vendo os próximos dias antes de escolher — ele
+   pediu (09/07/2026) pra não ficar 100% automático/invisível: quer olhar
+   os próximos 14 dias, ver quantos compromissos cada um já tem e escolher
+   em qual encaixar. Pula dias sem horário livre (domingo cheio, agenda
+   lotada) pra não poluir a lista. Retorna {data,hora} ou null se cancelar. */
+async function escolherDiaEHorario(compromisso){
+  const tipo = compromisso.tipo || 'presencial';
+  const cidade = tipo==='presencial' ? (compromisso.cidade||'') : null;
+  const hoje = new Date();
+  const iniISO = hojeISO();
+  const fimD = new Date(hoje); fimD.setDate(fimD.getDate()+14);
+  const fimISO = `${fimD.getFullYear()}-${String(fimD.getMonth()+1).padStart(2,'0')}-${String(fimD.getDate()).padStart(2,'0')}`;
+  const { data: doPeriodo } = await sb.from('agenda').select('id,data,hora,cidade,tipo')
+    .eq('status','planejado').gte('data', iniISO).lte('data', fimISO);
+  const porDia = {};
+  (doPeriodo||[]).forEach(a=>{ if(a.id===compromisso.id) return; (porDia[a.data]=porDia[a.data]||[]).push(a); });
+  return new Promise(resolve=>{
+    const {fundo,caixa}=_modalBase();
+    caixa.style.maxWidth='420px';
+    const titulo = el('div',null, `Escolher dia e horário — ${compromisso.titulo||'Compromisso'}`);
+    titulo.style.cssText='font-weight:700;margin-bottom:10px';
+    caixa.appendChild(titulo);
+    const lista = el('div'); lista.style.cssText='max-height:60vh;overflow:auto';
+    let achouAlgum = false;
+    for(let i=0;i<14;i++){
+      const d = new Date(hoje); d.setDate(d.getDate()+i);
+      const dataISO = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const doDia = porDia[dataISO]||[];
+      const ocupados = tipo==='presencial' ? doDia.filter(a=>a.tipo==='presencial' && cidadeChave(a.cidade)===cidadeChave(cidade)).map(a=>a.hora) : [];
+      const livres = horariosParaTipo(dataISO, tipo, ocupados);
+      if(!livres.length) continue;
+      achouAlgum = true;
+      const bloco = el('div'); bloco.style.cssText='margin-bottom:14px';
+      const rotulo = el('div',null, dataCurtaBR(dataISO) + (doDia.length ? ` · ${doDia.length} compromisso(s) nesse dia` : ' · dia livre'));
+      rotulo.style.cssText='font-weight:600;margin-bottom:6px;font-size:.88rem';
+      bloco.appendChild(rotulo);
+      const chips = el('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
+      livres.forEach(h=>{
+        const b = el('button','botao b-tel', h);
+        b.addEventListener('click', ()=>{ fundo.remove(); resolve({data:dataISO, hora:h}); });
+        chips.appendChild(b);
+      });
+      bloco.appendChild(chips);
+      lista.appendChild(bloco);
+    }
+    if(!achouAlgum){
+      lista.appendChild(el('div','vazio','Sem horário livre nos próximos 14 dias.'));
+    }
+    caixa.appendChild(lista);
+    const bCancelar = el('button','botao b-rm','Cancelar');
+    bCancelar.type='button'; bCancelar.style.cssText='margin-top:12px;width:100%';
+    bCancelar.addEventListener('click', ()=>{ fundo.remove(); resolve(null); });
+    caixa.appendChild(bCancelar);
+    fundo.addEventListener('mousedown', e=>{ if(e.target===fundo){ fundo.remove(); resolve(null); } });
+  });
+}
+
 /* Mostra o dia inteiro (ocupado + horários possíveis, com cidade) antes de
    confirmar um novo compromisso. Os horários são clicáveis — toca pra
    escolher outro em vez do sugerido automaticamente. Resolve com o
@@ -1669,14 +1726,15 @@ async function renderInicio(){
         bOk.addEventListener('click', async (e)=>{ e.stopPropagation(); await concluirCompromissoAgenda(p.agenda, renderInicio); });
         acoesAg.appendChild(bOk);
         const bReag = el('button','botao b-tel','↻');
-        bReag.title='Reagendar (a IA acha o próximo horário livre sozinha)';
+        bReag.title='Reagendar (escolher em qual dos próximos dias encaixar)';
         bReag.addEventListener('click', async (e)=>{
           e.stopPropagation();
-          const proximo = await proximoSlotAutomatico(p.agenda.tipo, p.agenda.cidade);
-          if(!proximo){ toast('Não achei horário livre nos próximos 14 dias.'); return; }
-          const { error } = await sb.from('agenda').update({ data: proximo.data, hora: proximo.hora }).eq('id',p.agenda.id);
+          const escolha = await escolherDiaEHorario(p.agenda);
+          if(!escolha) return;
+          const { error } = await sb.from('agenda').update({ data: escolha.data, hora: escolha.hora, status:'planejado' }).eq('id',p.agenda.id);
           if(error){ toast('Erro: '+error.message); return; }
-          toast(`✔ Remanejado pra ${dataCurtaBR(proximo.data)} às ${proximo.hora}`); renderInicio();
+          await sb.from('historico').insert({o_que:`Compromisso reagendado: ${p.agenda.titulo}`, por:'diego', detalhe:`Nova data: ${escolha.data} ${escolha.hora||''}`});
+          toast(`✔ Remanejado pra ${dataCurtaBR(escolha.data)} às ${escolha.hora}`); renderInicio();
         });
         acoesAg.appendChild(bReag);
         item.appendChild(acoesAg);
