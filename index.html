@@ -994,23 +994,27 @@ const JANELAS_SEMANA = {
   5: [['08:00','11:00'],['13:00','18:00']],
   6: [['08:00','21:00']],
 };
-function proximoHorarioLivre(dataISO, horariosOcupados){
+function todosHorariosLivres(dataISO, horariosOcupados){
   const diaSemana = new Date(dataISO+'T00:00:00').getDay();
   const ocupados = new Set((horariosOcupados||[]).filter(Boolean).map(h=>h.slice(0,5)));
+  const livres=[];
   for(const [ini,fim] of (JANELAS_SEMANA[diaSemana]||[])){
     let [h,m] = ini.split(':').map(Number);
     const [hf,mf] = fim.split(':').map(Number);
     while(h<hf || (h===hf && m<mf)){
       const hhmm = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
-      if(!ocupados.has(hhmm)) return hhmm;
+      if(!ocupados.has(hhmm)) livres.push(hhmm);
       m+=60; if(m>=60){ m-=60; h+=1; }
     }
   }
-  return null;
+  return livres;
 }
-/* Mostra o dia inteiro (horários ocupados x livre, com cidade) antes de
+function proximoHorarioLivre(dataISO, horariosOcupados){
+  return todosHorariosLivres(dataISO, horariosOcupados)[0] || null;
+}
+/* Mostra o dia inteiro (ocupado x horários livres, com cidade) antes de
    confirmar um novo compromisso — em vez de um texto corrido de conflito. */
-function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHorario, novoTipo){
+function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHorario, novoTipo, horariosLivres){
   return new Promise(resolve=>{
     const {fundo,caixa}=_modalBase();
     caixa.style.maxWidth='400px';
@@ -1029,6 +1033,21 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
       livre.style.cssText='padding:8px 10px;border-radius:8px;background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a);margin-bottom:6px;font-size:.88rem';
       caixa.appendChild(livre);
     }
+    if(horariosLivres?.length){
+      const rotLivres = el('div',null,'Horários livres nesse dia:');
+      rotLivres.style.cssText='font-size:.78rem;color:var(--texto2,#c7b4a4);margin:10px 0 4px';
+      caixa.appendChild(rotLivres);
+      const chips = el('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
+      horariosLivres.forEach(h=>{
+        const chip = el('div',null,h);
+        const escolhido = h===novoHorario;
+        chip.style.cssText='padding:4px 9px;border-radius:20px;font-size:.8rem;'
+          + (escolhido ? 'background:var(--marrom,#b4632f);color:#fff;font-weight:700'
+                       : 'background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a)');
+        chips.appendChild(chip);
+      });
+      caixa.appendChild(chips);
+    }
     const icNovo = novoTipo==='remoto' ? '💬' : '📍';
     const novo = el('div',null, `➕ Novo (${icNovo} ${novoTipo}): ${novoHorario?novoHorario+' — ':''}${novoTitulo}${novaCidade?' 🏙 '+novaCidade:''}${!novoHorario?' (sem horário livre na sua rotina esse dia — revisar)':''}`);
     novo.style.cssText='padding:8px 10px;border-radius:8px;background:var(--marrom,#b4632f);color:#fff;margin:10px 0;font-size:.88rem';
@@ -1044,7 +1063,27 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
   });
 }
 
-async function sincronizarAgendaServico(servico, cliente){
+/* Pergunta o tipo de compromisso (presencial/remoto) — chamar isso JUNTO com
+   as outras perguntas da ficha (logo após o prazo), antes de salvar, pra não
+   deixar essa pergunta "sobrando" pro final do fluxo. Retorna 'presencial',
+   'remoto' ou null (sem compromisso de agenda). */
+async function perguntarTipoAgenda(prazo, titulo){
+  if(!prazo) return null;
+  const tipoDigitado = await askText(`O prazo "${dataCurtaBR(prazo)}" de "${titulo}" precisa de um horário reservado?\n\nDigite "presencial" (visita, buscar material, entregar) ou "remoto" (ligar, mandar mensagem, pedir material por telefone/site). Deixe em branco ou cancele se não é um compromisso de agenda.`, '');
+  if(tipoDigitado===null) return null;
+  const tipo = tipoDigitado.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  return ['presencial','remoto'].includes(tipo) ? tipo : null;
+}
+
+/* Cria/atualiza o compromisso vinculado ao serviço. `tipo` já vem decidido
+   por perguntarTipoAgenda() — esta função não pergunta mais nada, só
+   mostra o dia (ocupado/livre) pra confirmação final antes de salvar. */
+async function jaTemAgendaVinculada(servicoId){
+  const { data } = await sb.from('agenda').select('id').eq('servico_id', servicoId).limit(1);
+  return !!data?.length;
+}
+
+async function sincronizarAgendaServico(servico, cliente, tipo){
   if(!servico?.prazo) return;
   const { data: existente } = await sb.from('agenda').select('id,data').eq('servico_id', servico.id).limit(1);
   if(existente?.length){
@@ -1054,15 +1093,13 @@ async function sincronizarAgendaServico(servico, cliente){
     }
     return;
   }
-  const tipoDigitado = await askText(`O prazo "${dataCurtaBR(servico.prazo)}" de "${servico.titulo}" precisa de um horário reservado?\n\nDigite "presencial" (visita, buscar material, entregar) ou "remoto" (ligar, mandar mensagem, pedir material por telefone/site). Deixe em branco ou cancele se não é um compromisso de agenda.`, '');
-  if(tipoDigitado===null) return;
-  const tipo = tipoDigitado.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
-  if(!['presencial','remoto'].includes(tipo)) return;
+  if(!tipo) return;
   const { data: doDia } = await sb.from('agenda').select('titulo,hora,cidade,tipo').eq('data', servico.prazo).eq('status','planejado');
   const novoTitulo = `${cliente?.nome||'Cliente'} — ${servico.titulo}`;
-  const horario = proximoHorarioLivre(servico.prazo, (doDia||[]).map(a=>a.hora));
+  const livres = todosHorariosLivres(servico.prazo, (doDia||[]).map(a=>a.hora));
+  const horario = livres[0] || null;
   const cidadeNova = tipo==='presencial' ? (cliente?.cidade||null) : null;
-  if(!await confirmarComDiaVisivel(servico.prazo, doDia||[], novoTitulo, cidadeNova, horario, tipo)) return;
+  if(!await confirmarComDiaVisivel(servico.prazo, doDia||[], novoTitulo, cidadeNova, horario, tipo, livres)) return;
   const { error } = await sb.from('agenda').insert({
     titulo: novoTitulo, data: servico.prazo, hora: horario, tipo,
     status:'planejado', servico_id: servico.id, cidade: cidadeNova
@@ -1230,13 +1267,16 @@ async function abrirFicha(clienteId){
       const prioridade=(await askText('Prioridade: baixa, media ou alta',s.prioridade||'media')||'media').toLowerCase();
       const proxima=await askText('Próxima ação:',s.proxima_acao||''); if(proxima===null) return;
       const prazo=await askText('Prazo (AAAA-MM-DD, opcional):',s.prazo||''); if(prazo===null) return;
+      const prazoValido = /^\d{4}-\d{2}-\d{2}$/.test(prazo) ? prazo : null;
+      let tipoAgenda = null;
+      if(prazoValido && !(await jaTemAgendaVinculada(s.id))) tipoAgenda = await perguntarTipoAgenda(prazoValido, titulo.trim());
       const valor=Number(String(valorTexto).replace(',','.'))||null;
-      const alterado={titulo:titulo.trim(),valor_orcamento:valor,prioridade:['baixa','media','alta'].includes(prioridade)?prioridade:'media',proxima_acao:proxima.trim()||null,prazo:/^\d{4}-\d{2}-\d{2}$/.test(prazo)?prazo:null,atualizado_em:new Date().toISOString()};
+      const alterado={titulo:titulo.trim(),valor_orcamento:valor,prioridade:['baixa','media','alta'].includes(prioridade)?prioridade:'media',proxima_acao:proxima.trim()||null,prazo:prazoValido,atualizado_em:new Date().toISOString()};
       const { error }=await sb.from('servicos').update(alterado).eq('id',s.id);
       if(error){ toast('Erro: '+error.message); return; }
       Object.assign(s,alterado);
       try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('Serviço salvo; financeiro: '+err.message); }
-      if(s.prazo) try{ await sincronizarAgendaServico(s,cli); }catch(err){ toast('Serviço salvo; agenda: '+err.message); }
+      if(s.prazo) try{ await sincronizarAgendaServico(s,cli,tipoAgenda); }catch(err){ toast('Serviço salvo; agenda: '+err.message); }
       toast('✔ Serviço atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
     });
     acoes.appendChild(bEditarServico);
@@ -1606,6 +1646,7 @@ async function renderInicio(){
         const proximaAcao = await askText('Qual é a próxima ação?', 'Responder o cliente e confirmar os detalhes') || '';
         const prazoInformado = (await askText('Prazo da próxima ação (AAAA-MM-DD, opcional):', '') || '').trim();
         const prazo = /^\d{4}-\d{2}-\d{2}$/.test(prazoInformado) ? prazoInformado : null;
+        const tipoAgenda = prazo ? await perguntarTipoAgenda(prazo, titulo.trim()) : null;
         btnCriarFicha.disabled = true;
         btnCriarFicha.textContent = 'Criando…';
         try{
@@ -1629,7 +1670,7 @@ async function renderInicio(){
           }).select('*').single();
           if(erroServico) throw erroServico;
           if(['producao','entregue','pago'].includes(status)) await sincronizarFinanceiroServico(servicoCriado, cliente);
-          if(prazo) try{ await sincronizarAgendaServico(servicoCriado, cliente); }catch(err){ toast('Ficha salva; agenda: '+err.message); }
+          if(prazo) try{ await sincronizarAgendaServico(servicoCriado, cliente, tipoAgenda); }catch(err){ toast('Ficha salva; agenda: '+err.message); }
           if(registro.imagemUrl){
             const { error: erroFoto } = await sb.from('fotos').insert({
               cliente_id: cliente.id, url: registro.imagemUrl, tipo: 'outro'
