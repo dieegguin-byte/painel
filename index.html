@@ -979,9 +979,38 @@ $('#btnWhatsappOrcamento').addEventListener('click',()=>{
    Evita duplicar: se o serviço já tem um compromisso vinculado (servico_id),
    só atualiza a data dele. Antes de criar um novo, avisa se já existe algo
    marcado nesse mesmo dia, pra não gerar conflito de agenda sem o Diego saber. */
+
+/* Rotina semanal do Diego (definida por ele em 08/07/2026): preenche o
+   horário do compromisso sozinho, sem perguntar — ele corrige clicando em
+   "Reagendar" na Agenda se a hora escolhida não servir.
+   Segunda/quarta/sexta: 08h-11h e 13h-18h. Terça/quinta/sábado: 08h-21h
+   (ele pode atender até de noite). Domingo: sem expediente. */
+const JANELAS_SEMANA = {
+  0: [],
+  1: [['08:00','11:00'],['13:00','18:00']],
+  2: [['08:00','21:00']],
+  3: [['08:00','11:00'],['13:00','18:00']],
+  4: [['08:00','21:00']],
+  5: [['08:00','11:00'],['13:00','18:00']],
+  6: [['08:00','21:00']],
+};
+function proximoHorarioLivre(dataISO, horariosOcupados){
+  const diaSemana = new Date(dataISO+'T00:00:00').getDay();
+  const ocupados = new Set((horariosOcupados||[]).filter(Boolean).map(h=>h.slice(0,5)));
+  for(const [ini,fim] of (JANELAS_SEMANA[diaSemana]||[])){
+    let [h,m] = ini.split(':').map(Number);
+    const [hf,mf] = fim.split(':').map(Number);
+    while(h<hf || (h===hf && m<mf)){
+      const hhmm = String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+      if(!ocupados.has(hhmm)) return hhmm;
+      m+=60; if(m>=60){ m-=60; h+=1; }
+    }
+  }
+  return null;
+}
 /* Mostra o dia inteiro (horários ocupados x livre, com cidade) antes de
    confirmar um novo compromisso — em vez de um texto corrido de conflito. */
-function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade){
+function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHorario){
   return new Promise(resolve=>{
     const {fundo,caixa}=_modalBase();
     caixa.style.maxWidth='400px';
@@ -999,7 +1028,7 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade){
       livre.style.cssText='padding:8px 10px;border-radius:8px;background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a);margin-bottom:6px;font-size:.88rem';
       caixa.appendChild(livre);
     }
-    const novo = el('div',null, `➕ Novo: ${novoTitulo}${novaCidade?' 🏙 '+novaCidade:''}`);
+    const novo = el('div',null, `➕ Novo: ${novoHorario?novoHorario+' — ':''}${novoTitulo}${novaCidade?' 🏙 '+novaCidade:''}${!novoHorario?' (sem horário livre na sua rotina esse dia — revisar)':''}`);
     novo.style.cssText='padding:8px 10px;border-radius:8px;background:var(--marrom,#b4632f);color:#fff;margin:10px 0;font-size:.88rem';
     caixa.appendChild(novo);
     const linhaBtn = el('div'); linhaBtn.style.cssText='display:flex;gap:10px;justify-content:flex-end';
@@ -1026,9 +1055,10 @@ async function sincronizarAgendaServico(servico, cliente){
   if(!await askConfirm(`O prazo "${dataCurtaBR(servico.prazo)}" de "${servico.titulo}" é um compromisso real (visita, buscar material, entregar)? Se sim, entra na Agenda também.`)) return;
   const { data: doDia } = await sb.from('agenda').select('titulo,hora,cidade').eq('data', servico.prazo).eq('status','planejado');
   const novoTitulo = `${cliente?.nome||'Cliente'} — ${servico.titulo}`;
-  if(!await confirmarComDiaVisivel(servico.prazo, doDia||[], novoTitulo, cliente?.cidade)) return;
+  const horario = proximoHorarioLivre(servico.prazo, (doDia||[]).map(a=>a.hora));
+  if(!await confirmarComDiaVisivel(servico.prazo, doDia||[], novoTitulo, cliente?.cidade, horario)) return;
   const { error } = await sb.from('agenda').insert({
-    titulo: novoTitulo, data: servico.prazo,
+    titulo: novoTitulo, data: servico.prazo, hora: horario,
     status:'planejado', servico_id: servico.id, cidade: cliente?.cidade || null
   });
   if(error){ toast('Erro ao lançar na Agenda: '+error.message); return; }
