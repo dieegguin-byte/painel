@@ -1763,6 +1763,17 @@ async function renderAgenda(){
       const b = el('button','botao b-ok','✔');
       b.addEventListener('click', async ()=>{ await sb.from('agenda').update({status:'feito'}).eq('id',a.id); renderAgenda(); renderInicio(); });
       item.appendChild(b);
+      const bReagendar = el('button','botao b-tel','Reagendar');
+      bReagendar.addEventListener('click', async ()=>{
+        const novaData = await askText('Nova data (AAAA-MM-DD):', a.data || '');
+        if(!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData.trim())){ if(novaData!==null) toast('Data inválida'); return; }
+        const novaHora = await askText('Novo horário (HH:MM, opcional):', (a.hora||'').slice(0,5));
+        if(novaHora===null) return;
+        const { error } = await sb.from('agenda').update({ data: novaData.trim(), hora: novaHora.trim()||null }).eq('id',a.id);
+        if(error){ toast('Erro: '+error.message); return; }
+        toast('✔ Reagendado'); renderAgenda(); renderInicio();
+      });
+      item.appendChild(bReagendar);
     }
     const bRm = el('button','botao b-rm','🗑');
     bRm.addEventListener('click', async ()=>{ if(!await askConfirm('Remover este compromisso?')) return; await sb.from('agenda').delete().eq('id',a.id); renderAgenda(); });
@@ -1911,9 +1922,11 @@ async function renderEstoque(){
   if(error){ card.appendChild(el('div','vazio','Erro: '+error.message)); }
   else if(!data.length){ card.appendChild(el('div','vazio','Nenhum item cadastrado.')); }
   else data.forEach(it=>{
-    const linha = el('div','estoque-item'+(it.comprar?' precisa':''));
-    linha.appendChild(el('div','nome', it.item + (it.comprar?' 🛒':'')));
-    linha.appendChild(el('div','qtd', (it.quantidade??0)+' '+(it.unidade||'')));
+    const abaixoMinimo = it.minimo!=null && (it.quantidade??0) < it.minimo;
+    const linha = el('div','estoque-item'+((it.comprar||abaixoMinimo)?' precisa':''));
+    linha.appendChild(el('div','nome', it.item + (it.comprar?' 🛒':'') + (abaixoMinimo?' ⚠':'')));
+    const qtdTexto = (it.quantidade??0)+' '+(it.unidade||'') + (it.minimo!=null?' (mín: '+it.minimo+')':'');
+    linha.appendChild(el('div','qtd', qtdTexto));
     const bComprar = el('button','botao '+(it.comprar?'b-ok':'b-tel'), it.comprar?'✔ Comprado':'Marcar p/ comprar');
     bComprar.addEventListener('click', async ()=>{ await sb.from('estoque').update({comprar: !it.comprar}).eq('id',it.id); renderEstoque(); });
     linha.appendChild(bComprar);
@@ -1928,13 +1941,21 @@ async function renderEstoque(){
       <input type="text" id="esItem" placeholder="Item">
       <input type="text" id="esUnidade" placeholder="Unidade (m, kg, un)">
     </div>
-    <input type="number" step="0.01" id="esQtd" placeholder="Quantidade atual">
+    <div class="linha2">
+      <input type="number" step="0.01" id="esQtd" placeholder="Quantidade atual">
+      <input type="number" step="0.01" id="esMinimo" placeholder="Quantidade mínima (opcional)">
+    </div>
   `;
   const bAdd = el('button','botao b-add','+ Adicionar item');
   bAdd.addEventListener('click', async ()=>{
     const item = $('#esItem').value.trim();
     if(!item){ toast('Informe o nome do item'); return; }
-    const { error } = await sb.from('estoque').insert({ item, unidade: $('#esUnidade').value.trim()||null, quantidade: parseFloat($('#esQtd').value)||0 });
+    const minimoTexto = $('#esMinimo').value;
+    const { error } = await sb.from('estoque').insert({
+      item, unidade: $('#esUnidade').value.trim()||null,
+      quantidade: parseFloat($('#esQtd').value)||0,
+      minimo: minimoTexto!==''? parseFloat(minimoTexto) : null
+    });
     if(error){ toast('Erro: '+error.message); return; }
     toast('✔ Adicionado'); renderEstoque();
   });
@@ -1950,7 +1971,7 @@ async function renderEstoque(){
 iniciar();
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=7').catch(()=>{}) );
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=9').catch(()=>{}) );
 }
 </script>
 </body>

@@ -204,3 +204,57 @@ Se for continuar daqui, eu atacaria nesta ordem:
 3. reduzir textos ambíguos em botões e confirmações
 4. criar ações rápidas por contexto, como `aguardando cliente`, `marcar visita` e `virar cobrança`
 5. separar melhor o que é sugestão da IA e o que já foi executado
+
+## Regras operacionais atuais — clientes, produção e financeiro
+
+Estas regras devem ser preservadas por qualquer IA que opere ou altere o app:
+
+- `Novo lead`, `Orçamento` e `Agendado` não geram lançamento financeiro.
+- O valor informado nesses estados é somente o valor do orçamento.
+- Ao mudar para `Produção`, confirmar a forma de pagamento antes de lançar valores.
+- No acordo 50/50, registrar a entrada como paga e o saldo como `a_receber` na entrega.
+- Entrada e saldo podem ter formas diferentes: Pix, dinheiro, transferência ou cartão.
+- Em cartão, registrar o número de parcelas de cada parte separadamente.
+- Cartão aprovado é tratado como pago para o controle operacional.
+- Ao marcar o serviço como `Pago`, atualizar os lançamentos vinculados sem duplicá-los.
+- Antes de criar um cliente, pesquisar o telefone para evitar ficha duplicada.
+- Nunca excluir ficha, foto, serviço ou lançamento sem confirmação humana explícita.
+- A IA deve resumir alterações de valor, pagamento, prazo e status ao terminar.
+- Gerar orçamento transforma somente `Novo lead` em `Orçamento` e não cria financeiro.
+- O orçamento deve ser revisado antes de imprimir, salvar ou compartilhar.
+- Nunca enviar orçamento ou mensagem de WhatsApp automaticamente; aguardar confirmação humana.
+- CNPJ, razão social e dados fiscais só podem aparecer após confirmação do dado atual.
+- O editor guarda localmente CNPJ, WhatsApp e endereço usados no PDF para evitar redigitação.
+
+### Orçamento profissional
+
+A ficha do cliente possui a ação `Orçamento PDF`. Ela abre um editor com serviço,
+descrição, medidas, materiais, valor, prazo, pagamento, validade, garantia,
+observações e fotos. O documento pode ser impresso ou salvo como PDF pelo
+navegador. O app também prepara a mensagem de acompanhamento para WhatsApp.
+
+Ao gerar, o app salva valor e mensagem sugerida no serviço, registra o evento no
+histórico e muda `Novo lead` para `Orçamento`. Ele não cria lançamento financeiro.
+
+## Interface v4
+
+A interface foi modernizada preservando a operação móvel:
+
+- navegação inferior flutuante e rolável
+- cards com hierarquia visual e feedback de interação
+- cabeçalhos claros para Clientes, Leads, Agenda, Financeiro e Estoque
+- formulários e modais com foco visual mais evidente
+- layout responsivo em duas colunas em telas maiores
+- linha do tempo clicável de `Novo lead` até `Pago`
+
+A linha do tempo é uma ação real: ao tocar em uma etapa, ela usa o mesmo fluxo de
+alteração de status e mantém as automações financeiras existentes.
+
+### Exemplo de pagamento parcelado
+
+Para um serviço de R$ 2.000 com metade agora e metade na entrega, ambas no cartão:
+
+- entrada de R$ 1.000 — cartão 12x — `pago`
+- saldo de R$ 1.000 — cartão 12x na entrega — `a_receber`
+
+Quando a segunda transação for aprovada na entrega, o saldo passa para `pago`.
