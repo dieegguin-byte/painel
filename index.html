@@ -1037,18 +1037,44 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
     const titulo = el('div',null, `Compromissos em ${dataCurtaBR(dataISO)}`);
     titulo.style.cssText='font-weight:700;margin-bottom:10px';
     caixa.appendChild(titulo);
-    if(doDia.length){
+    const listaOcupados = el('div');
+    /* Cada compromisso já marcado nesse dia pode ser remanejado NA HORA,
+       sem sair desse modal — evita ter que cancelar tudo, ir na Agenda e
+       voltar só pra abrir um horário. */
+    const renderOcupados = ()=>{
+      listaOcupados.innerHTML='';
+      if(!doDia.length){
+        const livre = el('div','','Nenhum outro compromisso marcado — dia livre.');
+        livre.style.cssText='padding:8px 10px;border-radius:8px;background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a);margin-bottom:6px;font-size:.88rem';
+        listaOcupados.appendChild(livre);
+        return;
+      }
       doDia.sort((a,b)=>(a.hora||'99:99').localeCompare(b.hora||'99:99')).forEach(a=>{
         const ic = a.tipo==='remoto' ? '💬' : '📍';
-        const linha = el('div',null, `${a.hora?a.hora.slice(0,5):'sem horário'} — ${ic} ${a.titulo}${a.cidade?' 🏙 '+a.cidade:''}`);
-        linha.style.cssText='padding:8px 10px;border-radius:8px;background:var(--card2,#2b221c);margin-bottom:6px;font-size:.88rem';
-        caixa.appendChild(linha);
+        const linha = el('div'); linha.style.cssText='padding:8px 10px;border-radius:8px;background:var(--card2,#2b221c);margin-bottom:6px;font-size:.88rem;display:flex;align-items:center;justify-content:space-between;gap:8px';
+        const txt = el('span',null, `${a.hora?a.hora.slice(0,5):'sem horário'} — ${ic} ${a.titulo}${a.cidade?' 🏙 '+a.cidade:''}`);
+        linha.appendChild(txt);
+        const bMover = document.createElement('button');
+        bMover.type='button'; bMover.textContent='↻'; bMover.title='Remanejar este compromisso';
+        bMover.style.cssText='background:none;border:1px solid var(--linha,#3a2d24);color:var(--texto2,#c7b4a4);border-radius:6px;padding:2px 8px;cursor:pointer;flex:none';
+        bMover.addEventListener('click', async ()=>{
+          const novaData = await askText('Remanejar pra qual data? (AAAA-MM-DD, deixe igual pra só mudar o horário)', dataISO);
+          if(novaData===null) return;
+          const dataFinal = /^\d{4}-\d{2}-\d{2}$/.test(novaData.trim()) ? novaData.trim() : dataISO;
+          const novaHora = await askText('Novo horário (HH:MM):', a.hora?a.hora.slice(0,5):'');
+          if(novaHora===null) return;
+          const { error } = await sb.from('agenda').update({ data: dataFinal, hora: novaHora.trim()||null }).eq('id', a.id);
+          if(error){ toast('Erro ao remanejar: '+error.message); return; }
+          toast('✔ Remanejado');
+          if(dataFinal===dataISO){ a.hora = novaHora.trim()||null; } else { doDia.splice(doDia.indexOf(a),1); }
+          renderOcupados();
+        });
+        linha.appendChild(bMover);
+        listaOcupados.appendChild(linha);
       });
-    } else {
-      const livre = el('div','','Nenhum outro compromisso marcado — dia livre.');
-      livre.style.cssText='padding:8px 10px;border-radius:8px;background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a);margin-bottom:6px;font-size:.88rem';
-      caixa.appendChild(livre);
-    }
+    };
+    renderOcupados();
+    caixa.appendChild(listaOcupados);
     let escolhido = novoHorario;
     const rotLivres = el('div',null,'Toque pra escolher o horário:');
     rotLivres.style.cssText='font-size:.78rem;color:var(--texto2,#c7b4a4);margin:10px 0 4px';
@@ -1126,11 +1152,21 @@ async function sincronizarAgendaServico(servico, cliente, tipo){
     return;
   }
   if(!tipo) return;
-  const { data: doDia } = await sb.from('agenda').select('titulo,hora,cidade,tipo').eq('data', servico.prazo).eq('status','planejado');
+  /* Presencial nunca pode ficar sem cidade — se a ficha do cliente não tem
+     cidade cadastrada, pergunta na hora em vez de deixar em branco. Remoto
+     não precisa (ligação/mensagem não tem endereço). */
+  let cidadeNova = null;
+  if(tipo==='presencial'){
+    cidadeNova = cliente?.cidade || null;
+    if(!cidadeNova){
+      cidadeNova = (await askText(`Compromisso presencial de "${servico.titulo}" precisa de cidade (o cliente ${cliente?.nome||''} não tem cidade cadastrada). Qual a cidade?`, '') || '').trim() || null;
+      if(!cidadeNova){ toast('Compromisso presencial não pode ficar sem cidade — não foi lançado na Agenda.'); return; }
+    }
+  }
+  const { data: doDia } = await sb.from('agenda').select('id,titulo,hora,cidade,tipo').eq('data', servico.prazo).eq('status','planejado');
   const novoTitulo = `${cliente?.nome||'Cliente'} — ${servico.titulo}`;
   const disponiveis = horariosParaTipo(servico.prazo, tipo, (doDia||[]).map(a=>a.hora));
   const sugestao = disponiveis[0] || null;
-  const cidadeNova = tipo==='presencial' ? (cliente?.cidade||null) : null;
   const horario = await confirmarComDiaVisivel(servico.prazo, doDia||[], novoTitulo, cidadeNova, sugestao, tipo, disponiveis);
   if(!horario) return;
   const { error } = await sb.from('agenda').insert({
@@ -2050,6 +2086,14 @@ async function renderAgenda(){
     const titulo = $('#agTitulo').value.trim();
     const data = $('#agData').value;
     if(!titulo || !data){ toast('Preencha ao menos título e data'); return; }
+    /* Compromisso do formulário manual é sempre tratado como presencial
+       (não tem seletor de tipo aqui) — por isso exige cidade, sem exceção.
+       Nunca criar/deixar passar sem cidade: se não souber, PERGUNTAR. */
+    let cidade = $('#agCidade').value.trim() || null;
+    if(!cidade){
+      cidade = (await askText(`Compromisso presencial precisa de cidade (pra rota e pra não ficar perdido depois). Qual a cidade de "${titulo}"?`, '') || '').trim() || null;
+      if(!cidade){ toast('Compromisso presencial não pode ficar sem cidade. Preencha a cidade pra salvar.'); return; }
+    }
     let hora = $('#agHora').value || null;
     if(!hora){
       const { data: doDia } = await sb.from('agenda').select('hora').eq('data', data).eq('status','planejado');
@@ -2057,7 +2101,7 @@ async function renderAgenda(){
       if(!hora){ toast('Nenhum compromisso pode ficar sem horário, e não sobrou horário livre nesse dia. Escolha outro dia ou informe a hora manualmente.'); return; }
       toast('🕐 Sem horário informado — usado '+hora+' (primeiro livre do dia)');
     }
-    const { error } = await sb.from('agenda').insert({ titulo, data, hora, local: $('#agLocal').value.trim() || null, cidade: $('#agCidade').value.trim() || null });
+    const { error } = await sb.from('agenda').insert({ titulo, data, hora, local: $('#agLocal').value.trim() || null, cidade });
     if(error){ toast('Erro: '+error.message); return; }
     toast('✔ Adicionado'); renderAgenda(); renderInicio();
   });
