@@ -974,6 +974,35 @@ $('#btnWhatsappOrcamento').addEventListener('click',()=>{
   window.open(wa+'?text='+encodeURIComponent(mensagemOrcamento(d)),'_blank','noopener');
 });
 
+/* Liga um serviço a um compromisso na Agenda quando o prazo é um evento real
+   (visita, buscar material, entregar) — não todo prazo de lead vira agenda.
+   Evita duplicar: se o serviço já tem um compromisso vinculado (servico_id),
+   só atualiza a data dele. Antes de criar um novo, avisa se já existe algo
+   marcado nesse mesmo dia, pra não gerar conflito de agenda sem o Diego saber. */
+async function sincronizarAgendaServico(servico, cliente){
+  if(!servico?.prazo) return;
+  const { data: existente } = await sb.from('agenda').select('id,data').eq('servico_id', servico.id).limit(1);
+  if(existente?.length){
+    if(existente[0].data !== servico.prazo){
+      await sb.from('agenda').update({ data: servico.prazo }).eq('id', existente[0].id);
+      toast('📅 Compromisso na Agenda atualizado pro novo prazo');
+    }
+    return;
+  }
+  if(!await askConfirm(`O prazo "${dataCurtaBR(servico.prazo)}" de "${servico.titulo}" é um compromisso real (visita, buscar material, entregar)? Se sim, entra na Agenda também.`)) return;
+  const { data: doDia } = await sb.from('agenda').select('titulo,hora').eq('data', servico.prazo).eq('status','planejado');
+  if(doDia?.length){
+    const lista = doDia.map(a=>`• ${a.titulo}${a.hora?' às '+a.hora:''}`).join('\n');
+    if(!await askConfirm(`Já tem compromisso(s) marcado(s) em ${dataCurtaBR(servico.prazo)}:\n${lista}\n\nConfirma mesmo assim?`)) return;
+  }
+  const { error } = await sb.from('agenda').insert({
+    titulo: `${cliente?.nome||'Cliente'} — ${servico.titulo}`, data: servico.prazo,
+    status:'planejado', servico_id: servico.id
+  });
+  if(error){ toast('Erro ao lançar na Agenda: '+error.message); return; }
+  toast('📅 Compromisso lançado na Agenda'); renderAgenda();
+}
+
 async function sincronizarFinanceiroServico(servico, cliente){
   const valor = Number(servico.valor_orcamento || 0);
   if(!valor || valor <= 0) return;
@@ -1139,6 +1168,7 @@ async function abrirFicha(clienteId){
       if(error){ toast('Erro: '+error.message); return; }
       Object.assign(s,alterado);
       try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('Serviço salvo; financeiro: '+err.message); }
+      if(s.prazo) try{ await sincronizarAgendaServico(s,cli); }catch(err){ toast('Serviço salvo; agenda: '+err.message); }
       toast('✔ Serviço atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
     });
     acoes.appendChild(bEditarServico);
@@ -1531,6 +1561,7 @@ async function renderInicio(){
           }).select('*').single();
           if(erroServico) throw erroServico;
           if(['producao','entregue','pago'].includes(status)) await sincronizarFinanceiroServico(servicoCriado, cliente);
+          if(prazo) try{ await sincronizarAgendaServico(servicoCriado, cliente); }catch(err){ toast('Ficha salva; agenda: '+err.message); }
           if(registro.imagemUrl){
             const { error: erroFoto } = await sb.from('fotos').insert({
               cliente_id: cliente.id, url: registro.imagemUrl, tipo: 'outro'
