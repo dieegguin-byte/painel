@@ -1087,9 +1087,15 @@ async function escolherDiaEHorario(compromisso){
         aviso.style.cssText='font-size:.78rem;color:var(--alta,#e0574f);margin-bottom:6px';
         bloco.appendChild(aviso);
       }
+      const periodosConflito = new Set(conflitoRota ? doDia.filter(a=>a.tipo==='presencial' && a.cidade && cidadeChave(a.cidade)!==cidadeChave(cidade)).map(a=>periodoDoHorario(a.hora)) : []);
       const chips = el('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
       livres.forEach(h=>{
+        const arriscado = periodosConflito.has(periodoDoHorario(h));
         const b = el('button','botao b-tel', h);
+        if(arriscado){
+          b.style.cssText='border-color:var(--alta,#e0574f);color:var(--alta,#e0574f)';
+          b.title='Mesmo período (manhã/tarde/noite) do compromisso em outra cidade — pode não dar tempo de rota.';
+        }
         b.addEventListener('click', ()=>{ fundo.remove(); resolve({data:dataISO, hora:h}); });
         chips.appendChild(b);
       });
@@ -1112,6 +1118,16 @@ async function escolherDiaEHorario(compromisso){
    confirmar um novo compromisso. Os horários são clicáveis — toca pra
    escolher outro em vez do sugerido automaticamente. Resolve com o
    horário escolhido (string) ou null se cancelou. */
+/* Manhã/tarde/noite pra comparar conflito de rota por período, não por
+   minuto exato — um compromisso só de manhã em Luziânia não impede
+   agendar à tarde em Brasília, por exemplo. */
+function periodoDoHorario(h){
+  const hh = Number((h||'').slice(0,2));
+  if(isNaN(hh)) return 'manha';
+  if(hh<12) return 'manha';
+  if(hh<18) return 'tarde';
+  return 'noite';
+}
 /* Compara cidades de forma tolerante (ignora acento, maiúscula, sufixo tipo
    "-DF" ou texto entre parênteses) — usado só pra decidir se dois
    compromissos presenciais no mesmo dia são de regiões diferentes. */
