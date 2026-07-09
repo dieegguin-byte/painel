@@ -418,3 +418,46 @@ preenchida e o padrão de datas antes de propor agrupamento.
   empilhar várias tarefas remotas no mesmo horário (ex: mandar 3 mensagens
   às 09h), porque não ocupam ele fisicamente como uma visita ocupa. Só
   compromisso `presencial` bloqueia horário repetido.
+
+### Travas adicionadas ao vivo em 09/07/2026 (primeiro dia de uso real)
+
+Processando a Caixa de Entrada de verdade pela primeira vez, apareceram bugs
+reais que viraram trava no código (não só regra escrita):
+
+- **Compromisso presencial nunca salva sem cidade.** Aconteceu de verdade:
+  criei "Buscar uniformes - Paulinho Cadeiras" só com data, sem cidade nem
+  hora. Agora `sincronizarAgendaServico` e o formulário manual da Agenda
+  perguntam a cidade (`askText`) se não tiver, e **recusam salvar** se a
+  resposta ficar em branco. Cliente já cadastrado sem cidade também dispara
+  a pergunta (aconteceu com a Cirlene, cadastro antigo sem cidade).
+- **Compromisso não pode ficar sem horário** — mesma lógica: se o Diego
+  deixar em branco no formulário manual, preenche sozinho com
+  `horariosParaTipo(...)[0]`; se não sobrar horário livre, recusa salvar.
+- **Valor do orçamento é obrigatório pra virar "Em produção" (ou além)** —
+  mesmo em combinado "pagar só na entrega", o valor tem que estar definido
+  desde já, senão o Financeiro não tem o que lançar depois. Os dois lugares
+  que trocam status (`select` da ficha e `select` da tela Leads) perguntam
+  o valor na hora se estiver faltando.
+- **Aviso de conflito de cidade entre presenciais no mesmo dia.** Erro real:
+  Taísa (Luziânia, 08h) ficou marcada pra segunda-feira 13/07, e no mesmo
+  dia entraram Brito Odontologia (Brasília-DF/Asa Norte, 07h) e Cirlene
+  (Brasília-DF/Vicente Pires, 09h) — fisicamente impossível estar em
+  Luziânia e Brasília nesse intervalo. **A IA não sabe distância nem
+  trânsito**, então o código não bloqueia sozinho — só destaca em vermelho
+  (com ⚠️) qualquer compromisso presencial existente de cidade diferente da
+  do novo, dentro do modal `confirmarComDiaVisivel` (função `cidadeChave`
+  compara ignorando acento/maiúscula/sufixo tipo "-DF"). **Decisão do Diego
+  em 09/07: não remanejar automaticamente — só garantir que fique visível
+  pra qualquer sessão (dele ou de IA) perceber e decidir.** A Taísa ficou de
+  propósito sem resolver essa sessão — quem abrir a Agenda vai ver o aviso
+  vermelho nela e precisa perguntar ao Diego o que fazer (não escolher
+  sozinho um novo horário).
+
+### Regra geral que emergiu hoje
+
+Toda vez que um dado crítico pra operação (cidade, horário, valor) puder
+ficar vazio "por enquanto", ele vira uma dívida que ninguém nunca volta pra
+pagar. A resposta não é deixar opcional — é perguntar no ato e **recusar
+salvar sem resposta**. Isso vale pra qualquer campo novo que apareça no
+futuro: antes de fazer opcional, perguntar se realmente pode ficar vazio ou
+se devia travar como esses três.
