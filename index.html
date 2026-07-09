@@ -1,11 +1,11 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#7a3b1f">
 <meta name="tb-versao" content="4.0">
-<title>Atendimento â€” TapeÃ§aria Bahia</title>
+<title>Atendimento — Tapeçaria Bahia</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="./icon.svg">
@@ -355,25 +355,25 @@
 <!-- TELA: carregando -->
 <div id="telaCarregando" class="tela-cheia">
   <img src="./icon.svg" alt="">
-  <p>Carregandoâ€¦</p>
+  <p>Carregando…</p>
 </div>
 
 <!-- TELA: login -->
 <div id="telaLogin" class="tela-cheia oculto">
   <img src="./icon.svg" alt="">
-  <h1>Atendimento â€” TapeÃ§aria Bahia</h1>
-  <p>Entre com seu e-mail. Vamos te mandar um link â€” sem senha.</p>
+  <h1>Atendimento — Tapeçaria Bahia</h1>
+  <p>Entre com seu e-mail. Vamos te mandar um link — sem senha.</p>
   <input class="campo" id="campoEmail" type="email" placeholder="seu@email.com" autocomplete="email">
   <button class="botao-primario" id="btnEnviarLink">Enviar link de acesso</button>
   <p class="erro-msg" id="erroLogin"></p>
-  <p id="msgLinkEnviado" class="oculto" style="color:var(--ok); font-size:.85rem">âœ” Link enviado! Abra seu e-mail neste celular e toque no link.</p>
+  <p id="msgLinkEnviado" class="oculto" style="color:var(--ok); font-size:.85rem">✔ Link enviado! Abra seu e-mail neste celular e toque no link.</p>
 </div>
 
 <!-- TELA: definir PIN -->
 <div id="telaDefinirPin" class="tela-cheia oculto">
   <img src="./icon.svg" alt="">
   <h1>Criar um PIN</h1>
-  <p id="msgDefinirPin">Escolha um PIN de 4 dÃ­gitos para travar o app no dia a dia.</p>
+  <p id="msgDefinirPin">Escolha um PIN de 4 dígitos para travar o app no dia a dia.</p>
   <div class="pin-pontos" id="pontosPin"><span></span><span></span><span></span><span></span></div>
   <p class="erro-msg" id="erroPin"></p>
   <div class="teclado-pin" id="tecladoDefinir"></div>
@@ -395,10 +395,10 @@
       <img src="./icon.svg" alt="">
       <div>
         <h1>Atendimento</h1>
-        <div class="sub">TapeÃ§aria e Estofados Bahia Â· LuziÃ¢nia-GO</div>
+        <div class="sub">Tapeçaria e Estofados Bahia · Luziânia-GO</div>
         <div class="sessao oculto" id="sessaoInfo"></div>
       </div>
-      <button class="btn-header-icon" id="btnGuia" title="Guia da IA" style="margin-left:auto">ðŸ“–</button>
+      <button class="btn-header-icon" id="btnGuia" title="Guia da IA" style="margin-left:auto">📖</button>
       <button class="sair" id="btnSair">Sair</button>
     </div>
   </header>
@@ -413,12 +413,12 @@
   </main>
 
   <nav class="tabs">
-    <button data-tab="inicio" class="ativo"><span class="ic">ðŸ </span>InÃ­cio</button>
-    <button data-tab="clientes"><span class="ic">ðŸ“‡</span>Clientes</button>
-    <button data-tab="leads"><span class="ic">ðŸ‘¥</span>Leads</button>
-    <button data-tab="agenda"><span class="ic">ðŸ“…</span>Agenda</button>
-    <button data-tab="financeiro"><span class="ic">ðŸ’°</span>Financeiro</button>
-    <button data-tab="estoque"><span class="ic">ðŸ“¦</span>Estoque</button>
+    <button data-tab="inicio" class="ativo"><span class="ic">🏠</span>Início</button>
+    <button data-tab="clientes"><span class="ic">📇</span>Clientes</button>
+    <button data-tab="leads"><span class="ic">👥</span>Leads</button>
+    <button data-tab="agenda"><span class="ic">📅</span>Agenda</button>
+    <button data-tab="financeiro"><span class="ic">💰</span>Financeiro</button>
+    <button data-tab="estoque"><span class="ic">📦</span>Estoque</button>
   </nav>
 </div>
 
@@ -426,11 +426,11 @@
 <div id="modalGuia" class="modal-overlay oculto">
   <div class="modal-box">
     <div class="modal-cab">
-      <h2>ðŸ“– Guia da IA</h2>
-      <button class="modal-fechar" id="btnFecharGuia">âœ•</button>
+      <h2>📖 Guia da IA</h2>
+      <button class="modal-fechar" id="btnFecharGuia">✕</button>
     </div>
     <p style="color:var(--fraco); font-size:.82rem; margin:0 0 14px">
-      Ã‰ o que a IA lÃª antes de mexer no app: contexto da empresa e como agir. Edite Ã  vontade.
+      É o que a IA lê antes de mexer no app: contexto da empresa e como agir. Edite à vontade.
     </p>
     <div id="guiaConteudo"></div>
   </div>
@@ -441,38 +441,38 @@
   <div class="modal-box">
     <div class="modal-cab">
       <h2 id="fichaNome">Cliente</h2>
-      <button class="modal-fechar" id="btnFecharFicha">âœ•</button>
+      <button class="modal-fechar" id="btnFecharFicha">✕</button>
     </div>
     <div id="fichaConteudo"></div>
   </div>
 </div>
 
-<!-- MODAL: OrÃ§amento profissional -->
+<!-- MODAL: Orçamento profissional -->
 <div id="modalOrcamento" class="modal-overlay oculto">
   <div class="modal-box">
     <div class="modal-cab">
-      <h2>OrÃ§amento profissional</h2>
-      <button class="modal-fechar" id="btnFecharOrcamento">âœ•</button>
+      <h2>Orçamento profissional</h2>
+      <button class="modal-fechar" id="btnFecharOrcamento">✕</button>
     </div>
     <div class="form">
-      <input id="orcServico" type="text" placeholder="ServiÃ§o proposto">
-      <textarea id="orcDescricao" rows="4" placeholder="DescriÃ§Ã£o detalhada do serviÃ§o"></textarea>
+      <input id="orcServico" type="text" placeholder="Serviço proposto">
+      <textarea id="orcDescricao" rows="4" placeholder="Descrição detalhada do serviço"></textarea>
       <div class="linha2">
         <input id="orcMedidas" type="text" placeholder="Medidas / quantidade">
         <input id="orcMaterial" type="text" placeholder="Tecido, material e acabamento">
       </div>
       <div class="linha2">
         <input id="orcValor" type="number" step="0.01" placeholder="Valor total (R$)">
-        <input id="orcPrazo" type="text" placeholder="Prazo de produÃ§Ã£o (ex.: 20 dias)">
+        <input id="orcPrazo" type="text" placeholder="Prazo de produção (ex.: 20 dias)">
       </div>
-      <textarea id="orcPagamento" rows="2" placeholder="CondiÃ§Ã£o de pagamento"></textarea>
+      <textarea id="orcPagamento" rows="2" placeholder="Condição de pagamento"></textarea>
       <div class="linha2">
         <input id="orcValidade" type="number" min="1" max="90" value="10" placeholder="Validade em dias">
-        <input id="orcGarantia" type="text" value="Garantia do serviÃ§o conforme condiÃ§Ãµes apresentadas" placeholder="Garantia">
+        <input id="orcGarantia" type="text" value="Garantia do serviço conforme condições apresentadas" placeholder="Garantia">
       </div>
-      <textarea id="orcObservacoes" rows="3" placeholder="ObservaÃ§Ãµes adicionais"></textarea>
+      <textarea id="orcObservacoes" rows="3" placeholder="Observações adicionais"></textarea>
       <label style="display:flex;gap:8px;align-items:center;font-size:.82rem;color:var(--texto2)">
-        <input id="orcIncluirFotos" type="checkbox" checked style="width:auto"> Incluir fotos da ficha no orÃ§amento
+        <input id="orcIncluirFotos" type="checkbox" checked style="width:auto"> Incluir fotos da ficha no orçamento
       </label>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="botao b-ok" id="btnGerarOrcamento">Gerar PDF / imprimir</button>
@@ -504,21 +504,14 @@ const hojeISO = () => {
 
 function moedaBR(n){ if(typeof n!=='number'||isNaN(n)) return 'R$ 0,00'; return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
 function dataCurtaBR(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); if(isNaN(d)) return esc(iso); return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}); }
-function dataComDiaBR(iso){
-  if(!iso) return '';
-  const d = new Date(iso+'T00:00:00');
-  if(isNaN(d)) return esc(iso);
-  const dia = d.toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','');
-  return dia.charAt(0).toUpperCase()+dia.slice(1)+', '+d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
-}
 function ehHoje(iso){ if(!iso) return false; const h=new Date(); const s=`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; return iso===s; }
 function ehAtrasado(iso){ return !!iso && iso < hojeISO(); }
 function prioridadePeso(prio){ return ({alta:0, media:1, baixa:2}[prio] ?? 1); }
 function textoPrazo(iso){
   if(!iso) return 'Sem prazo';
-  if(ehAtrasado(iso)) return 'Atrasado ' + dataComDiaBR(iso);
+  if(ehAtrasado(iso)) return 'Atrasado ' + dataCurtaBR(iso);
   if(ehHoje(iso)) return 'Hoje';
-  return 'Prazo ' + dataComDiaBR(iso);
+  return 'Prazo ' + dataCurtaBR(iso);
 }
 function telParaWa(tel){ const num=String(tel||'').replace(/\D/g,''); return num.length>=10 ? 'https://wa.me/'+num : null; }
 function telParaLigar(tel){ const num=String(tel||'').replace(/\D/g,''); return num.length>=10 ? 'tel:+'+num : null; }
@@ -528,11 +521,11 @@ function toast(msg){
   t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'), 1900);
 }
 async function copiarTexto(txt){
-  try{ await navigator.clipboard.writeText(txt); toast('ðŸ“‹ Copiado'); }
+  try{ await navigator.clipboard.writeText(txt); toast('📋 Copiado'); }
   catch(e){ await askText('Copie o texto:', txt); }
 }
 
-/* ---------- modais em pÃ¡gina (substituem prompt()/confirm() nativos) ---------- */
+/* ---------- modais em página (substituem prompt()/confirm() nativos) ---------- */
 function _modalBase(){
   const fundo=el('div','modal-fundo');
   fundo.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px';
@@ -585,34 +578,6 @@ function askConfirm(mensagem){
     setTimeout(()=>{ bOk.focus(); }, 0);
   });
 }
-function askOpcao(titulo, opcoes){
-  return new Promise(resolve=>{
-    const {fundo,caixa}=_modalBase();
-    const msg=el('div',null,titulo); msg.style.cssText='white-space:pre-wrap;margin-bottom:14px;font-size:.95rem;font-weight:700';
-    caixa.appendChild(msg);
-    const lista=el('div'); lista.style.cssText='display:flex;flex-direction:column;gap:8px';
-    opcoes.forEach(op=>{
-      const b=el('button','botao '+(op.classe||'b-tel'),op.rotulo);
-      b.type='button'; b.style.cssText='width:100%;justify-content:center;min-height:42px';
-      b.addEventListener('click',()=>{ fundo.remove(); resolve(op.valor); });
-      lista.appendChild(b);
-    });
-    caixa.appendChild(lista);
-    const cancelar=el('button','botao b-rm','Cancelar'); cancelar.type='button'; cancelar.style.cssText='width:100%;margin-top:10px';
-    cancelar.addEventListener('click',()=>{ fundo.remove(); resolve(null); });
-    caixa.appendChild(cancelar);
-    fundo.addEventListener('mousedown', e=>{ if(e.target===fundo){ fundo.remove(); resolve(null); } });
-  });
-}
-
-function sugerirPendencia(texto=''){
-  const t = String(texto||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  if(/whats|mensagem|contato|resposta|responder|cliente/.test(t)) return 'Aguardar resposta do cliente';
-  if(/visita|avaliar|orcamento|medir/.test(t)) return 'Reagendar visita ou avaliação';
-  if(/entrega|retirada|buscar|levar/.test(t)) return 'Reagendar retirada ou entrega';
-  if(/pag|sinal|entrada|saldo|cobrar/.test(t)) return 'Cobrar retorno do pagamento';
-  return 'Aguardar resposta do cliente';
-}
 
 function montarTextoCaixa(payload={}){
   const texto = String(payload.texto || '').trim();
@@ -647,16 +612,16 @@ async function subirPrintCaixa(file){
   if(urlErr) throw urlErr;
   return { url: urlData.signedUrl, nomeArquivo: nomeSeguro };
 }
-const STATUS_LABEL = {lead:'Novo lead', orcamento:'OrÃ§amento', agendado:'Agendado', producao:'Em produÃ§Ã£o', entregue:'Entregue', pago:'Pago', perdido:'Perdido'};
+const STATUS_LABEL = {lead:'Novo lead', orcamento:'Orçamento', agendado:'Agendado', producao:'Em produção', entregue:'Entregue', pago:'Pago', perdido:'Perdido'};
 const STATUS_ORDEM = ['lead','orcamento','agendado','producao','entregue','pago','perdido'];
 const STATUS_FLUXO = ['lead','orcamento','agendado','producao','entregue','pago'];
 
-/* Canal Ãºnico de pergunta/resposta entre a IA e o Diego: cada item da Caixa de
+/* Canal único de pergunta/resposta entre a IA e o Diego: cada item da Caixa de
    Entrada tem um status e uma conversa (array de {de:'ia'|'diego', texto, em}).
-   novo â†’ IA ainda nÃ£o olhou. aguardando_voce â†’ IA perguntou, Ã© a vez do Diego.
-   respondido â†’ Diego respondeu, Ã© a vez da IA agir. resolvido â†’ item encerrado
+   novo → IA ainda não olhou. aguardando_voce → IA perguntou, é a vez do Diego.
+   respondido → Diego respondeu, é a vez da IA agir. resolvido → item encerrado
    (mesmo efeito de processado:true, mantidos os dois por compatibilidade). */
-const STATUS_CAIXA_LABEL = {novo:'Novo', aguardando_voce:'Aguardando vocÃª', respondido:'Respondido', resolvido:'Resolvido'};
+const STATUS_CAIXA_LABEL = {novo:'Novo', aguardando_voce:'Aguardando você', respondido:'Respondido', resolvido:'Resolvido'};
 
 function cabecalhoPainel(icone,titulo,subtitulo){
   const cab=el('div','painel-cab');
@@ -672,7 +637,7 @@ function montarFluxoStatus(statusAtual,onEscolher){
     const classe=i<indice?' feito':i===indice?' atual':'';
     const b=el('button','status-passo'+classe);
     b.type='button'; b.title='Mudar para '+STATUS_LABEL[st];
-    b.appendChild(el('span','ponto',i<indice?'âœ“':String(i+1)));
+    b.appendChild(el('span','ponto',i<indice?'✓':String(i+1)));
     b.appendChild(document.createTextNode(STATUS_LABEL[st]));
     if(onEscolher) b.addEventListener('click',()=>{ if(st!==statusAtual) onEscolher(st); });
     trilha.appendChild(b);
@@ -687,9 +652,9 @@ function lerErroAuthDaUrl(){
   const code = params.get('error_code');
   const desc = params.get('error_description');
   if(!code && !desc) return null;
-  if(code === 'otp_expired') return 'Esse link expirou. PeÃ§a um novo e abra assim que chegar.';
+  if(code === 'otp_expired') return 'Esse link expirou. Peça um novo e abra assim que chegar.';
   if(desc) return desc.replace(/\+/g, ' ');
-  return 'NÃ£o foi possÃ­vel concluir sua entrada. Tente pedir um novo link.';
+  return 'Não foi possível concluir sua entrada. Tente pedir um novo link.';
 }
 
 function limparHashAuth(){
@@ -711,12 +676,12 @@ function atualizarInfoSessao(session){
     alvo.classList.add('oculto');
     return;
   }
-  alvo.textContent = `SessÃ£o pronta para operar Â· ${email}`;
+  alvo.textContent = `Sessão pronta para operar · ${email}`;
   alvo.classList.remove('oculto');
 }
 
 /* =========================================================================
-   AUTENTICAÃ‡ÃƒO
+   AUTENTICAÇÃO
    ========================================================================= */
 async function iniciar(){
   const { data: { session } } = await sb.auth.getSession();
@@ -734,8 +699,8 @@ async function iniciar(){
 $('#btnEnviarLink').addEventListener('click', async ()=>{
   const email = $('#campoEmail').value.trim();
   $('#erroLogin').textContent='';
-  if(!email || !email.includes('@')){ $('#erroLogin').textContent='Digite um e-mail vÃ¡lido.'; return; }
-  $('#btnEnviarLink').disabled = true; $('#btnEnviarLink').textContent='Enviandoâ€¦';
+  if(!email || !email.includes('@')){ $('#erroLogin').textContent='Digite um e-mail válido.'; return; }
+  $('#btnEnviarLink').disabled = true; $('#btnEnviarLink').textContent='Enviando…';
   const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
   $('#btnEnviarLink').disabled = false; $('#btnEnviarLink').textContent='Enviar link de acesso';
   if(error){ $('#erroLogin').textContent = 'Erro: ' + error.message; return; }
@@ -767,7 +732,7 @@ let pinTemp = '';
 
 function montarTeclado(container, onDigito){
   container.innerHTML = '';
-  const teclas = ['1','2','3','4','5','6','7','8','9','','0','âŒ«'];
+  const teclas = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
   teclas.forEach(t=>{
     const b = el('button', 'tecla'+(t===''?' vazia':''), t);
     if(t!=='') b.addEventListener('click', ()=>onDigito(t));
@@ -797,7 +762,7 @@ async function verificarPin(){
 
 function digitarDefinirPin(t){
   $('#erroPin').textContent='';
-  if(t==='âŒ«'){ pinTemp = pinTemp.slice(0,-1); atualizarPontos($('#pontosPin'), pinTemp.length); return; }
+  if(t==='⌫'){ pinTemp = pinTemp.slice(0,-1); atualizarPontos($('#pontosPin'), pinTemp.length); return; }
   if(pinTemp.length>=4) return;
   pinTemp += t;
   atualizarPontos($('#pontosPin'), pinTemp.length);
@@ -808,9 +773,9 @@ function digitarDefinirPin(t){
       atualizarPontos($('#pontosPin'), 0);
     } else {
       if(pinTemp !== window._primeiroPin){
-        $('#erroPin').textContent = 'Os PINs nÃ£o batem. Tente de novo.';
+        $('#erroPin').textContent = 'Os PINs não batem. Tente de novo.';
         window._primeiroPin=null; pinTemp='';
-        $('#msgDefinirPin').textContent = 'Escolha um PIN de 4 dÃ­gitos para travar o app no dia a dia.';
+        $('#msgDefinirPin').textContent = 'Escolha um PIN de 4 dígitos para travar o app no dia a dia.';
         atualizarPontos($('#pontosPin'), 0);
         return;
       }
@@ -827,7 +792,7 @@ async function salvarPin(pin){
 }
 function digitarPinEntrar(t){
   $('#erroPinEntrar').textContent='';
-  if(t==='âŒ«'){ pinDigitado = pinDigitado.slice(0,-1); atualizarPontos($('#pontosPinEntrar'), pinDigitado.length); return; }
+  if(t==='⌫'){ pinDigitado = pinDigitado.slice(0,-1); atualizarPontos($('#pontosPinEntrar'), pinDigitado.length); return; }
   if(pinDigitado.length>=4) return;
   pinDigitado += t;
   atualizarPontos($('#pontosPinEntrar'), pinDigitado.length);
@@ -856,7 +821,7 @@ function entrarNoApp(){
 }
 
 /* =========================================================================
-   NAVEGAÃ‡ÃƒO POR ABAS
+   NAVEGAÇÃO POR ABAS
    ========================================================================= */
 const PAINEIS = ['inicio','clientes','leads','agenda','financeiro','estoque'];
 function irPara(tab){
@@ -874,36 +839,31 @@ $$('nav.tabs button').forEach(btn=>{
 /* =========================================================================
    GUIA DA IA
    ========================================================================= */
-const SECAO_LABEL = {empresa:'Sobre a empresa', como_agir:'Como a IA deve agir', regras:'Regras inviolÃ¡veis'};
+const SECAO_LABEL = {empresa:'Sobre a empresa', como_agir:'Como a IA deve agir', regras:'Regras invioláveis'};
 const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
-- Novo lead, orÃ§amento e agendado nÃ£o geram lanÃ§amento financeiro.
-- O valor informado nesses status Ã© apenas valor de orÃ§amento.
-- Ao entrar em ProduÃ§Ã£o, confirmar forma de pagamento antes de lanÃ§ar valores.
+- Novo lead, orçamento e agendado não geram lançamento financeiro.
+- O valor informado nesses status é apenas valor de orçamento.
+- Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
 - Pagamento 50/50 gera entrada paga e saldo a receber na entrega.
-- Cada parte pode ser Pix, dinheiro, transferÃªncia ou cartÃ£o parcelado.
-- CartÃ£o aprovado Ã© considerado pago; registrar tambÃ©m a quantidade de parcelas.
-- Gerar orÃ§amento transforma apenas Novo lead em OrÃ§amento; nÃ£o cria financeiro.
+- Cada parte pode ser Pix, dinheiro, transferência ou cartão parcelado.
+- Cartão aprovado é considerado pago; registrar também a quantidade de parcelas.
+- Gerar orçamento transforma apenas Novo lead em Orçamento; não cria financeiro.
 - O PDF deve ser revisado antes de ser enviado e nunca deve ser enviado automaticamente.
-- Marcar serviÃ§o como Pago atualiza os lanÃ§amentos vinculados, sem duplicar.
-- Nunca excluir ficha, foto, serviÃ§o ou lanÃ§amento sem confirmaÃ§Ã£o humana.
+- Marcar serviço como Pago atualiza os lançamentos vinculados, sem duplicar.
+- Nunca excluir ficha, foto, serviço ou lançamento sem confirmação humana.
 - Antes de criar cliente, procurar telefone existente para evitar duplicidade.
-- AlteraÃ§Ãµes de valor, pagamento, prazo e status devem ser resumidas ao usuÃ¡rio.
-- Concluir uma aÃ§Ã£o nÃ£o encerra o relacionamento; sempre definir prÃ³ximo estado, prÃ³xima aÃ§Ã£o ou encerramento real.
-- Se uma aÃ§Ã£o nÃ£o foi concluÃ­da, registrar motivo e reagendar com nova data.
-- Criar ou reagendar compromisso exige olhar a agenda do dia, cidade, rota, tipo do serviÃ§o e horÃ¡rios jÃ¡ ocupados.
-- Verde no semÃ¡foro sÃ³ vale para item futuro com data e prÃ³xima aÃ§Ã£o definida.
-- Texto e print processados pela Caixa de Entrada devem ficar visÃ­veis na ficha do cliente.`;
+- Alterações de valor, pagamento, prazo e status devem ser resumidas ao usuário.`;
 $('#btnGuia').addEventListener('click', abrirGuia);
 $('#btnFecharGuia').addEventListener('click', ()=> $('#modalGuia').classList.add('oculto'));
 
 async function abrirGuia(){
-  const cont = $('#guiaConteudo'); cont.innerHTML = '<p class="vazio">Carregandoâ€¦</p>';
+  const cont = $('#guiaConteudo'); cont.innerHTML = '<p class="vazio">Carregando…</p>';
   $('#modalGuia').classList.remove('oculto');
   const { data, error } = await sb.from('guia_ia').select('*').order('secao');
   cont.innerHTML = '';
   if(error){ cont.appendChild(el('div','vazio','Erro: '+error.message)); return; }
   const regrasAtuais=el('div','guia-bloco');
-  regrasAtuais.appendChild(el('h3',null,'Regras automÃ¡ticas vigentes'));
+  regrasAtuais.appendChild(el('h3',null,'Regras automáticas vigentes'));
   const textoRegras=el('div',null,REGRAS_SISTEMA_ATUAIS);
   textoRegras.style.whiteSpace='pre-line'; textoRegras.style.fontSize='.82rem'; textoRegras.style.color='var(--texto2)';
   regrasAtuais.appendChild(textoRegras); cont.appendChild(regrasAtuais);
@@ -919,7 +879,7 @@ async function abrirGuia(){
     bSalvar.addEventListener('click', async ()=>{
       const { error: err2 } = await sb.from('guia_ia').upsert({ secao: sec, titulo: SECAO_LABEL[sec], conteudo: ta.value, atualizado_em: new Date().toISOString() }, {onConflict:'secao'});
       if(err2){ toast('Erro: '+err2.message); return; }
-      toast('âœ” Guia atualizado');
+      toast('✔ Guia atualizado');
     });
     bloco.appendChild(bSalvar);
     cont.appendChild(bloco);
@@ -927,7 +887,7 @@ async function abrirGuia(){
 }
 
 /* =========================================================================
-   FICHA DO CLIENTE (com histÃ³rico + fotos)
+   FICHA DO CLIENTE (com histórico + fotos)
    ========================================================================= */
 $('#btnFecharFicha').addEventListener('click', ()=> $('#modalFicha').classList.add('oculto'));
 $('#btnFecharOrcamento').addEventListener('click', ()=> $('#modalOrcamento').classList.add('oculto'));
@@ -936,13 +896,13 @@ let orcamentoAtual = null;
 function abrirOrcamento(cliente,servico,fotos=[]){
   orcamentoAtual={cliente,servico,fotos};
   $('#orcServico').value=servico.titulo||'';
-  $('#orcDescricao').value=servico.proxima_acao ? `ServiÃ§o solicitado: ${servico.titulo}.\nDetalhes atuais: ${servico.proxima_acao}` : `ServiÃ§o solicitado: ${servico.titulo||''}.`;
+  $('#orcDescricao').value=servico.proxima_acao ? `Serviço solicitado: ${servico.titulo}.\nDetalhes atuais: ${servico.proxima_acao}` : `Serviço solicitado: ${servico.titulo||''}.`;
   $('#orcMedidas').value=''; $('#orcMaterial').value='';
   $('#orcValor').value=servico.valor_orcamento||'';
-  $('#orcPrazo').value=servico.prazo ? `PrevisÃ£o atÃ© ${dataCurtaBR(servico.prazo)}` : '';
-  $('#orcPagamento').value='50% na aprovaÃ§Ã£o e 50% na entrega. Pix, dinheiro, transferÃªncia ou cartÃ£o, conforme combinado.';
+  $('#orcPrazo').value=servico.prazo ? `Previsão até ${dataCurtaBR(servico.prazo)}` : '';
+  $('#orcPagamento').value='50% na aprovação e 50% na entrega. Pix, dinheiro, transferência ou cartão, conforme combinado.';
   $('#orcValidade').value='10';
-  $('#orcGarantia').value='Garantia do serviÃ§o conforme condiÃ§Ãµes apresentadas';
+  $('#orcGarantia').value='Garantia do serviço conforme condições apresentadas';
   $('#orcObservacoes').value=cliente.obs||'';
   $('#orcIncluirFotos').checked=true;
   $('#modalOrcamento').classList.remove('oculto');
@@ -963,7 +923,7 @@ function dadosOrcamento(){
 }
 
 function mensagemOrcamento(d){
-  return `OlÃ¡, ${d.cliente.nome||'tudo bem'}! Preparei seu orÃ§amento personalizado para ${d.titulo||'o serviÃ§o solicitado'}.\n\nValor: ${moedaBR(d.valor)}\nPrazo: ${d.prazo||'a combinar'}\nCondiÃ§Ã£o: ${d.pagamento||'a combinar'}\n\nNo PDF estÃ£o todos os detalhes da proposta. Qualquer dÃºvida, estou Ã  disposiÃ§Ã£o.\n\nTapeÃ§aria e Estofados Bahia`;
+  return `Olá, ${d.cliente.nome||'tudo bem'}! Preparei seu orçamento personalizado para ${d.titulo||'o serviço solicitado'}.\n\nValor: ${moedaBR(d.valor)}\nPrazo: ${d.prazo||'a combinar'}\nCondição: ${d.pagamento||'a combinar'}\n\nNo PDF estão todos os detalhes da proposta. Qualquer dúvida, estou à disposição.\n\nTapeçaria e Estofados Bahia`;
 }
 
 async function registrarOrcamentoGerado(d){
@@ -977,8 +937,8 @@ async function registrarOrcamentoGerado(d){
   const { error }=await sb.from('servicos').update(atualizacao).eq('id',d.servico.id);
   if(error) throw error;
   await sb.from('historico').insert({
-    o_que:`OrÃ§amento gerado para ${d.cliente.nome||'cliente'}`, por:'diego',
-    detalhe:`${d.titulo} Â· ${moedaBR(d.valor)} Â· validade ${d.validade} dias`
+    o_que:`Orçamento gerado para ${d.cliente.nome||'cliente'}`, por:'diego',
+    detalhe:`${d.titulo} · ${moedaBR(d.valor)} · validade ${d.validade} dias`
   });
 }
 
@@ -987,44 +947,44 @@ function htmlOrcamento(d){
   const hoje=new Date(); const validade=new Date(hoje); validade.setDate(validade.getDate()+d.validade);
   const dataFmt=x=>x.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'});
   const logo=new URL('./icon.svg',location.href).href;
-  const fotos=d.incluirFotos ? (d.fotos||[]).slice(0,3).filter(f=>/^https?:/i.test(f.url||'')).map(f=>`<img src="${esc(f.url)}" alt="Foto do serviÃ§o">`).join('') : '';
+  const fotos=d.incluirFotos ? (d.fotos||[]).slice(0,3).filter(f=>/^https?:/i.test(f.url||'')).map(f=>`<img src="${esc(f.url)}" alt="Foto do serviço">`).join('') : '';
   const linha=(rot,val)=>val?`<div class="linha"><div class="rot">${rot}</div><div>${esc(val)}</div></div>`:'';
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${numero} - ${esc(d.cliente.nome||'Cliente')}</title><style>
   *{box-sizing:border-box} body{margin:0;background:#eef1f4;color:#25201d;font-family:Arial,sans-serif} .pagina{width:210mm;min-height:297mm;margin:10mm auto;background:#fff;padding:17mm 17mm 14mm;box-shadow:0 3px 20px #0002;position:relative}.topo{display:flex;align-items:center;border-bottom:3px solid #b48a45;padding-bottom:12px}.logo{width:70px;height:70px;margin-right:14px}.marca h1{margin:0;color:#35251f;font-size:24px}.marca p{margin:4px 0 0;color:#745a4b}.numero{margin-left:auto;text-align:right}.numero b{display:block;color:#b48a45;font-size:17px}.cliente,.proposta,.condicoes{margin-top:20px}.titulo{font-size:12px;letter-spacing:1.3px;text-transform:uppercase;color:#9a7339;font-weight:bold;margin-bottom:8px}.grade{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}.linha{border-bottom:1px solid #eadfd6;padding:7px 0;font-size:13px}.rot{font-size:10px;text-transform:uppercase;color:#8a766b;margin-bottom:3px}.descricao{background:#faf7f3;border-left:4px solid #b48a45;padding:14px;line-height:1.55;font-size:14px;white-space:pre-wrap}.fotos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.fotos img{width:100%;height:125px;object-fit:cover;border-radius:6px}.valor{margin-top:18px;padding:15px;background:#35251f;color:#fff;display:flex;align-items:center;justify-content:space-between;border-radius:7px}.valor span{font-size:12px;text-transform:uppercase;letter-spacing:1px}.valor b{font-size:25px;color:#f1d39b}.beneficios{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:18px}.beneficio{padding:10px;background:#faf7f3;text-align:center;font-size:12px;border-radius:5px}.rodape{position:absolute;left:17mm;right:17mm;bottom:12mm;border-top:1px solid #ddd;padding-top:8px;font-size:10px;color:#777;display:flex;justify-content:space-between}.acoes{position:fixed;top:10px;right:10px}.acoes button{padding:10px 14px;border:0;border-radius:5px;background:#35251f;color:white;cursor:pointer}@media print{body{background:#fff}.pagina{margin:0;box-shadow:none}.acoes{display:none}}@page{size:A4;margin:0}
   </style></head><body><div class="acoes"><button onclick="window.print()">Imprimir / salvar PDF</button></div><main class="pagina">
-  <header class="topo"><img class="logo" src="${logo}" alt="TapeÃ§aria Bahia"><div class="marca"><h1>TapeÃ§aria e Estofados Bahia</h1><p>Reforma, conforto e acabamento cuidadoso Â· LuziÃ¢nia-GO</p></div><div class="numero"><b>ORÃ‡AMENTO</b><span>${numero}</span><br><small>${dataFmt(hoje)}</small></div></header>
-  <section class="cliente"><div class="titulo">Preparado especialmente para</div><div class="grade">${linha('Cliente',d.cliente.nome)}${linha('Telefone',d.cliente.telefone)}${linha('Cidade',d.cliente.cidade)}${linha('EndereÃ§o',d.cliente.endereco)}</div></section>
-  <section class="proposta"><div class="titulo">Proposta de serviÃ§o</div><h2>${esc(d.titulo||'ServiÃ§o personalizado')}</h2><div class="descricao">${esc(d.descricao||'ServiÃ§o conforme avaliaÃ§Ã£o e alinhamento com o cliente.')}</div>${linha('Medidas / quantidade',d.medidas)}${linha('Material e acabamento',d.material)}<div class="fotos">${fotos}</div><div class="valor"><span>Investimento total</span><b>${moedaBR(d.valor)}</b></div></section>
-  <section class="condicoes"><div class="titulo">CondiÃ§Ãµes da proposta</div><div class="grade">${linha('Prazo',d.prazo||'A combinar')}${linha('Validade',`${d.validade} dias - atÃ© ${dataFmt(validade)}`)}${linha('Pagamento',d.pagamento||'A combinar')}${linha('Garantia',d.garantia)}</div>${d.observacoes?`<div class="descricao" style="margin-top:12px">${esc(d.observacoes)}</div>`:''}</section>
-  <div class="beneficios"><div class="beneficio"><b>Atendimento personalizado</b><br>Proposta pensada para o seu mÃ³vel</div><div class="beneficio"><b>Acabamento cuidadoso</b><br>AtenÃ§Ã£o aos detalhes do serviÃ§o</div><div class="beneficio"><b>Acompanhamento</b><br>Contato durante as etapas combinadas</div></div>
-  <footer class="rodape"><span>TapeÃ§aria e Estofados Bahia</span><span>WhatsApp: (61) 99403-7524</span></footer></main></body></html>`;
+  <header class="topo"><img class="logo" src="${logo}" alt="Tapeçaria Bahia"><div class="marca"><h1>Tapeçaria e Estofados Bahia</h1><p>Reforma, conforto e acabamento cuidadoso · Luziânia-GO</p></div><div class="numero"><b>ORÇAMENTO</b><span>${numero}</span><br><small>${dataFmt(hoje)}</small></div></header>
+  <section class="cliente"><div class="titulo">Preparado especialmente para</div><div class="grade">${linha('Cliente',d.cliente.nome)}${linha('Telefone',d.cliente.telefone)}${linha('Cidade',d.cliente.cidade)}${linha('Endereço',d.cliente.endereco)}</div></section>
+  <section class="proposta"><div class="titulo">Proposta de serviço</div><h2>${esc(d.titulo||'Serviço personalizado')}</h2><div class="descricao">${esc(d.descricao||'Serviço conforme avaliação e alinhamento com o cliente.')}</div>${linha('Medidas / quantidade',d.medidas)}${linha('Material e acabamento',d.material)}<div class="fotos">${fotos}</div><div class="valor"><span>Investimento total</span><b>${moedaBR(d.valor)}</b></div></section>
+  <section class="condicoes"><div class="titulo">Condições da proposta</div><div class="grade">${linha('Prazo',d.prazo||'A combinar')}${linha('Validade',`${d.validade} dias - até ${dataFmt(validade)}`)}${linha('Pagamento',d.pagamento||'A combinar')}${linha('Garantia',d.garantia)}</div>${d.observacoes?`<div class="descricao" style="margin-top:12px">${esc(d.observacoes)}</div>`:''}</section>
+  <div class="beneficios"><div class="beneficio"><b>Atendimento personalizado</b><br>Proposta pensada para o seu móvel</div><div class="beneficio"><b>Acabamento cuidadoso</b><br>Atenção aos detalhes do serviço</div><div class="beneficio"><b>Acompanhamento</b><br>Contato durante as etapas combinadas</div></div>
+  <footer class="rodape"><span>Tapeçaria e Estofados Bahia</span><span>WhatsApp: (61) 99403-7524</span></footer></main></body></html>`;
 }
 
 $('#btnGerarOrcamento').addEventListener('click',async ()=>{
-  const d=dadosOrcamento(); if(!d||!d.titulo||!d.valor){ toast('Preencha serviÃ§o e valor'); return; }
+  const d=dadosOrcamento(); if(!d||!d.titulo||!d.valor){ toast('Preencha serviço e valor'); return; }
   const janela=window.open('','_blank'); if(!janela){ toast('Permita pop-ups para gerar o PDF'); return; }
-  try{ await registrarOrcamentoGerado(d); }catch(err){ janela.close(); toast('Erro ao salvar orÃ§amento: '+err.message); return; }
+  try{ await registrarOrcamentoGerado(d); }catch(err){ janela.close(); toast('Erro ao salvar orçamento: '+err.message); return; }
   janela.document.open(); janela.document.write(htmlOrcamento(d)); janela.document.close();
-  toast('OrÃ§amento pronto para imprimir ou salvar em PDF'); renderLeads(); renderClientes();
+  toast('Orçamento pronto para imprimir ou salvar em PDF'); renderLeads(); renderClientes();
 });
 $('#btnCopiarMsgOrcamento').addEventListener('click',()=>{ const d=dadosOrcamento(); if(d) copiarTexto(mensagemOrcamento(d)); });
 $('#btnWhatsappOrcamento').addEventListener('click',()=>{
   const d=dadosOrcamento(); if(!d) return; const wa=telParaWa(d.cliente.telefone);
-  if(!wa){ toast('Cliente sem telefone vÃ¡lido'); return; }
+  if(!wa){ toast('Cliente sem telefone válido'); return; }
   window.open(wa+'?text='+encodeURIComponent(mensagemOrcamento(d)),'_blank','noopener');
 });
 
-/* Liga um serviÃ§o a um compromisso na Agenda quando o prazo Ã© um evento real
-   (visita, buscar material, entregar) â€” nÃ£o todo prazo de lead vira agenda.
-   Evita duplicar: se o serviÃ§o jÃ¡ tem um compromisso vinculado (servico_id),
-   sÃ³ atualiza a data dele. Antes de criar um novo, avisa se jÃ¡ existe algo
-   marcado nesse mesmo dia, pra nÃ£o gerar conflito de agenda sem o Diego saber. */
+/* Liga um serviço a um compromisso na Agenda quando o prazo é um evento real
+   (visita, buscar material, entregar) — não todo prazo de lead vira agenda.
+   Evita duplicar: se o serviço já tem um compromisso vinculado (servico_id),
+   só atualiza a data dele. Antes de criar um novo, avisa se já existe algo
+   marcado nesse mesmo dia, pra não gerar conflito de agenda sem o Diego saber. */
 
 /* Rotina semanal do Diego (definida por ele em 08/07/2026): preenche o
-   horÃ¡rio do compromisso sozinho, sem perguntar â€” ele corrige clicando em
-   "Reagendar" na Agenda se a hora escolhida nÃ£o servir.
-   Segunda/quarta/sexta: 08h-11h e 13h-18h. TerÃ§a/quinta/sÃ¡bado: 08h-21h
-   (ele pode atender atÃ© de noite). Domingo: sem expediente. */
+   horário do compromisso sozinho, sem perguntar — ele corrige clicando em
+   "Reagendar" na Agenda se a hora escolhida não servir.
+   Segunda/quarta/sexta: 08h-11h e 13h-18h. Terça/quinta/sábado: 08h-21h
+   (ele pode atender até de noite). Domingo: sem expediente. */
 const JANELAS_SEMANA = {
   0: [],
   1: [['08:00','11:00'],['13:00','18:00']],
@@ -1034,11 +994,11 @@ const JANELAS_SEMANA = {
   5: [['08:00','11:00'],['13:00','18:00']],
   6: [['08:00','21:00']],
 };
-/* Compromisso remoto (ligar, mandar mensagem, pedir material) nÃ£o disputa
-   hora com nada â€” o Diego pode "fazer" vÃ¡rias tarefas remotas no mesmo
-   horÃ¡rio (ex: mandar 3 mensagens Ã s 09:00). Por isso a janela Ã© ampla
-   (07h-22h, todo dia da semana) e NUNCA remove horÃ¡rio por jÃ¡ estar
-   ocupado â€” sÃ³ presencial bloqueia horÃ¡rio repetido. */
+/* Compromisso remoto (ligar, mandar mensagem, pedir material) não disputa
+   hora com nada — o Diego pode "fazer" várias tarefas remotas no mesmo
+   horário (ex: mandar 3 mensagens às 09:00). Por isso a janela é ampla
+   (07h-22h, todo dia da semana) e NUNCA remove horário por já estar
+   ocupado — só presencial bloqueia horário repetido. */
 const JANELA_REMOTO = ['07:00','22:00'];
 
 function gerarSlots(ini, fim){
@@ -1051,10 +1011,10 @@ function gerarSlots(ini, fim){
   }
   return slots;
 }
-/* HorÃ¡rios disponÃ­veis pro tipo de compromisso. Presencial: respeita a
-   rotina semanal e pula horÃ¡rio jÃ¡ ocupado (sÃ³ um presencial por vez).
-   Remoto: janela fixa 07h-22h, mostra todos os horÃ¡rios mesmo que jÃ¡
-   tenha outra tarefa remota marcada ali â€” nÃ£o Ã© exclusivo. */
+/* Horários disponíveis pro tipo de compromisso. Presencial: respeita a
+   rotina semanal e pula horário já ocupado (só um presencial por vez).
+   Remoto: janela fixa 07h-22h, mostra todos os horários mesmo que já
+   tenha outra tarefa remota marcada ali — não é exclusivo. */
 function horariosParaTipo(dataISO, tipo, horariosOcupados){
   if(tipo==='remoto') return gerarSlots(JANELA_REMOTO[0], JANELA_REMOTO[1]);
   const diaSemana = new Date(dataISO+'T00:00:00').getDay();
@@ -1066,10 +1026,10 @@ function horariosParaTipo(dataISO, tipo, horariosOcupados){
   return livres;
 }
 
-/* Remaneja sozinha, sem perguntar nada â€” o Diego sÃ³ clica "Reagendar" e a
-   IA acha o prÃ³ximo horÃ¡rio livre (hoje mesmo se ainda sobrar horÃ¡rio na
-   rotina, senÃ£o o primeiro horÃ¡rio livre dos prÃ³ximos dias). Olha atÃ© 14
-   dias Ã  frente pra nÃ£o ficar num loop infinito se a rotina nÃ£o tiver
+/* Remaneja sozinha, sem perguntar nada — o Diego só clica "Reagendar" e a
+   IA acha o próximo horário livre (hoje mesmo se ainda sobrar horário na
+   rotina, senão o primeiro horário livre dos próximos dias). Olha até 14
+   dias à frente pra não ficar num loop infinito se a rotina não tiver
    janela nenhuma (ex: tentando cair sempre num domingo). */
 async function proximoSlotAutomatico(tipo, cidade){
   const hoje = new Date();
@@ -1084,139 +1044,72 @@ async function proximoSlotAutomatico(tipo, cidade){
   return null;
 }
 
-async function escolherNovoHorarioAgenda(compromisso, dataPreferida){
-  const tipo = compromisso.tipo || 'presencial';
-  const cidade = tipo==='presencial' ? (compromisso.cidade || '') : null;
-  let dataISO = dataPreferida || compromisso.data || hojeISO();
-  while(true){
-    const { data: doDia, error } = await sb.from('agenda')
-      .select('id,titulo,hora,cidade,tipo')
-      .eq('data', dataISO)
-      .eq('status','planejado');
-    if(error) throw error;
-    const outros = (doDia||[]).filter(a=>a.id!==compromisso.id);
-    const ocupados = outros.map(a=>a.hora);
-    const livres = horariosParaTipo(dataISO, tipo, ocupados);
-    const sugestao = livres[0] || null;
-    const novoTitulo = compromisso.titulo || 'Compromisso';
-    const horario = await confirmarComDiaVisivel(dataISO, outros, novoTitulo, cidade, sugestao, tipo, livres);
-    if(horario) return { data: dataISO, hora: horario };
-    const outraData = await askText('Escolher outra data para reagendar? (AAAA-MM-DD, cancelar para sair)', dataISO);
-    if(outraData===null) return null;
-    if(/^\d{4}-\d{2}-\d{2}$/.test(outraData.trim())) dataISO = outraData.trim();
-    else toast('Data invÃ¡lida');
-  }
-}
-
-async function concluirCompromisso(compromisso){
-  const tipo = await askOpcao('Esse compromisso foi concluído?', [
-    {valor:'total', rotulo:'Concluído total', classe:'b-ok'},
-    {valor:'parcial', rotulo:'Concluído parcial', classe:'b-tel'}
-  ]);
-  if(tipo===null) return;
-  const parcial = tipo==='parcial';
-  if(!parcial){
-    const { error } = await sb.from('agenda').update({status:'feito'}).eq('id', compromisso.id);
-    if(error){ toast('Erro: '+error.message); return; }
-    await sb.from('historico').insert({o_que:`Compromisso concluido totalmente: ${compromisso.titulo}`, por:'diego', detalhe:'Saiu do semaforo porque foi finalizado.'});
-    toast('✔ Compromisso concluido');
-    return;
-  }
-  const pendencia = await askText('O que ficou pendente?', sugerirPendencia(compromisso.titulo));
-  if(pendencia===null || !pendencia.trim()) return;
-  const prazo = await exigirPrazo('', pendencia.trim());
-  if(!prazo){ toast('Precisa de data para continuar no semaforo.'); return; }
-  const { error } = await sb.from('agenda').update({status:'feito'}).eq('id', compromisso.id);
-  if(error){ toast('Erro: '+error.message); return; }
-  await sb.from('historico').insert({o_que:`Compromisso concluido parcialmente: ${compromisso.titulo}`, por:'diego', detalhe:`Pendente: ${pendencia.trim()}. Revisar em ${prazo}`});
-  if(compromisso.servico_id){
-    await sb.from('servicos').update({proxima_acao:pendencia.trim(), prazo, atualizado_em:new Date().toISOString()}).eq('id', compromisso.servico_id);
-  }
-  toast('✔ Parcial registrado e voltou para o semaforo');
-}
-
-async function naoConcluirCompromisso(compromisso){
-  const motivo = await askText('Por que nÃ£o foi concluÃ­do?', 'Cliente nÃ£o respondeu / nÃ£o deu tempo / precisa remarcar');
-  if(motivo===null) return;
-  const novaData = await askText('Nova data para tentar de novo (AAAA-MM-DD):', compromisso.data || hojeISO());
-  if(!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData.trim())){ toast('Precisa de uma nova data vÃ¡lida.'); return; }
-  const escolha = await escolherNovoHorarioAgenda(compromisso, novaData.trim());
-  if(!escolha) return;
-  const { error } = await sb.from('agenda').update({data:escolha.data, hora:escolha.hora, status:'planejado'}).eq('id', compromisso.id);
-  if(error){ toast('Erro: '+error.message); return; }
-  await sb.from('historico').insert({o_que:`Compromisso nÃ£o concluÃ­do e reagendado: ${compromisso.titulo}`, por:'diego', detalhe:`Motivo: ${motivo}. Nova data: ${escolha.data} ${escolha.hora||''}`});
-  if(compromisso.servico_id){
-    await sb.from('servicos').update({prazo:escolha.data, proxima_acao:'Retomar compromisso reagendado', atualizado_em:new Date().toISOString()}).eq('id', compromisso.servico_id);
-  }
-  toast('âœ” Reagendado com rastro');
-}
-
-/* Mostra o dia inteiro (ocupado + horÃ¡rios possÃ­veis, com cidade) antes de
-   confirmar um novo compromisso. Os horÃ¡rios sÃ£o clicÃ¡veis â€” toca pra
+/* Mostra o dia inteiro (ocupado + horários possíveis, com cidade) antes de
+   confirmar um novo compromisso. Os horários são clicáveis — toca pra
    escolher outro em vez do sugerido automaticamente. Resolve com o
-   horÃ¡rio escolhido (string) ou null se cancelou. */
-/* Compara cidades de forma tolerante (ignora acento, maiÃºscula, sufixo tipo
-   "-DF" ou texto entre parÃªnteses) â€” usado sÃ³ pra decidir se dois
-   compromissos presenciais no mesmo dia sÃ£o de regiÃµes diferentes. */
+   horário escolhido (string) ou null se cancelou. */
+/* Compara cidades de forma tolerante (ignora acento, maiúscula, sufixo tipo
+   "-DF" ou texto entre parênteses) — usado só pra decidir se dois
+   compromissos presenciais no mesmo dia são de regiões diferentes. */
 function cidadeChave(c){
-  return String(c||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').split('(')[0].split('-')[0].trim();
+  return String(c||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split('(')[0].split('-')[0].trim();
 }
-/* Base do Diego (TapeÃ§aria e Estofados Bahia fica em LuziÃ¢nia-GO). Usado sÃ³
-   pra dar uma dica de qual lado remanejar quando dÃ¡ conflito de cidade â€”
-   normalmente Ã© mais fÃ¡cil empurrar o compromisso da base (LuziÃ¢nia, ele
-   pode ir lÃ¡ qualquer dia) do que uma viagem jÃ¡ combinada pra outra cidade
-   (BrasÃ­lia etc). NÃ£o decide sozinho, sÃ³ sugere; o Diego confirma. */
+/* Base do Diego (Tapeçaria e Estofados Bahia fica em Luziânia-GO). Usado só
+   pra dar uma dica de qual lado remanejar quando dá conflito de cidade —
+   normalmente é mais fácil empurrar o compromisso da base (Luziânia, ele
+   pode ir lá qualquer dia) do que uma viagem já combinada pra outra cidade
+   (Brasília etc). Não decide sozinho, só sugere; o Diego confirma. */
 const CIDADE_BASE = 'luziania';
 function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHorario, novoTipo, horariosDisponiveis){
   return new Promise(resolve=>{
     const {fundo,caixa}=_modalBase();
     caixa.style.maxWidth='400px';
-    const titulo = el('div',null, `Compromissos em ${dataComDiaBR(dataISO)}`);
+    const titulo = el('div',null, `Compromissos em ${dataCurtaBR(dataISO)}`);
     titulo.style.cssText='font-weight:700;margin-bottom:10px';
     caixa.appendChild(titulo);
     const temConflitoCidade = novoTipo==='presencial' && novaCidade && doDia.some(a=>a.tipo==='presencial' && a.cidade && cidadeChave(a.cidade)!==cidadeChave(novaCidade));
     if(temConflitoCidade){
       const algumEhBase = doDia.some(a=>a.tipo==='presencial' && cidadeChave(a.cidade)===CIDADE_BASE) || cidadeChave(novaCidade)===CIDADE_BASE;
-      const dica = algumEhBase ? ' A base Ã© LuziÃ¢nia â€” geralmente Ã© mais fÃ¡cil remanejar o compromisso de lÃ¡ (vocÃª pode ir outro dia) do que a viagem jÃ¡ combinada pra outra cidade.' : '';
-      const aviso = el('div','','âš ï¸ Tem compromisso presencial em outra cidade nesse mesmo dia â€” confira se dÃ¡ tempo de ir de uma pra outra.'+dica);
+      const dica = algumEhBase ? ' A base é Luziânia — geralmente é mais fácil remanejar o compromisso de lá (você pode ir outro dia) do que a viagem já combinada pra outra cidade.' : '';
+      const aviso = el('div','','⚠️ Tem compromisso presencial em outra cidade nesse mesmo dia — confira se dá tempo de ir de uma pra outra.'+dica);
       aviso.style.cssText='padding:8px 10px;border-radius:8px;background:rgba(224,87,79,.15);border:1px solid var(--alta,#e0574f);color:var(--alta,#e0574f);margin-bottom:10px;font-size:.82rem;font-weight:600';
       caixa.appendChild(aviso);
     }
     const listaOcupados = el('div');
-    /* Cada compromisso jÃ¡ marcado nesse dia pode ser remanejado NA HORA,
-       sem sair desse modal â€” evita ter que cancelar tudo, ir na Agenda e
-       voltar sÃ³ pra abrir um horÃ¡rio. */
+    /* Cada compromisso já marcado nesse dia pode ser remanejado NA HORA,
+       sem sair desse modal — evita ter que cancelar tudo, ir na Agenda e
+       voltar só pra abrir um horário. */
     const renderOcupados = ()=>{
       listaOcupados.innerHTML='';
       if(!doDia.length){
-        const livre = el('div','','Nenhum outro compromisso marcado â€” dia livre.');
+        const livre = el('div','','Nenhum outro compromisso marcado — dia livre.');
         livre.style.cssText='padding:8px 10px;border-radius:8px;background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a);margin-bottom:6px;font-size:.88rem';
         listaOcupados.appendChild(livre);
         return;
       }
       doDia.sort((a,b)=>(a.hora||'99:99').localeCompare(b.hora||'99:99')).forEach(a=>{
-        const ic = a.tipo==='remoto' ? 'ðŸ’¬' : 'ðŸ“';
+        const ic = a.tipo==='remoto' ? '💬' : '📍';
         /* Dois presenciais no mesmo dia em cidades diferentes = fisicamente
-           pode ser impossÃ­vel (ex: LuziÃ¢nia 08h e BrasÃ­lia 09h). NÃ£o bloqueia
-           sozinho (a IA nÃ£o sabe distÃ¢ncia/trÃ¢nsito), sÃ³ avisa bem visÃ­vel
-           pro Diego decidir â€” ele quem sabe se dÃ¡ tempo ou nÃ£o. */
+           pode ser impossível (ex: Luziânia 08h e Brasília 09h). Não bloqueia
+           sozinho (a IA não sabe distância/trânsito), só avisa bem visível
+           pro Diego decidir — ele quem sabe se dá tempo ou não. */
         const conflitoCidade = novoTipo==='presencial' && a.tipo==='presencial' && a.cidade && novaCidade && cidadeChave(a.cidade)!==cidadeChave(novaCidade);
         const linha = el('div'); linha.style.cssText='padding:8px 10px;border-radius:8px;margin-bottom:6px;font-size:.88rem;display:flex;align-items:center;justify-content:space-between;gap:8px;'
           + (conflitoCidade ? 'background:rgba(224,87,79,.15);border:1px solid var(--alta,#e0574f)' : 'background:var(--card2,#2b221c)');
-        const txt = el('span',null, `${conflitoCidade?'âš ï¸ ':''}${a.hora?a.hora.slice(0,5):'sem horÃ¡rio'} â€” ${ic} ${a.titulo}${a.cidade?' ðŸ™ '+a.cidade:''}`);
+        const txt = el('span',null, `${conflitoCidade?'⚠️ ':''}${a.hora?a.hora.slice(0,5):'sem horário'} — ${ic} ${a.titulo}${a.cidade?' 🏙 '+a.cidade:''}`);
         linha.appendChild(txt);
         const bMover = document.createElement('button');
-        bMover.type='button'; bMover.textContent='â†»'; bMover.title='Remanejar este compromisso';
+        bMover.type='button'; bMover.textContent='↻'; bMover.title='Remanejar este compromisso';
         bMover.style.cssText='background:none;border:1px solid var(--linha,#3a2d24);color:var(--texto2,#c7b4a4);border-radius:6px;padding:2px 8px;cursor:pointer;flex:none';
         bMover.addEventListener('click', async ()=>{
-          const novaData = await askText('Remanejar pra qual data? (AAAA-MM-DD, deixe igual pra sÃ³ mudar o horÃ¡rio)', dataISO);
+          const novaData = await askText('Remanejar pra qual data? (AAAA-MM-DD, deixe igual pra só mudar o horário)', dataISO);
           if(novaData===null) return;
           const dataFinal = /^\d{4}-\d{2}-\d{2}$/.test(novaData.trim()) ? novaData.trim() : dataISO;
-          const novaHora = await askText('Novo horÃ¡rio (HH:MM):', a.hora?a.hora.slice(0,5):'');
+          const novaHora = await askText('Novo horário (HH:MM):', a.hora?a.hora.slice(0,5):'');
           if(novaHora===null) return;
           const { error } = await sb.from('agenda').update({ data: dataFinal, hora: novaHora.trim()||null }).eq('id', a.id);
           if(error){ toast('Erro ao remanejar: '+error.message); return; }
-          toast('âœ” Remanejado');
+          toast('✔ Remanejado');
           if(dataFinal===dataISO){ a.hora = novaHora.trim()||null; } else { doDia.splice(doDia.indexOf(a),1); }
           renderOcupados();
         });
@@ -1227,15 +1120,15 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
     renderOcupados();
     caixa.appendChild(listaOcupados);
     let escolhido = novoHorario;
-    const rotLivres = el('div',null,'Toque pra escolher o horÃ¡rio:');
+    const rotLivres = el('div',null,'Toque pra escolher o horário:');
     rotLivres.style.cssText='font-size:.78rem;color:var(--texto2,#c7b4a4);margin:10px 0 4px';
     caixa.appendChild(rotLivres);
     const chips = el('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
     const novo = el('div');
     novo.style.cssText='padding:8px 10px;border-radius:8px;background:var(--marrom,#b4632f);color:#fff;margin:10px 0;font-size:.88rem';
-    const icNovo = novoTipo==='remoto' ? 'ðŸ’¬' : 'ðŸ“';
+    const icNovo = novoTipo==='remoto' ? '💬' : '📍';
     const atualizarNovo = ()=>{
-      novo.textContent = `âž• Novo (${icNovo} ${novoTipo}): ${escolhido?escolhido+' â€” ':''}${novoTitulo}${novaCidade?' ðŸ™ '+novaCidade:''}${!escolhido?' (sem horÃ¡rio disponÃ­vel â€” escolha um acima ou cancele)':''}`;
+      novo.textContent = `➕ Novo (${icNovo} ${novoTipo}): ${escolhido?escolhido+' — ':''}${novoTitulo}${novaCidade?' 🏙 '+novaCidade:''}${!escolhido?' (sem horário disponível — escolha um acima ou cancele)':''}`;
     };
     (horariosDisponiveis||[]).forEach(h=>{
       const chip = document.createElement('button');
@@ -1272,35 +1165,35 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
   });
 }
 
-/* Nenhuma ficha ativa pode ficar sem prÃ³xima data â€” sem isso o lead vira
-   uma dÃ­vida que ninguÃ©m nunca mais volta pra pagar (aconteceu de verdade
+/* Nenhuma ficha ativa pode ficar sem próxima data — sem isso o lead vira
+   uma dívida que ninguém nunca mais volta pra pagar (aconteceu de verdade
    em 09/07: Julia e Priscilla ficaram "aguardando resposta" sem data
-   nenhuma marcada). NÃ£o preenche sozinha: TRAVA, pergunta de novo atÃ© vir
-   uma data vÃ¡lida, e se cancelar, quem chamou tem que abortar o salvamento. */
+   nenhuma marcada). Não preenche sozinha: TRAVA, pergunta de novo até vir
+   uma data válida, e se cancelar, quem chamou tem que abortar o salvamento. */
 async function exigirPrazo(valorAtual, contexto){
   let digitado = valorAtual || '';
   while(true){
-    digitado = await askText(`Toda ficha precisa de uma prÃ³xima data de aÃ§Ã£o. Qual a data pra "${contexto}"? (AAAA-MM-DD)`, digitado);
+    digitado = await askText(`Toda ficha precisa de uma próxima data de ação. Qual a data pra "${contexto}"? (AAAA-MM-DD)`, digitado);
     if(digitado===null) return null;
     if(/^\d{4}-\d{2}-\d{2}$/.test(digitado.trim())) return digitado.trim();
   }
 }
 
-/* Pergunta o tipo de compromisso (presencial/remoto) â€” chamar isso JUNTO com
-   as outras perguntas da ficha (logo apÃ³s o prazo), antes de salvar, pra nÃ£o
+/* Pergunta o tipo de compromisso (presencial/remoto) — chamar isso JUNTO com
+   as outras perguntas da ficha (logo após o prazo), antes de salvar, pra não
    deixar essa pergunta "sobrando" pro final do fluxo. Retorna 'presencial',
    'remoto' ou null (sem compromisso de agenda). */
 async function perguntarTipoAgenda(prazo, titulo){
   if(!prazo) return null;
-  const tipoDigitado = await askText(`O prazo "${dataCurtaBR(prazo)}" de "${titulo}" precisa de um horÃ¡rio reservado?\n\nDigite "presencial" (visita, buscar material, entregar) ou "remoto" (ligar, mandar mensagem, pedir material por telefone/site). Deixe em branco ou cancele se nÃ£o Ã© um compromisso de agenda.`, '');
+  const tipoDigitado = await askText(`O prazo "${dataCurtaBR(prazo)}" de "${titulo}" precisa de um horário reservado?\n\nDigite "presencial" (visita, buscar material, entregar) ou "remoto" (ligar, mandar mensagem, pedir material por telefone/site). Deixe em branco ou cancele se não é um compromisso de agenda.`, '');
   if(tipoDigitado===null) return null;
-  const tipo = tipoDigitado.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const tipo = tipoDigitado.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
   return ['presencial','remoto'].includes(tipo) ? tipo : null;
 }
 
-/* Cria/atualiza o compromisso vinculado ao serviÃ§o. `tipo` jÃ¡ vem decidido
-   por perguntarTipoAgenda() â€” esta funÃ§Ã£o nÃ£o pergunta mais nada, sÃ³
-   mostra o dia (ocupado/livre) pra confirmaÃ§Ã£o final antes de salvar. */
+/* Cria/atualiza o compromisso vinculado ao serviço. `tipo` já vem decidido
+   por perguntarTipoAgenda() — esta função não pergunta mais nada, só
+   mostra o dia (ocupado/livre) pra confirmação final antes de salvar. */
 async function jaTemAgendaVinculada(servicoId){
   const { data } = await sb.from('agenda').select('id').eq('servico_id', servicoId).limit(1);
   return !!data?.length;
@@ -1312,24 +1205,24 @@ async function sincronizarAgendaServico(servico, cliente, tipo){
   if(existente?.length){
     if(existente[0].data !== servico.prazo){
       await sb.from('agenda').update({ data: servico.prazo }).eq('id', existente[0].id);
-      toast('ðŸ“… Compromisso na Agenda atualizado pro novo prazo');
+      toast('📅 Compromisso na Agenda atualizado pro novo prazo');
     }
     return;
   }
   if(!tipo) return;
-  /* Presencial nunca pode ficar sem cidade â€” se a ficha do cliente nÃ£o tem
+  /* Presencial nunca pode ficar sem cidade — se a ficha do cliente não tem
      cidade cadastrada, pergunta na hora em vez de deixar em branco. Remoto
-     nÃ£o precisa (ligaÃ§Ã£o/mensagem nÃ£o tem endereÃ§o). */
+     não precisa (ligação/mensagem não tem endereço). */
   let cidadeNova = null;
   if(tipo==='presencial'){
     cidadeNova = cliente?.cidade || null;
     if(!cidadeNova){
-      cidadeNova = (await askText(`Compromisso presencial de "${servico.titulo}" precisa de cidade (o cliente ${cliente?.nome||''} nÃ£o tem cidade cadastrada). Qual a cidade?`, '') || '').trim() || null;
-      if(!cidadeNova){ toast('Compromisso presencial nÃ£o pode ficar sem cidade â€” nÃ£o foi lanÃ§ado na Agenda.'); return; }
+      cidadeNova = (await askText(`Compromisso presencial de "${servico.titulo}" precisa de cidade (o cliente ${cliente?.nome||''} não tem cidade cadastrada). Qual a cidade?`, '') || '').trim() || null;
+      if(!cidadeNova){ toast('Compromisso presencial não pode ficar sem cidade — não foi lançado na Agenda.'); return; }
     }
   }
   const { data: doDia } = await sb.from('agenda').select('id,titulo,hora,cidade,tipo').eq('data', servico.prazo).eq('status','planejado');
-  const novoTitulo = `${cliente?.nome||'Cliente'} â€” ${servico.titulo}`;
+  const novoTitulo = `${cliente?.nome||'Cliente'} — ${servico.titulo}`;
   const disponiveis = horariosParaTipo(servico.prazo, tipo, (doDia||[]).map(a=>a.hora));
   const sugestao = disponiveis[0] || null;
   const horario = await confirmarComDiaVisivel(servico.prazo, doDia||[], novoTitulo, cidadeNova, sugestao, tipo, disponiveis);
@@ -1338,14 +1231,14 @@ async function sincronizarAgendaServico(servico, cliente, tipo){
     titulo: novoTitulo, data: servico.prazo, hora: horario, tipo,
     status:'planejado', servico_id: servico.id, cidade: cidadeNova
   });
-  if(error){ toast('Erro ao lanÃ§ar na Agenda: '+error.message); return; }
-  toast('ðŸ“… Compromisso lanÃ§ado na Agenda'); renderAgenda();
+  if(error){ toast('Erro ao lançar na Agenda: '+error.message); return; }
+  toast('📅 Compromisso lançado na Agenda'); renderAgenda();
 }
 
 async function sincronizarFinanceiroServico(servico, cliente){
   const valor = Number(servico.valor_orcamento || 0);
   if(!valor || valor <= 0) return;
-  const marcador = `[ServiÃ§o #${servico.id}]`;
+  const marcador = `[Serviço #${servico.id}]`;
   const { data: existentes, error: erroBusca } = await sb.from('financeiro').select('*').like('descricao', marcador+'%');
   if(erroBusca) throw erroBusca;
   if(['lead','orcamento','agendado','perdido'].includes(servico.status)){
@@ -1368,7 +1261,7 @@ async function sincronizarFinanceiroServico(servico, cliente){
     if(!['producao','entregue','pago'].includes(servico.status)) return;
     let plano='entrega';
     if(servico.status==='producao'){
-      const opcao=await askText('O serviÃ§o entrou em produÃ§Ã£o. Como foi combinado o pagamento?\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo pago agora','1');
+      const opcao=await askText('O serviço entrou em produção. Como foi combinado o pagamento?\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo pago agora','1');
       if(opcao===null) return;
       plano=opcao.trim()==='1'?'50':opcao.trim()==='3'?'agora':'entrega';
     }else if(servico.status==='pago') plano='agora';
@@ -1387,22 +1280,22 @@ async function sincronizarFinanceiroServico(servico, cliente){
 
 async function configurarPagamentoServico(servico,cliente,plano){
   const valor=Number(servico.valor_orcamento||0);
-  if(!valor || valor<=0) throw new Error('Informe primeiro o valor do orÃ§amento.');
-  const marcador=`[ServiÃ§o #${servico.id}]`;
+  if(!valor || valor<=0) throw new Error('Informe primeiro o valor do orçamento.');
+  const marcador=`[Serviço #${servico.id}]`;
   const nome=cliente.nome||'Cliente';
   const hoje=new Date().toISOString().slice(0,10);
-  const base={tipo:'entrada',escopo:'empresa',categoria:'Venda/ServiÃ§o prestado',data:hoje};
+  const base={tipo:'entrada',escopo:'empresa',categoria:'Venda/Serviço prestado',data:hoje};
   const forma=async rotulo=>{
-    const digitada=await askText(`Forma de pagamento ${rotulo}: pix, dinheiro, cartÃ£o ou transferÃªncia`,'cartÃ£o');
+    const digitada=await askText(`Forma de pagamento ${rotulo}: pix, dinheiro, cartão ou transferência`,'cartão');
     if(digitada===null) return null;
     const normalizada=digitada.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    const nomes={pix:'Pix',dinheiro:'Dinheiro',cartao:'CartÃ£o',transferencia:'TransferÃªncia'};
-    const nomeForma=nomes[normalizada]||digitada.trim()||'NÃ£o informada';
+    const nomes={pix:'Pix',dinheiro:'Dinheiro',cartao:'Cartão',transferencia:'Transferência'};
+    const nomeForma=nomes[normalizada]||digitada.trim()||'Não informada';
     if(normalizada==='cartao'){
-      const parcelasTexto=await askText(`Em quantas parcelas no cartÃ£o ${rotulo}?`,'12');
+      const parcelasTexto=await askText(`Em quantas parcelas no cartão ${rotulo}?`,'12');
       if(parcelasTexto===null) return null;
       const parcelas=Math.max(1,Math.min(24,parseInt(parcelasTexto,10)||1));
-      return `CartÃ£o ${parcelas}x`;
+      return `Cartão ${parcelas}x`;
     }
     return nomeForma;
   };
@@ -1411,15 +1304,15 @@ async function configurarPagamentoServico(servico,cliente,plano){
     const formaEntrada=await forma('da entrada'); if(!formaEntrada) return false;
     const formaSaldo=await forma('previsto para o saldo na entrega'); if(!formaSaldo) return false;
     lancamentos=[
-      {...base,valor:valor/2,status:'pago',descricao:`${marcador} Entrada 50% (${formaEntrada}) â€” ${servico.titulo} â€” ${nome}`},
-      {...base,valor:valor/2,status:'a_receber',descricao:`${marcador} Saldo 50% na entrega (${formaSaldo}) â€” ${servico.titulo} â€” ${nome}`}
+      {...base,valor:valor/2,status:'pago',descricao:`${marcador} Entrada 50% (${formaEntrada}) — ${servico.titulo} — ${nome}`},
+      {...base,valor:valor/2,status:'a_receber',descricao:`${marcador} Saldo 50% na entrega (${formaSaldo}) — ${servico.titulo} — ${nome}`}
     ];
   }else if(plano==='agora'){
     const formaTotal=await forma('do valor total'); if(!formaTotal) return false;
-    lancamentos=[{...base,valor,status:'pago',descricao:`${marcador} Total recebido (${formaTotal}) â€” ${servico.titulo} â€” ${nome}`}];
+    lancamentos=[{...base,valor,status:'pago',descricao:`${marcador} Total recebido (${formaTotal}) — ${servico.titulo} — ${nome}`}];
   }else{
     const formaEntrega=await forma('previsto para a entrega'); if(!formaEntrega) return false;
-    lancamentos=[{...base,valor,status:'a_receber',descricao:`${marcador} Total na entrega (${formaEntrega}) â€” ${servico.titulo} â€” ${nome}`}];
+    lancamentos=[{...base,valor,status:'a_receber',descricao:`${marcador} Total na entrega (${formaEntrega}) — ${servico.titulo} — ${nome}`}];
   }
   const { error:erroLimpar }=await sb.from('financeiro').delete().like('descricao',marcador+'%');
   if(erroLimpar) throw erroLimpar;
@@ -1431,7 +1324,7 @@ async function configurarPagamentoServico(servico,cliente,plano){
 async function abrirFicha(clienteId){
   if(!clienteId) return;
   $('#modalFicha').classList.remove('oculto');
-  const cont = $('#fichaConteudo'); cont.innerHTML = '<p class="vazio">Carregandoâ€¦</p>';
+  const cont = $('#fichaConteudo'); cont.innerHTML = '<p class="vazio">Carregando…</p>';
   const [{data:cli, error:e1}, {data:servicos, error:e2}, {data:fotos, error:e3}] = await Promise.all([
     sb.from('clientes').select('*').eq('id', clienteId).single(),
     sb.from('servicos').select('*').eq('cliente_id', clienteId).order('criado_em',{ascending:false}),
@@ -1446,80 +1339,77 @@ async function abrirFicha(clienteId){
     const nome = await askText('Nome:', cli.nome || ''); if(nome===null || !nome.trim()) return;
     const telefone = await askText('Telefone/WhatsApp:', cli.telefone || ''); if(telefone===null) return;
     const cidade = await askText('Cidade:', cli.cidade || ''); if(cidade===null) return;
-    const endereco = await askText('EndereÃ§o:', cli.endereco || ''); if(endereco===null) return;
-    const obs = await askText('ObservaÃ§Ãµes:', cli.obs || ''); if(obs===null) return;
+    const endereco = await askText('Endereço:', cli.endereco || ''); if(endereco===null) return;
+    const obs = await askText('Observações:', cli.obs || ''); if(obs===null) return;
     const { error } = await sb.from('clientes').update({
       nome:nome.trim(), telefone:telefone.trim()||null, cidade:cidade.trim()||null,
       endereco:endereco.trim()||null, obs:obs.trim()||null
     }).eq('id', clienteId);
     if(error){ toast('Erro: '+error.message); return; }
-    toast('âœ” Ficha atualizada'); renderClientes(); renderLeads(); abrirFicha(clienteId);
+    toast('✔ Ficha atualizada'); renderClientes(); renderLeads(); abrirFicha(clienteId);
   });
   cont.appendChild(bEditarCliente);
   const bExcluirCliente = el('button','botao b-rm','Excluir ficha');
   bExcluirCliente.style.marginLeft='6px';
   bExcluirCliente.addEventListener('click', async ()=>{
-    if(!await askConfirm(`Excluir definitivamente a ficha de ${cli.nome || 'este cliente'}, seus serviÃ§os e fotos?`)) return;
-    if(!await askConfirm('Essa aÃ§Ã£o nÃ£o pode ser desfeita. Confirma a exclusÃ£o?')) return;
+    if(!await askConfirm(`Excluir definitivamente a ficha de ${cli.nome || 'este cliente'}, seus serviços e fotos?`)) return;
+    if(!await askConfirm('Essa ação não pode ser desfeita. Confirma a exclusão?')) return;
     try{
-      for(const s of (servicos||[])) await sb.from('financeiro').delete().like('descricao',`[ServiÃ§o #${s.id}]%`);
+      for(const s of (servicos||[])) await sb.from('financeiro').delete().like('descricao',`[Serviço #${s.id}]%`);
       const { error:eFotos }=await sb.from('fotos').delete().eq('cliente_id',clienteId); if(eFotos) throw eFotos;
       const { error:eServicos }=await sb.from('servicos').delete().eq('cliente_id',clienteId); if(eServicos) throw eServicos;
       const { error:eCliente }=await sb.from('clientes').delete().eq('id',clienteId); if(eCliente) throw eCliente;
       $('#modalFicha').classList.add('oculto');
-      toast('Ficha excluÃ­da'); renderClientes(); renderLeads(); renderFinanceiro(); renderInicio();
+      toast('Ficha excluída'); renderClientes(); renderLeads(); renderFinanceiro(); renderInicio();
     }catch(err){ toast('Erro ao excluir: '+err.message); }
   });
   cont.appendChild(bExcluirCliente);
 
   const campo=(rot,val)=>{ if(!val) return null; const d=el('div','ficha-campo'); d.appendChild(el('div','rot',rot)); d.appendChild(el('div','val',val)); return d; };
-  [campo('Telefone', cli.telefone), campo('Cidade', cli.cidade), campo('EndereÃ§o', cli.endereco), campo('ObservaÃ§Ãµes', cli.obs)]
+  [campo('Telefone', cli.telefone), campo('Cidade', cli.cidade), campo('Endereço', cli.endereco), campo('Observações', cli.obs)]
     .filter(Boolean).forEach(c=>cont.appendChild(c));
 
-  cont.appendChild(el('h3',null,'HistÃ³rico de serviÃ§os'));
-  if(e2 || !servicos.length){ cont.appendChild(el('div','vazio', e2? 'Erro: '+e2.message : 'Nenhum serviÃ§o registrado.')); }
+  cont.appendChild(el('h3',null,'Histórico de serviços'));
+  if(e2 || !servicos.length){ cont.appendChild(el('div','vazio', e2? 'Erro: '+e2.message : 'Nenhum serviço registrado.')); }
   else { const lst=el('div','lista'); servicos.forEach(s=>{
     const it=el('div','item p-'+(s.prioridade||'media'));
     it.appendChild(el('div','nome', s.titulo));
-    it.appendChild(el('div','servico', STATUS_LABEL[s.status]+(s.valor_orcamento?' Â· '+moedaBR(Number(s.valor_orcamento)):'')));
-    if(s.descricao) it.appendChild(el('div','servico', s.descricao));
-    if(s.proxima_acao) it.appendChild(el('div','acao', 'PrÃ³xima aÃ§Ã£o: '+s.proxima_acao));
-    if(s.prazo) it.appendChild(el('div','servico', 'Prazo: '+dataComDiaBR(s.prazo)));
+    it.appendChild(el('div','servico', STATUS_LABEL[s.status]+(s.valor_orcamento?' · '+moedaBR(Number(s.valor_orcamento)):'')));
     const acoes = el('div','rodape');
     const status = document.createElement('select'); status.className='status';
     STATUS_ORDEM.forEach(st=>{ const o=document.createElement('option'); o.value=st; o.textContent=STATUS_LABEL[st]; o.selected=st===s.status; status.appendChild(o); });
     status.addEventListener('change', async ()=>{
       const alterado = {status:status.value, atualizado_em:new Date().toISOString()};
-      /* NÃ£o deixa virar Em produÃ§Ã£o (ou alÃ©m) sem valor do orÃ§amento â€” mesmo
-         quando o pagamento Ã© sÃ³ na entrega, o valor precisa estar definido
-         desde jÃ¡, senÃ£o o Financeiro nÃ£o tem o que lanÃ§ar depois. */
+      /* Não deixa virar Em produção (ou além) sem valor do orçamento — mesmo
+         quando o pagamento é só na entrega, o valor precisa estar definido
+         desde já, senão o Financeiro não tem o que lançar depois. */
       if(['producao','entregue','pago'].includes(status.value) && !(Number(s.valor_orcamento)>0)){
-        const valorTexto = await askText(`"${s.titulo}" nÃ£o tem valor de orÃ§amento. Qual o valor (R$)? (obrigatÃ³rio pra virar ${STATUS_LABEL[status.value]})`, '');
+        const valorTexto = await askText(`"${s.titulo}" não tem valor de orçamento. Qual o valor (R$)? (obrigatório pra virar ${STATUS_LABEL[status.value]})`, '');
         const valor = Number(String(valorTexto||'').replace(',','.'));
-        if(!valorTexto || !(valor>0)){ toast('Sem valor, status nÃ£o foi alterado.'); status.value=s.status; return; }
+        if(!valorTexto || !(valor>0)){ toast('Sem valor, status não foi alterado.'); status.value=s.status; return; }
         alterado.valor_orcamento = valor;
       }
       const { error } = await sb.from('servicos').update(alterado).eq('id',s.id);
       if(error){ toast('Erro: '+error.message); status.value=s.status; return; }
       Object.assign(s, alterado);
       try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('Status salvo; financeiro: '+err.message); }
-      toast('âœ” Status atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
+      toast('✔ Status atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
     });
     it.appendChild(montarFluxoStatus(s.status,st=>{ status.value=st; status.dispatchEvent(new Event('change')); }));
     acoes.appendChild(status);
-    const bEditarServico=el('button','botao b-tel','Editar serviÃ§o');
+    const bEditarServico=el('button','botao b-tel','Editar serviço');
     bEditarServico.addEventListener('click', async ()=>{
-      const titulo=await askText('ServiÃ§o:',s.titulo||''); if(titulo===null || !titulo.trim()) return;
-      const valorTexto=await askText('Valor do orÃ§amento (R$):',s.valor_orcamento||''); if(valorTexto===null) return;
+      const titulo=await askText('Serviço:',s.titulo||''); if(titulo===null || !titulo.trim()) return;
+      const valorTexto=await askText('Valor do orçamento (R$):',s.valor_orcamento||''); if(valorTexto===null) return;
       const prioridade=(await askText('Prioridade: baixa, media ou alta',s.prioridade||'media')||'media').toLowerCase();
-      let proxima=await askText('PrÃ³xima aÃ§Ã£o:',s.proxima_acao||''); if(proxima===null) return;
+      let proxima=await askText('Próxima ação:',s.proxima_acao||''); if(proxima===null) return;
       let prazo=await askText('Prazo (AAAA-MM-DD):',s.prazo||''); if(prazo===null) return;
       let prazoValido = /^\d{4}-\d{2}-\d{2}$/.test(prazo) ? prazo : null;
-      /* Nenhuma ficha ativa pode ficar sem prÃ³xima data â€” nÃ£o preenche
-         sozinha, TRAVA e obriga a perguntar atÃ© vir uma data vÃ¡lida. */
+      /* Nenhuma ficha ativa pode ficar sem próxima data — não preenche
+         sozinha, TRAVA e obriga a perguntar até vir uma data válida. */
       if(!prazoValido && !['pago','perdido'].includes(s.status)){
         prazoValido = await exigirPrazo(prazo, titulo.trim());
-        if(!prazoValido){ toast('Prazo Ã© obrigatÃ³rio â€” serviÃ§o nÃ£o foi salvo.'); return; }
+        if(!prazoValido){ toast('Prazo é obrigatório — serviço não foi salvo.'); return; }
       }
       let tipoAgenda = null;
       const jaVinculada = await jaTemAgendaVinculada(s.id);
@@ -1529,12 +1419,12 @@ async function abrirFicha(clienteId){
       const { error }=await sb.from('servicos').update(alterado).eq('id',s.id);
       if(error){ toast('Erro: '+error.message); return; }
       Object.assign(s,alterado);
-      try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('ServiÃ§o salvo; financeiro: '+err.message); }
-      if(s.prazo) try{ await sincronizarAgendaServico(s,cli,tipoAgenda); }catch(err){ toast('ServiÃ§o salvo; agenda: '+err.message); }
-      toast('âœ” ServiÃ§o atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
+      try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('Serviço salvo; financeiro: '+err.message); }
+      if(s.prazo) try{ await sincronizarAgendaServico(s,cli,tipoAgenda); }catch(err){ toast('Serviço salvo; agenda: '+err.message); }
+      toast('✔ Serviço atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
     });
     acoes.appendChild(bEditarServico);
-    const bOrcamento=el('button','botao b-copy','OrÃ§amento PDF');
+    const bOrcamento=el('button','botao b-copy','Orçamento PDF');
     bOrcamento.addEventListener('click',()=>abrirOrcamento(cli,s,fotos||[]));
     acoes.appendChild(bOrcamento);
     const bPagamento=el('button','botao b-ok','Pagamento');
@@ -1545,7 +1435,7 @@ async function abrirFicha(clienteId){
       try{
         const salvo=await configurarPagamentoServico(s,cli,plano);
         if(!salvo) return;
-        toast('âœ” Financeiro atualizado'); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
+        toast('✔ Financeiro atualizado'); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
       }catch(err){ toast('Erro no financeiro: '+err.message); }
     });
     acoes.appendChild(bPagamento); it.appendChild(acoes);
@@ -1558,7 +1448,7 @@ async function abrirFicha(clienteId){
     const box = el('div','foto');
     const img = document.createElement('img'); img.src = f.url; box.appendChild(img);
     if(f.tipo) box.appendChild(el('div','tipo-tag', f.tipo));
-    const bRm = el('button','rm','âœ•');
+    const bRm = el('button','rm','✕');
     bRm.addEventListener('click', async ()=>{
       if(!await askConfirm('Remover esta foto?')) return;
       await sb.from('fotos').delete().eq('id', f.id);
@@ -1571,13 +1461,13 @@ async function abrirFicha(clienteId){
   const input = document.createElement('input'); input.type='file'; input.accept='image/*'; input.capture='environment'; input.style.display='none';
   input.addEventListener('change', async ()=>{
     const file = input.files[0]; if(!file) return;
-    label.textContent = 'Enviandoâ€¦';
+    label.textContent = 'Enviando…';
     const caminho = clienteId+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
     const { error: upErr } = await sb.storage.from('fotos-servicos').upload(caminho, file);
     if(upErr){ toast('Erro no upload: '+upErr.message); label.textContent='+ Foto'; return; }
     const { data: urlData } = await sb.storage.from('fotos-servicos').createSignedUrl(caminho, 60*60*24*365);
     await sb.from('fotos').insert({ cliente_id: clienteId, url: urlData.signedUrl, tipo: 'outro' });
-    toast('âœ” Foto adicionada');
+    toast('✔ Foto adicionada');
     abrirFicha(clienteId);
   });
   label.appendChild(input);
@@ -1586,7 +1476,7 @@ async function abrirFicha(clienteId){
 }
 
 /* =========================================================================
-   SEÃ‡Ã•ES RECOLHÃVEIS (utilitÃ¡rio)
+   SEÇÕES RECOLHÍVEIS (utilitário)
    ========================================================================= */
 function lerColapsadas(){ try{ return JSON.parse(localStorage.getItem('tb_colapsadas'))||{} }catch(e){ return {} } }
 function salvarColapsadas(d){ try{ localStorage.setItem('tb_colapsadas', JSON.stringify(d)) }catch(e){} }
@@ -1595,7 +1485,7 @@ function secao(titulo, count){
   const t = el('div','titulo-sec');
   t.appendChild(el('span',null,titulo));
   if(count!=null) t.appendChild(el('span','cont',String(count)));
-  t.appendChild(el('span','chev','âŒ„'));
+  t.appendChild(el('span','chev','⌄'));
   if(lerColapsadas()[titulo]) s.classList.add('recolhida');
   t.addEventListener('click', ()=>{
     s.classList.toggle('recolhida');
@@ -1613,7 +1503,7 @@ async function carregarTudo(){
   await Promise.all([renderInicio(), renderClientes(), renderLeads(), renderAgenda(), renderFinanceiro(), renderEstoque()]);
 }
 
-/* ---------- INÃCIO: urgente + chat de entrada + resumo ---------- */
+/* ---------- INÍCIO: urgente + chat de entrada + resumo ---------- */
 let geracaoRenderInicio = 0;
 async function renderInicio(){
   const minhaGeracao = ++geracaoRenderInicio;
@@ -1648,24 +1538,24 @@ async function renderInicio(){
     box.appendChild(el('div','sub', sub));
     return box;
   };
-  resumoGrid.appendChild(mkResumo('Leads ativos', leadsAbertos.length, qtdAltos ? `${qtdAltos} em alta prioridade` : 'Sem urgÃªncia alta agora', qtdAltos ? 'alerta' : 'ok'));
-  resumoGrid.appendChild(mkResumo('Sem prÃ³xima aÃ§Ã£o', qtdSemProximaAcao, qtdSemProximaAcao ? 'Vale decidir o prÃ³ximo passo' : 'Tudo com direÃ§Ã£o definida', qtdSemProximaAcao ? 'warn' : 'ok'));
+  resumoGrid.appendChild(mkResumo('Leads ativos', leadsAbertos.length, qtdAltos ? `${qtdAltos} em alta prioridade` : 'Sem urgência alta agora', qtdAltos ? 'alerta' : 'ok'));
+  resumoGrid.appendChild(mkResumo('Sem próxima ação', qtdSemProximaAcao, qtdSemProximaAcao ? 'Vale decidir o próximo passo' : 'Tudo com direção definida', qtdSemProximaAcao ? 'warn' : 'ok'));
   resumoGrid.appendChild(mkResumo('Agenda pendente', qtdAgendaHojeOuAtrasada, qtdAgendaHojeOuAtrasada ? 'Hoje ou atrasada' : 'Dia organizado', qtdAgendaHojeOuAtrasada ? 'warn' : 'ok'));
-  resumoGrid.appendChild(mkResumo('Chat de entrada', qtdCaixaEntrada, qtdCaixaEntrada ? 'AnotaÃ§Ãµes aguardando triagem' : 'Nada pendente', qtdCaixaEntrada ? 'neutro' : 'ok'));
-  resumoGrid.appendChild(mkResumo('Aguardando vocÃª', qtdAguardandoVoce, qtdAguardandoVoce ? 'A IA tem dÃºvida nesses leads' : 'Nada pendente de resposta', qtdAguardandoVoce ? 'alerta' : 'ok'));
+  resumoGrid.appendChild(mkResumo('Chat de entrada', qtdCaixaEntrada, qtdCaixaEntrada ? 'Anotações aguardando triagem' : 'Nada pendente', qtdCaixaEntrada ? 'neutro' : 'ok'));
+  resumoGrid.appendChild(mkResumo('Aguardando você', qtdAguardandoVoce, qtdAguardandoVoce ? 'A IA tem dúvida nesses leads' : 'Nada pendente de resposta', qtdAguardandoVoce ? 'alerta' : 'ok'));
   c.appendChild(resumoGrid);
 
-  /* Lista Ãºnica de prioridades, em semÃ¡foro, substituindo o que antes eram
-     3 seÃ§Ãµes separadas perguntando basicamente a mesma coisa ("o que fazer
-     agora?"): Compromissos de hoje + Foco do momento + Precisa de atenÃ§Ã£o
-     agora. DecisÃ£o do Diego em 09/07/2026: era "bagunÃ§a" ter 3 listas.
-     ðŸ”´ atrasado Â· ðŸŸ¡ hoje/alta prioridade Â· ðŸŸ¢ futuro (jÃ¡ agendado, sÃ³
-     acompanhar â€” nada fica "sem data" porque isso agora Ã© travado na
-     criaÃ§Ã£o/ediÃ§Ã£o da ficha, ver exigirPrazo()).
-     Cada linha Ã© clicÃ¡vel e abre a ficha do cliente (que jÃ¡ tem o botÃ£o de
-     WhatsApp com a sugestÃ£o de mensagem) â€” nÃ£o duplica isso aqui pra nÃ£o
-     inchar a lista. Compromissos de agenda ganham botÃµes prÃ³prios de
-     ConcluÃ­do/Reagendar (reagendar Ã© automÃ¡tico, sÃ³ clica). */
+  /* Lista única de prioridades, em semáforo, substituindo o que antes eram
+     3 seções separadas perguntando basicamente a mesma coisa ("o que fazer
+     agora?"): Compromissos de hoje + Foco do momento + Precisa de atenção
+     agora. Decisão do Diego em 09/07/2026: era "bagunça" ter 3 listas.
+     🔴 atrasado · 🟡 hoje/alta prioridade · 🟢 futuro (já agendado, só
+     acompanhar — nada fica "sem data" porque isso agora é travado na
+     criação/edição da ficha, ver exigirPrazo()).
+     Cada linha é clicável e abre a ficha do cliente (que já tem o botão de
+     WhatsApp com a sugestão de mensagem) — não duplica isso aqui pra não
+     inchar a lista. Compromissos de agenda ganham botões próprios de
+     Concluído/Reagendar (reagendar é automático, só clica). */
   const idsServicoComAgenda = new Set(agendaPendente.map(a=>a.servico_id).filter(Boolean));
   const prioridades = [];
   agendaPendente.forEach(a=>{
@@ -1673,11 +1563,10 @@ async function renderInicio(){
     prioridades.push({ tipoItem:'agenda', agenda:a, tier, chave:a.data+(a.hora||'99:99') });
   });
   leadsAbertos.forEach(s=>{
-    if(idsServicoComAgenda.has(s.id)) return; // jÃ¡ aparece como item de agenda
-    if(!s.prazo) return; // nÃ£o deveria acontecer mais, mas por seguranÃ§a
+    if(idsServicoComAgenda.has(s.id)) return; // já aparece como item de agenda
+    if(!s.prazo) return; // não deveria acontecer mais, mas por segurança
     let tier = ehAtrasado(s.prazo) ? 'atrasado' : (s.prazo===hojeStr ? 'hoje' : 'futuro');
     if(tier==='futuro' && s.prioridade==='alta') tier='hoje';
-    if(tier==='futuro' && !s.proxima_acao) tier='hoje';
     prioridades.push({ tipoItem:'lead', lead:s, tier, chave:s.prazo+'00:00' });
   });
   financeiroPendente.forEach(f=>{
@@ -1687,9 +1576,9 @@ async function renderInicio(){
   const ORDEM_TIER = {atrasado:0, hoje:1, futuro:2};
   prioridades.sort((a,b)=> ORDEM_TIER[a.tier]-ORDEM_TIER[b.tier] || a.chave.localeCompare(b.chave));
   if(prioridades.length){
-    const sPrior = secao('ðŸš¦ Prioridades', prioridades.length);
+    const sPrior = secao('🚦 Prioridades', prioridades.length);
     const cardPrior = el('div','card');
-    const CORES_TIER = {atrasado:{ic:'ðŸ”´',bg:'rgba(224,87,79,.12)',bd:'var(--alta,#e0574f)'}, hoje:{ic:'ðŸŸ¡',bg:'rgba(224,162,63,.12)',bd:'var(--media,#e0a23f)'}, futuro:{ic:'ðŸŸ¢',bg:'rgba(90,160,106,.10)',bd:'var(--baixa,#5aa06a)'}};
+    const CORES_TIER = {atrasado:{ic:'🔴',bg:'rgba(224,87,79,.12)',bd:'var(--alta,#e0574f)'}, hoje:{ic:'🟡',bg:'rgba(224,162,63,.12)',bd:'var(--media,#e0a23f)'}, futuro:{ic:'🟢',bg:'rgba(90,160,106,.10)',bd:'var(--baixa,#5aa06a)'}};
     prioridades.forEach(p=>{
       const cor = CORES_TIER[p.tier];
       const item = el('div','urgente-item');
@@ -1697,49 +1586,34 @@ async function renderInicio(){
       item.appendChild(el('div','ic',cor.ic));
       const txt = el('div','txt');
       if(p.tipoItem==='agenda'){
-        const a=p.agenda; const icTipo=a.tipo==='remoto'?'ðŸ’¬':'ðŸ“';
+        const a=p.agenda; const icTipo=a.tipo==='remoto'?'💬':'📍';
         const atrasado = p.tier==='atrasado';
-        txt.appendChild(el('b',null, `${a.hora?a.hora.slice(0,5)+' â€” ':''}${icTipo} ${a.titulo}`));
-        txt.appendChild(el('div','sub', (atrasado?'Atrasado desde '+dataComDiaBR(a.data):dataComDiaBR(a.data)) + (a.cidade?' Â· ðŸ™ '+a.cidade:'')));
+        txt.appendChild(el('b',null, `${a.hora?a.hora.slice(0,5)+' — ':''}${icTipo} ${a.titulo}`));
+        txt.appendChild(el('div','sub', (atrasado?'Atrasado desde '+dataCurtaBR(a.data):dataCurtaBR(a.data)) + (a.cidade?' · 🏙 '+a.cidade:'')));
       } else if(p.tipoItem==='lead'){
         const s=p.lead;
-        txt.appendChild(el('b',null, (s.clientes?.nome||'Cliente')+' â€” '+s.titulo));
-        txt.appendChild(el('div','sub', (s.proxima_acao||'Sem prÃ³xima aÃ§Ã£o definida')+' Â· '+textoPrazo(s.prazo)));
+        txt.appendChild(el('b',null, (s.clientes?.nome||'Cliente')+' — '+s.titulo));
+        txt.appendChild(el('div','sub', (s.proxima_acao||'Sem próxima ação definida')+' · '+textoPrazo(s.prazo)));
       } else {
         const f=p.fin;
-        txt.appendChild(el('b',null, (f.descricao||'LanÃ§amento')+' â€” '+moedaBR(Number(f.valor))));
-        txt.appendChild(el('div','sub', (f.status==='a_pagar'?'A pagar':'A receber')+' Â· '+dataComDiaBR(f.data)));
+        txt.appendChild(el('b',null, (f.descricao||'Lançamento')+' — '+moedaBR(Number(f.valor))));
+        txt.appendChild(el('div','sub', (f.status==='a_pagar'?'A pagar':'A receber')+' · '+dataCurtaBR(f.data)));
       }
       item.appendChild(txt);
       if(p.tipoItem==='agenda'){
         const acoesAg = el('div'); acoesAg.style.cssText='display:flex;gap:6px;flex:none';
-        const bOk = el('button','botao b-ok','âœ”');
-        bOk.addEventListener('click', async (e)=>{
-          e.stopPropagation();
-          await concluirCompromisso(p.agenda);
-          renderInicio(); renderAgenda(); renderLeads();
-        });
+        const bOk = el('button','botao b-ok','✔');
+        bOk.addEventListener('click', async (e)=>{ e.stopPropagation(); await sb.from('agenda').update({status:'feito'}).eq('id',p.agenda.id); toast('✔ Compromisso concluído'); renderInicio(); });
         acoesAg.appendChild(bOk);
-        const bNao = el('button','botao b-rm','NÃ£o');
-        bNao.title='NÃ£o concluÃ­do: registrar motivo e reagendar';
-        bNao.addEventListener('click', async (e)=>{
-          e.stopPropagation();
-          await naoConcluirCompromisso(p.agenda);
-          renderInicio(); renderAgenda(); renderLeads();
-        });
-        acoesAg.appendChild(bNao);
-        const bReag = el('button','botao b-tel','â†»');
-        bReag.title='Reagendar olhando compromissos do dia';
+        const bReag = el('button','botao b-tel','↻');
+        bReag.title='Reagendar (a IA acha o próximo horário livre sozinha)';
         bReag.addEventListener('click', async (e)=>{
           e.stopPropagation();
-          const novaData = await askText('Nova data (AAAA-MM-DD):', p.agenda.data || hojeISO());
-          if(!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData.trim())){ if(novaData!==null) toast('Data invÃ¡lida'); return; }
-          const proximo = await escolherNovoHorarioAgenda(p.agenda, novaData.trim());
-          if(!proximo) return;
-          const { error } = await sb.from('agenda').update({ data: proximo.data, hora: proximo.hora, status:'planejado' }).eq('id',p.agenda.id);
+          const proximo = await proximoSlotAutomatico(p.agenda.tipo, p.agenda.cidade);
+          if(!proximo){ toast('Não achei horário livre nos próximos 14 dias.'); return; }
+          const { error } = await sb.from('agenda').update({ data: proximo.data, hora: proximo.hora }).eq('id',p.agenda.id);
           if(error){ toast('Erro: '+error.message); return; }
-          await sb.from('historico').insert({o_que:`Compromisso reagendado: ${p.agenda.titulo}`, por:'diego', detalhe:`Nova data: ${proximo.data} ${proximo.hora||''}`});
-          toast(`âœ” Remanejado pra ${dataComDiaBR(proximo.data)} Ã s ${proximo.hora}`); renderInicio(); renderAgenda();
+          toast(`✔ Remanejado pra ${dataCurtaBR(proximo.data)} às ${proximo.hora}`); renderInicio();
         });
         acoesAg.appendChild(bReag);
         item.appendChild(acoesAg);
@@ -1759,11 +1633,11 @@ async function renderInicio(){
   }
 
   if(qtdAguardandoVoce){
-    const sAgu = secao('ðŸŸ  Aguardando vocÃª', qtdAguardandoVoce);
+    const sAgu = secao('🟠 Aguardando você', qtdAguardandoVoce);
     const card = el('div','card');
     const it = el('div','urgente-item');
     it.style.cursor='pointer';
-    it.appendChild(el('div','ic','â“'));
+    it.appendChild(el('div','ic','❓'));
     const txt = el('div','txt');
     txt.appendChild(el('b',null, qtdAguardandoVoce===1 ? '1 pergunta esperando sua resposta' : qtdAguardandoVoce+' perguntas esperando sua resposta'));
     txt.appendChild(el('div','sub','Toque pra abrir a Caixa de Entrada e responder'));
@@ -1778,14 +1652,14 @@ async function renderInicio(){
   const sChat = secao('Caixa de entrada', qtdCaixaEntrada);
   sChat.id = 'secaoCaixaEntrada';
   const caixaWrap = el('div');
-  caixaWrap.appendChild(el('p','entrada-ajuda','Cole a mensagem do cliente ou suba um print do WhatsApp. A ideia aqui Ã© virar isso em ficha, lead e prÃ³xima aÃ§Ã£o sem depender de API.'));
+  caixaWrap.appendChild(el('p','entrada-ajuda','Cole a mensagem do cliente ou suba um print do WhatsApp. A ideia aqui é virar isso em ficha, lead e próxima ação sem depender de API.'));
   const box = el('div','chat-box');
   const ta = document.createElement('textarea'); ta.rows=2; ta.placeholder='Cole a mensagem do cliente ou descreva o atendimento...';
-  const btnEnv = el('button','chat-send','âž¤');
+  const btnEnv = el('button','chat-send','➤');
   box.appendChild(ta); box.appendChild(btnEnv);
   caixaWrap.appendChild(box);
   const ferramentas = el('div','chat-tools');
-  const labelUpload = document.createElement('label'); labelUpload.className='chat-upload'; labelUpload.textContent='ðŸ–¼ Adicionar print';
+  const labelUpload = document.createElement('label'); labelUpload.className='chat-upload'; labelUpload.textContent='🖼 Adicionar print';
   const inputPrint = document.createElement('input'); inputPrint.type='file'; inputPrint.accept='image/*';
   labelUpload.appendChild(inputPrint);
   ferramentas.appendChild(labelUpload);
@@ -1813,7 +1687,7 @@ async function renderInicio(){
     preview.classList.add('oculto');
     previewImg.removeAttribute('src');
     previewMeta.textContent = '';
-    labelUpload.textContent = 'ðŸ–¼ Adicionar print';
+    labelUpload.textContent = '🖼 Adicionar print';
     labelUpload.appendChild(inputPrint);
   }
   inputPrint.addEventListener('change', ()=>{
@@ -1821,9 +1695,9 @@ async function renderInicio(){
     if(!file){ limparPreviewPrint(); return; }
     arquivoPrint = file;
     previewImg.src = URL.createObjectURL(file);
-    previewMeta.textContent = file.name + ' Â· ' + Math.round(file.size/1024) + ' KB';
+    previewMeta.textContent = file.name + ' · ' + Math.round(file.size/1024) + ' KB';
     preview.classList.remove('oculto');
-    labelUpload.textContent = 'ðŸ–¼ Trocar print';
+    labelUpload.textContent = '🖼 Trocar print';
     labelUpload.appendChild(inputPrint);
   });
 
@@ -1848,7 +1722,7 @@ async function renderInicio(){
     btnEnv.disabled = false;
     labelUpload.style.pointerEvents = '';
     if(error){ toast('Erro: '+error.message); return; }
-    ta.value=''; limparPreviewPrint(); toast('âœ” Entrada anotada'); carregarCaixaEntrada();
+    ta.value=''; limparPreviewPrint(); toast('✔ Entrada anotada'); carregarCaixaEntrada();
   }
   btnEnv.addEventListener('click', enviarNota);
   ta.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); enviarNota(); } });
@@ -1865,11 +1739,11 @@ async function renderInicio(){
       const linha = el('div','chat-item');
       const txt = el('div','txt');
       if(statusItem!=='novo'){
-        const tagStatus = el('div','tag', statusItem==='aguardando_voce' ? 'ðŸŸ  Aguardando vocÃª' : (statusItem==='respondido' ? 'ðŸ”µ VocÃª respondeu' : STATUS_CAIXA_LABEL[statusItem]));
+        const tagStatus = el('div','tag', statusItem==='aguardando_voce' ? '🟠 Aguardando você' : (statusItem==='respondido' ? '🔵 Você respondeu' : STATUS_CAIXA_LABEL[statusItem]));
         txt.appendChild(tagStatus);
       }
       if(registro.temImagem) txt.appendChild(el('div','tag','Print recebido'));
-      txt.appendChild(el('div',null, registro.texto || (registro.temImagem ? 'Print sem anotaÃ§Ã£o escrita.' : 'Sem texto.')));
+      txt.appendChild(el('div',null, registro.texto || (registro.temImagem ? 'Print sem anotação escrita.' : 'Sem texto.')));
       if(registro.imagemUrl){
         const img = document.createElement('img');
         img.src = registro.imagemUrl;
@@ -1905,7 +1779,7 @@ async function renderInicio(){
           const novaConversa = [...conversa, {de:'diego', texto, em:new Date().toISOString()}];
           const { error: errResp } = await sb.from('caixa_entrada').update({ conversa: novaConversa, status:'respondido' }).eq('id', item.id);
           if(errResp){ toast('Erro: '+errResp.message); return; }
-          toast('âœ” Resposta enviada'); carregarCaixaEntrada(); renderInicio();
+          toast('✔ Resposta enviada'); carregarCaixaEntrada(); renderInicio();
         };
         respondeBtn.addEventListener('click', enviarResposta);
         respondeInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); enviarResposta(); } });
@@ -1917,33 +1791,33 @@ async function renderInicio(){
       linha.appendChild(el('div','hora', d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})));
 
       const acoes = el('div','acoes');
-      const btnCriarFicha = el('button',null,'Criar ficha/orÃ§amento');
+      const btnCriarFicha = el('button',null,'Criar ficha/orçamento');
       btnCriarFicha.addEventListener('click', async ()=>{
         const nome = await askText('Nome do cliente:');
         if(!nome || !nome.trim()) return;
         const telefone = await askText('Telefone/WhatsApp do cliente (opcional):', '') || '';
         const cidade = await askText('Cidade do cliente (opcional):', '') || '';
-        const endereco = await askText('EndereÃ§o do cliente (opcional):', '') || '';
+        const endereco = await askText('Endereço do cliente (opcional):', '') || '';
         const tituloSugerido = (registro.texto || '').split('\n').find(l=>l.trim()) || 'Atendimento recebido';
-        const titulo = await askText('Qual serviÃ§o ou pedido deste cliente?', tituloSugerido.slice(0,80));
+        const titulo = await askText('Qual serviço ou pedido deste cliente?', tituloSugerido.slice(0,80));
         if(!titulo || !titulo.trim()) return;
-        const statusDigitado = (await askText('Status inicial: lead, orÃ§amento, agendado ou produÃ§Ã£o', 'lead') || 'lead').trim().toLowerCase();
+        const statusDigitado = (await askText('Status inicial: lead, orçamento, agendado ou produção', 'lead') || 'lead').trim().toLowerCase();
         const statusInformado = statusDigitado.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
         const status = ['lead','orcamento','agendado','producao'].includes(statusInformado) ? statusInformado : 'lead';
         const prioridadeInformada = (await askText('Prioridade: baixa, media ou alta', 'media') || 'media').trim().toLowerCase();
         const prioridade = ['baixa','media','alta'].includes(prioridadeInformada) ? prioridadeInformada : 'media';
-        const valorTexto = await askText('Valor do orÃ§amento (R$, opcional):', '') || '';
+        const valorTexto = await askText('Valor do orçamento (R$, opcional):', '') || '';
         const valorOrcamento = Number(valorTexto.replace(',','.')) || null;
-        let proximaAcao = await askText('Qual Ã© a prÃ³xima aÃ§Ã£o?', 'Responder o cliente e confirmar os detalhes') || '';
-        const prazoInformado = (await askText('Prazo da prÃ³xima aÃ§Ã£o (AAAA-MM-DD):', '') || '').trim();
+        let proximaAcao = await askText('Qual é a próxima ação?', 'Responder o cliente e confirmar os detalhes') || '';
+        const prazoInformado = (await askText('Prazo da próxima ação (AAAA-MM-DD):', '') || '').trim();
         let prazo = /^\d{4}-\d{2}-\d{2}$/.test(prazoInformado) ? prazoInformado : null;
         if(!prazo){
           prazo = await exigirPrazo(prazoInformado, titulo.trim());
-          if(!prazo){ toast('Prazo Ã© obrigatÃ³rio â€” ficha nÃ£o foi criada.'); btnCriarFicha.disabled=false; btnCriarFicha.textContent='Criar ficha/orÃ§amento'; return; }
+          if(!prazo){ toast('Prazo é obrigatório — ficha não foi criada.'); btnCriarFicha.disabled=false; btnCriarFicha.textContent='Criar ficha/orçamento'; return; }
         }
         const tipoAgenda = await perguntarTipoAgenda(prazo, titulo.trim());
         btnCriarFicha.disabled = true;
-        btnCriarFicha.textContent = 'Criandoâ€¦';
+        btnCriarFicha.textContent = 'Criando…';
         try{
           let cliente = null;
           if(telefone.trim()){
@@ -1977,45 +1851,45 @@ async function renderInicio(){
           await sb.from('historico').insert({
             o_que:`Ficha/lead criado para ${cliente.nome || nome.trim()}`, por:'diego', detalhe:titulo.trim()
           });
-          toast('âœ” Ficha e lead criados');
+          toast('✔ Ficha e lead criados');
           carregarCaixaEntrada(); renderClientes(); renderLeads(); renderInicio();
           if(status==='orcamento') abrirOrcamento(cliente,servicoCriado,registro.imagemUrl?[{url:registro.imagemUrl}]:[]);
         }catch(err){
           toast('Erro ao criar ficha: '+err.message);
           btnCriarFicha.disabled = false;
-          btnCriarFicha.textContent = 'Criar ficha/orÃ§amento';
+          btnCriarFicha.textContent = 'Criar ficha/orçamento';
         }
       });
       acoes.appendChild(btnCriarFicha);
       const btnEditar = el('button',null,'Editar');
       btnEditar.addEventListener('click', async ()=>{
-        const novoTexto = await askText('Editar anotaÃ§Ã£o:', registro.texto || '');
+        const novoTexto = await askText('Editar anotação:', registro.texto || '');
         if(novoTexto===null) return;
         const payload = montarTextoCaixa({ texto: novoTexto, imagemUrl: registro.imagemUrl, nomeArquivo: registro.nomeArquivo });
         const { error: errEdit } = await sb.from('caixa_entrada').update({ texto: payload }).eq('id', item.id);
         if(errEdit){ toast('Erro: '+errEdit.message); return; }
-        toast('âœ” AnotaÃ§Ã£o atualizada');
+        toast('✔ Anotação atualizada');
         carregarCaixaEntrada();
       });
       acoes.appendChild(btnEditar);
       if(statusItem!=='aguardando_voce'){
-        const btnPerguntar = el('button',null,'â“ Perguntar');
+        const btnPerguntar = el('button',null,'❓ Perguntar');
         btnPerguntar.addEventListener('click', async ()=>{
-          const pergunta = await askText('Antes de checar Financeiro/Clientes/Leads/Agenda/Estoque e nÃ£o achar a resposta, qual Ã© a sua dÃºvida objetiva pro Diego?');
+          const pergunta = await askText('Antes de checar Financeiro/Clientes/Leads/Agenda/Estoque e não achar a resposta, qual é a sua dúvida objetiva pro Diego?');
           if(!pergunta || !pergunta.trim()) return;
           const novaConversa = [...conversa, {de:'ia', texto: pergunta.trim(), em:new Date().toISOString()}];
           const { error: errPerg } = await sb.from('caixa_entrada').update({ conversa: novaConversa, status:'aguardando_voce' }).eq('id', item.id);
           if(errPerg){ toast('Erro: '+errPerg.message); return; }
-          toast('â“ Pergunta registrada'); carregarCaixaEntrada(); renderInicio();
+          toast('❓ Pergunta registrada'); carregarCaixaEntrada(); renderInicio();
         });
         acoes.appendChild(btnPerguntar);
       }
       const btnCopiar = el('button',null,'Copiar');
       btnCopiar.addEventListener('click', ()=>copiarTexto(registro.texto || item.texto || ''));
       acoes.appendChild(btnCopiar);
-      const btnDel = el('button',null,'Resolver');
+      const btnDel = el('button',null,'🗑');
       btnDel.addEventListener('click', async ()=>{
-        if(!await askConfirm('Marcar esta anotaÃ§Ã£o como resolvida e tirar da fila?')) return;
+        if(!await askConfirm('Marcar esta anotação como resolvida/remover da lista?')) return;
         await sb.from('caixa_entrada').update({processado:true, status:'resolvido'}).eq('id', item.id);
         carregarCaixaEntrada(); renderInicio();
       });
@@ -2026,16 +1900,16 @@ async function renderInicio(){
   }
   carregarCaixaEntrada();
 
-  // resumo rÃ¡pido: leads em aberto + agenda de hoje
+  // resumo rápido: leads em aberto + agenda de hoje
   const { data: servicos } = await sb.from('servicos').select('id,status,prazo,proxima_acao').not('status','in','(pago,perdido)');
   if(minhaGeracao !== geracaoRenderInicio) return;
   const { data: agendaHoje } = await sb.from('agenda').select('id').eq('status','planejado');
   if(minhaGeracao !== geracaoRenderInicio) return;
-  const sResumo = secao('Resumo rÃ¡pido');
+  const sResumo = secao('Resumo rápido');
   const card = el('div','card');
   const pendSemAcao = (servicos||[]).filter(s=>!s.proxima_acao).length;
-  card.innerHTML = `<p style="margin:0 0 8px">VocÃª tem <b>${servicos?servicos.length:0}</b> serviÃ§o(s) em aberto e <b>${agendaHoje?agendaHoje.length:0}</b> compromisso(s) planejado(s).</p>
-  <p style="margin:0; color:var(--texto2)">${pendSemAcao ? `<b>${pendSemAcao}</b> lead(s) ainda sem prÃ³xima aÃ§Ã£o.` : 'Todos os leads abertos jÃ¡ tÃªm prÃ³ximo passo definido.'}</p>`;
+  card.innerHTML = `<p style="margin:0 0 8px">Você tem <b>${servicos?servicos.length:0}</b> serviço(s) em aberto e <b>${agendaHoje?agendaHoje.length:0}</b> compromisso(s) planejado(s).</p>
+  <p style="margin:0; color:var(--texto2)">${pendSemAcao ? `<b>${pendSemAcao}</b> lead(s) ainda sem próxima ação.` : 'Todos os leads abertos já têm próximo passo definido.'}</p>`;
   sResumo.appendChild(card);
   c.appendChild(sResumo);
 }
@@ -2043,7 +1917,7 @@ async function renderInicio(){
 /* ---------- LEADS / FUNIL ---------- */
 async function renderClientes(){
   const c = $('#painelClientes'); c.innerHTML='';
-  c.appendChild(cabecalhoPainel('ðŸ“‡','Clientes','Fichas, histÃ³rico, fotos e orÃ§amentos em um sÃ³ lugar'));
+  c.appendChild(cabecalhoPainel('📇','Clientes','Fichas, histórico, fotos e orçamentos em um só lugar'));
   const topo = el('div','card');
   const form = el('div','form');
   const campo = document.createElement('input');
@@ -2059,7 +1933,7 @@ async function renderClientes(){
     filtrados.slice(0,100).forEach(cli=>{
       const item=el('div','item');
       item.appendChild(el('div','nome',cli.nome||'Cliente sem nome'));
-      item.appendChild(el('div','servico',[cli.telefone,cli.cidade,cli.endereco].filter(Boolean).join(' Â· ')||'Cadastro sem contato'));
+      item.appendChild(el('div','servico',[cli.telefone,cli.cidade,cli.endereco].filter(Boolean).join(' · ')||'Cadastro sem contato'));
       const b=el('button','botao b-ok','Abrir ficha'); b.addEventListener('click',()=>abrirFicha(cli.id)); item.appendChild(b);
       lista.appendChild(item);
     });
@@ -2070,7 +1944,7 @@ async function renderClientes(){
 let filtroStatus = 'todos';
 async function renderLeads(){
   const c = $('#painelLeads'); c.innerHTML='';
-  c.appendChild(cabecalhoPainel('ðŸ‘¥','Leads e produÃ§Ã£o','Acompanhe cada serviÃ§o do primeiro contato atÃ© o pagamento'));
+  c.appendChild(cabecalhoPainel('👥','Leads e produção','Acompanhe cada serviço do primeiro contato até o pagamento'));
 
   const buscaClientes = el('div','card');
   const formBusca = el('div','form');
@@ -2095,7 +1969,7 @@ async function renderLeads(){
       return;
     }
     btnBuscarCliente.disabled = true;
-    btnBuscarCliente.textContent = 'Buscandoâ€¦';
+    btnBuscarCliente.textContent = 'Buscando…';
     const { data: clientes, error: erroBusca } = await sb.from('clientes')
       .select('id,nome,telefone,cidade').order('nome').limit(500);
     btnBuscarCliente.disabled = false;
@@ -2111,7 +1985,7 @@ async function renderLeads(){
     encontrados.forEach(cli=>{
       const item = el('div','item');
       item.appendChild(el('div','nome',cli.nome || 'Cliente sem nome'));
-      item.appendChild(el('div','servico',[cli.telefone,cli.cidade].filter(Boolean).join(' Â· ') || 'Sem telefone ou cidade'));
+      item.appendChild(el('div','servico',[cli.telefone,cli.cidade].filter(Boolean).join(' · ') || 'Sem telefone ou cidade'));
       const abrir = el('button','botao b-ok','Abrir ficha');
       abrir.addEventListener('click',()=>abrirFicha(cli.id));
       item.appendChild(abrir);
@@ -2138,7 +2012,7 @@ async function renderLeads(){
   const { data, error } = await query;
 
   if(error){ c.appendChild(el('div','erro','Erro: '+error.message)); return; }
-  if(!data.length){ const card=el('div','card'); card.appendChild(el('div','vazio','Nada aqui. ðŸ‘')); c.appendChild(card); return; }
+  if(!data.length){ const card=el('div','card'); card.appendChild(el('div','vazio','Nada aqui. 👏')); c.appendChild(card); return; }
 
   const semAcao = data.filter(s=>!s.proxima_acao).length;
   const atrasados = data.filter(s=>ehAtrasado(s.prazo)).length;
@@ -2151,10 +2025,10 @@ async function renderLeads(){
     box.appendChild(el('div','sub', sub));
     return box;
   };
-  resumo.appendChild(mkResumo('Neste filtro', data.length, 'Itens visÃ­veis agora', 'neutro'));
-  resumo.appendChild(mkResumo('Sem prÃ³xima aÃ§Ã£o', semAcao, semAcao ? 'Vale decidir o prÃ³ximo passo' : 'Tudo com direÃ§Ã£o', semAcao ? 'warn' : 'ok'));
-  resumo.appendChild(mkResumo('Atrasados', atrasados, atrasados ? 'Pedem aÃ§Ã£o primeiro' : 'Nenhum vencido', atrasados ? 'alerta' : 'ok'));
-  resumo.appendChild(mkResumo('Alta prioridade', alta, alta ? 'Pedidos mais sensÃ­veis' : 'Sem urgÃªncia alta', alta ? 'alerta' : 'ok'));
+  resumo.appendChild(mkResumo('Neste filtro', data.length, 'Itens visíveis agora', 'neutro'));
+  resumo.appendChild(mkResumo('Sem próxima ação', semAcao, semAcao ? 'Vale decidir o próximo passo' : 'Tudo com direção', semAcao ? 'warn' : 'ok'));
+  resumo.appendChild(mkResumo('Atrasados', atrasados, atrasados ? 'Pedem ação primeiro' : 'Nenhum vencido', atrasados ? 'alerta' : 'ok'));
+  resumo.appendChild(mkResumo('Alta prioridade', alta, alta ? 'Pedidos mais sensíveis' : 'Sem urgência alta', alta ? 'alerta' : 'ok'));
   c.appendChild(resumo);
 
   data.sort((a,b)=>{
@@ -2176,9 +2050,9 @@ async function renderLeads(){
     sel.addEventListener('change', async ()=>{
       const alterado = {status:sel.value, atualizado_em:new Date().toISOString()};
       if(['producao','entregue','pago'].includes(sel.value) && !(Number(s.valor_orcamento)>0)){
-        const valorTexto = await askText(`"${s.titulo}" nÃ£o tem valor de orÃ§amento. Qual o valor (R$)? (obrigatÃ³rio pra virar ${STATUS_LABEL[sel.value]})`, '');
+        const valorTexto = await askText(`"${s.titulo}" não tem valor de orçamento. Qual o valor (R$)? (obrigatório pra virar ${STATUS_LABEL[sel.value]})`, '');
         const valor = Number(String(valorTexto||'').replace(',','.'));
-        if(!valorTexto || !(valor>0)){ toast('Sem valor, status nÃ£o foi alterado.'); sel.value=s.status; return; }
+        if(!valorTexto || !(valor>0)){ toast('Sem valor, status não foi alterado.'); sel.value=s.status; return; }
         alterado.valor_orcamento = valor;
       }
       await sb.from('servicos').update(alterado).eq('id', s.id);
@@ -2198,10 +2072,10 @@ async function renderLeads(){
     const mStatus = el('span','tag'); mStatus.innerHTML = '<b>Status:</b> ' + esc(STATUS_LABEL[s.status] || s.status || 'Sem status'); meta.appendChild(mStatus);
     if(meta.childNodes.length) it.appendChild(meta);
     if(s.proxima_acao){
-      const ac = el('div','acao'); ac.appendChild(el('span','lbl','PrÃ³xima aÃ§Ã£o'));
+      const ac = el('div','acao'); ac.appendChild(el('span','lbl','Próxima ação'));
       ac.appendChild(document.createTextNode(s.proxima_acao)); it.appendChild(ac);
     } else {
-      it.appendChild(el('div','alerta','Falta definir a prÃ³xima aÃ§Ã£o. Esse lead fica mais difÃ­cil para vocÃª e para a IA conduzirem.'));
+      it.appendChild(el('div','alerta','Falta definir a próxima ação. Esse lead fica mais difícil para você e para a IA conduzirem.'));
     }
     const rod = el('div','rodape');
     if(s.prazo){
@@ -2210,60 +2084,39 @@ async function renderLeads(){
       rod.appendChild(el('span','prazo'+prazoClasse, prazoRotulo));
     }
     const sugestao = s.sugestao_resposta || s.proxima_acao || '';
-    if(sugestao) rod.appendChild((()=>{ const b=el('button','botao b-copy','ðŸ“‹'); b.addEventListener('click',()=>copiarTexto(sugestao)); return b; })());
+    if(sugestao) rod.appendChild((()=>{ const b=el('button','botao b-copy','📋'); b.addEventListener('click',()=>copiarTexto(sugestao)); return b; })());
     const wa = telParaWa(cli.telefone);
     if(wa){ const a=document.createElement('a'); a.className='botao b-wa'; a.textContent='WhatsApp'; a.target='_blank'; a.rel='noopener'; a.href = sugestao ? wa+'?text='+encodeURIComponent(sugestao) : wa; rod.appendChild(a); }
     const tel = telParaLigar(cli.telefone);
-    if(tel){ const a=document.createElement('a'); a.className='botao b-tel'; a.textContent='ðŸ“ž'; a.href=tel; rod.appendChild(a); }
+    if(tel){ const a=document.createElement('a'); a.className='botao b-tel'; a.textContent='📞'; a.href=tel; rod.appendChild(a); }
     const bConcluirAcao = el('button','botao b-ok','✔ Concluir ação');
     bConcluirAcao.addEventListener('click', async ()=>{
-      const tipo = await askOpcao('Essa ação foi concluída?', [
-        {valor:'total', rotulo:'Concluída total', classe:'b-ok'},
-        {valor:'parcial', rotulo:'Concluída parcial', classe:'b-tel'}
-      ]);
-      if(tipo===null) return;
-      const parcial = tipo==='parcial';
-      if(!parcial){
-        await sb.from('historico').insert({o_que:`"${s.titulo}": acao concluida totalmente`, por:'diego', detalhe:s.proxima_acao || ''});
-        toast('✔ Acao concluida');
-        renderLeads(); renderInicio();
-        return;
+      const proximo = await askText('O que foi feito agora? (fica no histórico)', s.proxima_acao || '');
+      if(proximo === null) return;
+      const novaAcao = await askText('Qual a PRÓXIMA ação? (deixe em branco se está aguardando resposta do cliente)', '');
+      if(novaAcao === null) return;
+      let novoPrazo = s.prazo;
+      if(!novaAcao.trim()){
+        const dataRevisao = await askText('Aguardando resposta — revisar em que data? (AAAA-MM-DD, opcional)', '');
+        if(dataRevisao && /^\d{4}-\d{2}-\d{2}$/.test(dataRevisao.trim())) novoPrazo = dataRevisao.trim();
       }
-      const pendencia = await askText('O que ficou pendente?', sugerirPendencia(s.proxima_acao || s.titulo));
-      if(pendencia===null || !pendencia.trim()) return;
-      const novoPrazo = await exigirPrazo('', pendencia.trim());
-      if(!novoPrazo){ toast('Precisa de data para continuar no semaforo.'); return; }
-      await sb.from('servicos').update({ proxima_acao: pendencia.trim(), prazo: novoPrazo, atualizado_em: new Date().toISOString() }).eq('id', s.id);
-      await sb.from('historico').insert({o_que:`"${s.titulo}": acao concluida parcialmente`, por:'diego', detalhe:`Pendente: ${pendencia.trim()}. Revisar em ${novoPrazo}`});
-      toast('✔ Parcial registrado e voltou para o semaforo'); renderLeads(); renderInicio();
+      await sb.from('servicos').update({ proxima_acao: novaAcao.trim() || null, prazo: novoPrazo, atualizado_em: new Date().toISOString() }).eq('id', s.id);
+      await sb.from('historico').insert({o_que:`"${s.titulo}": ${proximo || 'ação concluída'}`, por:'diego', detalhe: novaAcao.trim() ? 'Próxima ação: '+novaAcao.trim() : 'Aguardando resposta do cliente'});
+      toast('✔ Ação registrada — lead continua aberto'); renderLeads(); renderInicio();
     });
     rod.appendChild(bConcluirAcao);
-    const bNaoConcluirAcao = el('button','botao b-rm','NÃ£o concluir');
-    bNaoConcluirAcao.addEventListener('click', async ()=>{
-      const motivo = await askText('Por que essa aÃ§Ã£o nÃ£o foi concluÃ­da?', 'Cliente nÃ£o respondeu / nÃ£o deu tempo / precisa remarcar');
-      if(motivo===null) return;
-      const novaAcao = await askText('Qual a prÃ³xima aÃ§Ã£o?', s.proxima_acao || 'Tentar contato novamente');
-      if(novaAcao===null || !novaAcao.trim()){ toast('Precisa definir uma prÃ³xima aÃ§Ã£o.'); return; }
-      const novoPrazo = await exigirPrazo('', novaAcao.trim());
-      if(!novoPrazo){ toast('Precisa de nova data.'); return; }
-      await sb.from('servicos').update({proxima_acao:novaAcao.trim(), prazo:novoPrazo, atualizado_em:new Date().toISOString()}).eq('id', s.id);
-      await sb.from('historico').insert({o_que:`"${s.titulo}": aÃ§Ã£o nÃ£o concluÃ­da`, por:'diego', detalhe:`Motivo: ${motivo}. PrÃ³xima aÃ§Ã£o: ${novaAcao.trim()}. Prazo: ${novoPrazo}`});
-      toast('âœ” Motivo registrado e aÃ§Ã£o reagendada');
-      renderLeads(); renderInicio();
-    });
-    rod.appendChild(bNaoConcluirAcao);
-    const bEncerrarPago = el('button','botao b-ok','ðŸ Pago');
+    const bEncerrarPago = el('button','botao b-ok','🏁 Pago');
     bEncerrarPago.addEventListener('click', async ()=>{
       if(!await askConfirm(`Encerrar "${s.titulo}" como PAGO/finalizado? Isso tira o lead da lista ativa.`)) return;
-      const motivo = await askText('Motivo/observaÃ§Ã£o do encerramento (opcional):', '') || '';
+      const motivo = await askText('Motivo/observação do encerramento (opcional):', '') || '';
       await sb.from('servicos').update({status:'pago'}).eq('id', s.id);
       s.status='pago';
-      try{ await sincronizarFinanceiroServico(s, cli); }catch(err){ toast('ServiÃ§o pago; financeiro: '+err.message); }
+      try{ await sincronizarFinanceiroServico(s, cli); }catch(err){ toast('Serviço pago; financeiro: '+err.message); }
       await sb.from('historico').insert({o_que:`"${s.titulo}" encerrado como PAGO`, por:'diego', detalhe: motivo});
       toast('Lead encerrado (pago)'); renderLeads(); renderFinanceiro(); renderInicio();
     });
     rod.appendChild(bEncerrarPago);
-    const bEncerrarPerdido = el('button','botao b-rm','âŒ Perdido');
+    const bEncerrarPerdido = el('button','botao b-rm','❌ Perdido');
     bEncerrarPerdido.addEventListener('click', async ()=>{
       if(!await askConfirm(`Encerrar "${s.titulo}" como PERDIDO? Isso tira o lead da lista ativa.`)) return;
       const motivo = await askText('Motivo do lead perdido (opcional):', '') || '';
@@ -2272,9 +2125,9 @@ async function renderLeads(){
       toast('Lead marcado como perdido'); renderLeads(); renderInicio();
     });
     rod.appendChild(bEncerrarPerdido);
-    const bRemover = el('button','botao b-rm','ðŸ—‘ Remover');
+    const bRemover = el('button','botao b-rm','🗑 Remover');
     bRemover.addEventListener('click', async ()=>{
-      if(!await askConfirm('Remover ESTE serviÃ§o/lead completamente? NÃ£o dÃ¡ pra desfazer.')) return;
+      if(!await askConfirm('Remover ESTE serviço/lead completamente? Não dá pra desfazer.')) return;
       await sb.from('servicos').delete().eq('id', s.id);
       toast('Removido'); renderLeads(); renderInicio();
     });
@@ -2288,7 +2141,7 @@ async function renderLeads(){
 /* ---------- AGENDA ---------- */
 async function renderAgenda(){
   const c = $('#painelAgenda'); c.innerHTML='';
-  c.appendChild(cabecalhoPainel('ðŸ“…','Agenda','Compromissos, visitas, retiradas e entregas'));
+  c.appendChild(cabecalhoPainel('📅','Agenda','Compromissos, visitas, retiradas e entregas'));
   const s = secao('Compromissos');
   const card = el('div','card');
 
@@ -2299,31 +2152,27 @@ async function renderAgenda(){
     const item = el('div','agenda-item'+(a.status==='feito'?' feito':''));
     item.appendChild(el('div','hora', (a.hora||'--').slice(0,5)));
     const desc = el('div','desc');
-    desc.appendChild(el('div',null, (a.tipo==='remoto'?'ðŸ’¬ ':'ðŸ“ ') + a.titulo + ' â€” ' + dataComDiaBR(a.data)));
-    if(a.local) desc.appendChild(el('div','loc','ðŸ“ '+a.local));
-    if(a.cidade) desc.appendChild(el('div','loc','ðŸ™ '+a.cidade));
+    desc.appendChild(el('div',null, (a.tipo==='remoto'?'💬 ':'📍 ') + a.titulo + ' — ' + dataCurtaBR(a.data)));
+    if(a.local) desc.appendChild(el('div','loc','📍 '+a.local));
+    if(a.cidade) desc.appendChild(el('div','loc','🏙 '+a.cidade));
     item.appendChild(desc);
     if(a.status!=='feito'){
-      const b = el('button','botao b-ok','âœ”');
-      b.addEventListener('click', async ()=>{ await concluirCompromisso(a); renderAgenda(); renderInicio(); renderLeads(); });
+      const b = el('button','botao b-ok','✔');
+      b.addEventListener('click', async ()=>{ await sb.from('agenda').update({status:'feito'}).eq('id',a.id); renderAgenda(); renderInicio(); });
       item.appendChild(b);
-      const bNao = el('button','botao b-rm','NÃ£o');
-      bNao.addEventListener('click', async ()=>{ await naoConcluirCompromisso(a); renderAgenda(); renderInicio(); renderLeads(); });
-      item.appendChild(bNao);
       const bReagendar = el('button','botao b-tel','Reagendar');
       bReagendar.addEventListener('click', async ()=>{
         const novaData = await askText('Nova data (AAAA-MM-DD):', a.data || '');
-        if(!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData.trim())){ if(novaData!==null) toast('Data invÃ¡lida'); return; }
-        const escolha = await escolherNovoHorarioAgenda(a, novaData.trim());
-        if(!escolha) return;
-        const { error } = await sb.from('agenda').update({ data: escolha.data, hora: escolha.hora, status:'planejado' }).eq('id',a.id);
+        if(!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData.trim())){ if(novaData!==null) toast('Data inválida'); return; }
+        const novaHora = await askText('Novo horário (HH:MM, opcional):', (a.hora||'').slice(0,5));
+        if(novaHora===null) return;
+        const { error } = await sb.from('agenda').update({ data: novaData.trim(), hora: novaHora.trim()||null }).eq('id',a.id);
         if(error){ toast('Erro: '+error.message); return; }
-        await sb.from('historico').insert({o_que:`Compromisso reagendado: ${a.titulo}`, por:'diego', detalhe:`Nova data: ${escolha.data} ${escolha.hora||''}`});
-        toast('âœ” Reagendado'); renderAgenda(); renderInicio();
+        toast('✔ Reagendado'); renderAgenda(); renderInicio();
       });
       item.appendChild(bReagendar);
     }
-    const bRm = el('button','botao b-rm','ðŸ—‘');
+    const bRm = el('button','botao b-rm','🗑');
     bRm.addEventListener('click', async ()=>{ if(!await askConfirm('Remover este compromisso?')) return; await sb.from('agenda').delete().eq('id',a.id); renderAgenda(); });
     item.appendChild(bRm);
     card.appendChild(item);
@@ -2331,7 +2180,7 @@ async function renderAgenda(){
 
   const form = el('div','form');
   form.innerHTML = `
-    <input type="text" id="agTitulo" placeholder="O que Ã© o compromisso?">
+    <input type="text" id="agTitulo" placeholder="O que é o compromisso?">
     <div class="linha2">
       <input type="date" id="agData">
       <input type="time" id="agHora">
@@ -2343,23 +2192,25 @@ async function renderAgenda(){
   bAdd.addEventListener('click', async ()=>{
     const titulo = $('#agTitulo').value.trim();
     const data = $('#agData').value;
-    if(!titulo || !data){ toast('Preencha ao menos tÃ­tulo e data'); return; }
-    /* Compromisso do formulÃ¡rio manual Ã© sempre tratado como presencial
-       (nÃ£o tem seletor de tipo aqui) â€” por isso exige cidade, sem exceÃ§Ã£o.
-       Nunca criar/deixar passar sem cidade: se nÃ£o souber, PERGUNTAR. */
+    if(!titulo || !data){ toast('Preencha ao menos título e data'); return; }
+    /* Compromisso do formulário manual é sempre tratado como presencial
+       (não tem seletor de tipo aqui) — por isso exige cidade, sem exceção.
+       Nunca criar/deixar passar sem cidade: se não souber, PERGUNTAR. */
     let cidade = $('#agCidade').value.trim() || null;
     if(!cidade){
-      cidade = (await askText(`Compromisso presencial precisa de cidade (pra rota e pra nÃ£o ficar perdido depois). Qual a cidade de "${titulo}"?`, '') || '').trim() || null;
-      if(!cidade){ toast('Compromisso presencial nÃ£o pode ficar sem cidade. Preencha a cidade pra salvar.'); return; }
+      cidade = (await askText(`Compromisso presencial precisa de cidade (pra rota e pra não ficar perdido depois). Qual a cidade de "${titulo}"?`, '') || '').trim() || null;
+      if(!cidade){ toast('Compromisso presencial não pode ficar sem cidade. Preencha a cidade pra salvar.'); return; }
     }
-    const { data: doDia } = await sb.from('agenda').select('id,titulo,hora,cidade,tipo').eq('data', data).eq('status','planejado');
-    const disponiveis = horariosParaTipo(data, 'presencial', (doDia||[]).map(a=>a.hora));
-    let hora = $('#agHora').value || disponiveis[0] || null;
-    const escolha = await confirmarComDiaVisivel(data, doDia||[], titulo, cidade, hora, 'presencial', disponiveis);
-    if(!escolha){ toast('Compromisso nÃ£o foi criado.'); return; }
-    const { error } = await sb.from('agenda').insert({ titulo, data, hora: escolha, local: $('#agLocal').value.trim() || null, cidade, tipo:'presencial' });
+    let hora = $('#agHora').value || null;
+    if(!hora){
+      const { data: doDia } = await sb.from('agenda').select('hora').eq('data', data).eq('status','planejado');
+      hora = horariosParaTipo(data, 'presencial', (doDia||[]).map(a=>a.hora))[0] || null;
+      if(!hora){ toast('Nenhum compromisso pode ficar sem horário, e não sobrou horário livre nesse dia. Escolha outro dia ou informe a hora manualmente.'); return; }
+      toast('🕐 Sem horário informado — usado '+hora+' (primeiro livre do dia)');
+    }
+    const { error } = await sb.from('agenda').insert({ titulo, data, hora, local: $('#agLocal').value.trim() || null, cidade });
     if(error){ toast('Erro: '+error.message); return; }
-    toast('âœ” Adicionado'); renderAgenda(); renderInicio();
+    toast('✔ Adicionado'); renderAgenda(); renderInicio();
   });
   form.appendChild(bAdd);
   card.appendChild(form);
@@ -2371,11 +2222,11 @@ async function renderAgenda(){
 let escopoFin = 'empresa';
 async function renderFinanceiro(){
   const c = $('#painelFinanceiro'); c.innerHTML='';
-  c.appendChild(cabecalhoPainel('ðŸ’°','Financeiro','Recebidos, valores pendentes e despesas da operaÃ§Ã£o'));
+  c.appendChild(cabecalhoPainel('💰','Financeiro','Recebidos, valores pendentes e despesas da operação'));
 
   const toggle = el('div','toggle2');
-  const bEmp = el('button', escopoFin==='empresa'?'ativo':'', 'ðŸ¢ Empresa');
-  const bPro = el('button', escopoFin==='pro_labore'?'ativo':'', 'ðŸ‘¤ PrÃ³-labore');
+  const bEmp = el('button', escopoFin==='empresa'?'ativo':'', '🏢 Empresa');
+  const bPro = el('button', escopoFin==='pro_labore'?'ativo':'', '👤 Pró-labore');
   bEmp.addEventListener('click', ()=>{ escopoFin='empresa'; renderFinanceiro(); });
   bPro.addEventListener('click', ()=>{ escopoFin='pro_labore'; renderFinanceiro(); });
   toggle.appendChild(bEmp); toggle.appendChild(bPro);
@@ -2383,18 +2234,18 @@ async function renderFinanceiro(){
 
   const { data, error } = await sb.from('financeiro').select('*').eq('escopo', escopoFin).order('data',{ascending:false});
   if(!error && data?.length && escopoFin==='empresa'){
-    const ids=[...new Set(data.map(f=>(f.descricao||'').match(/^\[ServiÃ§o #([^\]]+)\]/)?.[1]).filter(Boolean))];
+    const ids=[...new Set(data.map(f=>(f.descricao||'').match(/^\[Serviço #([^\]]+)\]/)?.[1]).filter(Boolean))];
     if(ids.length){
       const { data: ligados }=await sb.from('servicos').select('id,status').in('id',ids);
       const prematuros=new Set((ligados||[]).filter(s=>['lead','orcamento','agendado','perdido'].includes(s.status)).map(s=>String(s.id)));
-      for(const id of prematuros) await sb.from('financeiro').delete().like('descricao',`[ServiÃ§o #${id}]%`);
+      for(const id of prematuros) await sb.from('financeiro').delete().like('descricao',`[Serviço #${id}]%`);
       for(let i=data.length-1;i>=0;i--){
-        const id=(data[i].descricao||'').match(/^\[ServiÃ§o #([^\]]+)\]/)?.[1];
+        const id=(data[i].descricao||'').match(/^\[Serviço #([^\]]+)\]/)?.[1];
         if(id && prematuros.has(String(id))) data.splice(i,1);
       }
     }
   }
-  const s = secao(escopoFin==='empresa' ? 'Financeiro da empresa' : 'PrÃ³-labore / pessoal');
+  const s = secao(escopoFin==='empresa' ? 'Financeiro da empresa' : 'Pró-labore / pessoal');
   const card = el('div','card');
 
   if(error){ card.appendChild(el('div','vazio','Erro: '+error.message)); }
@@ -2405,12 +2256,12 @@ async function renderFinanceiro(){
     const grid = el('div','fin-grid');
     const cel=(rot,val,cls)=>{ const x=el('div','fin-cel'); x.appendChild(el('div','rot',rot)); x.appendChild(el('div','val'+(cls?' '+cls:''),moedaBR(val))); return x; };
     grid.appendChild(cel('Entradas', entradas, 'pos'));
-    grid.appendChild(cel('SaÃ­das', saidas, 'neg'));
+    grid.appendChild(cel('Saídas', saidas, 'neg'));
     grid.appendChild(cel('Saldo', lucro, lucro>=0?'pos':'neg'));
     card.appendChild(grid);
 
     const dizimo = el('div','dizimo-card');
-    dizimo.appendChild(el('div','rot','DÃ­zimo (10% do saldo, se positivo)'));
+    dizimo.appendChild(el('div','rot','Dízimo (10% do saldo, se positivo)'));
     dizimo.appendChild(el('div','val', moedaBR(lucro>0 ? lucro*0.1 : 0)));
     card.appendChild(dizimo);
 
@@ -2419,44 +2270,44 @@ async function renderFinanceiro(){
       card.appendChild(el('h3',null,'A confirmar'));
       pendentes.forEach(f=>{
         const linha = el('div','fin-item');
-        linha.appendChild(el('div','d', (f.descricao||f.categoria||'')+' Â· '+(f.status==='a_pagar'?'a pagar':'a receber')));
+        linha.appendChild(el('div','d', (f.descricao||f.categoria||'')+' · '+(f.status==='a_pagar'?'a pagar':'a receber')));
         linha.appendChild(el('div','v '+f.tipo, moedaBR(Number(f.valor))));
         card.appendChild(linha);
       });
     }
 
-    card.appendChild(el('h3',null,'LanÃ§amentos'));
-    if(!data.length){ card.appendChild(el('div','vazio','Nenhum lanÃ§amento ainda.')); }
+    card.appendChild(el('h3',null,'Lançamentos'));
+    if(!data.length){ card.appendChild(el('div','vazio','Nenhum lançamento ainda.')); }
     else data.forEach(f=>{
       const linha = el('div','fin-item');
-      const d = el('div','d'); d.textContent = (f.descricao||'')+(f.categoria?' Â· '+f.categoria:'') + ' Â· ' + dataCurtaBR(f.data);
+      const d = el('div','d'); d.textContent = (f.descricao||'')+(f.categoria?' · '+f.categoria:'') + ' · ' + dataCurtaBR(f.data);
       const v = el('div','v '+f.tipo, (f.tipo==='saida'?'-':'+') + moedaBR(Number(f.valor)));
       linha.appendChild(d); linha.appendChild(v);
-      const bRm = el('button',null,'ðŸ—‘'); bRm.style.cssText='background:none;border:0;color:var(--fraco);cursor:pointer';
-      bRm.addEventListener('click', async ()=>{ if(!await askConfirm('Remover este lanÃ§amento?')) return; await sb.from('financeiro').delete().eq('id',f.id); renderFinanceiro(); });
+      const bRm = el('button',null,'🗑'); bRm.style.cssText='background:none;border:0;color:var(--fraco);cursor:pointer';
+      bRm.addEventListener('click', async ()=>{ if(!await askConfirm('Remover este lançamento?')) return; await sb.from('financeiro').delete().eq('id',f.id); renderFinanceiro(); });
       linha.appendChild(bRm);
       card.appendChild(linha);
     });
   }
 
-  const CATEGORIAS = ['Materiais','Ferramentas','Frete','CombustÃ­vel','Pessoal','ServiÃ§o de terceiro','Venda/ServiÃ§o prestado','Outro'];
+  const CATEGORIAS = ['Materiais','Ferramentas','Frete','Combustível','Pessoal','Serviço de terceiro','Venda/Serviço prestado','Outro'];
   const form = el('div','form');
   form.innerHTML = `
     <div class="linha2">
-      <select id="finTipo"><option value="entrada">Entrada</option><option value="saida">SaÃ­da</option></select>
+      <select id="finTipo"><option value="entrada">Entrada</option><option value="saida">Saída</option></select>
       <input type="number" step="0.01" id="finValor" placeholder="Valor (R$)">
     </div>
-    <input type="text" id="finDescricao" placeholder="DescriÃ§Ã£o">
+    <input type="text" id="finDescricao" placeholder="Descrição">
     <div class="linha2">
       <select id="finCategoria">${CATEGORIAS.map(c=>`<option>${c}</option>`).join('')}</select>
       <select id="finStatus"><option value="pago">Pago/recebido</option><option value="a_pagar">A pagar</option><option value="a_receber">A receber</option></select>
     </div>
     <input type="date" id="finData">
   `;
-  const bAdd = el('button','botao b-add','+ Adicionar lanÃ§amento');
+  const bAdd = el('button','botao b-add','+ Adicionar lançamento');
   bAdd.addEventListener('click', async ()=>{
     const valor = parseFloat($('#finValor').value);
-    if(!valor || valor<=0){ toast('Informe um valor vÃ¡lido'); return; }
+    if(!valor || valor<=0){ toast('Informe um valor válido'); return; }
     const { error } = await sb.from('financeiro').insert({
       tipo: $('#finTipo').value, escopo: escopoFin, valor,
       descricao: $('#finDescricao').value.trim() || null,
@@ -2465,7 +2316,7 @@ async function renderFinanceiro(){
       data: $('#finData').value || new Date().toISOString().slice(0,10),
     });
     if(error){ toast('Erro: '+error.message); return; }
-    toast('âœ” LanÃ§ado'); renderFinanceiro(); renderInicio();
+    toast('✔ Lançado'); renderFinanceiro(); renderInicio();
   });
   form.appendChild(bAdd);
   card.appendChild(form);
@@ -2476,7 +2327,7 @@ async function renderFinanceiro(){
 /* ---------- ESTOQUE ---------- */
 async function renderEstoque(){
   const c = $('#painelEstoque'); c.innerHTML='';
-  c.appendChild(cabecalhoPainel('ðŸ“¦','Estoque e materiais','Controle rÃ¡pido do que existe e do que precisa comprar'));
+  c.appendChild(cabecalhoPainel('📦','Estoque e materiais','Controle rápido do que existe e do que precisa comprar'));
   const s = secao('Estoque e materiais');
   const card = el('div','card');
 
@@ -2486,13 +2337,13 @@ async function renderEstoque(){
   else data.forEach(it=>{
     const abaixoMinimo = it.minimo!=null && (it.quantidade??0) < it.minimo;
     const linha = el('div','estoque-item'+((it.comprar||abaixoMinimo)?' precisa':''));
-    linha.appendChild(el('div','nome', it.item + (it.comprar?' ðŸ›’':'') + (abaixoMinimo?' âš ':'')));
-    const qtdTexto = (it.quantidade??0)+' '+(it.unidade||'') + (it.minimo!=null?' (mÃ­n: '+it.minimo+')':'');
+    linha.appendChild(el('div','nome', it.item + (it.comprar?' 🛒':'') + (abaixoMinimo?' ⚠':'')));
+    const qtdTexto = (it.quantidade??0)+' '+(it.unidade||'') + (it.minimo!=null?' (mín: '+it.minimo+')':'');
     linha.appendChild(el('div','qtd', qtdTexto));
-    const bComprar = el('button','botao '+(it.comprar?'b-ok':'b-tel'), it.comprar?'âœ” Comprado':'Marcar p/ comprar');
+    const bComprar = el('button','botao '+(it.comprar?'b-ok':'b-tel'), it.comprar?'✔ Comprado':'Marcar p/ comprar');
     bComprar.addEventListener('click', async ()=>{ await sb.from('estoque').update({comprar: !it.comprar}).eq('id',it.id); renderEstoque(); });
     linha.appendChild(bComprar);
-    const bRm = el('button','botao b-rm','ðŸ—‘'); bRm.addEventListener('click', async ()=>{ if(!await askConfirm('Remover?')) return; await sb.from('estoque').delete().eq('id',it.id); renderEstoque(); });
+    const bRm = el('button','botao b-rm','🗑'); bRm.addEventListener('click', async ()=>{ if(!await askConfirm('Remover?')) return; await sb.from('estoque').delete().eq('id',it.id); renderEstoque(); });
     linha.appendChild(bRm);
     card.appendChild(linha);
   });
@@ -2505,7 +2356,7 @@ async function renderEstoque(){
     </div>
     <div class="linha2">
       <input type="number" step="0.01" id="esQtd" placeholder="Quantidade atual">
-      <input type="number" step="0.01" id="esMinimo" placeholder="Quantidade mÃ­nima (opcional)">
+      <input type="number" step="0.01" id="esMinimo" placeholder="Quantidade mínima (opcional)">
     </div>
   `;
   const bAdd = el('button','botao b-add','+ Adicionar item');
@@ -2519,7 +2370,7 @@ async function renderEstoque(){
       minimo: minimoTexto!==''? parseFloat(minimoTexto) : null
     });
     if(error){ toast('Erro: '+error.message); return; }
-    toast('âœ” Adicionado'); renderEstoque();
+    toast('✔ Adicionado'); renderEstoque();
   });
   form.appendChild(bAdd);
   card.appendChild(form);
@@ -2528,7 +2379,7 @@ async function renderEstoque(){
 }
 
 /* =========================================================================
-   INÃCIO
+   INÍCIO
    ========================================================================= */
 iniciar();
 
@@ -2539,5 +2390,3 @@ if('serviceWorker' in navigator){
 </body>
 </html>
 <!-- deploy 20260705T165406Z -->
-
-
