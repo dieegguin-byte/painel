@@ -359,20 +359,35 @@ sistemas totalmente separados. Agora, `sincronizarAgendaServico(servico,
 cliente)` (`index.html`) é chamada sempre que um serviço é criado ou editado
 com prazo:
 
-- Pergunta (`askConfirm`) se o prazo é um compromisso real (visita, buscar
-  material, entregar) — nem todo prazo de lead é isso.
-- Se sim, **checa conflito**: busca outros compromissos `planejado` no mesmo
-  `data` e mostra a lista (com cidade, se tiver) antes de confirmar. Evita
-  agendar em cima de outro compromisso sem o Diego perceber.
+- Pergunta (`askText`) que tipo de compromisso é: `presencial` (visita,
+  buscar material, entregar — ocupa rota/cidade) ou `remoto` (ligar, mandar
+  mensagem, pedir material por telefone/site — só ocupa horário, sem
+  cidade). Em branco/cancelar = não é compromisso de agenda, não cria nada.
+  Guardado em `agenda.tipo` (Supabase, text, default `'presencial'`).
+- **Preenche o horário sozinho**, sem perguntar — usa `proximoHorarioLivre()`
+  em cima da rotina semanal do Diego (`JANELAS_SEMANA`, definida por ele em
+  08/07/2026): segunda/quarta/sexta 08h-11h e 13h-18h; terça/quinta/sábado
+  08h-21h; domingo sem expediente. Pula horários já ocupados na Agenda
+  naquele dia. Se o Diego mudar de rotina, é só editar `JANELAS_SEMANA` no
+  `index.html` — não precisa perguntar de novo em toda ficha.
+- Antes de salvar, mostra **`confirmarComDiaVisivel`**: um modal com o dia
+  inteiro — cada compromisso existente numa linha (horário, ícone 📍/💬,
+  cidade se tiver) e o novo destacado embaixo com o horário escolhido. Só
+  depois disso o Diego confirma ou cancela. Se não sobrar horário livre na
+  rotina daquele dia, avisa isso na própria linha do novo compromisso ao
+  invés de simplesmente falhar.
 - Vincula via `agenda.servico_id` — se o prazo mudar de novo, atualiza o
-  compromisso existente em vez de duplicar.
+  compromisso existente em vez de duplicar (não repergunta tipo/horário).
+- Se o horário automático não servir, o Diego corrige direto na Agenda
+  clicando **"Reagendar"** — não precisa voltar na ficha.
 
 **Terreno preparado pra otimizar rota depois:** `agenda.cidade` (Supabase,
 text, nullable) existe e é preenchido automático a partir da cidade do
-cliente ao vincular ficha→agenda, e é editável no formulário manual da
-Agenda também. **Ainda não tem nenhuma lógica de roteirização** — a ideia é
-deixar isso rodar no dia a dia real (quantos "buscar/entregar" por semana,
-se concentram numa cidade ou espalham) antes de desenhar a otimização de
-rota em cima de dado de verdade, mesmo raciocínio do "Aguardando você".
-Qualquer IA que for atacar isso: comece olhando quantos registros já têm
-`cidade` preenchida e o padrão de datas antes de propor agrupamento.
+cliente só pra compromissos `presencial` (compromissos `remoto` não têm
+cidade, faz sentido não ter). Editável no formulário manual da Agenda
+também. **Ainda não tem nenhuma lógica de roteirização** — a ideia é deixar
+isso rodar no dia a dia real (quantos "buscar/entregar" por semana, se
+concentram numa cidade ou espalham) antes de desenhar a otimização de rota
+em cima de dado de verdade, mesmo raciocínio do "Aguardando você". Qualquer
+IA que for atacar isso: comece olhando quantos registros já têm `cidade`
+preenchida e o padrão de datas antes de propor agrupamento.
