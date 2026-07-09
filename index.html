@@ -1079,15 +1079,18 @@ async function escolherDiaEHorario(compromisso){
       const bloco = el('div'); bloco.style.cssText='margin-bottom:14px';
       const cidadesDoDia = [...new Set(doDia.filter(a=>a.tipo==='presencial' && a.cidade).map(a=>a.cidade))];
       const conflitoRota = tipo==='presencial' && cidade && cidadesDoDia.some(c=>cidadeChave(c)!==cidadeChave(cidade));
+      const outrasCidadesPresencial = conflitoRota ? doDia.filter(a=>a.tipo==='presencial' && a.cidade && cidadeChave(a.cidade)!==cidadeChave(cidade)) : [];
+      const periodosConflito = new Set(outrasCidadesPresencial.map(a=>periodoDoHorario(a.hora)));
       const rotulo = el('div',null, dataCurtaBR(dataISO) + (doDia.length ? ` · ${doDia.length} compromisso(s)` : ' · dia livre') + (cidadesDoDia.length ? ` · 🏙 ${cidadesDoDia.join(', ')}` : ''));
       rotulo.style.cssText='font-weight:600;margin-bottom:6px;font-size:.88rem'+(conflitoRota?';color:var(--alta,#e0574f)':'');
       bloco.appendChild(rotulo);
       if(conflitoRota){
-        const aviso = el('div','',`⚠️ Já tem compromisso presencial em outra cidade nesse dia — confira se a rota fecha antes de encaixar aqui.`);
+        const NOME_PERIODO = {manha:'de manhã', tarde:'à tarde', noite:'à noite'};
+        const periodosTexto = [...periodosConflito].map(p=>NOME_PERIODO[p]).join(' e ');
+        const aviso = el('div','',`⚠️ Já tem compromisso presencial em outra cidade ${periodosTexto} nesse dia — só os horários ${periodosTexto} ficaram marcados em vermelho, confira se a rota fecha antes de encaixar aqui.`);
         aviso.style.cssText='font-size:.78rem;color:var(--alta,#e0574f);margin-bottom:6px';
         bloco.appendChild(aviso);
       }
-      const periodosConflito = new Set(conflitoRota ? doDia.filter(a=>a.tipo==='presencial' && a.cidade && cidadeChave(a.cidade)!==cidadeChave(cidade)).map(a=>periodoDoHorario(a.hora)) : []);
       const chips = el('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
       livres.forEach(h=>{
         const arriscado = periodosConflito.has(periodoDoHorario(h));
