@@ -1462,17 +1462,14 @@ async function renderInicio(){
         });
         txt.appendChild(fio);
       }
-      linha.appendChild(txt);
-      const d = new Date(item.criado_em);
-      linha.appendChild(el('div','hora', d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})));
-
       if(statusItem==='aguardando_voce'){
         const respondeBox = el('div');
-        respondeBox.style.cssText='display:flex;gap:8px;margin-top:8px';
+        respondeBox.style.cssText='display:flex;gap:8px;margin-top:8px;width:100%;flex-wrap:wrap';
         const respondeInput = document.createElement('input');
         respondeInput.type='text'; respondeInput.placeholder='Sua resposta...'; respondeInput.className='campo';
-        respondeInput.style.cssText='flex:1';
+        respondeInput.style.cssText='flex:1;min-width:0;width:100%;box-sizing:border-box';
         const respondeBtn = el('button','botao b-ok','Responder');
+        respondeBtn.style.cssText='flex:none';
         const enviarResposta = async ()=>{
           const texto = respondeInput.value.trim();
           if(!texto) return;
@@ -1484,8 +1481,11 @@ async function renderInicio(){
         respondeBtn.addEventListener('click', enviarResposta);
         respondeInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); enviarResposta(); } });
         respondeBox.appendChild(respondeInput); respondeBox.appendChild(respondeBtn);
-        linha.appendChild(respondeBox);
+        txt.appendChild(respondeBox);
       }
+      linha.appendChild(txt);
+      const d = new Date(item.criado_em);
+      linha.appendChild(el('div','hora', d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})));
 
       const acoes = el('div','acoes');
       const btnCriarFicha = el('button',null,'Criar ficha/orçamento');
