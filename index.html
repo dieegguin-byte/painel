@@ -990,14 +990,14 @@ async function sincronizarAgendaServico(servico, cliente){
     return;
   }
   if(!await askConfirm(`O prazo "${dataCurtaBR(servico.prazo)}" de "${servico.titulo}" é um compromisso real (visita, buscar material, entregar)? Se sim, entra na Agenda também.`)) return;
-  const { data: doDia } = await sb.from('agenda').select('titulo,hora').eq('data', servico.prazo).eq('status','planejado');
+  const { data: doDia } = await sb.from('agenda').select('titulo,hora,cidade').eq('data', servico.prazo).eq('status','planejado');
   if(doDia?.length){
-    const lista = doDia.map(a=>`• ${a.titulo}${a.hora?' às '+a.hora:''}`).join('\n');
+    const lista = doDia.map(a=>`• ${a.titulo}${a.hora?' às '+a.hora:''}${a.cidade?' ('+a.cidade+')':''}`).join('\n');
     if(!await askConfirm(`Já tem compromisso(s) marcado(s) em ${dataCurtaBR(servico.prazo)}:\n${lista}\n\nConfirma mesmo assim?`)) return;
   }
   const { error } = await sb.from('agenda').insert({
     titulo: `${cliente?.nome||'Cliente'} — ${servico.titulo}`, data: servico.prazo,
-    status:'planejado', servico_id: servico.id
+    status:'planejado', servico_id: servico.id, cidade: cliente?.cidade || null
   });
   if(error){ toast('Erro ao lançar na Agenda: '+error.message); return; }
   toast('📅 Compromisso lançado na Agenda'); renderAgenda();
@@ -1869,6 +1869,7 @@ async function renderAgenda(){
     const desc = el('div','desc');
     desc.appendChild(el('div',null, a.titulo + ' — ' + dataCurtaBR(a.data)));
     if(a.local) desc.appendChild(el('div','loc','📍 '+a.local));
+    if(a.cidade) desc.appendChild(el('div','loc','🏙 '+a.cidade));
     item.appendChild(desc);
     if(a.status!=='feito'){
       const b = el('button','botao b-ok','✔');
@@ -1900,13 +1901,14 @@ async function renderAgenda(){
       <input type="time" id="agHora">
     </div>
     <input type="text" id="agLocal" placeholder="Local (opcional)">
+    <input type="text" id="agCidade" placeholder="Cidade (opcional, ajuda a agrupar rota depois)">
   `;
   const bAdd = el('button','botao b-add','+ Adicionar compromisso');
   bAdd.addEventListener('click', async ()=>{
     const titulo = $('#agTitulo').value.trim();
     const data = $('#agData').value;
     if(!titulo || !data){ toast('Preencha ao menos título e data'); return; }
-    const { error } = await sb.from('agenda').insert({ titulo, data, hora: $('#agHora').value || null, local: $('#agLocal').value.trim() || null });
+    const { error } = await sb.from('agenda').insert({ titulo, data, hora: $('#agHora').value || null, local: $('#agLocal').value.trim() || null, cidade: $('#agCidade').value.trim() || null });
     if(error){ toast('Erro: '+error.message); return; }
     toast('✔ Adicionado'); renderAgenda(); renderInicio();
   });
