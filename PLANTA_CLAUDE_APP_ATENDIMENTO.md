@@ -351,3 +351,28 @@ No app (`index.html`, dentro de `carregarCaixaEntrada`):
 - Ao abrir o app numa sessão nova, ler primeiro os itens **novo** e
   **respondido** da Caixa de Entrada (é a vez da IA agir neles). Itens
   **aguardando_voce** são a vez do Diego — não mexer, só esperar.
+
+## Prazo de ficha → compromisso na Agenda (08/07/2026 noite)
+
+Antes, criar/editar um serviço com prazo nunca gerava nada na Agenda — eram
+sistemas totalmente separados. Agora, `sincronizarAgendaServico(servico,
+cliente)` (`index.html`) é chamada sempre que um serviço é criado ou editado
+com prazo:
+
+- Pergunta (`askConfirm`) se o prazo é um compromisso real (visita, buscar
+  material, entregar) — nem todo prazo de lead é isso.
+- Se sim, **checa conflito**: busca outros compromissos `planejado` no mesmo
+  `data` e mostra a lista (com cidade, se tiver) antes de confirmar. Evita
+  agendar em cima de outro compromisso sem o Diego perceber.
+- Vincula via `agenda.servico_id` — se o prazo mudar de novo, atualiza o
+  compromisso existente em vez de duplicar.
+
+**Terreno preparado pra otimizar rota depois:** `agenda.cidade` (Supabase,
+text, nullable) existe e é preenchido automático a partir da cidade do
+cliente ao vincular ficha→agenda, e é editável no formulário manual da
+Agenda também. **Ainda não tem nenhuma lógica de roteirização** — a ideia é
+deixar isso rodar no dia a dia real (quantos "buscar/entregar" por semana,
+se concentram numa cidade ou espalham) antes de desenhar a otimização de
+rota em cima de dado de verdade, mesmo raciocínio do "Aguardando você".
+Qualquer IA que for atacar isso: comece olhando quantos registros já têm
+`cidade` preenchida e o padrão de datas antes de propor agrupamento.
