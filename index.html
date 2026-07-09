@@ -1321,9 +1321,19 @@ async function abrirFicha(clienteId){
     const status = document.createElement('select'); status.className='status';
     STATUS_ORDEM.forEach(st=>{ const o=document.createElement('option'); o.value=st; o.textContent=STATUS_LABEL[st]; o.selected=st===s.status; status.appendChild(o); });
     status.addEventListener('change', async ()=>{
-      const { error } = await sb.from('servicos').update({status:status.value,atualizado_em:new Date().toISOString()}).eq('id',s.id);
+      const alterado = {status:status.value, atualizado_em:new Date().toISOString()};
+      /* Não deixa virar Em produção (ou além) sem valor do orçamento — mesmo
+         quando o pagamento é só na entrega, o valor precisa estar definido
+         desde já, senão o Financeiro não tem o que lançar depois. */
+      if(['producao','entregue','pago'].includes(status.value) && !(Number(s.valor_orcamento)>0)){
+        const valorTexto = await askText(`"${s.titulo}" não tem valor de orçamento. Qual o valor (R$)? (obrigatório pra virar ${STATUS_LABEL[status.value]})`, '');
+        const valor = Number(String(valorTexto||'').replace(',','.'));
+        if(!valorTexto || !(valor>0)){ toast('Sem valor, status não foi alterado.'); status.value=s.status; return; }
+        alterado.valor_orcamento = valor;
+      }
+      const { error } = await sb.from('servicos').update(alterado).eq('id',s.id);
       if(error){ toast('Erro: '+error.message); status.value=s.status; return; }
-      s.status=status.value;
+      Object.assign(s, alterado);
       try{ await sincronizarFinanceiroServico(s,cli); }catch(err){ toast('Status salvo; financeiro: '+err.message); }
       toast('✔ Status atualizado'); renderLeads(); renderFinanceiro(); renderInicio(); abrirFicha(clienteId);
     });
@@ -1948,8 +1958,15 @@ async function renderLeads(){
     const sel = document.createElement('select'); sel.className='status';
     STATUS_ORDEM.forEach(st=>{ const o=document.createElement('option'); o.value=st; o.textContent=STATUS_LABEL[st]; if(st===s.status) o.selected=true; sel.appendChild(o); });
     sel.addEventListener('change', async ()=>{
-      await sb.from('servicos').update({status:sel.value, atualizado_em:new Date().toISOString()}).eq('id', s.id);
-      s.status = sel.value;
+      const alterado = {status:sel.value, atualizado_em:new Date().toISOString()};
+      if(['producao','entregue','pago'].includes(sel.value) && !(Number(s.valor_orcamento)>0)){
+        const valorTexto = await askText(`"${s.titulo}" não tem valor de orçamento. Qual o valor (R$)? (obrigatório pra virar ${STATUS_LABEL[sel.value]})`, '');
+        const valor = Number(String(valorTexto||'').replace(',','.'));
+        if(!valorTexto || !(valor>0)){ toast('Sem valor, status não foi alterado.'); sel.value=s.status; return; }
+        alterado.valor_orcamento = valor;
+      }
+      await sb.from('servicos').update(alterado).eq('id', s.id);
+      Object.assign(s, alterado);
       try{ await sincronizarFinanceiroServico(s, cli); }catch(err){ toast('Status salvo; financeiro: '+err.message); }
       await sb.from('historico').insert({o_que:`Status de "${s.titulo}" mudou para ${STATUS_LABEL[sel.value]}`, por:'diego'});
       toast('Status atualizado'); renderLeads(); renderFinanceiro();
