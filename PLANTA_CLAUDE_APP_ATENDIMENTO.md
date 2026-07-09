@@ -331,10 +331,17 @@ a pena. Não adivinhar o design agora.
 - **"Aguardando você" só existe dentro de uma ficha (`proxima_acao` de um
   `servico`).** Se o item da Caixa de Entrada não é sobre cliente/serviço —
   ex: nota administrativa tipo "conta da Vivo, ver duplicidade" — não force
-  a criação de uma ficha só pra caber a pergunta. Nesse caso, **deixe o item
-  parado na Caixa de Entrada** (não processar, não apagar) até o Diego
-  resolver sozinho ou dar contexto suficiente pra virar ficha de verdade.
-  Errado (já aconteceu em 08/07/2026): perguntar sobre esse tipo de item no
-  chat de conversa com o Diego em vez de deixar a dúvida registrada onde ele
-  realmente vai ver — que aqui é a própria Caixa de Entrada, já que não há
-  ficha pra anexar o `❓`.
+  a criação de uma ficha só pra caber a pergunta.
+- **Antes de perguntar qualquer coisa (aqui ou como "Aguardando você"), a IA
+  tem que primeiro tentar resolver sozinha olhando o que já existe no app**
+  (Financeiro, Clientes, Leads, Agenda, Estoque). Só vira pergunta se, depois
+  de checar, a informação realmente não está lá. Errado (aconteceu em
+  08/07/2026): a nota da Caixa de Entrada dizia "conta da Vivo com
+  duplicidade, pode excluir uma" — a IA perguntou ao Diego em vez de abrir o
+  Financeiro primeiro; ao checar depois, viu que já estava tudo consolidado
+  num lançamento só, nada pra excluir. A pergunta era desnecessária.
+- Se, mesmo depois de checar o app, a dúvida for real e o item não é sobre
+  cliente/serviço (não tem onde anexar o `❓`), **deixe o item parado na
+  Caixa de Entrada** (não processar, não apagar) até o Diego resolver
+  sozinho ou dar mais contexto. Se a dúvida for sobre um cliente/serviço,
+  use "Aguardando você" na ficha em vez de perguntar no chat de conversa.
