@@ -1036,6 +1036,12 @@ function horariosParaTipo(dataISO, tipo, horariosOcupados){
 function cidadeChave(c){
   return String(c||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split('(')[0].split('-')[0].trim();
 }
+/* Base do Diego (Tapeçaria e Estofados Bahia fica em Luziânia-GO). Usado só
+   pra dar uma dica de qual lado remanejar quando dá conflito de cidade —
+   normalmente é mais fácil empurrar o compromisso da base (Luziânia, ele
+   pode ir lá qualquer dia) do que uma viagem já combinada pra outra cidade
+   (Brasília etc). Não decide sozinho, só sugere; o Diego confirma. */
+const CIDADE_BASE = 'luziania';
 function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHorario, novoTipo, horariosDisponiveis){
   return new Promise(resolve=>{
     const {fundo,caixa}=_modalBase();
@@ -1045,7 +1051,9 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
     caixa.appendChild(titulo);
     const temConflitoCidade = novoTipo==='presencial' && novaCidade && doDia.some(a=>a.tipo==='presencial' && a.cidade && cidadeChave(a.cidade)!==cidadeChave(novaCidade));
     if(temConflitoCidade){
-      const aviso = el('div','','⚠️ Tem compromisso presencial em outra cidade nesse mesmo dia — confira se dá tempo de ir de uma pra outra.');
+      const algumEhBase = doDia.some(a=>a.tipo==='presencial' && cidadeChave(a.cidade)===CIDADE_BASE) || cidadeChave(novaCidade)===CIDADE_BASE;
+      const dica = algumEhBase ? ' A base é Luziânia — geralmente é mais fácil remanejar o compromisso de lá (você pode ir outro dia) do que a viagem já combinada pra outra cidade.' : '';
+      const aviso = el('div','','⚠️ Tem compromisso presencial em outra cidade nesse mesmo dia — confira se dá tempo de ir de uma pra outra.'+dica);
       aviso.style.cssText='padding:8px 10px;border-radius:8px;background:rgba(224,87,79,.15);border:1px solid var(--alta,#e0574f);color:var(--alta,#e0574f);margin-bottom:10px;font-size:.82rem;font-weight:600';
       caixa.appendChild(aviso);
     }
@@ -1362,11 +1370,21 @@ async function abrirFicha(clienteId){
       const titulo=await askText('Serviço:',s.titulo||''); if(titulo===null || !titulo.trim()) return;
       const valorTexto=await askText('Valor do orçamento (R$):',s.valor_orcamento||''); if(valorTexto===null) return;
       const prioridade=(await askText('Prioridade: baixa, media ou alta',s.prioridade||'media')||'media').toLowerCase();
-      const proxima=await askText('Próxima ação:',s.proxima_acao||''); if(proxima===null) return;
+      let proxima=await askText('Próxima ação:',s.proxima_acao||''); if(proxima===null) return;
       const prazo=await askText('Prazo (AAAA-MM-DD, opcional):',s.prazo||''); if(prazo===null) return;
-      const prazoValido = /^\d{4}-\d{2}-\d{2}$/.test(prazo) ? prazo : null;
+      let prazoValido = /^\d{4}-\d{2}-\d{2}$/.test(prazo) ? prazo : null;
       let tipoAgenda = null;
-      if(prazoValido && !(await jaTemAgendaVinculada(s.id))) tipoAgenda = await perguntarTipoAgenda(prazoValido, titulo.trim());
+      const jaVinculada = await jaTemAgendaVinculada(s.id);
+      if(prazoValido && !jaVinculada) tipoAgenda = await perguntarTipoAgenda(prazoValido, titulo.trim());
+      /* Mesma regra da criação: orçamento sem prazo de retomada não pode
+         ficar em aberto — a IA agenda um lembrete remoto pra daqui 3 dias
+         sozinha, sem perguntar. */
+      if(s.status==='orcamento' && !prazoValido && !jaVinculada){
+        const d=new Date(); d.setDate(d.getDate()+3);
+        prazoValido = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        tipoAgenda = 'remoto';
+        if(!proxima.trim()) proxima = 'Cobrar resposta do orçamento';
+      }
       const valor=Number(String(valorTexto).replace(',','.'))||null;
       const alterado={titulo:titulo.trim(),valor_orcamento:valor,prioridade:['baixa','media','alta'].includes(prioridade)?prioridade:'media',proxima_acao:proxima.trim()||null,prazo:prazoValido,atualizado_em:new Date().toISOString()};
       const { error }=await sb.from('servicos').update(alterado).eq('id',s.id);
@@ -1740,10 +1758,21 @@ async function renderInicio(){
         const prioridade = ['baixa','media','alta'].includes(prioridadeInformada) ? prioridadeInformada : 'media';
         const valorTexto = await askText('Valor do orçamento (R$, opcional):', '') || '';
         const valorOrcamento = Number(valorTexto.replace(',','.')) || null;
-        const proximaAcao = await askText('Qual é a próxima ação?', 'Responder o cliente e confirmar os detalhes') || '';
+        let proximaAcao = await askText('Qual é a próxima ação?', 'Responder o cliente e confirmar os detalhes') || '';
         const prazoInformado = (await askText('Prazo da próxima ação (AAAA-MM-DD, opcional):', '') || '').trim();
-        const prazo = /^\d{4}-\d{2}-\d{2}$/.test(prazoInformado) ? prazoInformado : null;
-        const tipoAgenda = prazo ? await perguntarTipoAgenda(prazo, titulo.trim()) : null;
+        let prazo = /^\d{4}-\d{2}-\d{2}$/.test(prazoInformado) ? prazoInformado : null;
+        let tipoAgenda = prazo ? await perguntarTipoAgenda(prazo, titulo.trim()) : null;
+        /* Orçamento enviado sem prazo de retomada é dívida que ninguém volta
+           pra pagar (aconteceu de verdade em 09/07: Julia e Priscilla
+           ficaram "aguardando resposta" sem data nenhuma marcada pra
+           cobrar). Em vez de deixar em aberto, a própria IA já agenda um
+           lembrete remoto pra daqui 3 dias — não pergunta, decide sozinha. */
+        if(status==='orcamento' && !prazo){
+          const d=new Date(); d.setDate(d.getDate()+3);
+          prazo = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          tipoAgenda = 'remoto';
+          if(!proximaAcao.trim()) proximaAcao = 'Cobrar resposta do orçamento';
+        }
         btnCriarFicha.disabled = true;
         btnCriarFicha.textContent = 'Criando…';
         try{
