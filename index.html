@@ -979,6 +979,40 @@ $('#btnWhatsappOrcamento').addEventListener('click',()=>{
    Evita duplicar: se o serviço já tem um compromisso vinculado (servico_id),
    só atualiza a data dele. Antes de criar um novo, avisa se já existe algo
    marcado nesse mesmo dia, pra não gerar conflito de agenda sem o Diego saber. */
+/* Mostra o dia inteiro (horários ocupados x livre, com cidade) antes de
+   confirmar um novo compromisso — em vez de um texto corrido de conflito. */
+function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade){
+  return new Promise(resolve=>{
+    const {fundo,caixa}=_modalBase();
+    caixa.style.maxWidth='400px';
+    const titulo = el('div',null, `Compromissos em ${dataCurtaBR(dataISO)}`);
+    titulo.style.cssText='font-weight:700;margin-bottom:10px';
+    caixa.appendChild(titulo);
+    if(doDia.length){
+      doDia.sort((a,b)=>(a.hora||'99:99').localeCompare(b.hora||'99:99')).forEach(a=>{
+        const linha = el('div',null, `${a.hora?a.hora.slice(0,5):'sem horário'} — ${a.titulo}${a.cidade?' 🏙 '+a.cidade:''}`);
+        linha.style.cssText='padding:8px 10px;border-radius:8px;background:var(--card2,#2b221c);margin-bottom:6px;font-size:.88rem';
+        caixa.appendChild(linha);
+      });
+    } else {
+      const livre = el('div','','Nenhum outro compromisso marcado — dia livre.');
+      livre.style.cssText='padding:8px 10px;border-radius:8px;background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a);margin-bottom:6px;font-size:.88rem';
+      caixa.appendChild(livre);
+    }
+    const novo = el('div',null, `➕ Novo: ${novoTitulo}${novaCidade?' 🏙 '+novaCidade:''}`);
+    novo.style.cssText='padding:8px 10px;border-radius:8px;background:var(--marrom,#b4632f);color:#fff;margin:10px 0;font-size:.88rem';
+    caixa.appendChild(novo);
+    const linhaBtn = el('div'); linhaBtn.style.cssText='display:flex;gap:10px;justify-content:flex-end';
+    const bCancelar=el('button','botao b-rm','Cancelar'); bCancelar.type='button';
+    const bOk=el('button','botao b-ok','Confirmar'); bOk.type='button';
+    linhaBtn.appendChild(bCancelar); linhaBtn.appendChild(bOk); caixa.appendChild(linhaBtn);
+    const fechar=(valor)=>{ fundo.remove(); resolve(valor); };
+    bCancelar.addEventListener('click', ()=>fechar(false));
+    bOk.addEventListener('click', ()=>fechar(true));
+    fundo.addEventListener('mousedown', e=>{ if(e.target===fundo) fechar(false); });
+  });
+}
+
 async function sincronizarAgendaServico(servico, cliente){
   if(!servico?.prazo) return;
   const { data: existente } = await sb.from('agenda').select('id,data').eq('servico_id', servico.id).limit(1);
@@ -991,12 +1025,10 @@ async function sincronizarAgendaServico(servico, cliente){
   }
   if(!await askConfirm(`O prazo "${dataCurtaBR(servico.prazo)}" de "${servico.titulo}" é um compromisso real (visita, buscar material, entregar)? Se sim, entra na Agenda também.`)) return;
   const { data: doDia } = await sb.from('agenda').select('titulo,hora,cidade').eq('data', servico.prazo).eq('status','planejado');
-  if(doDia?.length){
-    const lista = doDia.map(a=>`• ${a.titulo}${a.hora?' às '+a.hora:''}${a.cidade?' ('+a.cidade+')':''}`).join('\n');
-    if(!await askConfirm(`Já tem compromisso(s) marcado(s) em ${dataCurtaBR(servico.prazo)}:\n${lista}\n\nConfirma mesmo assim?`)) return;
-  }
+  const novoTitulo = `${cliente?.nome||'Cliente'} — ${servico.titulo}`;
+  if(!await confirmarComDiaVisivel(servico.prazo, doDia||[], novoTitulo, cliente?.cidade)) return;
   const { error } = await sb.from('agenda').insert({
-    titulo: `${cliente?.nome||'Cliente'} — ${servico.titulo}`, data: servico.prazo,
+    titulo: novoTitulo, data: servico.prazo,
     status:'planejado', servico_id: servico.id, cidade: cliente?.cidade || null
   });
   if(error){ toast('Erro ao lançar na Agenda: '+error.message); return; }
