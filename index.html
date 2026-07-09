@@ -1077,9 +1077,16 @@ async function escolherDiaEHorario(compromisso){
       if(!livres.length) continue;
       achouAlgum = true;
       const bloco = el('div'); bloco.style.cssText='margin-bottom:14px';
-      const rotulo = el('div',null, dataCurtaBR(dataISO) + (doDia.length ? ` · ${doDia.length} compromisso(s) nesse dia` : ' · dia livre'));
-      rotulo.style.cssText='font-weight:600;margin-bottom:6px;font-size:.88rem';
+      const cidadesDoDia = [...new Set(doDia.filter(a=>a.tipo==='presencial' && a.cidade).map(a=>a.cidade))];
+      const conflitoRota = tipo==='presencial' && cidade && cidadesDoDia.some(c=>cidadeChave(c)!==cidadeChave(cidade));
+      const rotulo = el('div',null, dataCurtaBR(dataISO) + (doDia.length ? ` · ${doDia.length} compromisso(s)` : ' · dia livre') + (cidadesDoDia.length ? ` · 🏙 ${cidadesDoDia.join(', ')}` : ''));
+      rotulo.style.cssText='font-weight:600;margin-bottom:6px;font-size:.88rem'+(conflitoRota?';color:var(--alta,#e0574f)':'');
       bloco.appendChild(rotulo);
+      if(conflitoRota){
+        const aviso = el('div','',`⚠️ Já tem compromisso presencial em outra cidade nesse dia — confira se a rota fecha antes de encaixar aqui.`);
+        aviso.style.cssText='font-size:.78rem;color:var(--alta,#e0574f);margin-bottom:6px';
+        bloco.appendChild(aviso);
+      }
       const chips = el('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
       livres.forEach(h=>{
         const b = el('button','botao b-tel', h);
@@ -1251,12 +1258,14 @@ function escolherTotalParcial(titulo){
     const linha = el('div'); linha.style.cssText='display:flex;flex-direction:column;gap:8px';
     const bTotal = el('button','botao b-ok','✔ Concluído total — acabou');
     const bParcial = el('button','botao b-tel','🟡 Parcial — ainda falta algo');
+    const bReagendar = el('button','botao b-tel','↻ Reagendar — não rolou, marcar outro dia');
     const bCancelar = el('button','botao b-rm','Cancelar');
-    linha.appendChild(bTotal); linha.appendChild(bParcial); linha.appendChild(bCancelar);
+    linha.appendChild(bTotal); linha.appendChild(bParcial); linha.appendChild(bReagendar); linha.appendChild(bCancelar);
     caixa.appendChild(linha);
     const fechar=(v)=>{ fundo.remove(); resolve(v); };
     bTotal.addEventListener('click', ()=>fechar('total'));
     bParcial.addEventListener('click', ()=>fechar('parcial'));
+    bReagendar.addEventListener('click', ()=>fechar('reagendar'));
     bCancelar.addEventListener('click', ()=>fechar(null));
     fundo.addEventListener('mousedown', e=>{ if(e.target===fundo) fechar(null); });
   });
@@ -1282,6 +1291,15 @@ async function concluirCompromissoAgenda(a, aoTerminar){
     await sb.from('agenda').update({status:'feito'}).eq('id',a.id);
     if(a.servico_id) await sb.from('historico').insert({o_que:`"${a.titulo}" concluído`, por:'diego'});
     toast('✔ Concluído'); aoTerminar();
+    return;
+  }
+  if(escolha==='reagendar'){
+    const proximo = await escolherDiaEHorario(a);
+    if(!proximo) return;
+    const { error } = await sb.from('agenda').update({ data: proximo.data, hora: proximo.hora, status:'planejado' }).eq('id',a.id);
+    if(error){ toast('Erro: '+error.message); return; }
+    await sb.from('historico').insert({o_que:`Compromisso reagendado: ${a.titulo}`, por:'diego', detalhe:`Nova data: ${proximo.data} ${proximo.hora||''}`});
+    toast(`✔ Remanejado pra ${dataCurtaBR(proximo.data)} às ${proximo.hora}`); aoTerminar();
     return;
   }
   const pendenteDigitado = await askText('O que ficou pendente?', sugerirPendente(a.titulo));
