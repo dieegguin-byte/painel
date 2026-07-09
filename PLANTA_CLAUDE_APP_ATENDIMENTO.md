@@ -328,3 +328,13 @@ a pena. Não adivinhar o design agora.
 - Ao processar a Caixa de Entrada numa sessão futura, sempre checar a seção
   "Aguardando você" primeiro: se o Diego já respondeu (a próxima ação não tem
   mais o `❓`), está resolvido; se ainda tem `❓`, ainda está esperando.
+- **"Aguardando você" só existe dentro de uma ficha (`proxima_acao` de um
+  `servico`).** Se o item da Caixa de Entrada não é sobre cliente/serviço —
+  ex: nota administrativa tipo "conta da Vivo, ver duplicidade" — não force
+  a criação de uma ficha só pra caber a pergunta. Nesse caso, **deixe o item
+  parado na Caixa de Entrada** (não processar, não apagar) até o Diego
+  resolver sozinho ou dar contexto suficiente pra virar ficha de verdade.
+  Errado (já aconteceu em 08/07/2026): perguntar sobre esse tipo de item no
+  chat de conversa com o Diego em vez de deixar a dúvida registrada onde ele
+  realmente vai ver — que aqui é a própria Caixa de Entrada, já que não há
+  ficha pra anexar o `❓`.
