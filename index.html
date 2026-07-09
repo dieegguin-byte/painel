@@ -1483,7 +1483,7 @@ async function renderInicio(){
   const hojeStr = hojeISO();
   const [{data:leadsUrg}, {data:agUrg}, {data:finUrg}, {data:caixaPend}] = await Promise.all([
     sb.from('servicos').select('id,cliente_id,titulo,prioridade,prazo,status,proxima_acao,clientes(nome)').not('status','in','(pago,perdido)'),
-    sb.from('agenda').select('id,titulo,data,hora').eq('status','planejado').lte('data', hojeStr),
+    sb.from('agenda').select('id,titulo,data,hora,cidade,tipo').eq('status','planejado').lte('data', hojeStr),
     sb.from('financeiro').select('id,descricao,valor,status,data').in('status',['a_pagar','a_receber']).lte('data', hojeStr),
     sb.from('caixa_entrada').select('id,status').eq('processado', false),
   ]);
@@ -1513,6 +1513,41 @@ async function renderInicio(){
   resumoGrid.appendChild(mkResumo('Chat de entrada', qtdCaixaEntrada, qtdCaixaEntrada ? 'Anotações aguardando triagem' : 'Nada pendente', qtdCaixaEntrada ? 'neutro' : 'ok'));
   resumoGrid.appendChild(mkResumo('Aguardando você', qtdAguardandoVoce, qtdAguardandoVoce ? 'A IA tem dúvida nesses leads' : 'Nada pendente de resposta', qtdAguardandoVoce ? 'alerta' : 'ok'));
   c.appendChild(resumoGrid);
+
+  /* Compromissos de hoje (e atrasados) direto na Início — antes só dava pra
+     ver/concluir compromisso abrindo a aba Agenda separada. Agora aparece
+     aqui com os mesmos botões (✔ Concluir / Reagendar) que a Agenda tem. */
+  const agendaHojeOuAtraso = [...agendaPendente].sort((a,b)=>(a.data+((a.hora||'99:99'))).localeCompare(b.data+(b.hora||'99:99')));
+  if(agendaHojeOuAtraso.length){
+    const sAgenda = secao('📅 Compromissos de hoje', agendaHojeOuAtraso.length);
+    const cardAgenda = el('div','card');
+    agendaHojeOuAtraso.forEach(a=>{
+      const atrasado = a.data < hojeStr;
+      const item = el('div','agenda-item');
+      const ic = a.tipo==='remoto' ? '💬' : '📍';
+      item.appendChild(el('div','hora', (atrasado?'⏰ ':'')+(a.hora?a.hora.slice(0,5):'--')));
+      const desc = el('div','desc');
+      desc.appendChild(el('div',null, `${ic} ${a.titulo}${atrasado?' — atrasado ('+dataCurtaBR(a.data)+')':''}`));
+      if(a.cidade) desc.appendChild(el('div','loc','🏙 '+a.cidade));
+      item.appendChild(desc);
+      const bOk = el('button','botao b-ok','✔ Concluir');
+      bOk.addEventListener('click', async ()=>{ await sb.from('agenda').update({status:'feito'}).eq('id',a.id); toast('✔ Compromisso concluído'); renderInicio(); });
+      item.appendChild(bOk);
+      const bReag = el('button','botao b-tel','Reagendar');
+      bReag.addEventListener('click', async ()=>{
+        const novaData = await askText('Nova data (AAAA-MM-DD):', a.data || '');
+        if(!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData.trim())){ if(novaData!==null) toast('Data inválida'); return; }
+        const novaHora = await askText('Novo horário (HH:MM, opcional):', (a.hora||'').slice(0,5));
+        if(novaHora===null) return;
+        const { error } = await sb.from('agenda').update({ data: novaData.trim(), hora: novaHora.trim()||null }).eq('id',a.id);
+        if(error){ toast('Erro: '+error.message); return; }
+        toast('✔ Reagendado'); renderInicio();
+      });
+      item.appendChild(bReag);
+      cardAgenda.appendChild(item);
+    });
+    sAgenda.appendChild(cardAgenda); c.appendChild(sAgenda);
+  }
 
   const filaOperacional = [...leadsAbertos]
     .sort((a,b)=>{
