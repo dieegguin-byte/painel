@@ -504,14 +504,21 @@ const hojeISO = () => {
 
 function moedaBR(n){ if(typeof n!=='number'||isNaN(n)) return 'R$ 0,00'; return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
 function dataCurtaBR(iso){ if(!iso) return ''; const d=new Date(iso+'T00:00:00'); if(isNaN(d)) return esc(iso); return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}); }
+function dataComDiaBR(iso){
+  if(!iso) return '';
+  const d = new Date(iso+'T00:00:00');
+  if(isNaN(d)) return esc(iso);
+  const dia = d.toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','');
+  return dia.charAt(0).toUpperCase()+dia.slice(1)+', '+d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+}
 function ehHoje(iso){ if(!iso) return false; const h=new Date(); const s=`${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`; return iso===s; }
 function ehAtrasado(iso){ return !!iso && iso < hojeISO(); }
 function prioridadePeso(prio){ return ({alta:0, media:1, baixa:2}[prio] ?? 1); }
 function textoPrazo(iso){
   if(!iso) return 'Sem prazo';
-  if(ehAtrasado(iso)) return 'Atrasado ' + dataCurtaBR(iso);
+  if(ehAtrasado(iso)) return 'Atrasado ' + dataComDiaBR(iso);
   if(ehHoje(iso)) return 'Hoje';
-  return 'Prazo ' + dataCurtaBR(iso);
+  return 'Prazo ' + dataComDiaBR(iso);
 }
 function telParaWa(tel){ const num=String(tel||'').replace(/\D/g,''); return num.length>=10 ? 'https://wa.me/'+num : null; }
 function telParaLigar(tel){ const num=String(tel||'').replace(/\D/g,''); return num.length>=10 ? 'tel:+'+num : null; }
@@ -852,7 +859,12 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - Marcar serviço como Pago atualiza os lançamentos vinculados, sem duplicar.
 - Nunca excluir ficha, foto, serviço ou lançamento sem confirmação humana.
 - Antes de criar cliente, procurar telefone existente para evitar duplicidade.
-- Alterações de valor, pagamento, prazo e status devem ser resumidas ao usuário.`;
+- Alterações de valor, pagamento, prazo e status devem ser resumidas ao usuário.
+- Concluir uma ação não encerra o relacionamento; sempre definir próximo estado, próxima ação ou encerramento real.
+- Se uma ação não foi concluída, registrar motivo e reagendar com nova data.
+- Criar ou reagendar compromisso exige olhar a agenda do dia, cidade, rota, tipo do serviço e horários já ocupados.
+- Verde no semáforo só vale para item futuro com data e próxima ação definida.
+- Texto e print processados pela Caixa de Entrada devem ficar visíveis na ficha do cliente.`;
 $('#btnGuia').addEventListener('click', abrirGuia);
 $('#btnFecharGuia').addEventListener('click', ()=> $('#modalGuia').classList.add('oculto'));
 
@@ -1044,6 +1056,66 @@ async function proximoSlotAutomatico(tipo, cidade){
   return null;
 }
 
+async function escolherNovoHorarioAgenda(compromisso, dataPreferida){
+  const tipo = compromisso.tipo || 'presencial';
+  const cidade = tipo==='presencial' ? (compromisso.cidade || '') : null;
+  let dataISO = dataPreferida || compromisso.data || hojeISO();
+  while(true){
+    const { data: doDia, error } = await sb.from('agenda')
+      .select('id,titulo,hora,cidade,tipo')
+      .eq('data', dataISO)
+      .eq('status','planejado');
+    if(error) throw error;
+    const outros = (doDia||[]).filter(a=>a.id!==compromisso.id);
+    const ocupados = outros.map(a=>a.hora);
+    const livres = horariosParaTipo(dataISO, tipo, ocupados);
+    const sugestao = livres[0] || null;
+    const novoTitulo = compromisso.titulo || 'Compromisso';
+    const horario = await confirmarComDiaVisivel(dataISO, outros, novoTitulo, cidade, sugestao, tipo, livres);
+    if(horario) return { data: dataISO, hora: horario };
+    const outraData = await askText('Escolher outra data para reagendar? (AAAA-MM-DD, cancelar para sair)', dataISO);
+    if(outraData===null) return null;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(outraData.trim())) dataISO = outraData.trim();
+    else toast('Data inválida');
+  }
+}
+
+async function concluirCompromisso(compromisso){
+  const detalhe = await askText('O que foi concluído? (fica no histórico)', compromisso.titulo || '');
+  if(detalhe===null) return;
+  const { error } = await sb.from('agenda').update({status:'feito'}).eq('id', compromisso.id);
+  if(error){ toast('Erro: '+error.message); return; }
+  await sb.from('historico').insert({o_que:`Compromisso concluído: ${compromisso.titulo}`, por:'diego', detalhe});
+  if(compromisso.servico_id){
+    const proxima = await askText('Esse cliente ainda precisa de próxima ação? Se sim, escreva aqui. Se não, deixe em branco.', '');
+    if(proxima===null){ toast('Compromisso concluído'); return; }
+    if(proxima.trim()){
+      const prazo = await exigirPrazo('', proxima.trim());
+      if(prazo){
+        await sb.from('servicos').update({proxima_acao:proxima.trim(), prazo, atualizado_em:new Date().toISOString()}).eq('id', compromisso.servico_id);
+        await sb.from('historico').insert({o_que:`Próxima ação definida após compromisso: ${proxima.trim()}`, por:'diego', detalhe:'Prazo: '+prazo});
+      }
+    }
+  }
+  toast('✔ Compromisso concluído');
+}
+
+async function naoConcluirCompromisso(compromisso){
+  const motivo = await askText('Por que não foi concluído?', 'Cliente não respondeu / não deu tempo / precisa remarcar');
+  if(motivo===null) return;
+  const novaData = await askText('Nova data para tentar de novo (AAAA-MM-DD):', compromisso.data || hojeISO());
+  if(!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData.trim())){ toast('Precisa de uma nova data válida.'); return; }
+  const escolha = await escolherNovoHorarioAgenda(compromisso, novaData.trim());
+  if(!escolha) return;
+  const { error } = await sb.from('agenda').update({data:escolha.data, hora:escolha.hora, status:'planejado'}).eq('id', compromisso.id);
+  if(error){ toast('Erro: '+error.message); return; }
+  await sb.from('historico').insert({o_que:`Compromisso não concluído e reagendado: ${compromisso.titulo}`, por:'diego', detalhe:`Motivo: ${motivo}. Nova data: ${escolha.data} ${escolha.hora||''}`});
+  if(compromisso.servico_id){
+    await sb.from('servicos').update({prazo:escolha.data, proxima_acao:'Retomar compromisso reagendado', atualizado_em:new Date().toISOString()}).eq('id', compromisso.servico_id);
+  }
+  toast('✔ Reagendado com rastro');
+}
+
 /* Mostra o dia inteiro (ocupado + horários possíveis, com cidade) antes de
    confirmar um novo compromisso. Os horários são clicáveis — toca pra
    escolher outro em vez do sugerido automaticamente. Resolve com o
@@ -1064,7 +1136,7 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
   return new Promise(resolve=>{
     const {fundo,caixa}=_modalBase();
     caixa.style.maxWidth='400px';
-    const titulo = el('div',null, `Compromissos em ${dataCurtaBR(dataISO)}`);
+    const titulo = el('div',null, `Compromissos em ${dataComDiaBR(dataISO)}`);
     titulo.style.cssText='font-weight:700;margin-bottom:10px';
     caixa.appendChild(titulo);
     const temConflitoCidade = novoTipo==='presencial' && novaCidade && doDia.some(a=>a.tipo==='presencial' && a.cidade && cidadeChave(a.cidade)!==cidadeChave(novaCidade));
@@ -1375,6 +1447,9 @@ async function abrirFicha(clienteId){
     const it=el('div','item p-'+(s.prioridade||'media'));
     it.appendChild(el('div','nome', s.titulo));
     it.appendChild(el('div','servico', STATUS_LABEL[s.status]+(s.valor_orcamento?' · '+moedaBR(Number(s.valor_orcamento)):'')));
+    if(s.descricao) it.appendChild(el('div','servico', s.descricao));
+    if(s.proxima_acao) it.appendChild(el('div','acao', 'Próxima ação: '+s.proxima_acao));
+    if(s.prazo) it.appendChild(el('div','servico', 'Prazo: '+dataComDiaBR(s.prazo)));
     const acoes = el('div','rodape');
     const status = document.createElement('select'); status.className='status';
     STATUS_ORDEM.forEach(st=>{ const o=document.createElement('option'); o.value=st; o.textContent=STATUS_LABEL[st]; o.selected=st===s.status; status.appendChild(o); });
@@ -1567,6 +1642,7 @@ async function renderInicio(){
     if(!s.prazo) return; // não deveria acontecer mais, mas por segurança
     let tier = ehAtrasado(s.prazo) ? 'atrasado' : (s.prazo===hojeStr ? 'hoje' : 'futuro');
     if(tier==='futuro' && s.prioridade==='alta') tier='hoje';
+    if(tier==='futuro' && !s.proxima_acao) tier='hoje';
     prioridades.push({ tipoItem:'lead', lead:s, tier, chave:s.prazo+'00:00' });
   });
   financeiroPendente.forEach(f=>{
@@ -1589,7 +1665,7 @@ async function renderInicio(){
         const a=p.agenda; const icTipo=a.tipo==='remoto'?'💬':'📍';
         const atrasado = p.tier==='atrasado';
         txt.appendChild(el('b',null, `${a.hora?a.hora.slice(0,5)+' — ':''}${icTipo} ${a.titulo}`));
-        txt.appendChild(el('div','sub', (atrasado?'Atrasado desde '+dataCurtaBR(a.data):dataCurtaBR(a.data)) + (a.cidade?' · 🏙 '+a.cidade:'')));
+        txt.appendChild(el('div','sub', (atrasado?'Atrasado desde '+dataComDiaBR(a.data):dataComDiaBR(a.data)) + (a.cidade?' · 🏙 '+a.cidade:'')));
       } else if(p.tipoItem==='lead'){
         const s=p.lead;
         txt.appendChild(el('b',null, (s.clientes?.nome||'Cliente')+' — '+s.titulo));
@@ -1597,23 +1673,38 @@ async function renderInicio(){
       } else {
         const f=p.fin;
         txt.appendChild(el('b',null, (f.descricao||'Lançamento')+' — '+moedaBR(Number(f.valor))));
-        txt.appendChild(el('div','sub', (f.status==='a_pagar'?'A pagar':'A receber')+' · '+dataCurtaBR(f.data)));
+        txt.appendChild(el('div','sub', (f.status==='a_pagar'?'A pagar':'A receber')+' · '+dataComDiaBR(f.data)));
       }
       item.appendChild(txt);
       if(p.tipoItem==='agenda'){
         const acoesAg = el('div'); acoesAg.style.cssText='display:flex;gap:6px;flex:none';
         const bOk = el('button','botao b-ok','✔');
-        bOk.addEventListener('click', async (e)=>{ e.stopPropagation(); await sb.from('agenda').update({status:'feito'}).eq('id',p.agenda.id); toast('✔ Compromisso concluído'); renderInicio(); });
+        bOk.addEventListener('click', async (e)=>{
+          e.stopPropagation();
+          await concluirCompromisso(p.agenda);
+          renderInicio(); renderAgenda(); renderLeads();
+        });
         acoesAg.appendChild(bOk);
+        const bNao = el('button','botao b-rm','Não');
+        bNao.title='Não concluído: registrar motivo e reagendar';
+        bNao.addEventListener('click', async (e)=>{
+          e.stopPropagation();
+          await naoConcluirCompromisso(p.agenda);
+          renderInicio(); renderAgenda(); renderLeads();
+        });
+        acoesAg.appendChild(bNao);
         const bReag = el('button','botao b-tel','↻');
-        bReag.title='Reagendar (a IA acha o próximo horário livre sozinha)';
+        bReag.title='Reagendar olhando compromissos do dia';
         bReag.addEventListener('click', async (e)=>{
           e.stopPropagation();
-          const proximo = await proximoSlotAutomatico(p.agenda.tipo, p.agenda.cidade);
-          if(!proximo){ toast('Não achei horário livre nos próximos 14 dias.'); return; }
-          const { error } = await sb.from('agenda').update({ data: proximo.data, hora: proximo.hora }).eq('id',p.agenda.id);
+          const novaData = await askText('Nova data (AAAA-MM-DD):', p.agenda.data || hojeISO());
+          if(!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData.trim())){ if(novaData!==null) toast('Data inválida'); return; }
+          const proximo = await escolherNovoHorarioAgenda(p.agenda, novaData.trim());
+          if(!proximo) return;
+          const { error } = await sb.from('agenda').update({ data: proximo.data, hora: proximo.hora, status:'planejado' }).eq('id',p.agenda.id);
           if(error){ toast('Erro: '+error.message); return; }
-          toast(`✔ Remanejado pra ${dataCurtaBR(proximo.data)} às ${proximo.hora}`); renderInicio();
+          await sb.from('historico').insert({o_que:`Compromisso reagendado: ${p.agenda.titulo}`, por:'diego', detalhe:`Nova data: ${proximo.data} ${proximo.hora||''}`});
+          toast(`✔ Remanejado pra ${dataComDiaBR(proximo.data)} às ${proximo.hora}`); renderInicio(); renderAgenda();
         });
         acoesAg.appendChild(bReag);
         item.appendChild(acoesAg);
@@ -1887,9 +1978,9 @@ async function renderInicio(){
       const btnCopiar = el('button',null,'Copiar');
       btnCopiar.addEventListener('click', ()=>copiarTexto(registro.texto || item.texto || ''));
       acoes.appendChild(btnCopiar);
-      const btnDel = el('button',null,'🗑');
+      const btnDel = el('button',null,'Resolver');
       btnDel.addEventListener('click', async ()=>{
-        if(!await askConfirm('Marcar esta anotação como resolvida/remover da lista?')) return;
+        if(!await askConfirm('Marcar esta anotação como resolvida e tirar da fila?')) return;
         await sb.from('caixa_entrada').update({processado:true, status:'resolvido'}).eq('id', item.id);
         carregarCaixaEntrada(); renderInicio();
       });
@@ -2097,14 +2188,29 @@ async function renderLeads(){
       if(novaAcao === null) return;
       let novoPrazo = s.prazo;
       if(!novaAcao.trim()){
-        const dataRevisao = await askText('Aguardando resposta — revisar em que data? (AAAA-MM-DD, opcional)', '');
-        if(dataRevisao && /^\d{4}-\d{2}-\d{2}$/.test(dataRevisao.trim())) novoPrazo = dataRevisao.trim();
+        const dataRevisao = await exigirPrazo('', 'revisar resposta de '+(cli.nome || s.titulo || 'cliente'));
+        if(!dataRevisao){ toast('Ação não foi registrada sem data de revisão.'); return; }
+        novoPrazo = dataRevisao;
       }
       await sb.from('servicos').update({ proxima_acao: novaAcao.trim() || null, prazo: novoPrazo, atualizado_em: new Date().toISOString() }).eq('id', s.id);
       await sb.from('historico').insert({o_que:`"${s.titulo}": ${proximo || 'ação concluída'}`, por:'diego', detalhe: novaAcao.trim() ? 'Próxima ação: '+novaAcao.trim() : 'Aguardando resposta do cliente'});
       toast('✔ Ação registrada — lead continua aberto'); renderLeads(); renderInicio();
     });
     rod.appendChild(bConcluirAcao);
+    const bNaoConcluirAcao = el('button','botao b-rm','Não concluir');
+    bNaoConcluirAcao.addEventListener('click', async ()=>{
+      const motivo = await askText('Por que essa ação não foi concluída?', 'Cliente não respondeu / não deu tempo / precisa remarcar');
+      if(motivo===null) return;
+      const novaAcao = await askText('Qual a próxima ação?', s.proxima_acao || 'Tentar contato novamente');
+      if(novaAcao===null || !novaAcao.trim()){ toast('Precisa definir uma próxima ação.'); return; }
+      const novoPrazo = await exigirPrazo('', novaAcao.trim());
+      if(!novoPrazo){ toast('Precisa de nova data.'); return; }
+      await sb.from('servicos').update({proxima_acao:novaAcao.trim(), prazo:novoPrazo, atualizado_em:new Date().toISOString()}).eq('id', s.id);
+      await sb.from('historico').insert({o_que:`"${s.titulo}": ação não concluída`, por:'diego', detalhe:`Motivo: ${motivo}. Próxima ação: ${novaAcao.trim()}. Prazo: ${novoPrazo}`});
+      toast('✔ Motivo registrado e ação reagendada');
+      renderLeads(); renderInicio();
+    });
+    rod.appendChild(bNaoConcluirAcao);
     const bEncerrarPago = el('button','botao b-ok','🏁 Pago');
     bEncerrarPago.addEventListener('click', async ()=>{
       if(!await askConfirm(`Encerrar "${s.titulo}" como PAGO/finalizado? Isso tira o lead da lista ativa.`)) return;
@@ -2152,22 +2258,26 @@ async function renderAgenda(){
     const item = el('div','agenda-item'+(a.status==='feito'?' feito':''));
     item.appendChild(el('div','hora', (a.hora||'--').slice(0,5)));
     const desc = el('div','desc');
-    desc.appendChild(el('div',null, (a.tipo==='remoto'?'💬 ':'📍 ') + a.titulo + ' — ' + dataCurtaBR(a.data)));
+    desc.appendChild(el('div',null, (a.tipo==='remoto'?'💬 ':'📍 ') + a.titulo + ' — ' + dataComDiaBR(a.data)));
     if(a.local) desc.appendChild(el('div','loc','📍 '+a.local));
     if(a.cidade) desc.appendChild(el('div','loc','🏙 '+a.cidade));
     item.appendChild(desc);
     if(a.status!=='feito'){
       const b = el('button','botao b-ok','✔');
-      b.addEventListener('click', async ()=>{ await sb.from('agenda').update({status:'feito'}).eq('id',a.id); renderAgenda(); renderInicio(); });
+      b.addEventListener('click', async ()=>{ await concluirCompromisso(a); renderAgenda(); renderInicio(); renderLeads(); });
       item.appendChild(b);
+      const bNao = el('button','botao b-rm','Não');
+      bNao.addEventListener('click', async ()=>{ await naoConcluirCompromisso(a); renderAgenda(); renderInicio(); renderLeads(); });
+      item.appendChild(bNao);
       const bReagendar = el('button','botao b-tel','Reagendar');
       bReagendar.addEventListener('click', async ()=>{
         const novaData = await askText('Nova data (AAAA-MM-DD):', a.data || '');
         if(!novaData || !/^\d{4}-\d{2}-\d{2}$/.test(novaData.trim())){ if(novaData!==null) toast('Data inválida'); return; }
-        const novaHora = await askText('Novo horário (HH:MM, opcional):', (a.hora||'').slice(0,5));
-        if(novaHora===null) return;
-        const { error } = await sb.from('agenda').update({ data: novaData.trim(), hora: novaHora.trim()||null }).eq('id',a.id);
+        const escolha = await escolherNovoHorarioAgenda(a, novaData.trim());
+        if(!escolha) return;
+        const { error } = await sb.from('agenda').update({ data: escolha.data, hora: escolha.hora, status:'planejado' }).eq('id',a.id);
         if(error){ toast('Erro: '+error.message); return; }
+        await sb.from('historico').insert({o_que:`Compromisso reagendado: ${a.titulo}`, por:'diego', detalhe:`Nova data: ${escolha.data} ${escolha.hora||''}`});
         toast('✔ Reagendado'); renderAgenda(); renderInicio();
       });
       item.appendChild(bReagendar);
@@ -2201,14 +2311,12 @@ async function renderAgenda(){
       cidade = (await askText(`Compromisso presencial precisa de cidade (pra rota e pra não ficar perdido depois). Qual a cidade de "${titulo}"?`, '') || '').trim() || null;
       if(!cidade){ toast('Compromisso presencial não pode ficar sem cidade. Preencha a cidade pra salvar.'); return; }
     }
-    let hora = $('#agHora').value || null;
-    if(!hora){
-      const { data: doDia } = await sb.from('agenda').select('hora').eq('data', data).eq('status','planejado');
-      hora = horariosParaTipo(data, 'presencial', (doDia||[]).map(a=>a.hora))[0] || null;
-      if(!hora){ toast('Nenhum compromisso pode ficar sem horário, e não sobrou horário livre nesse dia. Escolha outro dia ou informe a hora manualmente.'); return; }
-      toast('🕐 Sem horário informado — usado '+hora+' (primeiro livre do dia)');
-    }
-    const { error } = await sb.from('agenda').insert({ titulo, data, hora, local: $('#agLocal').value.trim() || null, cidade });
+    const { data: doDia } = await sb.from('agenda').select('id,titulo,hora,cidade,tipo').eq('data', data).eq('status','planejado');
+    const disponiveis = horariosParaTipo(data, 'presencial', (doDia||[]).map(a=>a.hora));
+    let hora = $('#agHora').value || disponiveis[0] || null;
+    const escolha = await confirmarComDiaVisivel(data, doDia||[], titulo, cidade, hora, 'presencial', disponiveis);
+    if(!escolha){ toast('Compromisso não foi criado.'); return; }
+    const { error } = await sb.from('agenda').insert({ titulo, data, hora: escolha, local: $('#agLocal').value.trim() || null, cidade, tipo:'presencial' });
     if(error){ toast('Erro: '+error.message); return; }
     toast('✔ Adicionado'); renderAgenda(); renderInicio();
   });
