@@ -258,3 +258,73 @@ Para um serviço de R$ 2.000 com metade agora e metade na entrega, ambas no cart
 - saldo de R$ 1.000 — cartão 12x na entrega — `a_receber`
 
 Quando a segunda transação for aprovada na entrega, o saldo passa para `pago`.
+
+## Diálogos nativos removidos (08/07/2026)
+
+O app usava `prompt()`/`confirm()` nativos do navegador em ~40 pontos (criar ficha,
+editar cliente/serviço, encerrar lead, remover item, etc). Isso travava qualquer
+automação de navegador (Claude/Codex operando via Chrome DevTools Protocol) — o
+diálogo nativo bloqueia a página inteira e a automação trava esperando um clique
+que nunca chega, sem erro claro.
+
+Trocado por `askText(mensagem, valorPadrao)` e `askConfirm(mensagem)` — funções em
+`index.html` que abrem um modal dentro da própria página (Promise-based, `await`).
+Mesma UX pro Diego, mas agora clicável por automação e mais bonito no PWA que o
+prompt cinza do sistema. **Qualquer IA que for adicionar uma nova pergunta/confirmação
+ao app deve usar `askText`/`askConfirm`, nunca `prompt()`/`confirm()` nativos.**
+
+## Fluxo "Aguardando você" — fichas incompletas (08/07/2026)
+
+### O problema
+
+A IA (Claude/Codex) processa a Caixa de Entrada e cria fichas/leads a partir de
+notas curtas do Diego. Às vezes falta informação real pra decidir (ex: "é
+presencial ou o cliente manda medida pelo WhatsApp?", "tem prazo combinado?").
+Antes, a IA ou inventava uma resposta plausível (ruim: pode ficar errado) ou
+perguntava no chat de conversa com o Diego (ruim: ele opera pelo celular e não
+fica nessa conversa; o chat da sessão do Claude não é um canal de dia a dia).
+
+### A decisão
+
+O Diego opera 100% pelo app (celular). Então qualquer pergunta pendente da IA
+tem que aparecer **dentro do app**, não numa conversa separada. O app é o ponto
+de encontro assíncrono entre o Diego e a IA — ele joga coisas cruas na Caixa de
+Entrada, a IA processa e devolve dúvidas ali, ele responde quando puder.
+
+### Como funciona hoje (implementado)
+
+- A ficha É criada mesmo com informação faltando — a IA nunca deixa de criar
+  por falta de dado.
+- Quando há uma dúvida real (não um detalhe cosmético), a IA grava em
+  `proxima_acao` do serviço o texto: `❓ AGUARDANDO VOCÊ: <pergunta objetiva>`
+  — usando o marcador `MARCADOR_AGUARDANDO` definido em `index.html`.
+- A tela Início ganha uma seção **"🟠 Aguardando você"**, acima de "Precisa de
+  atenção agora", listando todo serviço ativo cuja `proxima_acao` comece com
+  esse marcador. Tocar no item abre a ficha do cliente direto.
+- Tem também um card de resumo "Aguardando você" no topo da Início.
+- Quando o Diego responde (edita a próxima ação da ficha removendo o `❓` e
+  escrevendo o que decidiu), o item some sozinho da seção — não precisa de
+  campo novo no banco, é só o prefixo do texto.
+- **Não foi feita nenhuma alteração de schema no Supabase** — de propósito,
+  pra não depender de rodar SQL manual no dashboard. Tudo roda em cima do
+  campo `proxima_acao` que já existia.
+
+### O que NÃO foi implementado (proposto e descartado por enquanto)
+
+Chegou a se cogitar transformar a Caixa de Entrada num chat de verdade (bolhas
+de mensagem, cor diferente pra IA e pro Diego, histórico da conversa). Decisão:
+adiar. Primeiro rodar o fluxo simples (`❓ AGUARDANDO VOCÊ` na próxima ação) no
+dia a dia real, ver que tipo de pergunta se repete (presencial/WhatsApp? prazo?
+medida? valor?), e só then desenhar uma UI de chat se o padrão mostrar que vale
+a pena. Não adivinhar o design agora.
+
+### Regra pra qualquer IA operando o app
+
+- Antes de inventar um dado que muda o resultado prático (endereço/medida real
+  não importa tanto; **presencial vs. remoto, prazo prometido, valor combinado
+  importam**), prefira marcar como "Aguardando você" a chutar.
+- Não é para toda ficha ter uma pergunta — só quando a dúvida é real e o Diego
+  precisa decidir. Ficha simples e completa não precisa de marcador nenhum.
+- Ao processar a Caixa de Entrada numa sessão futura, sempre checar a seção
+  "Aguardando você" primeiro: se o Diego já respondeu (a próxima ação não tem
+  mais o `❓`), está resolvido; se ainda tem `❓`, ainda está esperando.

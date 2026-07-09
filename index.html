@@ -616,6 +616,13 @@ const STATUS_LABEL = {lead:'Novo lead', orcamento:'Orçamento', agendado:'Agenda
 const STATUS_ORDEM = ['lead','orcamento','agendado','producao','entregue','pago','perdido'];
 const STATUS_FLUXO = ['lead','orcamento','agendado','producao','entregue','pago'];
 
+/* Marcador de "ficha incompleta": quando a IA cria uma ficha mas tem uma dúvida real
+   (presencial ou não, prazo, medida etc.), ela grava a pergunta em proxima_acao com
+   este prefixo em vez de adivinhar. Isso vira a seção "Aguardando você" na Início. */
+const MARCADOR_AGUARDANDO = '❓ AGUARDANDO VOCÊ: ';
+const ehAguardandoVoce = (s) => (s?.proxima_acao || '').startsWith(MARCADOR_AGUARDANDO);
+const perguntaAguardando = (s) => (s?.proxima_acao || '').slice(MARCADOR_AGUARDANDO.length);
+
 function cabecalhoPainel(icone,titulo,subtitulo){
   const cab=el('div','painel-cab');
   cab.appendChild(el('div','icone',icone));
@@ -1222,7 +1229,7 @@ async function renderInicio(){
 
   const hojeStr = hojeISO();
   const [{data:leadsUrg}, {data:agUrg}, {data:finUrg}, {data:caixaPend}] = await Promise.all([
-    sb.from('servicos').select('id,titulo,prioridade,prazo,status,proxima_acao,clientes(nome)').not('status','in','(pago,perdido)'),
+    sb.from('servicos').select('id,cliente_id,titulo,prioridade,prazo,status,proxima_acao,clientes(nome)').not('status','in','(pago,perdido)'),
     sb.from('agenda').select('id,titulo,data,hora').eq('status','planejado').lte('data', hojeStr),
     sb.from('financeiro').select('id,descricao,valor,status,data').in('status',['a_pagar','a_receber']).lte('data', hojeStr),
     sb.from('caixa_entrada').select('id', { count:'exact' }).eq('processado', false),
@@ -1236,6 +1243,7 @@ async function renderInicio(){
   const qtdAltos = leadsAbertos.filter(s=>s.prioridade==='alta').length;
   const qtdAgendaHojeOuAtrasada = agendaPendente.length;
   const qtdCaixaEntrada = caixaPend?.length || 0;
+  const qtdAguardandoVoce = leadsAbertos.filter(ehAguardandoVoce).length;
 
   const resumoGrid = el('div','resumo-grid');
   const mkResumo = (rot, num, sub, cls='neutro') => {
@@ -1249,6 +1257,7 @@ async function renderInicio(){
   resumoGrid.appendChild(mkResumo('Sem próxima ação', qtdSemProximaAcao, qtdSemProximaAcao ? 'Vale decidir o próximo passo' : 'Tudo com direção definida', qtdSemProximaAcao ? 'warn' : 'ok'));
   resumoGrid.appendChild(mkResumo('Agenda pendente', qtdAgendaHojeOuAtrasada, qtdAgendaHojeOuAtrasada ? 'Hoje ou atrasada' : 'Dia organizado', qtdAgendaHojeOuAtrasada ? 'warn' : 'ok'));
   resumoGrid.appendChild(mkResumo('Chat de entrada', qtdCaixaEntrada, qtdCaixaEntrada ? 'Anotações aguardando triagem' : 'Nada pendente', qtdCaixaEntrada ? 'neutro' : 'ok'));
+  resumoGrid.appendChild(mkResumo('Aguardando você', qtdAguardandoVoce, qtdAguardandoVoce ? 'A IA tem dúvida nesses leads' : 'Nada pendente de resposta', qtdAguardandoVoce ? 'alerta' : 'ok'));
   c.appendChild(resumoGrid);
 
   const filaOperacional = [...leadsAbertos]
@@ -1286,6 +1295,24 @@ async function renderInicio(){
     });
     destaque.appendChild(stack);
     c.appendChild(destaque);
+  }
+
+  const aguardandoVoce = leadsAbertos.filter(ehAguardandoVoce);
+  if(aguardandoVoce.length){
+    const sAgu = secao('🟠 Aguardando você', aguardandoVoce.length);
+    const card = el('div','card');
+    aguardandoVoce.forEach(s=>{
+      const it = el('div','urgente-item');
+      it.style.cursor='pointer';
+      it.appendChild(el('div','ic','❓'));
+      const txt = el('div','txt');
+      txt.appendChild(el('b',null,(s.clientes?.nome||'Cliente')+' — '+s.titulo));
+      txt.appendChild(el('div','sub', perguntaAguardando(s)));
+      it.appendChild(txt);
+      it.addEventListener('click', ()=>{ if(s.cliente_id) abrirFicha(s.cliente_id); else irPara('leads'); });
+      card.appendChild(it);
+    });
+    sAgu.appendChild(card); c.appendChild(sAgu);
   }
 
   const urgentes = [];
