@@ -391,3 +391,30 @@ concentram numa cidade ou espalham) antes de desenhar a otimização de rota
 em cima de dado de verdade, mesmo raciocínio do "Aguardando você". Qualquer
 IA que for atacar isso: comece olhando quantos registros já têm `cidade`
 preenchida e o padrão de datas antes de propor agrupamento.
+
+### Ajustes de 09/07/2026 — testado ao vivo, chips clicáveis, janela remota
+
+- **A pergunta de tipo (presencial/remoto) entra na mesma leva do prazo**,
+  antes de salvar a ficha — não fica pra depois de tudo já criado. Só
+  pergunta se o serviço ainda não tem agenda vinculada (`jaTemAgendaVinculada`).
+- **Testado de ponta a ponta em produção** (09/07/2026): criar ficha de
+  teste com prazo presencial numa segunda-feira, confirmar que detecta o
+  compromisso existente da Taísa às 08h e sugere 09h sem conflito, e que o
+  compromisso aparece certo na Agenda. Dados de teste removidos depois.
+- **Os horários do modal viraram `<button>` clicáveis de verdade** — a
+  primeira versão só *mostrava* os horários como `<div>`, sem listener de
+  clique, e por isso não funcionava no toque do celular (só parecia
+  clicável no mouse do desktop, que às vezes ativa hover/focus por engano).
+  `confirmarComDiaVisivel` agora retorna o horário escolhido (string) em
+  vez de um booleano — o Diego pode tocar em qualquer horário sugerido, não
+  só aceitar o primeiro disponível.
+- **Presencial continua travado na rotina fixa** (`JANELAS_SEMANA`) por
+  decisão do Diego — só destrava se ele autorizar explicitamente numa
+  conversa futura. Não flexibilizar sozinho.
+- **Tarefa remota (ligar, mandar mensagem, pedir material) ganhou janela
+  própria**: `JANELA_REMOTO = ['07:00','22:00']`, válida todo dia da
+  semana (diferente de `JANELAS_SEMANA`, que é só presencial). E o mais
+  importante: **remoto nunca exclui horário já ocupado** — o Diego pode
+  empilhar várias tarefas remotas no mesmo horário (ex: mandar 3 mensagens
+  às 09h), porque não ocupam ele fisicamente como uma visita ocupa. Só
+  compromisso `presencial` bloqueia horário repetido.
