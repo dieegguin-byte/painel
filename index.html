@@ -1030,6 +1030,12 @@ function horariosParaTipo(dataISO, tipo, horariosOcupados){
    confirmar um novo compromisso. Os horários são clicáveis — toca pra
    escolher outro em vez do sugerido automaticamente. Resolve com o
    horário escolhido (string) ou null se cancelou. */
+/* Compara cidades de forma tolerante (ignora acento, maiúscula, sufixo tipo
+   "-DF" ou texto entre parênteses) — usado só pra decidir se dois
+   compromissos presenciais no mesmo dia são de regiões diferentes. */
+function cidadeChave(c){
+  return String(c||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').split('(')[0].split('-')[0].trim();
+}
 function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHorario, novoTipo, horariosDisponiveis){
   return new Promise(resolve=>{
     const {fundo,caixa}=_modalBase();
@@ -1037,6 +1043,12 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
     const titulo = el('div',null, `Compromissos em ${dataCurtaBR(dataISO)}`);
     titulo.style.cssText='font-weight:700;margin-bottom:10px';
     caixa.appendChild(titulo);
+    const temConflitoCidade = novoTipo==='presencial' && novaCidade && doDia.some(a=>a.tipo==='presencial' && a.cidade && cidadeChave(a.cidade)!==cidadeChave(novaCidade));
+    if(temConflitoCidade){
+      const aviso = el('div','','⚠️ Tem compromisso presencial em outra cidade nesse mesmo dia — confira se dá tempo de ir de uma pra outra.');
+      aviso.style.cssText='padding:8px 10px;border-radius:8px;background:rgba(224,87,79,.15);border:1px solid var(--alta,#e0574f);color:var(--alta,#e0574f);margin-bottom:10px;font-size:.82rem;font-weight:600';
+      caixa.appendChild(aviso);
+    }
     const listaOcupados = el('div');
     /* Cada compromisso já marcado nesse dia pode ser remanejado NA HORA,
        sem sair desse modal — evita ter que cancelar tudo, ir na Agenda e
@@ -1051,8 +1063,14 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
       }
       doDia.sort((a,b)=>(a.hora||'99:99').localeCompare(b.hora||'99:99')).forEach(a=>{
         const ic = a.tipo==='remoto' ? '💬' : '📍';
-        const linha = el('div'); linha.style.cssText='padding:8px 10px;border-radius:8px;background:var(--card2,#2b221c);margin-bottom:6px;font-size:.88rem;display:flex;align-items:center;justify-content:space-between;gap:8px';
-        const txt = el('span',null, `${a.hora?a.hora.slice(0,5):'sem horário'} — ${ic} ${a.titulo}${a.cidade?' 🏙 '+a.cidade:''}`);
+        /* Dois presenciais no mesmo dia em cidades diferentes = fisicamente
+           pode ser impossível (ex: Luziânia 08h e Brasília 09h). Não bloqueia
+           sozinho (a IA não sabe distância/trânsito), só avisa bem visível
+           pro Diego decidir — ele quem sabe se dá tempo ou não. */
+        const conflitoCidade = novoTipo==='presencial' && a.tipo==='presencial' && a.cidade && novaCidade && cidadeChave(a.cidade)!==cidadeChave(novaCidade);
+        const linha = el('div'); linha.style.cssText='padding:8px 10px;border-radius:8px;margin-bottom:6px;font-size:.88rem;display:flex;align-items:center;justify-content:space-between;gap:8px;'
+          + (conflitoCidade ? 'background:rgba(224,87,79,.15);border:1px solid var(--alta,#e0574f)' : 'background:var(--card2,#2b221c)');
+        const txt = el('span',null, `${conflitoCidade?'⚠️ ':''}${a.hora?a.hora.slice(0,5):'sem horário'} — ${ic} ${a.titulo}${a.cidade?' 🏙 '+a.cidade:''}`);
         linha.appendChild(txt);
         const bMover = document.createElement('button');
         bMover.type='button'; bMover.textContent='↻'; bMover.title='Remanejar este compromisso';
