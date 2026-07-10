@@ -18,6 +18,9 @@
 @media(max-width:1100px){.records-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.metric-grid{grid-template-columns:repeat(2,1fr)}.finance-metrics{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:850px){.product-shell{display:block}.side-nav{display:none}.workspace{padding:18px 15px 92px}.workspace-header{align-items:flex-start}.workspace-header h1{font-size:25px}.header-actions{flex-wrap:wrap;justify-content:flex-end}.inbox-layout{grid-template-columns:1fr}.triage-column{position:static}.triage-panel{max-height:none}.triage-welcome{min-height:380px}.mobile-nav{display:flex;position:fixed;left:10px;right:10px;bottom:9px;z-index:100;background:#181412ee;border:1px solid var(--line2);border-radius:17px;padding:6px;overflow:auto;backdrop-filter:blur(18px);box-shadow:var(--shadow)}.mobile-nav button{min-width:70px;flex:1;border:0;background:transparent;color:var(--dim);border-radius:10px;padding:6px 4px;font-size:8px}.mobile-nav button i{font-style:normal;display:block;font-size:15px}.mobile-nav button.active{background:#d86d3618;color:#ffc099}}
 @media(max-width:560px){.login-card{padding:28px 20px}.login-card h1{font-size:32px}.workspace-header{display:block}.header-actions{justify-content:flex-start;margin-top:12px}.header-actions .ghost{padding:8px 10px}.queue-summary{gap:5px}.queue-summary div{padding:8px}.row,.row.three{grid-template-columns:1fr}.metric-grid,.finance-metrics{grid-template-columns:1fr 1fr}.hero-summary{display:block;padding:20px}.hero-summary h2{font-size:26px}.hero-summary .primary{margin-top:15px}.records-grid,.customer-list{grid-template-columns:1fr}.agenda-day{grid-template-columns:1fr}.day-label{margin-bottom:8px}.card-head{display:block}.search{width:100%;margin-top:10px}.triage-panel{padding:14px}.classify button{flex:1}.composer-actions{align-items:flex-end}.primary,.secondary,.ghost{font-size:10px}.notice{right:16px;top:12px}.source-card img{max-width:100%}}
+.pin-card{max-width:340px}.pin-sub{color:var(--muted);font-size:12px;margin:0 auto 20px;max-width:260px}.pin-dots{display:flex;gap:16px;justify-content:center;margin:6px 0 18px}.pin-dots span{width:15px;height:15px;border-radius:50%;border:2px solid var(--line2);background:transparent;transition:.15s}.pin-dots span.filled{background:var(--orange2);border-color:var(--orange2)}.pin-error{color:#e88477;font-size:12px;margin-bottom:12px}.pin-pad{display:grid;grid-template-columns:repeat(3,72px);gap:12px;justify-content:center;margin-top:4px}.pin-key{width:72px;height:72px;border-radius:50%;background:var(--surface2);border:1px solid var(--line2);color:var(--text);font:500 24px Georgia,serif;transition:.12s}.pin-key:active{background:#c95f2e;transform:scale(.95)}
+.modal-overlay{position:fixed;inset:0;z-index:2000;background:#0a0807cc;backdrop-filter:blur(4px);display:grid;place-items:center;padding:20px}.modal-card{width:min(680px,100%);max-height:88vh;overflow:auto;background:linear-gradient(145deg,#1c1613,#141110);border:1px solid var(--line2);border-radius:22px;padding:22px;box-shadow:var(--shadow)}.modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:6px}.modal-head h2{font:500 24px Georgia,serif;margin:4px 0 0}.modal-intro{color:var(--muted);font-size:12px;margin:0 0 16px}.guia-block{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;margin-bottom:12px}.guia-block h3{font-size:13px;margin:0 0 9px;color:var(--cream)}.guia-block textarea{width:100%;min-height:130px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:11px;font-size:12px;line-height:1.55;outline:0}.guia-block textarea:focus{border-color:#d37742;box-shadow:0 0 0 3px #d86d3619}.guia-block .primary{margin-top:9px}.guia-block.readonly{background:#0f0d0c}.guia-block.readonly pre{white-space:pre-wrap;font-family:inherit;font-size:11px;line-height:1.6;color:var(--muted);margin:0}
+@media(max-width:560px){.pin-pad{grid-template-columns:repeat(3,64px)}.pin-key{width:64px;height:64px;font-size:21px}.modal-card{padding:16px;border-radius:16px}}
 </style>
 </head>
 <body>
@@ -86,6 +89,26 @@ function money(value) {
 function eventMessage(messages, text, mode) {
   return [...(messages || []), { de: mode === "claude" ? "ia" : "diego", texto: text, em: new Date().toISOString(), tipo: "sistema" }];
 }
+async function sha256(txt) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+const SECAO_LABEL = { empresa: "Sobre a empresa", como_agir: "Como a IA deve agir", regras: "Regras invioláveis" };
+const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
+- Novo lead, orçamento e agendado não geram lançamento financeiro.
+- O valor informado nesses status é apenas valor de orçamento.
+- Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
+- Pagamento 50/50 gera entrada paga e saldo a receber na entrega.
+- Cada parte pode ser Pix, dinheiro, transferência ou cartão parcelado.
+- Cartão aprovado é considerado pago; registrar também a quantidade de parcelas.
+- Gerar orçamento transforma apenas Novo lead em Orçamento; não cria financeiro.
+- Marcar serviço como Pago atualiza os lançamentos vinculados, sem duplicar.
+- Nunca excluir ficha, foto, serviço ou lançamento sem confirmação humana.
+- Antes de criar cliente, procurar telefone existente para evitar duplicidade.
+- Alterações de valor, pagamento, prazo e status devem ser resumidas ao usuário.
+- No modo Claude, nunca mexer no Financeiro nem excluir nada — isso é do Diego.`;
+const TABELAS_BACKUP = ["clientes", "servicos", "fotos", "agenda", "financeiro", "estoque", "caixa_entrada", "historico", "guia_ia"];
 
 function Home() {
   const [db, setDb] = useState(null);
@@ -110,6 +133,8 @@ function Home() {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState(null);
   const [search, setSearch] = useState("");
+  const [pinState, setPinState] = useState("checking");
+  const [showGuia, setShowGuia] = useState(false);
 
   const notify = useCallback((text, kind = "info") => {
     setNotice({ text, kind });
@@ -157,6 +182,56 @@ function Home() {
 
   useEffect(() => { if (demo || session) loadAll(); }, [demo, session, loadAll]);
   useEffect(() => { window.localStorage.setItem("tb-novo-modo", mode); }, [mode]);
+
+  useEffect(() => {
+    if (demo) { setPinState("ok"); return; }
+    if (!db || !session) { setPinState("checking"); return; }
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await db.from("config").select("pin_hash").eq("id", 1).single();
+      if (cancelled) return;
+      if (error) { setPinState("ok"); return; }
+      if (!data?.pin_hash) setPinState("define");
+      else if (window.sessionStorage.getItem("tb_pin_ok") === "1") setPinState("ok");
+      else setPinState("enter");
+    })();
+    return () => { cancelled = true; };
+  }, [db, session, demo]);
+
+  const definePin = useCallback(async (pin) => {
+    const hash = await sha256(pin);
+    const { error } = await db.from("config").update({ pin_hash: hash }).eq("id", 1);
+    if (error) { notify("Erro ao salvar PIN: " + error.message, "error"); return false; }
+    window.sessionStorage.setItem("tb_pin_ok", "1");
+    setPinState("ok");
+    return true;
+  }, [db, notify]);
+
+  const tryPin = useCallback(async (pin) => {
+    const hash = await sha256(pin);
+    const { data } = await db.from("config").select("pin_hash").eq("id", 1).single();
+    if (data && data.pin_hash === hash) { window.sessionStorage.setItem("tb_pin_ok", "1"); setPinState("ok"); return true; }
+    return false;
+  }, [db]);
+
+  const backupAll = useCallback(async () => {
+    notify("Gerando backup…", "info");
+    try {
+      const dump = { app: "painel-tapecaria-bahia", gerado_em: new Date().toISOString() };
+      for (const t of TABELAS_BACKUP) {
+        const { data, error } = await db.from(t).select("*");
+        if (error) throw new Error(t + ": " + error.message);
+        dump[t] = data;
+      }
+      const blob = new Blob([JSON.stringify(dump, null, 1)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "backup-tapecaria-" + new Date().toISOString().slice(0, 10) + ".json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      notify("Backup baixado.", "ok");
+    } catch (error) { notify("Erro no backup: " + error.message, "error"); }
+  }, [db, notify]);
 
   const activeServices = useMemo(() => services.filter((service) => !["pago", "perdido"].includes(service.status)), [services]);
   const claudeQueue = useMemo(() => inbox.filter((item) => ["respondido", "novo"].includes(item.status || "novo")).sort((a, b) => {
@@ -331,6 +406,8 @@ function Home() {
 
   if (booting) return <div className="loading-screen"><div className="brand-seal">TB</div><p>Preparando a central…</p></div>;
   if (!session && !demo) return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">NOVA CENTRAL OPERACIONAL</p><h1>Tapeçaria Bahia</h1><p>Um ambiente separado para Diego e Claude trabalharem na mesma fila, sem apagar, duplicar ou perder o próximo passo.</p>{loginSent ? <div className="success-box">Link enviado. Abra seu e-mail neste aparelho.</div> : <><label>E-mail de acesso<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" onKeyDown={(event) => event.key === "Enter" && sendMagicLink()} /></label><button className="primary" onClick={sendMagicLink} disabled={busy || !email.trim()}>Enviar link de acesso</button></>}<button className="ghost demo-button" onClick={() => setDemo(true)}>Ver demonstração do novo site</button></div></div>;
+  if (!demo && pinState === "checking") return <div className="loading-screen"><div className="brand-seal">TB</div><p>Verificando o bloqueio…</p></div>;
+  if (!demo && (pinState === "define" || pinState === "enter")) return <PinScreen mode={pinState} onDefine={definePin} onEnter={tryPin} />;
 
   const nav = [
     { id: "caixa", label: "Caixa", icon: "◎", count: inbox.length }, { id: "painel", label: "Painel", icon: "⌂" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
@@ -345,7 +422,7 @@ function Home() {
       <div className="operator-card"><span>Operador atual</span><strong>{mode === "claude" ? "Claude" : "Diego"}</strong><small>{mode === "claude" ? "Ações críticas bloqueadas" : "Controle e aprovações"}</small><button onClick={() => setMode(mode === "claude" ? "diego" : "claude")}>Trocar para {mode === "claude" ? "Diego" : "Claude"}</button></div>
     </aside>
     <main className="workspace">
-      <header className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{tab === "caixa" ? "Caixa de entrada" : nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><button className="ghost" onClick={copyContext}>Copiar contexto</button><button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => db.auth.signOut()}>Sair</button>}</div></header>
+      <header className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{tab === "caixa" ? "Caixa de entrada" : nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
 
       {tab === "caixa" && <div className="inbox-layout">
         <section className="queue-column">
@@ -369,6 +446,68 @@ function Home() {
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} />}
     </main>
     <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setSelectedId(null); }}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
+    {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
+  </div>;
+}
+
+function PinScreen({ mode, onDefine, onEnter }) {
+  const [digits, setDigits] = useState("");
+  const [first, setFirst] = useState(null);
+  const [error, setError] = useState("");
+  const [confirming, setConfirming] = useState(false);
+  const press = async (key) => {
+    setError("");
+    if (key === "⌫") { setDigits((d) => d.slice(0, -1)); return; }
+    if (digits.length >= 4) return;
+    const next = digits + key;
+    setDigits(next);
+    if (next.length < 4) return;
+    if (mode === "define") {
+      if (!confirming) { setFirst(next); setConfirming(true); setDigits(""); return; }
+      if (next !== first) { setError("Os PINs não batem. Comece de novo."); setFirst(null); setConfirming(false); setDigits(""); return; }
+      const ok = await onDefine(next);
+      if (!ok) { setDigits(""); }
+    } else {
+      const ok = await onEnter(next);
+      if (!ok) { setError("PIN incorreto."); setDigits(""); }
+    }
+  };
+  const title = mode === "define" ? (confirming ? "Confirme o PIN" : "Crie um PIN") : "Digite seu PIN";
+  const sub = mode === "define" ? (confirming ? "Digite os 4 dígitos de novo." : "Escolha 4 dígitos para travar o app no dia a dia.") : "4 dígitos para desbloquear a central.";
+  return <div className="login-screen"><div className="login-card pin-card"><div className="brand-seal">TB</div><p className="kicker">{title}</p><p className="pin-sub">{sub}</p><div className="pin-dots">{[0, 1, 2, 3].map((i) => <span key={i} className={i < digits.length ? "filled" : ""} />)}</div>{error && <div className="pin-error">{error}</div>}<div className="pin-pad">{["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"].map((key, i) => key === "" ? <span key={i} /> : <button key={i} className="pin-key" onClick={() => press(key)}>{key}</button>)}</div></div></div>;
+}
+
+function GuiaModal({ db, demo, notify, onClose }) {
+  const [rows, setRows] = useState(null);
+  const [drafts, setDrafts] = useState({ empresa: "", como_agir: "", regras: "" });
+  const [savingSec, setSavingSec] = useState("");
+  useEffect(() => {
+    if (demo) { setRows([]); setDrafts({ empresa: "(demonstração) Reforma de estofados em Luziânia-GO e região.", como_agir: "(demonstração) Ler a caixa, pesquisar antes de criar, uma entrada por vez.", regras: REGRAS_SISTEMA_ATUAIS }); return; }
+    (async () => {
+      const { data, error } = await db.from("guia_ia").select("*").order("secao");
+      if (error) { notify("Erro ao ler o guia: " + error.message, "error"); setRows([]); return; }
+      setRows(data || []);
+      const next = { empresa: "", como_agir: "", regras: "" };
+      (data || []).forEach((r) => { if (r.secao in next) next[r.secao] = r.conteudo || ""; });
+      setDrafts(next);
+    })();
+  }, [db, demo, notify]);
+  const save = async (sec) => {
+    if (demo) { notify("Na demonstração o guia não é salvo.", "info"); return; }
+    setSavingSec(sec);
+    const { error } = await db.from("guia_ia").upsert({ secao: sec, titulo: SECAO_LABEL[sec], conteudo: drafts[sec], atualizado_em: new Date().toISOString() }, { onConflict: "secao" });
+    setSavingSec("");
+    if (error) notify("Erro: " + error.message, "error"); else notify("Guia atualizado.", "ok");
+  };
+  return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-card">
+      <div className="modal-head"><div><p className="kicker">CARTILHA DA IA</p><h2>Guia da IA</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
+      <p className="modal-intro">A cartilha que qualquer IA lê antes de operar. Edite para mudar como a IA se comporta.</p>
+      {rows === null ? <div className="empty-state"><b>Carregando…</b></div> : <>
+        <div className="guia-block readonly"><h3>Regras automáticas vigentes</h3><pre>{REGRAS_SISTEMA_ATUAIS}</pre></div>
+        {["empresa", "como_agir", "regras"].map((sec) => <div className="guia-block" key={sec}><h3>{SECAO_LABEL[sec]}</h3><textarea value={drafts[sec]} onChange={(e) => setDrafts((d) => ({ ...d, [sec]: e.target.value }))} /><button className="primary" onClick={() => save(sec)} disabled={savingSec === sec}>{savingSec === sec ? "Salvando…" : "Salvar"}</button></div>)}
+      </>}
+    </div>
   </div>;
 }
 
