@@ -399,6 +399,7 @@
         <div class="sessao oculto" id="sessaoInfo"></div>
       </div>
       <button class="btn-header-icon" id="btnGuia" title="Guia da IA" style="margin-left:auto">📖</button>
+      <button class="btn-header-icon" id="btnBackup" title="Baixar backup de todos os dados">⬇</button>
       <button class="sair" id="btnSair">Sair</button>
     </div>
   </header>
@@ -856,6 +857,32 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 $('#btnGuia').addEventListener('click', abrirGuia);
 $('#btnFecharGuia').addEventListener('click', ()=> $('#modalGuia').classList.add('oculto'));
 
+/* Backup completo em um toque: baixa todas as tabelas num JSON local.
+   Segurança contra qualquer problema no Supabase (plano free) — o arquivo
+   fica no aparelho do Diego. 'config' fica de fora (só guarda o hash do
+   PIN, não é dado de negócio). */
+$('#btnBackup').addEventListener('click', async ()=>{
+  const btn = $('#btnBackup');
+  btn.disabled = true; btn.textContent = '…';
+  try{
+    const tabelas = ['clientes','servicos','fotos','agenda','financeiro','estoque','caixa_entrada','historico','guia_ia'];
+    const dump = { app:'painel-tapecaria-bahia', gerado_em: new Date().toISOString() };
+    for(const t of tabelas){
+      const { data, error } = await sb.from(t).select('*');
+      if(error) throw new Error(t+': '+error.message);
+      dump[t] = data;
+    }
+    const blob = new Blob([JSON.stringify(dump,null,1)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'backup-tapecaria-'+hojeISO()+'.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('⬇ Backup baixado');
+  }catch(err){ toast('Erro no backup: '+err.message); }
+  btn.disabled = false; btn.textContent = '⬇';
+});
+
 async function abrirGuia(){
   const cont = $('#guiaConteudo'); cont.innerHTML = '<p class="vazio">Carregando…</p>';
   $('#modalGuia').classList.remove('oculto');
@@ -1060,26 +1087,24 @@ async function escolherDiaEHorario(compromisso){
       achouAlgum = true;
       const bloco = el('div'); bloco.style.cssText='margin-bottom:14px';
       const cidadesDoDia = [...new Set(doDia.filter(a=>(a.tipo||'presencial')==='presencial' && a.cidade).map(a=>a.cidade))];
-      const conflitoRota = tipo==='presencial' && cidade && cidadesDoDia.some(c=>cidadeChave(c)!==cidadeChave(cidade));
-      const outrasCidadesPresencial = conflitoRota ? doDia.filter(a=>(a.tipo||'presencial')==='presencial' && a.cidade && cidadeChave(a.cidade)!==cidadeChave(cidade)) : [];
-      const periodosConflito = new Set(outrasCidadesPresencial.map(a=>periodoDoHorario(a.hora)));
+      const outrasCidadesPresencial = tipo==='presencial' && cidade ? doDia.filter(a=>(a.tipo||'presencial')==='presencial' && a.cidade && a.hora && cidadeChave(a.cidade)!==cidadeChave(cidade)) : [];
+      const conflitoRota = outrasCidadesPresencial.length>0;
       const rotulo = el('div',null, dataCurtaBR(dataISO) + (doDia.length ? ` · ${doDia.length} compromisso(s)` : ' · dia livre') + (cidadesDoDia.length ? ` · 🏙 ${cidadesDoDia.join(', ')}` : ''));
       rotulo.style.cssText='font-weight:600;margin-bottom:6px;font-size:.88rem'+(conflitoRota?';color:var(--alta,#e0574f)':'');
       bloco.appendChild(rotulo);
       if(conflitoRota){
-        const NOME_PERIODO = {manha:'de manhã', tarde:'à tarde', noite:'à noite'};
-        const periodosTexto = [...periodosConflito].map(p=>NOME_PERIODO[p]).join(' e ');
-        const aviso = el('div','',`⚠️ Já tem compromisso presencial em outra cidade ${periodosTexto} nesse dia — só os horários ${periodosTexto} ficaram marcados em vermelho, confira se a rota fecha antes de encaixar aqui.`);
+        const resumoOutras = outrasCidadesPresencial.map(a=>`${(a.hora||'').slice(0,5)} em ${a.cidade}`).join(', ');
+        const aviso = el('div','',`⚠️ Nesse dia já tem ${resumoOutras} — os horários em vermelho não dão tempo de serviço + estrada até lá.`);
         aviso.style.cssText='font-size:.78rem;color:var(--alta,#e0574f);margin-bottom:6px';
         bloco.appendChild(aviso);
       }
       const chips = el('div'); chips.style.cssText='display:flex;flex-wrap:wrap;gap:6px';
       livres.forEach(h=>{
-        const arriscado = periodosConflito.has(periodoDoHorario(h));
+        const arriscado = horarioApertado(h, outrasCidadesPresencial, cidade);
         const b = el('button','botao b-tel', h);
         if(arriscado){
           b.style.cssText='border-color:var(--alta,#e0574f);color:var(--alta,#e0574f)';
-          b.title='Mesmo período (manhã/tarde/noite) do compromisso em outra cidade — pode não dar tempo de rota.';
+          b.title='Muito perto do compromisso em outra cidade — a conta de serviço + estrada não fecha.';
         }
         b.addEventListener('click', ()=>{ fundo.remove(); resolve({data:dataISO, hora:h}); });
         chips.appendChild(b);
@@ -1103,15 +1128,40 @@ async function escolherDiaEHorario(compromisso){
    confirmar um novo compromisso. Os horários são clicáveis — toca pra
    escolher outro em vez do sugerido automaticamente. Resolve com o
    horário escolhido (string) ou null se cancelou. */
-/* Manhã/tarde/noite pra comparar conflito de rota por período, não por
-   minuto exato — um compromisso só de manhã em Luziânia não impede
-   agendar à tarde em Brasília, por exemplo. */
-function periodoDoHorario(h){
-  const hh = Number((h||'').slice(0,2));
-  if(isNaN(hh)) return 'manha';
-  if(hh<12) return 'manha';
-  if(hh<18) return 'tarde';
-  return 'noite';
+/* Tempo típico de estrada entre as praças do Diego, em MINUTOS (chaves são
+   pares de cidadeChave() em ordem alfabética, unidas por "|"). São
+   estimativas de trânsito normal — servem pro ALERTA, não pra bloquear;
+   quem conhece o dia a dia da estrada é o Diego. Par desconhecido usa 60. */
+const TEMPO_ESTRADA_MIN = {
+  'brasilia|luziania': 75,
+  'luziania|valparaiso': 25,
+  'cidade ocidental|luziania': 30,
+  'luziania|novo gama': 35,
+  'jardim inga|luziania': 15,
+  'aguas lindas de goias|luziania': 105,
+  'aguas claras|luziania': 60,
+  'aguas claras|brasilia': 25,
+  'brasilia|valparaiso': 45,
+  'brasilia|novo gama': 50,
+  'brasilia|cidade ocidental': 50,
+  'aguas lindas de goias|brasilia': 50,
+  'novo gama|valparaiso': 15,
+  'cidade ocidental|valparaiso': 15,
+  'cidade ocidental|novo gama': 20,
+};
+/* Tempo reservado pro serviço em si (visita, entrega) antes de pegar estrada
+   de novo — soma com o deslocamento na conta do alerta de rota. */
+const DURACAO_SERVICO_MIN = 60;
+function minutosDoHorario(h){ const [hh,mm]=String(h||'').split(':').map(Number); return (hh||0)*60+(mm||0); }
+function tempoEstradaMin(c1, c2){
+  const a=cidadeChave(c1), b=cidadeChave(c2);
+  if(!a || !b || a===b) return 0;
+  return TEMPO_ESTRADA_MIN[[a,b].sort().join('|')] ?? 60;
+}
+/* Um horário "não fecha" com um compromisso em outra cidade quando o vão
+   entre os dois começos é menor que serviço + estrada. */
+function horarioApertado(h, outros, cidadeNova){
+  return (outros||[]).some(a=>Math.abs(minutosDoHorario(h)-minutosDoHorario(a.hora)) < tempoEstradaMin(cidadeNova, a.cidade) + DURACAO_SERVICO_MIN);
 }
 /* Compara cidades de forma tolerante (ignora acento, maiúscula, sufixo tipo
    "-DF" ou texto entre parênteses) — usado só pra decidir se dois
@@ -1195,27 +1245,28 @@ function confirmarComDiaVisivel(dataISO, doDia, novoTitulo, novaCidade, novoHora
     const atualizarNovo = ()=>{
       novo.textContent = `➕ Novo (${icNovo} ${novoTipo}): ${escolhido?escolhido+' — ':''}${novoTitulo}${novaCidade?' 🏙 '+novaCidade:''}${!escolhido?' (sem horário disponível — escolha um acima ou cancele)':''}`;
     };
+    /* Mesmo alerta de rota do reagendamento: horário que não fecha a conta
+       de serviço + estrada com um presencial de outra cidade fica vermelho
+       (continua clicável — a decisão final é do Diego). */
+    const outrasCidades = novoTipo==='presencial' && novaCidade ? doDia.filter(a=>(a.tipo||'presencial')==='presencial' && a.cidade && a.hora && cidadeChave(a.cidade)!==cidadeChave(novaCidade)) : [];
+    const estiloChip = (h2)=>{
+      if(h2===escolhido) return 'background:var(--marrom,#b4632f);color:#fff;font-weight:700';
+      if(horarioApertado(h2, outrasCidades, novaCidade)) return 'background:rgba(224,87,79,.12);color:var(--alta,#e0574f)';
+      return 'background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a)';
+    };
+    const pintarChips = ()=>{
+      chips.querySelectorAll('button').forEach(b=>{
+        b.style.cssText='padding:6px 12px;border-radius:20px;font-size:.85rem;border:0;cursor:pointer;min-height:32px;'+estiloChip(b.textContent);
+      });
+    };
     (horariosDisponiveis||[]).forEach(h=>{
       const chip = document.createElement('button');
       chip.type='button'; chip.textContent=h;
-      const pintarChip = ()=>{
-        chip.style.cssText='padding:6px 12px;border-radius:20px;font-size:.85rem;border:0;cursor:pointer;min-height:32px;'
-          + (h===escolhido ? 'background:var(--marrom,#b4632f);color:#fff;font-weight:700'
-                            : 'background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a)');
-      };
-      pintarChip();
-      chip.addEventListener('click', ()=>{
-        escolhido = h;
-        chips.querySelectorAll('button').forEach(b=>{
-          const h2=b.textContent;
-          b.style.cssText='padding:6px 12px;border-radius:20px;font-size:.85rem;border:0;cursor:pointer;min-height:32px;'
-            + (h2===escolhido ? 'background:var(--marrom,#b4632f);color:#fff;font-weight:700'
-                               : 'background:rgba(90,160,106,.12);color:var(--baixa,#5aa06a)');
-        });
-        atualizarNovo();
-      });
+      if(horarioApertado(h, outrasCidades, novaCidade)) chip.title='Muito perto do compromisso em outra cidade — a conta de serviço + estrada não fecha.';
+      chip.addEventListener('click', ()=>{ escolhido = h; pintarChips(); atualizarNovo(); });
       chips.appendChild(chip);
     });
+    pintarChips();
     caixa.appendChild(chips);
     atualizarNovo();
     caixa.appendChild(novo);
@@ -1243,6 +1294,43 @@ async function exigirPrazo(valorAtual, contexto){
     const t = digitado.trim();
     if(/^\d{4}-\d{2}-\d{2}$/.test(t) && !isNaN(new Date(t+'T00:00:00'))) return t;
   }
+}
+
+/* Depois de remanejar um compromisso ligado a um cliente, oferece a mensagem
+   de reagendamento pronta — o Diego copia e manda ele mesmo pelo WhatsApp
+   (regra inviolável: nada é enviado automaticamente). Compromisso sem ficha
+   (ex: "pegar camisa com Paulinho") não tem cliente pra avisar, só pula. */
+async function oferecerMensagemReagendamento(compromisso, novaData, novaHora){
+  if(!compromisso.servico_id) return;
+  const { data: serv } = await sb.from('servicos').select('titulo,clientes(nome,telefone)').eq('id', compromisso.servico_id).single();
+  const cli = serv?.clientes;
+  if(!cli?.nome) return;
+  const diaSemana = new Date(novaData+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'long'});
+  const msg = `Oi ${cli.nome}, tudo bem? Sobre ${serv.titulo||compromisso.titulo}: precisei reorganizar a agenda e podemos remarcar para ${diaSemana} (${dataCurtaBR(novaData)}) às ${(novaHora||'').slice(0,5)}. Pode ser? Qualquer coisa me avisa que a gente ajusta. — Tapeçaria e Estofados Bahia`;
+  await new Promise(resolve=>{
+    const {fundo,caixa}=_modalBase();
+    const t = el('div',null,`Avisar ${cli.nome} do novo horário?`);
+    t.style.cssText='font-weight:700;margin-bottom:10px';
+    caixa.appendChild(t);
+    const prev = el('div',null,msg);
+    prev.style.cssText='background:var(--card2,#2b221c);border:1px solid var(--linha,#3a2d24);border-radius:8px;padding:10px;font-size:.88rem;margin-bottom:12px;white-space:pre-wrap';
+    caixa.appendChild(prev);
+    const linha = el('div'); linha.style.cssText='display:flex;flex-direction:column;gap:8px';
+    const wa = telParaWa(cli.telefone);
+    if(wa){
+      const bWa = el('button','botao b-wa','Abrir no WhatsApp');
+      bWa.addEventListener('click', ()=>{ window.open(wa+'?text='+encodeURIComponent(msg),'_blank','noopener'); fundo.remove(); resolve(); });
+      linha.appendChild(bWa);
+    }
+    const bCopiar = el('button','botao b-copy','📋 Copiar mensagem');
+    bCopiar.addEventListener('click', async ()=>{ await copiarTexto(msg); fundo.remove(); resolve(); });
+    linha.appendChild(bCopiar);
+    const bNao = el('button','botao b-rm','Agora não');
+    bNao.addEventListener('click', ()=>{ fundo.remove(); resolve(); });
+    linha.appendChild(bNao);
+    caixa.appendChild(linha);
+    fundo.addEventListener('mousedown', e=>{ if(e.target===fundo){ fundo.remove(); resolve(); } });
+  });
 }
 
 /* Concluir um compromisso nunca deveria assumir "acabou tudo" — se foi só
@@ -1302,7 +1390,9 @@ async function concluirCompromissoAgenda(a, aoTerminar){
     const { error } = await sb.from('agenda').update({ data: proximo.data, hora: proximo.hora, status:'planejado' }).eq('id',a.id);
     if(error){ toast('Erro: '+error.message); return; }
     await sb.from('historico').insert({o_que:`Compromisso reagendado: ${a.titulo}`, por:'diego', detalhe:`Nova data: ${proximo.data} ${proximo.hora||''}`});
-    toast(`✔ Remanejado pra ${dataCurtaBR(proximo.data)} às ${proximo.hora}`); aoTerminar();
+    toast(`✔ Remanejado pra ${dataCurtaBR(proximo.data)} às ${proximo.hora}`);
+    await oferecerMensagemReagendamento(a, proximo.data, proximo.hora);
+    aoTerminar();
     return;
   }
   const pendenteDigitado = await askText('O que ficou pendente?', sugerirPendente(a.titulo));
@@ -1657,7 +1747,7 @@ async function renderInicio(){
   const horizonteD = new Date(); horizonteD.setDate(horizonteD.getDate()+30);
   const horizonteStr = `${horizonteD.getFullYear()}-${String(horizonteD.getMonth()+1).padStart(2,'0')}-${String(horizonteD.getDate()).padStart(2,'0')}`;
   const [{data:leadsUrg}, {data:agUrg}, {data:finUrg}, {data:caixaPend}] = await Promise.all([
-    sb.from('servicos').select('id,cliente_id,titulo,prioridade,prazo,status,proxima_acao,clientes(nome)').not('status','in','(pago,perdido)'),
+    sb.from('servicos').select('id,cliente_id,titulo,prioridade,prazo,status,proxima_acao,atualizado_em,criado_em,clientes(nome)').not('status','in','(pago,perdido)'),
     sb.from('agenda').select('id,titulo,data,hora,cidade,tipo,servico_id').eq('status','planejado').lte('data', horizonteStr),
     sb.from('financeiro').select('id,descricao,valor,status,data').in('status',['a_pagar','a_receber']).lte('data', hojeStr),
     sb.from('caixa_entrada').select('id,status').eq('processado', false),
@@ -1739,6 +1829,16 @@ async function renderInicio(){
         const s=p.lead;
         txt.appendChild(el('b',null, (s.clientes?.nome||'Cliente')+' — '+s.titulo));
         txt.appendChild(el('div','sub', (s.proxima_acao||'Sem próxima ação definida')+' · '+textoPrazo(s.prazo)));
+        /* Lead esquecido foi a origem do caso Julia (09/07) — orçamento
+           enviado, "aguardando resposta", e ninguém cutuca. 3+ dias sem
+           nenhuma mexida na ficha = aviso pra cobrar. */
+        const ultimaMexida = s.atualizado_em || s.criado_em;
+        const diasParado = ultimaMexida ? Math.floor((Date.now()-new Date(ultimaMexida).getTime())/86400000) : 0;
+        if(diasParado>=3){
+          const parado = el('div','sub', `🕐 Sem movimento há ${diasParado} dias — vale cutucar o cliente`);
+          parado.style.color='var(--media,#e0a23f)';
+          txt.appendChild(parado);
+        }
       } else {
         const f=p.fin;
         txt.appendChild(el('b',null, (f.descricao||'Lançamento')+' — '+moedaBR(Number(f.valor))));
@@ -1759,7 +1859,9 @@ async function renderInicio(){
           const { error } = await sb.from('agenda').update({ data: escolha.data, hora: escolha.hora, status:'planejado' }).eq('id',p.agenda.id);
           if(error){ toast('Erro: '+error.message); return; }
           await sb.from('historico').insert({o_que:`Compromisso reagendado: ${p.agenda.titulo}`, por:'diego', detalhe:`Nova data: ${escolha.data} ${escolha.hora||''}`});
-          toast(`✔ Remanejado pra ${dataCurtaBR(escolha.data)} às ${escolha.hora}`); renderInicio(); renderAgenda();
+          toast(`✔ Remanejado pra ${dataCurtaBR(escolha.data)} às ${escolha.hora}`);
+          await oferecerMensagemReagendamento(p.agenda, escolha.data, escolha.hora);
+          renderInicio(); renderAgenda();
         });
         acoesAg.appendChild(bReag);
         item.appendChild(acoesAg);
@@ -2374,7 +2476,9 @@ async function renderAgenda(){
         const { error } = await sb.from('agenda').update({ data: escolha.data, hora: escolha.hora }).eq('id',a.id);
         if(error){ toast('Erro: '+error.message); return; }
         await sb.from('historico').insert({o_que:`Compromisso reagendado: ${a.titulo}`, por:'diego', detalhe:`Nova data: ${escolha.data} ${escolha.hora||''}`});
-        toast(`✔ Remanejado pra ${dataCurtaBR(escolha.data)} às ${escolha.hora}`); renderAgenda(); renderInicio();
+        toast(`✔ Remanejado pra ${dataCurtaBR(escolha.data)} às ${escolha.hora}`);
+        await oferecerMensagemReagendamento(a, escolha.data, escolha.hora);
+        renderAgenda(); renderInicio();
       });
       item.appendChild(bReagendar);
     }
