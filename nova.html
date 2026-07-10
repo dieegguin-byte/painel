@@ -22,7 +22,7 @@
 </head>
 <body>
 <div id="root"></div>
-<script type="text/babel" data-presets="react,typescript">
+<script type="text/plain" id="app-source">
 const { useCallback, useEffect, useMemo, useState } = React;
 
 const SUPABASE_URL = "https://iymlzdcloaeyybhefywp.supabase.co";
@@ -443,6 +443,18 @@ function CustomersView({ customers, services, search, setSearch }) {
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<Home />);
+</script>
+<script>
+(function () {
+  const source = document.getElementById("app-source").textContent;
+  const output = Babel.transform(source, {
+    presets: [["react", { runtime: "classic" }], "typescript"],
+    filename: "app.tsx",
+  }).code;
+  const script = document.createElement("script");
+  script.textContent = output;
+  document.body.appendChild(script);
+})();
 </script>
 </body>
 </html>
