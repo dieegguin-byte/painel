@@ -23,7 +23,9 @@
 .customer-list article.clickable{cursor:pointer;transition:.15s}.customer-list article.clickable:hover{border-color:#8a5a3e;transform:translateY(-1px)}.ficha-link{cursor:pointer;text-decoration:underline;text-decoration-color:#8a5a3e;text-underline-offset:3px}.ficha-link:hover{color:#ffc6a0}
 .ficha-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}.ficha-field{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:10px 12px}.ficha-field.wide{grid-column:1/-1}.ficha-field small{display:block;font-size:8px;letter-spacing:.6px;color:var(--dim);margin-bottom:4px}.ficha-field span{font-size:12px;color:var(--text)}.ficha-actions{grid-column:1/-1;display:flex;gap:8px;margin-top:2px}.ficha-actions a{display:inline-flex;align-items:center;text-decoration:none}.ficha-edit{margin-bottom:6px}.ficha-edit textarea{min-height:60px;resize:vertical}.ficha-section{font:500 16px Georgia,serif;margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--line)}.ficha-servicos{display:flex;flex-direction:column;gap:8px}.ficha-servico{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--yellow);border-radius:11px;padding:11px 13px}.ficha-servico.priority-alta{border-left-color:var(--red)}.ficha-servico.priority-baixa{border-left-color:var(--green)}.ficha-servico-main strong{display:block;font-size:12px;margin-bottom:3px}.ficha-servico-main span{font-size:10px;color:var(--dim)}.ficha-servico-meta{text-align:right;flex:none}.ficha-servico-meta b{display:block;font-size:12px;color:var(--orange2)}.ficha-servico-meta time{font-size:9px;color:var(--dim)}.ficha-note{font-size:10px;color:var(--dim);font-style:italic;margin:9px 0 0}
 .foto-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:4px}.foto{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--line2)}.foto img{width:100%;height:100%;object-fit:cover;display:block}.foto-tag{position:absolute;left:6px;bottom:6px;background:#0f0d0ccc;color:var(--cream);font-size:8px;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:999px}.foto-rm{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:#0f0d0ccc;border:1px solid var(--line2);color:#e88477;font-size:11px;display:grid;place-items:center}.foto-confirm{position:absolute;inset:0;background:#0f0d0ce6;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;padding:8px}.foto-confirm button{width:100%;border-radius:8px;padding:7px;font-size:10px;font-weight:700;border:1px solid var(--line2)}.foto-confirm button:first-child{background:#48221e;color:#ffd8d2;border-color:#8f4d44}.foto-confirm button:last-child{background:var(--surface2);color:var(--muted)}.foto-add{aspect-ratio:1;display:grid;place-items:center;border:1px dashed var(--line2);border-radius:12px;color:var(--muted);font-size:11px;cursor:pointer;text-align:center;background:var(--surface)}.foto-add:hover{border-color:#8a5a3e;color:var(--orange2)}.foto-add input{display:none}
-@media(max-width:560px){.pin-pad{grid-template-columns:repeat(3,64px)}.pin-key{width:64px;height:64px;font-size:21px}.modal-card{padding:16px;border-radius:16px}.ficha-fields{grid-template-columns:1fr}.foto-grid{grid-template-columns:repeat(auto-fill,minmax(95px,1fr))}}
+.modal-card.small{width:min(480px,100%)}.agenda-row{grid-template-columns:48px 24px 1fr auto!important}.agenda-reagendar{padding:6px 10px;font-size:9px;flex:none}.agenda-conflito{display:inline-block;margin-top:4px;font-size:9px;color:#e88477;background:#df6a5d18;border:1px solid #df6a5d55;border-radius:999px;padding:2px 8px}
+.picker-day{border-top:1px solid var(--line);padding:12px 0}.picker-day:first-of-type{border-top:0}.picker-day-label{font-size:12px;font-weight:600;color:var(--cream);margin-bottom:7px}.picker-day-label.conflito{color:#e88477}.picker-aviso{font-size:10px;color:#e88477;margin-bottom:8px;line-height:1.4}.picker-slots{display:flex;flex-wrap:wrap;gap:6px}.picker-slot{background:#75a9871a;border:1px solid #75a98750;color:#9bc7a7;border-radius:999px;padding:7px 13px;font-size:12px;min-height:34px}.picker-slot:hover{background:#75a98733}.picker-slot.risky{background:#df6a5d15;border-color:#df6a5d66;color:#e88477}
+@media(max-width:560px){.pin-pad{grid-template-columns:repeat(3,64px)}.pin-key{width:64px;height:64px;font-size:21px}.modal-card{padding:16px;border-radius:16px}.ficha-fields{grid-template-columns:1fr}.foto-grid{grid-template-columns:repeat(auto-fill,minmax(95px,1fr))}.agenda-row{grid-template-columns:44px 20px 1fr!important}.agenda-reagendar{grid-column:1/-1;margin-top:6px;justify-self:start}}
 </style>
 </head>
 <body>
@@ -112,6 +114,23 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - Alterações de valor, pagamento, prazo e status devem ser resumidas ao usuário.
 - No modo Claude, nunca mexer no Financeiro nem excluir nada — isso é do Diego.`;
 const TABELAS_BACKUP = ["clientes", "servicos", "fotos", "agenda", "financeiro", "estoque", "caixa_entrada", "historico", "guia_ia"];
+
+// ===== Cérebro de rota/agenda (portado do app v1, definido pelo Diego 08-09/07/2026) =====
+// Rotina semanal: seg/qua/sex 08-11h e 13-18h; ter/qui/sáb 08-21h; domingo sem expediente.
+const JANELAS_SEMANA = { 0: [], 1: [["08:00", "11:00"], ["13:00", "18:00"]], 2: [["08:00", "21:00"]], 3: [["08:00", "11:00"], ["13:00", "18:00"]], 4: [["08:00", "21:00"]], 5: [["08:00", "11:00"], ["13:00", "18:00"]], 6: [["08:00", "21:00"]] };
+// Tarefa remota (ligar, mandar mensagem) não disputa horário: janela ampla, todo dia, nunca bloqueia horário ocupado.
+const JANELA_REMOTO = ["07:00", "22:00"];
+// Tempo típico de estrada entre as praças do Diego, em minutos (par de cidadeChave em ordem alfabética). Estimativa pro ALERTA, não pra bloquear.
+const TEMPO_ESTRADA_MIN = { "brasilia|luziania": 75, "luziania|valparaiso": 25, "cidade ocidental|luziania": 30, "luziania|novo gama": 35, "jardim inga|luziania": 15, "aguas lindas de goias|luziania": 105, "aguas claras|luziania": 60, "aguas claras|brasilia": 25, "brasilia|valparaiso": 45, "brasilia|novo gama": 50, "brasilia|cidade ocidental": 50, "aguas lindas de goias|brasilia": 50, "novo gama|valparaiso": 15, "cidade ocidental|valparaiso": 15, "cidade ocidental|novo gama": 20 };
+const DURACAO_SERVICO_MIN = 60;
+const CIDADE_BASE = "luziania";
+function hojeISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+function gerarSlots(ini, fim) { const slots = []; let [h, m] = ini.split(":").map(Number); const [hf, mf] = fim.split(":").map(Number); while (h < hf || (h === hf && m < mf)) { slots.push(String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0")); m += 60; if (m >= 60) { m -= 60; h += 1; } } return slots; }
+function horariosParaTipo(dataISO, tipo, ocupados) { if (tipo === "remoto") return gerarSlots(JANELA_REMOTO[0], JANELA_REMOTO[1]); const dia = new Date(dataISO + "T00:00:00").getDay(); const occ = new Set((ocupados || []).filter(Boolean).map((h) => h.slice(0, 5))); const livres = []; for (const [ini, fim] of (JANELAS_SEMANA[dia] || [])) gerarSlots(ini, fim).forEach((h) => { if (!occ.has(h)) livres.push(h); }); return livres; }
+function minutosDoHorario(h) { const [hh, mm] = String(h || "").split(":").map(Number); return (hh || 0) * 60 + (mm || 0); }
+function cidadeChave(c) { return String(c || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split("(")[0].split("-")[0].trim(); }
+function tempoEstradaMin(c1, c2) { const a = cidadeChave(c1), b = cidadeChave(c2); if (!a || !b || a === b) return 0; return TEMPO_ESTRADA_MIN[[a, b].sort().join("|")] ?? 60; }
+function horarioApertado(h, outros, cidadeNova) { return (outros || []).some((a) => Math.abs(minutosDoHorario(h) - minutosDoHorario(a.hora)) < tempoEstradaMin(cidadeNova, a.cidade) + DURACAO_SERVICO_MIN); }
 
 function Home() {
   const [db, setDb] = useState(null);
@@ -317,7 +336,7 @@ function Home() {
       }
       if (form.addAgenda) {
         const occupied = appointments.filter((entry) => entry.data === form.due && entry.tipo === "presencial").map((entry) => entry.hora?.slice(0, 5));
-        const fallback = ["08:00", "09:00", "10:00", "13:00", "14:00", "15:00", "16:00", "17:00"].find((time) => form.agendaType === "remoto" || !occupied.includes(time)) || "18:00";
+        const fallback = horariosParaTipo(form.due, form.agendaType, occupied)[0] || "18:00";
         const appointment = { titulo: `${customer.nome} — ${form.service.trim()}`, data: form.due, hora: form.time || fallback, cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType, status: "planejado", servico_id: service.id };
         const { data: linked } = await db.from("agenda").select("id").eq("servico_id", service.id).eq("status", "planejado").limit(1);
         if (linked?.length) { const { error } = await db.from("agenda").update(appointment).eq("id", linked[0].id); if (error) throw error; }
@@ -340,7 +359,7 @@ function Home() {
     setBusy(true);
     try {
       const occupied = appointments.filter((entry) => entry.data === form.due && entry.tipo === "presencial").map((entry) => entry.hora?.slice(0, 5));
-      const fallback = ["08:00", "09:00", "10:00", "13:00", "14:00", "15:00", "16:00", "17:00"].find((time) => form.agendaType === "remoto" || !occupied.includes(time)) || "18:00";
+      const fallback = horariosParaTipo(form.due, form.agendaType, occupied)[0] || "18:00";
       const payload = { titulo: form.service.trim(), data: form.due, hora: form.time || fallback, cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType, status: "planejado" };
       const { data: same } = await db.from("agenda").select("id").eq("titulo", payload.titulo).eq("data", payload.data).eq("status", "planejado").limit(1);
       let id = same?.[0]?.id;
@@ -445,7 +464,7 @@ function Home() {
 
       {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={appointments} finances={finances} onOpenQueue={() => setTab("caixa")} />}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
-      {tab === "agenda" && <AgendaView appointments={appointments} />}
+      {tab === "agenda" && <AgendaView appointments={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} />}
       {tab === "financeiro" && <FinanceView finances={finances} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
     </main>
@@ -570,9 +589,79 @@ function LeadsView({ services, search, setSearch, onOpenFicha }) {
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">FUNIL DE TRABALHO</p><h3>{visible.length} serviços ativos</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente ou serviço" /></div><div className="records-grid">{visible.map((service) => <article className={`record-card priority-${service.prioridade || "media"}`} key={service.id}><div className="record-top"><span className="status-pill">{statusLabel[service.status] || service.status}</span><time>{compactDate(service.prazo)}</time></div><h4 className="ficha-link" onClick={() => onOpenFicha(service.cliente_id)}>{service.clientes?.nome || "Cliente"}</h4><p>{service.titulo}</p><div className="next-action"><small>PRÓXIMA AÇÃO</small>{service.proxima_acao || "Não definida"}</div><footer>{service.valor_orcamento ? <b>{money(service.valor_orcamento)}</b> : <span>Sem valor</span>}{service.clientes?.telefone && <a href={`https://wa.me/55${normalizePhone(service.clientes.telefone)}`} target="_blank" rel="noreferrer">WhatsApp</a>}</footer></article>)}</div></section>;
 }
 
-function AgendaView({ appointments }) {
+function AgendaView({ appointments, db, demo, notify, onChanged }) {
+  const [picker, setPicker] = useState(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ titulo: "", tipo: "presencial", cidade: "" });
+  const [busy, setBusy] = useState(false);
   const groups = appointments.reduce((acc, item) => { (acc[item.data] ||= []).push(item); return acc; }, {});
-  return <section className="content-card full"><div className="card-head"><div><p className="kicker">ROTINA E DESLOCAMENTO</p><h3>Agenda planejada</h3></div></div>{Object.entries(groups).map(([date, items]) => <div className="agenda-day" key={date}><div className="day-label"><b>{compactDate(date)}</b><span>{items.length} compromisso(s)</span></div><div>{items.map((item) => <article className="agenda-row" key={item.id}><time>{item.hora?.slice(0, 5) || "—"}</time><i>{item.tipo === "remoto" ? "◌" : "⌖"}</i><div><strong>{item.titulo}</strong><span>{item.tipo === "remoto" ? "Remoto" : item.cidade || "Cidade não informada"}</span></div></article>)}</div></div>)}</section>;
+  const dias = Object.keys(groups).sort();
+  const conflitosDoDia = (items) => { const chaves = new Set(items.filter((a) => (a.tipo || "presencial") === "presencial" && a.cidade).map((a) => cidadeChave(a.cidade))); return chaves.size > 1 ? [...chaves] : null; };
+  const submitAdd = () => {
+    if (!addForm.titulo.trim()) { notify("Descreva o compromisso.", "error"); return; }
+    if (addForm.tipo === "presencial" && !addForm.cidade.trim()) { notify("Compromisso presencial precisa de cidade.", "error"); return; }
+    setAddOpen(false);
+    setPicker({ mode: "new", appt: { titulo: addForm.titulo.trim(), tipo: addForm.tipo, cidade: addForm.tipo === "presencial" ? addForm.cidade.trim() : null } });
+  };
+  const onPicked = async (dataISO, hora) => {
+    const { appt, mode } = picker; setPicker(null);
+    if (demo) { notify("Na demonstração a agenda não é salva.", "info"); return; }
+    setBusy(true);
+    try {
+      if (mode === "reschedule") { const { error } = await db.from("agenda").update({ data: dataISO, hora }).eq("id", appt.id); if (error) throw error; notify("Compromisso reagendado.", "ok"); }
+      else { const { error } = await db.from("agenda").insert({ titulo: appt.titulo, data: dataISO, hora, cidade: appt.cidade, tipo: appt.tipo, status: "planejado" }); if (error) throw error; notify("Compromisso adicionado.", "ok"); }
+      onChanged?.();
+    } catch (e) { notify("Erro: " + e.message, "error"); }
+    finally { setBusy(false); }
+  };
+  return <section className="content-card full">
+    <div className="card-head"><div><p className="kicker">ROTINA E DESLOCAMENTO</p><h3>Agenda planejada</h3></div><button className="primary" onClick={() => { setAddForm({ titulo: "", tipo: "presencial", cidade: "" }); setAddOpen(true); }}>+ Adicionar</button></div>
+    {!dias.length && <div className="empty-state"><b>Sem compromissos planejados.</b><span>Toque em “+ Adicionar” para criar.</span></div>}
+    {dias.map((date) => { const items = groups[date]; const conf = conflitosDoDia(items); return <div className="agenda-day" key={date}>
+      <div className="day-label"><b>{compactDate(date)}</b><span>{items.length} compromisso(s)</span>{conf && <span className="agenda-conflito">⚠️ rota: {conf.join(" / ")}</span>}</div>
+      <div>{[...items].sort((a, b) => (a.hora || "99").localeCompare(b.hora || "99")).map((item) => <article className="agenda-row" key={item.id}><time>{item.hora?.slice(0, 5) || "—"}</time><i>{item.tipo === "remoto" ? "◌" : "⌖"}</i><div><strong>{item.titulo}</strong><span>{item.tipo === "remoto" ? "Remoto" : item.cidade || "Cidade não informada"}</span></div><button className="ghost agenda-reagendar" onClick={() => setPicker({ mode: "reschedule", appt: item })} disabled={busy}>Reagendar</button></article>)}</div>
+    </div>; })}
+    {addOpen && <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setAddOpen(false); }}><div className="modal-card small">
+      <div className="modal-head"><div><p className="kicker">NOVO COMPROMISSO</p><h2>Adicionar</h2></div><button className="ghost" onClick={() => setAddOpen(false)}>Fechar</button></div>
+      <div className="form-grid">
+        <label>Compromisso*<input value={addForm.titulo} onChange={(e) => setAddForm((f) => ({ ...f, titulo: e.target.value }))} /></label>
+        <div className="row"><label>Tipo<select value={addForm.tipo} onChange={(e) => setAddForm((f) => ({ ...f, tipo: e.target.value }))}><option value="presencial">Presencial</option><option value="remoto">Remoto</option></select></label><label>Cidade{addForm.tipo === "presencial" ? "*" : ""}<input value={addForm.cidade} onChange={(e) => setAddForm((f) => ({ ...f, cidade: e.target.value }))} disabled={addForm.tipo === "remoto"} /></label></div>
+        <button className="primary wide" onClick={submitAdd}>Escolher dia e horário</button>
+      </div>
+    </div></div>}
+    {picker && <AgendaPicker appointments={appointments} appt={picker.appt} onClose={() => setPicker(null)} onPicked={onPicked} />}
+  </section>;
+}
+
+function AgendaPicker({ appointments, appt, onClose, onPicked }) {
+  const tipo = appt.tipo || "presencial";
+  const cidade = tipo === "presencial" ? (appt.cidade || "") : null;
+  const hoje = new Date();
+  const porDia = {};
+  appointments.forEach((a) => { if (a.id && a.id === appt.id) return; (porDia[a.data] = porDia[a.data] || []).push(a); });
+  const dias = [];
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(hoje); d.setDate(d.getDate() + i);
+    const dataISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const doDia = porDia[dataISO] || [];
+    const ocupados = tipo === "presencial" ? doDia.filter((a) => (a.tipo || "presencial") === "presencial" && cidadeChave(a.cidade) === cidadeChave(cidade)).map((a) => a.hora) : [];
+    const livres = horariosParaTipo(dataISO, tipo, ocupados);
+    if (!livres.length) continue;
+    const cidadesDoDia = [...new Set(doDia.filter((a) => (a.tipo || "presencial") === "presencial" && a.cidade).map((a) => a.cidade))];
+    const outrasCidades = tipo === "presencial" && cidade ? doDia.filter((a) => (a.tipo || "presencial") === "presencial" && a.cidade && a.hora && cidadeChave(a.cidade) !== cidadeChave(cidade)) : [];
+    dias.push({ dataISO, doDia, livres, cidadesDoDia, outrasCidades, conflito: outrasCidades.length > 0 });
+  }
+  return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-card small">
+      <div className="modal-head"><div><p className="kicker">ESCOLHER DIA E HORÁRIO</p><h2>{appt.titulo || "Compromisso"}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
+      <p className="modal-intro">{tipo === "remoto" ? "Tarefa remota — qualquer horário das 07h às 22h." : `Presencial${cidade ? " em " + cidade : ""} — respeitando sua rotina da semana.`}</p>
+      {!dias.length ? <div className="empty-state"><b>Sem horário livre nos próximos 14 dias.</b></div> : dias.map((dia) => <div className="picker-day" key={dia.dataISO}>
+        <div className={`picker-day-label${dia.conflito ? " conflito" : ""}`}>{compactDate(dia.dataISO)}{dia.doDia.length ? ` · ${dia.doDia.length} compromisso(s)` : " · dia livre"}{dia.cidadesDoDia.length ? ` · 🏙 ${dia.cidadesDoDia.join(", ")}` : ""}</div>
+        {dia.conflito && <div className="picker-aviso">⚠️ Já tem {dia.outrasCidades.map((a) => `${(a.hora || "").slice(0, 5)} em ${a.cidade}`).join(", ")} — horários em vermelho não dão tempo de serviço + estrada.</div>}
+        <div className="picker-slots">{dia.livres.map((h) => { const risky = horarioApertado(h, dia.outrasCidades, cidade); return <button key={h} className={`picker-slot${risky ? " risky" : ""}`} title={risky ? "Muito perto do compromisso em outra cidade — serviço + estrada não fecha." : ""} onClick={() => onPicked(dia.dataISO, h)}>{h}</button>; })}</div>
+      </div>)}
+    </div>
+  </div>;
 }
 
 function FinanceView({ finances }) {
