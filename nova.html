@@ -159,6 +159,9 @@ function Home() {
   const [pinState, setPinState] = useState("checking");
   const [showGuia, setShowGuia] = useState(false);
   const [fichaId, setFichaId] = useState(null);
+  const [rescheduleAppt, setRescheduleAppt] = useState(null);
+  const [concluirAppt, setConcluirAppt] = useState(null);
+  const [addAgendaOpen, setAddAgendaOpen] = useState(false);
 
   const notify = useCallback((text, kind = "info") => {
     setNotice({ text, kind });
@@ -428,6 +431,13 @@ function Home() {
     await navigator.clipboard.writeText(lines.join("\n")); notify("Contexto enxuto copiado.", "ok");
   }
 
+  async function saveReschedule(dataISO, hora) {
+    const appt = rescheduleAppt; setRescheduleAppt(null);
+    if (demo) { notify("Na demonstração a agenda não é salva.", "info"); return; }
+    const { error } = await db.from("agenda").update({ data: dataISO, hora }).eq("id", appt.id);
+    if (error) notify("Erro: " + error.message, "error"); else { notify("Compromisso reagendado.", "ok"); loadAll(); }
+  }
+
   if (booting) return <div className="loading-screen"><div className="brand-seal">TB</div><p>Preparando a central…</p></div>;
   if (!session && !demo) return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">NOVA CENTRAL OPERACIONAL</p><h1>Tapeçaria Bahia</h1><p>Um ambiente separado para Diego e Claude trabalharem na mesma fila, sem apagar, duplicar ou perder o próximo passo.</p>{loginSent ? <div className="success-box">Link enviado. Abra seu e-mail neste aparelho.</div> : <><label>E-mail de acesso<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" onKeyDown={(event) => event.key === "Enter" && sendMagicLink()} /></label><button className="primary" onClick={sendMagicLink} disabled={busy || !email.trim()}>Enviar link de acesso</button></>}<button className="ghost demo-button" onClick={() => setDemo(true)}>Ver demonstração do novo site</button></div></div>;
   if (!demo && pinState === "checking") return <div className="loading-screen"><div className="brand-seal">TB</div><p>Verificando o bloqueio…</p></div>;
@@ -463,15 +473,18 @@ function Home() {
         </section>
       </div>}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={appointments} finances={finances} onOpenQueue={() => setTab("caixa")} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={appointments} finances={finances} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={setRescheduleAppt} />}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
-      {tab === "agenda" && <AgendaView appointments={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} />}
+      {tab === "agenda" && <AgendaView appointments={appointments} onReschedule={setRescheduleAppt} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
     </main>
     <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setSelectedId(null); }}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
     {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
     {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} onClose={() => setFichaId(null)} onChanged={loadAll} />}
+    {rescheduleAppt && <AgendaPicker appointments={appointments} appt={rescheduleAppt} onClose={() => setRescheduleAppt(null)} onPicked={saveReschedule} />}
+    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appointments={appointments} appt={concluirAppt} onClose={() => setConcluirAppt(null)} onDone={() => { setConcluirAppt(null); loadAll(); }} />}
+    {addAgendaOpen && <AddAgendaModal appointments={appointments} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
   </div>;
 }
 
@@ -579,9 +592,11 @@ function TriagePanel(props) {
 
 function ReviewBox({ lines }) { return <div className="review-box"><p className="kicker">SERÁ GRAVADO</p>{lines.map((line) => <span key={line}>✓ {line}</span>)}</div>; }
 
-function Dashboard({ inbox, services, appointments, finances, onOpenQueue }) {
+function Dashboard({ inbox, services, appointments, finances, onOpenQueue, onConcluir, onReschedule }) {
   const today = new Date().toISOString().slice(0, 10); const due = appointments.filter((entry) => entry.data <= today); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
-  return <div className="page-grid"><section className="hero-summary"><div><p className="kicker">VISÃO OPERACIONAL</p><h2>Clareza antes de velocidade.</h2><p>O site separa a vez do Claude, a sua vez e as decisões que exigem aprovação.</p></div><button className="primary" onClick={onOpenQueue}>Abrir fila de entrada</button></section><section className="metric-grid"><Metric label="Para Claude" value={inbox.filter((entry) => ["novo", "respondido"].includes(entry.status || "novo")).length} detail="Novos e respondidos" tone="orange" /><Metric label="Aguardando você" value={inbox.filter((entry) => entry.status === "aguardando_voce").length} detail="Perguntas no app" tone="red" /><Metric label="Agenda vencendo" value={due.length} detail="Hoje ou atrasada" tone="yellow" /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" /></section><section className="content-card"><div className="card-head"><div><p className="kicker">PRIORIDADES</p><h3>O que pede ação</h3></div></div>{[...services].sort((a, b) => String(a.prazo || "9").localeCompare(String(b.prazo || "9"))).slice(0, 7).map((service) => <div className="priority-row" key={service.id}><i className={`priority ${service.prioridade || "media"}`}></i><div><strong>{service.clientes?.nome || "Cliente"} · {service.titulo}</strong><span>{service.proxima_acao || "Sem próxima ação definida"}</span></div><time>{compactDate(service.prazo)}</time></div>)}</section>{openFin.length > 0 && <section className="warning-card"><b>{openFin.length} item(ns) financeiro(s) vencendo ou atrasados</b><span>Somente Diego pode alterar ou confirmar pagamentos.</span></section>}</div>;
+  return <div className="page-grid"><section className="hero-summary"><div><p className="kicker">VISÃO OPERACIONAL</p><h2>Clareza antes de velocidade.</h2><p>O site separa a vez do Claude, a sua vez e as decisões que exigem aprovação.</p></div><button className="primary" onClick={onOpenQueue}>Abrir fila de entrada</button></section><section className="metric-grid"><Metric label="Para Claude" value={inbox.filter((entry) => ["novo", "respondido"].includes(entry.status || "novo")).length} detail="Novos e respondidos" tone="orange" /><Metric label="Aguardando você" value={inbox.filter((entry) => entry.status === "aguardando_voce").length} detail="Perguntas no app" tone="red" /><Metric label="Agenda vencendo" value={due.length} detail="Hoje ou atrasada" tone="yellow" /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" /></section>
+    {due.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Compromissos de hoje e atrasados</h3></div></div>{[...due].sort((a, b) => (a.data + (a.hora || "")).localeCompare(b.data + (b.hora || ""))).map((a) => <div className="priority-row agenda-painel-row" key={a.id}><i className={`priority ${a.data < today ? "alta" : "media"}`}></i><div><strong>{a.titulo}</strong><span>{compactDate(a.data)}{a.data < today ? " · atrasado" : " · hoje"}{a.hora ? ` · ${a.hora.slice(0, 5)}` : ""}{a.tipo === "remoto" ? " · Remoto" : a.cidade ? ` · ${a.cidade}` : ""}</span></div><div className="agenda-acoes"><button className="ghost" onClick={() => onConcluir(a)}>✓ Concluir</button><button className="ghost" onClick={() => onReschedule(a)}>Reagendar</button></div></div>)}</section>}
+    <section className="content-card"><div className="card-head"><div><p className="kicker">PRIORIDADES</p><h3>O que pede ação</h3></div></div>{[...services].sort((a, b) => String(a.prazo || "9").localeCompare(String(b.prazo || "9"))).slice(0, 7).map((service) => <div className="priority-row" key={service.id}><i className={`priority ${service.prioridade || "media"}`}></i><div><strong>{service.clientes?.nome || "Cliente"} · {service.titulo}</strong><span>{service.proxima_acao || "Sem próxima ação definida"}</span></div><time>{compactDate(service.prazo)}</time></div>)}</section>{openFin.length > 0 && <section className="warning-card"><b>{openFin.length} item(ns) financeiro(s) vencendo ou atrasados</b><span>Somente Diego pode alterar ou confirmar pagamentos.</span></section>}</div>;
 }
 function Metric({ label, value, detail, tone }) { return <article className={`metric-card ${tone}`}><span>{label}</span><b>{String(value).padStart(2, "0")}</b><small>{detail}</small></article>; }
 
@@ -590,58 +605,59 @@ function LeadsView({ services, search, setSearch, onOpenFicha }) {
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">FUNIL DE TRABALHO</p><h3>{visible.length} serviços ativos</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente ou serviço" /></div><div className="records-grid">{visible.map((service) => <article className={`record-card priority-${service.prioridade || "media"}`} key={service.id}><div className="record-top"><span className="status-pill">{statusLabel[service.status] || service.status}</span><time>{compactDate(service.prazo)}</time></div><h4 className="ficha-link" onClick={() => onOpenFicha(service.cliente_id)}>{service.clientes?.nome || "Cliente"}</h4><p>{service.titulo}</p><div className="next-action"><small>PRÓXIMA AÇÃO</small>{service.proxima_acao || "Não definida"}</div><footer>{service.valor_orcamento ? <b>{money(service.valor_orcamento)}</b> : <span>Sem valor</span>}{service.clientes?.telefone && <a href={`https://wa.me/55${normalizePhone(service.clientes.telefone)}`} target="_blank" rel="noreferrer">WhatsApp</a>}</footer></article>)}</div></section>;
 }
 
-function AgendaView({ appointments, db, demo, notify, onChanged }) {
-  const [picker, setPicker] = useState(null);
-  const [addOpen, setAddOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ titulo: "", tipo: "presencial", cidade: "" });
-  const [concluir, setConcluir] = useState(null);
-  const [busy, setBusy] = useState(false);
+function AgendaView({ appointments, onReschedule, onConcluir, onAdd }) {
   const groups = appointments.reduce((acc, item) => { (acc[item.data] ||= []).push(item); return acc; }, {});
   const dias = Object.keys(groups).sort();
   const conflitosDoDia = (items) => { const chaves = new Set(items.filter((a) => (a.tipo || "presencial") === "presencial" && a.cidade).map((a) => cidadeChave(a.cidade))); return chaves.size > 1 ? [...chaves] : null; };
-  const submitAdd = () => {
-    if (!addForm.titulo.trim()) { notify("Descreva o compromisso.", "error"); return; }
-    if (addForm.tipo === "presencial" && !addForm.cidade.trim()) { notify("Compromisso presencial precisa de cidade.", "error"); return; }
-    setAddOpen(false);
-    setPicker({ mode: "new", appt: { titulo: addForm.titulo.trim(), tipo: addForm.tipo, cidade: addForm.tipo === "presencial" ? addForm.cidade.trim() : null } });
-  };
-  const onPicked = async (dataISO, hora) => {
-    const { appt, mode } = picker; setPicker(null);
-    if (demo) { notify("Na demonstração a agenda não é salva.", "info"); return; }
-    setBusy(true);
-    try {
-      if (mode === "reschedule") { const { error } = await db.from("agenda").update({ data: dataISO, hora }).eq("id", appt.id); if (error) throw error; notify("Compromisso reagendado.", "ok"); }
-      else { const { error } = await db.from("agenda").insert({ titulo: appt.titulo, data: dataISO, hora, cidade: appt.cidade, tipo: appt.tipo, status: "planejado" }); if (error) throw error; notify("Compromisso adicionado.", "ok"); }
-      onChanged?.();
-    } catch (e) { notify("Erro: " + e.message, "error"); }
-    finally { setBusy(false); }
-  };
   return <section className="content-card full">
-    <div className="card-head"><div><p className="kicker">ROTINA E DESLOCAMENTO</p><h3>Agenda planejada</h3></div><button className="primary" onClick={() => { setAddForm({ titulo: "", tipo: "presencial", cidade: "" }); setAddOpen(true); }}>+ Adicionar</button></div>
+    <div className="card-head"><div><p className="kicker">ROTINA E DESLOCAMENTO</p><h3>Agenda planejada</h3></div><button className="primary" onClick={onAdd}>+ Adicionar</button></div>
     {!dias.length && <div className="empty-state"><b>Sem compromissos planejados.</b><span>Toque em “+ Adicionar” para criar.</span></div>}
     {dias.map((date) => { const items = groups[date]; const conf = conflitosDoDia(items); return <div className="agenda-day" key={date}>
       <div className="day-label"><b>{compactDate(date)}</b><span>{items.length} compromisso(s)</span>{conf && <span className="agenda-conflito">⚠️ rota: {conf.join(" / ")}</span>}</div>
-      <div>{[...items].sort((a, b) => (a.hora || "99").localeCompare(b.hora || "99")).map((item) => <article className="agenda-row" key={item.id}><time>{item.hora?.slice(0, 5) || "—"}</time><i>{item.tipo === "remoto" ? "◌" : "⌖"}</i><div><strong>{item.titulo}</strong><span>{item.tipo === "remoto" ? "Remoto" : item.cidade || "Cidade não informada"}</span></div><div className="agenda-acoes"><button className="ghost" onClick={() => setConcluir(item)} disabled={busy}>✓ Concluir</button><button className="ghost" onClick={() => setPicker({ mode: "reschedule", appt: item })} disabled={busy}>Reagendar</button></div></article>)}</div>
+      <div>{[...items].sort((a, b) => (a.hora || "99").localeCompare(b.hora || "99")).map((item) => <article className="agenda-row" key={item.id}><time>{item.hora?.slice(0, 5) || "—"}</time><i>{item.tipo === "remoto" ? "◌" : "⌖"}</i><div><strong>{item.titulo}</strong><span>{item.tipo === "remoto" ? "Remoto" : item.cidade || "Cidade não informada"}</span></div><div className="agenda-acoes"><button className="ghost" onClick={() => onConcluir(item)}>✓ Concluir</button><button className="ghost" onClick={() => onReschedule(item)}>Reagendar</button></div></article>)}</div>
     </div>; })}
-    {addOpen && <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setAddOpen(false); }}><div className="modal-card small">
-      <div className="modal-head"><div><p className="kicker">NOVO COMPROMISSO</p><h2>Adicionar</h2></div><button className="ghost" onClick={() => setAddOpen(false)}>Fechar</button></div>
-      <div className="form-grid">
-        <label>Compromisso*<input value={addForm.titulo} onChange={(e) => setAddForm((f) => ({ ...f, titulo: e.target.value }))} /></label>
-        <div className="row"><label>Tipo<select value={addForm.tipo} onChange={(e) => setAddForm((f) => ({ ...f, tipo: e.target.value }))}><option value="presencial">Presencial</option><option value="remoto">Remoto</option></select></label><label>Cidade{addForm.tipo === "presencial" ? "*" : ""}<input value={addForm.cidade} onChange={(e) => setAddForm((f) => ({ ...f, cidade: e.target.value }))} disabled={addForm.tipo === "remoto"} /></label></div>
-        <button className="primary wide" onClick={submitAdd}>Escolher dia e horário</button>
-      </div>
-    </div></div>}
-    {picker && <AgendaPicker appointments={appointments} appt={picker.appt} onClose={() => setPicker(null)} onPicked={onPicked} />}
-    {concluir && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluir} onClose={() => setConcluir(null)} onDone={() => { setConcluir(null); onChanged?.(); }} />}
   </section>;
 }
 
-function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
+function AddAgendaModal({ appointments, db, demo, notify, onClose, onDone }) {
+  const [form, setForm] = useState({ titulo: "", tipo: "presencial", cidade: "" });
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const submit = () => {
+    if (!form.titulo.trim()) { notify("Descreva o compromisso.", "error"); return; }
+    if (form.tipo === "presencial" && !form.cidade.trim()) { notify("Compromisso presencial precisa de cidade.", "error"); return; }
+    setPickerOpen(true);
+  };
+  const onPicked = async (dataISO, hora) => {
+    setPickerOpen(false);
+    if (demo) { notify("Na demonstração a agenda não é salva.", "info"); onClose(); return; }
+    setBusy(true);
+    try {
+      const { error } = await db.from("agenda").insert({ titulo: form.titulo.trim(), data: dataISO, hora, cidade: form.tipo === "presencial" ? form.cidade.trim() : null, tipo: form.tipo, status: "planejado" });
+      if (error) throw error;
+      notify("Compromisso adicionado.", "ok"); onDone();
+    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
+  };
+  const apptDesc = { titulo: form.titulo.trim() || "Novo compromisso", tipo: form.tipo, cidade: form.tipo === "presencial" ? form.cidade.trim() : null };
+  return <>
+    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><div className="modal-card small">
+      <div className="modal-head"><div><p className="kicker">NOVO COMPROMISSO</p><h2>Adicionar</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
+      <div className="form-grid">
+        <label>Compromisso*<input value={form.titulo} onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))} /></label>
+        <div className="row"><label>Tipo<select value={form.tipo} onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}><option value="presencial">Presencial</option><option value="remoto">Remoto</option></select></label><label>Cidade{form.tipo === "presencial" ? "*" : ""}<input value={form.cidade} onChange={(e) => setForm((f) => ({ ...f, cidade: e.target.value }))} disabled={form.tipo === "remoto"} /></label></div>
+        <button className="primary wide" onClick={submit} disabled={busy}>Escolher dia e horário</button>
+      </div>
+    </div></div>
+    {pickerOpen && <AgendaPicker appointments={appointments} appt={apptDesc} onClose={() => setPickerOpen(false)} onPicked={onPicked} />}
+  </>;
+}
+
+function ConcluirModal({ db, demo, notify, appointments, appt, onClose, onDone }) {
   const [step, setStep] = useState("choose");
   const [pendente, setPendente] = useState("");
-  const [novaData, setNovaData] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const openParcial = () => { setPendente(sugerirPendente(appt.titulo)); setNovaData(""); setStep("parcial"); };
+  const openParcial = () => { setPendente(sugerirPendente(appt.titulo)); setStep("parcial"); };
   const doTotal = async () => {
     if (demo) { notify("Na demonstração não salva.", "info"); onClose(); return; }
     setBusy(true);
@@ -651,36 +667,40 @@ function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
       notify("Concluído.", "ok"); onDone();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
-  const doParcial = async () => {
-    if (!pendente.trim()) { notify("Escreva o que ficou pendente.", "error"); return; }
-    if (!novaData) { notify("A revisão precisa de uma data.", "error"); return; }
+  const goPicker = () => { if (!pendente.trim()) { notify("Escreva o que ficou pendente.", "error"); return; } setPickerOpen(true); };
+  const doParcial = async (dataISO, hora) => {
+    setPickerOpen(false);
     if (demo) { notify("Na demonstração não salva.", "info"); onClose(); return; }
     setBusy(true);
     try {
       if (appt.servico_id) {
         const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", appt.id); if (error) throw error;
-        await db.from("servicos").update({ proxima_acao: pendente.trim(), prazo: novaData, atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
+        await db.from("servicos").update({ proxima_acao: pendente.trim(), prazo: dataISO, atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
         await db.from("historico").insert({ o_que: `"${appt.titulo}": concluído parcialmente`, por: "diego", detalhe: "Pendente: " + pendente.trim() });
       } else {
-        const { error } = await db.from("agenda").update({ titulo: pendente.trim(), data: novaData, status: "planejado" }).eq("id", appt.id); if (error) throw error;
+        const { error } = await db.from("agenda").update({ titulo: pendente.trim(), data: dataISO, hora, status: "planejado" }).eq("id", appt.id); if (error) throw error;
       }
       notify("Registrado — continua na agenda até resolver.", "ok"); onDone();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
-  return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <div className="modal-card small">
-      <div className="modal-head"><div><p className="kicker">CONCLUIR COMPROMISSO</p><h2>{appt.titulo}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
-      {step === "choose" ? <div className="concluir-opcoes">
-        <p className="modal-intro">Foi concluído totalmente ou ficou pendência?</p>
-        <button className="primary wide" onClick={doTotal} disabled={busy}>✔ Concluído total — acabou</button>
-        <button className="secondary wide" onClick={openParcial} disabled={busy}>🟡 Parcial — ainda falta algo</button>
-      </div> : <div className="form-grid">
-        <label>O que ficou pendente?<input value={pendente} onChange={(e) => setPendente(e.target.value)} /></label>
-        <label>Nova data para revisar<input type="date" value={novaData} onChange={(e) => setNovaData(e.target.value)} /></label>
-        <div className="ficha-actions"><button className="primary" onClick={doParcial} disabled={busy}>Salvar pendência</button><button className="ghost" onClick={() => setStep("choose")}>Voltar</button></div>
-      </div>}
+  const pendingAppt = { id: appt.id, titulo: pendente.trim() || appt.titulo, tipo: appt.tipo, cidade: appt.cidade };
+  return <>
+    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-card small">
+        <div className="modal-head"><div><p className="kicker">CONCLUIR COMPROMISSO</p><h2>{appt.titulo}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
+        {step === "choose" ? <div className="concluir-opcoes">
+          <p className="modal-intro">Foi concluído totalmente ou ficou pendência?</p>
+          <button className="primary wide" onClick={doTotal} disabled={busy}>✔ Concluído total — acabou</button>
+          <button className="secondary wide" onClick={openParcial} disabled={busy}>🟡 Parcial — ainda falta algo</button>
+        </div> : <div className="form-grid">
+          <label>O que ficou pendente?<input value={pendente} onChange={(e) => setPendente(e.target.value)} /></label>
+          <p className="ficha-note">A data você escolhe no calendário, vendo os dias que já têm compromisso e os avisos de rota.</p>
+          <div className="ficha-actions"><button className="primary" onClick={goPicker} disabled={busy}>Escolher dia e horário</button><button className="ghost" onClick={() => setStep("choose")}>Voltar</button></div>
+        </div>}
+      </div>
     </div>
-  </div>;
+    {pickerOpen && <AgendaPicker appointments={appointments} appt={pendingAppt} onClose={() => setPickerOpen(false)} onPicked={doParcial} />}
+  </>;
 }
 
 function AgendaPicker({ appointments, appt, onClose, onPicked }) {
