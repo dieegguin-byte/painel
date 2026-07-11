@@ -483,7 +483,7 @@ function Home() {
     {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
     {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} onClose={() => setFichaId(null)} onChanged={loadAll} />}
     {rescheduleAppt && <AgendaPicker appointments={appointments} appt={rescheduleAppt} onClose={() => setRescheduleAppt(null)} onPicked={saveReschedule} />}
-    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appointments={appointments} appt={concluirAppt} onClose={() => setConcluirAppt(null)} onDone={() => { setConcluirAppt(null); loadAll(); }} />}
+    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} onClose={() => setConcluirAppt(null)} onDone={() => { setConcluirAppt(null); loadAll(); }} />}
     {addAgendaOpen && <AddAgendaModal appointments={appointments} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
   </div>;
 }
@@ -652,10 +652,9 @@ function AddAgendaModal({ appointments, db, demo, notify, onClose, onDone }) {
   </>;
 }
 
-function ConcluirModal({ db, demo, notify, appointments, appt, onClose, onDone }) {
+function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
   const [step, setStep] = useState("choose");
   const [pendente, setPendente] = useState("");
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const openParcial = () => { setPendente(sugerirPendente(appt.titulo)); setStep("parcial"); };
   const doTotal = async () => {
@@ -667,40 +666,33 @@ function ConcluirModal({ db, demo, notify, appointments, appt, onClose, onDone }
       notify("Concluído.", "ok"); onDone();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
-  const goPicker = () => { if (!pendente.trim()) { notify("Escreva o que ficou pendente.", "error"); return; } setPickerOpen(true); };
-  const doParcial = async (dataISO, hora) => {
-    setPickerOpen(false);
+  const doParcial = async () => {
+    if (!pendente.trim()) { notify("Explique o que ficou pendente.", "error"); return; }
     if (demo) { notify("Na demonstração não salva.", "info"); onClose(); return; }
     setBusy(true);
     try {
-      if (appt.servico_id) {
-        const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", appt.id); if (error) throw error;
-        await db.from("servicos").update({ proxima_acao: pendente.trim(), prazo: dataISO, atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
-        await db.from("historico").insert({ o_que: `"${appt.titulo}": concluído parcialmente`, por: "diego", detalhe: "Pendente: " + pendente.trim() });
-      } else {
-        const { error } = await db.from("agenda").update({ titulo: pendente.trim(), data: dataISO, hora, status: "planejado" }).eq("id", appt.id); if (error) throw error;
-      }
-      notify("Registrado — continua na agenda até resolver.", "ok"); onDone();
+      const nota = `Reagendar (parcial): "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}${appt.tipo === "remoto" ? " · remoto" : ""}. Ficou pendente: ${pendente.trim()}.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}`;
+      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: nota, status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
+      const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", appt.id); if (error) throw error;
+      if (appt.servico_id) await db.from("servicos").update({ proxima_acao: pendente.trim(), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
+      await db.from("historico").insert({ o_que: `"${appt.titulo}": parcial — Claude vai reagendar`, por: "diego", detalhe: "Pendente: " + pendente.trim() });
+      notify("Anotado. O Claude reagenda na próxima vez que você chamar.", "ok"); onDone();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
-  const pendingAppt = { id: appt.id, titulo: pendente.trim() || appt.titulo, tipo: appt.tipo, cidade: appt.cidade };
-  return <>
-    <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-card small">
-        <div className="modal-head"><div><p className="kicker">CONCLUIR COMPROMISSO</p><h2>{appt.titulo}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
-        {step === "choose" ? <div className="concluir-opcoes">
-          <p className="modal-intro">Foi concluído totalmente ou ficou pendência?</p>
-          <button className="primary wide" onClick={doTotal} disabled={busy}>✔ Concluído total — acabou</button>
-          <button className="secondary wide" onClick={openParcial} disabled={busy}>🟡 Parcial — ainda falta algo</button>
-        </div> : <div className="form-grid">
-          <label>O que ficou pendente?<input value={pendente} onChange={(e) => setPendente(e.target.value)} /></label>
-          <p className="ficha-note">A data você escolhe no calendário, vendo os dias que já têm compromisso e os avisos de rota.</p>
-          <div className="ficha-actions"><button className="primary" onClick={goPicker} disabled={busy}>Escolher dia e horário</button><button className="ghost" onClick={() => setStep("choose")}>Voltar</button></div>
-        </div>}
-      </div>
+  return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-card small">
+      <div className="modal-head"><div><p className="kicker">CONCLUIR COMPROMISSO</p><h2>{appt.titulo}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
+      {step === "choose" ? <div className="concluir-opcoes">
+        <p className="modal-intro">Foi concluído totalmente ou ficou pendência?</p>
+        <button className="primary wide" onClick={doTotal} disabled={busy}>✔ Concluído total — acabou</button>
+        <button className="secondary wide" onClick={openParcial} disabled={busy}>🟡 Parcial — falta algo, o Claude reagenda</button>
+      </div> : <div className="form-grid">
+        <label>Explique o que ficou pendente<textarea value={pendente} onChange={(e) => setPendente(e.target.value)} /></label>
+        <p className="ficha-note">Você só explica o que faltou — o Claude reagenda na próxima vez que você chamar. Não precisa escolher data agora.</p>
+        <div className="ficha-actions"><button className="primary" onClick={doParcial} disabled={busy}>Registrar pro Claude</button><button className="ghost" onClick={() => setStep("choose")}>Voltar</button></div>
+      </div>}
     </div>
-    {pickerOpen && <AgendaPicker appointments={appointments} appt={pendingAppt} onClose={() => setPickerOpen(false)} onPicked={doParcial} />}
-  </>;
+  </div>;
 }
 
 function AgendaPicker({ appointments, appt, onClose, onPicked }) {
