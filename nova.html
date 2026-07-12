@@ -89,12 +89,21 @@ function extractLead(text) {
   const phone = phoneMatch ? phoneMatch[0] : "";
   const nameMatch = raw.match(/(?:sou|meu nome é|me chamo|aqui é)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+){0,2})/i);
   const name = nameMatch ? nameMatch[1].trim() : "";
-  let service = raw
-    .replace(phoneMatch ? phoneMatch[0] : "", "")
-    .replace(nameMatch ? nameMatch[0] : "", "")
+  let stripped = raw;
+  if (phoneMatch) stripped = stripped.replace(new RegExp(phoneMatch[0].replace(/[().]/g, "\\$&") + "\\.?", ""), " ");
+  if (nameMatch) stripped = stripped.replace(new RegExp(nameMatch[0].replace(/[().]/g, "\\$&") + "\\s*,?", ""), " ");
+  let service = stripped
     .replace(/^(oi|olá|ola|bom dia|boa tarde|boa noite)[,.!\s]*/i, "")
     .split("\n").find(Boolean) || "";
-  service = service.replace(/\s{2,}/g, " ").trim();
+  service = service
+    .replace(/\bmeu whatsapp é\b/gi, "")
+    .replace(/\s*,\s*,/g, ",")
+    .replace(/^[\s,.]+/, "")
+    .replace(/\s+([,.!?])/g, "$1")
+    .replace(/[,.]\s*[,.]/g, ".")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .replace(/^[,.\s]+|[,.\s]+$/g, "");
   if (!service) service = raw.split("\n").find(Boolean) || "";
   return { name, phone, service: service.slice(0, 100) };
 }
