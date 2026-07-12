@@ -96,14 +96,17 @@ function extractLead(text) {
     .replace(/^(oi|olá|ola|bom dia|boa tarde|boa noite)[,.!\s]*/i, "")
     .split("\n").find(Boolean) || "";
   service = service
-    .replace(/\bmeu whatsapp é\b/gi, "")
+    .replace(/\bmeu (whatsapp|numero|número|telefone|contato)\s*(é|e)?\s*$/i, "")
+    .replace(/\bmeu (whatsapp|numero|número|telefone|contato)\b/gi, "")
     .replace(/\s*,\s*,/g, ",")
     .replace(/^[\s,.]+/, "")
     .replace(/\s+([,.!?])/g, "$1")
     .replace(/[,.]\s*[,.]/g, ".")
     .replace(/\s{2,}/g, " ")
     .trim()
-    .replace(/^[,.\s]+|[,.\s]+$/g, "");
+    .replace(/^[,.\s]+|[,.\s]+$/g, "")
+    .replace(/\s+(é|e|para|pra|no|na|em|de)$/i, "")
+    .trim();
   if (!service) service = raw.split("\n").find(Boolean) || "";
   return { name, phone, service: service.slice(0, 100) };
 }
