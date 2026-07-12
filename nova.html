@@ -112,14 +112,14 @@ function extractLead(text) {
   const valor = detectValor(raw);
   const prazo = detectPrazo(raw);
   const tipo = /\b(buscar|entregar|retirar|retirada|entrega|visita|visitar|avaliar|avaliação|medir|medida|levar|passar (lá|la|no local))\b/i.test(raw) ? "presencial"
-    : /\b(ligar|liguei|mandar mensagem|whatsapp|mensagem|telefonar)\b/i.test(raw) ? "remoto" : "";
+    : /\b(ligar|liguei|telefonar|mandar (uma )?(mensagem|whatsapp|zap|msg)|chamar no (whats|zap|whatsapp)|responder (a )?mensagem)\b/i.test(raw) ? "remoto" : "";
   const prioridade = /\b(urgente|urgência|urgencia|emergência|emergencia|hoje mesmo|o quanto antes|correndo)\b/i.test(raw) ? "alta" : "";
   return { name, phone, service: service.slice(0, 100), cidade, valor, prazo, tipo, prioridade };
 }
 
 const CIDADES_TB = ["Luziânia", "Brasília", "Valparaíso", "Cidade Ocidental", "Novo Gama", "Jardim Ingá", "Águas Lindas de Goiás", "Águas Claras"];
 function detectCidade(text) {
-  const t = cidadeChave(text);
+  const t = String(text).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   return CIDADES_TB.find((c) => t.includes(cidadeChave(c))) || "";
 }
 function detectValor(text) {
@@ -134,8 +134,8 @@ function detectPrazo(text) {
   const t = text.toLowerCase();
   const hoje = new Date();
   if (/\bhoje\b/.test(t)) return isoData(hoje);
-  if (/\bdepois de amanh[ãa]\b/.test(t)) { const d = new Date(hoje); d.setDate(d.getDate() + 2); return isoData(d); }
-  if (/\bamanh[ãa]\b/.test(t)) { const d = new Date(hoje); d.setDate(d.getDate() + 1); return isoData(d); }
+  if (/\bdepois de amanh[ãa]/.test(t)) { const d = new Date(hoje); d.setDate(d.getDate() + 2); return isoData(d); }
+  if (/\bamanh[ãa]/.test(t)) { const d = new Date(hoje); d.setDate(d.getDate() + 1); return isoData(d); }
   const dataExplicita = t.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
   if (dataExplicita) {
     const dia = Number(dataExplicita[1]), mes = Number(dataExplicita[2]) - 1;
