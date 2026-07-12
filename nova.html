@@ -83,6 +83,21 @@ function parseInbox(raw = "") {
   const note = raw.match(/\[\[TB_INBOX_NOTE\]\]([\s\S]*)$/);
   return { text: image ? (note?.[1] || "").trim() : raw.trim(), imageUrl: (image?.[1] || "").trim(), fileName: (file?.[1] || "print").trim() };
 }
+function extractLead(text) {
+  const raw = text || "";
+  const phoneMatch = raw.match(/\(?\d{2}\)?\s?9?\d{4}-?\d{4}/);
+  const phone = phoneMatch ? phoneMatch[0] : "";
+  const nameMatch = raw.match(/(?:sou|meu nome é|me chamo|aqui é)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+){0,2})/i);
+  const name = nameMatch ? nameMatch[1].trim() : "";
+  let service = raw
+    .replace(phoneMatch ? phoneMatch[0] : "", "")
+    .replace(nameMatch ? nameMatch[0] : "", "")
+    .replace(/^(oi|olá|ola|bom dia|boa tarde|boa noite)[,.!\s]*/i, "")
+    .split("\n").find(Boolean) || "";
+  service = service.replace(/\s{2,}/g, " ").trim();
+  if (!service) service = raw.split("\n").find(Boolean) || "";
+  return { name, phone, service: service.slice(0, 100) };
+}
 function compactDate(value) {
   if (!value) return "Sem data";
   const date = new Date(`${value}T12:00:00`);
@@ -279,8 +294,8 @@ function Home() {
   useEffect(() => {
     if (!selected) { setForm(emptyForm); return; }
     const parsed = parseInbox(selected.texto);
-    const first = parsed.text.split("\n").find(Boolean) || "";
-    setForm({ ...emptyForm, service: first.slice(0, 100), due: new Date().toISOString().slice(0, 10) });
+    const lead = extractLead(parsed.text);
+    setForm({ ...emptyForm, name: lead.name, phone: lead.phone, service: lead.service, due: new Date().toISOString().slice(0, 10) });
   }, [selectedId]);
 
   async function sendMagicLink() {
