@@ -229,7 +229,7 @@ function Home() {
   const [pinState, setPinState] = useState("checking");
   const [showGuia, setShowGuia] = useState(false);
   const [fichaId, setFichaId] = useState(null);
-  const [rescheduleAppt, setRescheduleAppt] = useState(null);
+  const [explicar, setExplicar] = useState(null);
   const [concluirAppt, setConcluirAppt] = useState(null);
   const [addAgendaOpen, setAddAgendaOpen] = useState(false);
 
@@ -508,12 +508,8 @@ function Home() {
     await navigator.clipboard.writeText(lines.join("\n")); notify("Contexto enxuto copiado.", "ok");
   }
 
-  async function saveReschedule(dataISO, hora) {
-    const appt = rescheduleAppt; setRescheduleAppt(null);
-    if (demo) { notify("Na demonstração a agenda não é salva.", "info"); return; }
-    const { error } = await db.from("agenda").update({ data: dataISO, hora }).eq("id", appt.id);
-    if (error) notify("Erro: " + error.message, "error"); else { notify("Compromisso reagendado.", "ok"); loadAll(); }
-  }
+  const abrirReagendar = (a) => setExplicar({ item: { tipoItem: "agenda", id: a.id, titulo: a.titulo, cidade: a.cidade, tipo: a.tipo, servico_id: a.servico_id }, kind: "reagendar" });
+  const abrirLeadAcao = (s, kind) => setExplicar({ item: { tipoItem: "servico", id: s.id, titulo: s.titulo, cliente: s.clientes?.nome }, kind });
 
   if (booting) return <div className="loading-screen"><div className="brand-seal">TB</div><p>Preparando a central…</p></div>;
   if (!session && !demo) return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">NOVA CENTRAL OPERACIONAL</p><h1>Tapeçaria Bahia</h1><p>Um ambiente separado para Diego e Claude trabalharem na mesma fila, sem apagar, duplicar ou perder o próximo passo.</p>{loginSent ? <div className="success-box">Link enviado. Abra seu e-mail neste aparelho.</div> : <><label>E-mail de acesso<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" onKeyDown={(event) => event.key === "Enter" && sendMagicLink()} /></label><button className="primary" onClick={sendMagicLink} disabled={busy || !email.trim()}>Enviar link de acesso</button></>}<button className="ghost demo-button" onClick={() => setDemo(true)}>Ver demonstração do novo site</button></div></div>;
@@ -550,16 +546,16 @@ function Home() {
         </section>
       </div>}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={appointments} finances={finances} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={setRescheduleAppt} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={appointments} finances={finances} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onLeadAcao={abrirLeadAcao} />}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
-      {tab === "agenda" && <AgendaView appointments={appointments} onReschedule={setRescheduleAppt} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
+      {tab === "agenda" && <AgendaView appointments={appointments} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
     </main>
     <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setSelectedId(null); }}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
     {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
     {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} onClose={() => setFichaId(null)} onChanged={loadAll} />}
-    {rescheduleAppt && <AgendaPicker appointments={appointments} appt={rescheduleAppt} onClose={() => setRescheduleAppt(null)} onPicked={saveReschedule} />}
+    {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={() => { setExplicar(null); loadAll(); }} />}
     {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} onClose={() => setConcluirAppt(null)} onDone={() => { setConcluirAppt(null); loadAll(); }} />}
     {addAgendaOpen && <AddAgendaModal appointments={appointments} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
   </div>;
@@ -669,11 +665,11 @@ function TriagePanel(props) {
 
 function ReviewBox({ lines }) { return <div className="review-box"><p className="kicker">SERÁ GRAVADO</p>{lines.map((line) => <span key={line}>✓ {line}</span>)}</div>; }
 
-function Dashboard({ inbox, services, appointments, finances, onOpenQueue, onConcluir, onReschedule }) {
+function Dashboard({ inbox, services, appointments, finances, onOpenQueue, onConcluir, onReschedule, onLeadAcao }) {
   const today = new Date().toISOString().slice(0, 10); const due = appointments.filter((entry) => entry.data <= today); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
   return <div className="page-grid"><section className="hero-summary"><div><p className="kicker">VISÃO OPERACIONAL</p><h2>Clareza antes de velocidade.</h2><p>O site separa a vez do Claude, a sua vez e as decisões que exigem aprovação.</p></div><button className="primary" onClick={onOpenQueue}>Abrir fila de entrada</button></section><section className="metric-grid"><Metric label="Para Claude" value={inbox.filter((entry) => ["novo", "respondido"].includes(entry.status || "novo")).length} detail="Novos e respondidos" tone="orange" /><Metric label="Aguardando você" value={inbox.filter((entry) => entry.status === "aguardando_voce").length} detail="Perguntas no app" tone="red" /><Metric label="Agenda vencendo" value={due.length} detail="Hoje ou atrasada" tone="yellow" /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" /></section>
     {due.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Compromissos de hoje e atrasados</h3></div></div>{[...due].sort((a, b) => (a.data + (a.hora || "")).localeCompare(b.data + (b.hora || ""))).map((a) => <div className="priority-row agenda-painel-row" key={a.id}><i className={`priority ${a.data < today ? "alta" : "media"}`}></i><div><strong>{a.titulo}</strong><span>{compactDate(a.data)}{a.data < today ? " · atrasado" : " · hoje"}{a.hora ? ` · ${a.hora.slice(0, 5)}` : ""}{a.tipo === "remoto" ? " · Remoto" : a.cidade ? ` · ${a.cidade}` : ""}</span></div><div className="agenda-acoes"><button className="ghost" onClick={() => onConcluir(a)}>✓ Concluir</button><button className="ghost" onClick={() => onReschedule(a)}>Reagendar</button></div></div>)}</section>}
-    <section className="content-card"><div className="card-head"><div><p className="kicker">PRIORIDADES</p><h3>O que pede ação</h3></div></div>{[...services].sort((a, b) => String(a.prazo || "9").localeCompare(String(b.prazo || "9"))).slice(0, 7).map((service) => <div className="priority-row" key={service.id}><i className={`priority ${service.prioridade || "media"}`}></i><div><strong>{service.clientes?.nome || "Cliente"} · {service.titulo}</strong><span>{service.proxima_acao || "Sem próxima ação definida"}</span></div><time>{compactDate(service.prazo)}</time></div>)}</section>{openFin.length > 0 && <section className="warning-card"><b>{openFin.length} item(ns) financeiro(s) vencendo ou atrasados</b><span>Somente Diego pode alterar ou confirmar pagamentos.</span></section>}</div>;
+    <section className="content-card"><div className="card-head"><div><p className="kicker">PRIORIDADES</p><h3>O que pede ação</h3></div></div>{[...services].sort((a, b) => String(a.prazo || "9").localeCompare(String(b.prazo || "9"))).slice(0, 7).map((service) => <div className="priority-row" key={service.id}><i className={`priority ${service.prioridade || "media"}`}></i><div><strong>{service.clientes?.nome || "Cliente"} · {service.titulo}</strong><span>{service.proxima_acao || "Sem próxima ação definida"} · {compactDate(service.prazo)}</span></div><div className="agenda-acoes"><button className="ghost" onClick={() => onLeadAcao(service, "concluir")}>✓ Concluir</button><button className="ghost" onClick={() => onLeadAcao(service, "reagendar")}>Reagendar</button></div></div>)}</section>{openFin.length > 0 && <section className="warning-card"><b>{openFin.length} item(ns) financeiro(s) vencendo ou atrasados</b><span>Somente Diego pode alterar ou confirmar pagamentos.</span></section>}</div>;
 }
 function Metric({ label, value, detail, tone }) { return <article className={`metric-card ${tone}`}><span>{label}</span><b>{String(value).padStart(2, "0")}</b><small>{detail}</small></article>; }
 
@@ -768,6 +764,37 @@ function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
         <p className="ficha-note">Você só explica o que faltou — o Claude reagenda na próxima vez que você chamar. Não precisa escolher data agora.</p>
         <div className="ficha-actions"><button className="primary" onClick={doParcial} disabled={busy}>Registrar pro Claude</button><button className="ghost" onClick={() => setStep("choose")}>Voltar</button></div>
       </div>}
+    </div>
+  </div>;
+}
+
+function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
+  const ehReagendar = kind === "reagendar";
+  const [texto, setTexto] = useState(ehReagendar ? sugerirPendente(item.titulo) : "");
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!texto.trim()) { notify("Escreva uma explicação pro Claude.", "error"); return; }
+    if (demo) { notify("Na demonstração não salva.", "info"); onClose(); return; }
+    setBusy(true);
+    try {
+      const ref = item.tipoItem === "agenda" ? `(agenda #${item.id}${item.servico_id ? ", serviço #" + item.servico_id : ""})` : `(serviço #${item.id})`;
+      const cabec = ehReagendar ? "Reagendar" : "Concluir lead";
+      const ctx = `${item.cliente ? item.cliente + " · " : ""}${item.titulo}${item.cidade ? " · " + item.cidade : ""}${item.tipo === "remoto" ? " · remoto" : ""}`;
+      const nota = `${cabec}: ${ctx}. ${ehReagendar ? "Explicação" : "O que aconteceu"}: ${texto.trim()}. ${ref}`;
+      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: nota, status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
+      if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", item.id); if (error) throw error; }
+      await db.from("historico").insert({ o_que: `${cabec}: ${item.titulo}`, por: "diego", detalhe: texto.trim() });
+      notify("Anotado. O Claude cuida disso na próxima vez que você chamar.", "ok"); onDone();
+    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
+  };
+  return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal-card small">
+      <div className="modal-head"><div><p className="kicker">{ehReagendar ? "REAGENDAR" : "CONCLUIR"}</p><h2>{item.titulo}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
+      <div className="form-grid">
+        <label>{ehReagendar ? "O que explicar pro Claude?" : "O que foi feito / o que o Claude deve fazer?"}<textarea value={texto} onChange={(e) => setTexto(e.target.value)} /></label>
+        <p className="ficha-note">{ehReagendar ? "Você só explica — o Claude abre o calendário e reagenda na próxima vez que você chamar. Não precisa escolher a data agora." : "Você explica o que rolou — o Claude atualiza o lead (status, próximo passo) na próxima vez que você chamar."}</p>
+        <div className="ficha-actions"><button className="primary" onClick={submit} disabled={busy}>Registrar pro Claude</button><button className="ghost" onClick={onClose}>Cancelar</button></div>
+      </div>
     </div>
   </div>;
 }
