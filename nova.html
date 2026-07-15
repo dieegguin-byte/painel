@@ -25,6 +25,7 @@
 .foto-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:4px}.foto{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--line2)}.foto img{width:100%;height:100%;object-fit:cover;display:block}.foto-tag{position:absolute;left:6px;bottom:6px;background:#0f0d0ccc;color:var(--cream);font-size:8px;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:999px}.foto-rm{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:#0f0d0ccc;border:1px solid var(--line2);color:#e88477;font-size:11px;display:grid;place-items:center}.foto-confirm{position:absolute;inset:0;background:#0f0d0ce6;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;padding:8px}.foto-confirm button{width:100%;border-radius:8px;padding:7px;font-size:10px;font-weight:700;border:1px solid var(--line2)}.foto-confirm button:first-child{background:#48221e;color:#ffd8d2;border-color:#8f4d44}.foto-confirm button:last-child{background:var(--surface2);color:var(--muted)}.foto-add{aspect-ratio:1;display:grid;place-items:center;border:1px dashed var(--line2);border-radius:12px;color:var(--muted);font-size:11px;cursor:pointer;text-align:center;background:var(--surface)}.foto-add:hover{border-color:#8a5a3e;color:var(--orange2)}.foto-add input{display:none}
 .modal-card.small{width:min(480px,100%)}.agenda-row{grid-template-columns:48px 24px 1fr auto!important}.agenda-acoes{display:flex;gap:6px;flex:none}.agenda-acoes button{padding:6px 10px;font-size:9px}.agenda-conflito{display:inline-block;margin-top:4px;font-size:9px;color:#e88477;background:#df6a5d18;border:1px solid #df6a5d55;border-radius:999px;padding:2px 8px}.concluir-opcoes{display:flex;flex-direction:column;gap:10px}.concluir-opcoes .modal-intro{margin-bottom:4px}
 .picker-day{border-top:1px solid var(--line);padding:12px 0}.picker-day:first-of-type{border-top:0}.picker-day-label{font-size:12px;font-weight:600;color:var(--cream);margin-bottom:7px}.picker-day-label.conflito{color:#e88477}.picker-aviso{font-size:10px;color:#e88477;margin-bottom:8px;line-height:1.4}.picker-slots{display:flex;flex-wrap:wrap;gap:6px}.picker-slot{background:#75a9871a;border:1px solid #75a98750;color:#9bc7a7;border-radius:999px;padding:7px 13px;font-size:12px;min-height:34px}.picker-slot:hover{background:#75a98733}.picker-slot.risky{background:#df6a5d15;border-color:#df6a5d66;color:#e88477}
+.triage-head-actions{display:flex;gap:6px;flex-wrap:wrap}.confirm-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}.confirm-row div{display:flex;gap:8px}.edit-note{width:100%;min-height:110px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:11px;font-size:12px;line-height:1.55;outline:0;margin-bottom:9px}.edit-note:focus{border-color:#d37742;box-shadow:0 0 0 3px #d86d3619}
 @media(max-width:560px){.pin-pad{grid-template-columns:repeat(3,64px)}.pin-key{width:64px;height:64px;font-size:21px}.modal-card{padding:16px;border-radius:16px}.ficha-fields{grid-template-columns:1fr}.foto-grid{grid-template-columns:repeat(auto-fill,minmax(95px,1fr))}.agenda-row{grid-template-columns:44px 20px 1fr!important}.agenda-acoes{grid-column:1/-1;margin-top:6px;justify-content:flex-start}}
 </style>
 </head>
@@ -476,6 +477,21 @@ function Home() {
     if (error) notify(error.message, "error"); else { setSelectedId(null); await loadAll(); notify("Pergunta registrada no app.", "ok"); }
   }
 
+  async function editInboxNote(item, novoTexto) {
+    const parsed = parseInbox(item.texto);
+    const semImagem = !parsed.imageUrl;
+    const payload = semImagem ? novoTexto : `[[TB_INBOX_IMG]]${parsed.imageUrl}\n[[TB_INBOX_FILE]]${parsed.fileName}\n[[TB_INBOX_NOTE]]${novoTexto}`;
+    if (demo) { setInbox((items) => items.map((entry) => entry.id === item.id ? { ...entry, texto: payload } : entry)); notify("Na demonstração não salva.", "info"); return; }
+    const { error } = await db.from("caixa_entrada").update({ texto: payload }).eq("id", item.id);
+    if (error) notify("Erro: " + error.message, "error"); else { await loadAll(); notify("Anotação atualizada.", "ok"); }
+  }
+
+  async function deleteInboxItem(item) {
+    if (demo) { setInbox((items) => items.filter((entry) => entry.id !== item.id)); setSelectedId(null); notify("Na demonstração não salva.", "info"); return; }
+    const { error } = await db.from("caixa_entrada").delete().eq("id", item.id);
+    if (error) notify("Erro: " + error.message, "error"); else { setSelectedId(null); await loadAll(); notify("Item excluído.", "ok"); }
+  }
+
   async function answer(item) {
     if (!reply.trim()) return;
     const conversation = [...(item.conversa || []), { de: "diego", texto: reply.trim(), em: new Date().toISOString() }];
@@ -543,7 +559,7 @@ function Home() {
         </section>
         <section className="triage-column">
           {!selected && <div className="triage-welcome"><div className="big-orb">◎</div><p className="kicker">UMA TAREFA POR VEZ</p><h2>{working ? "Retome a triagem em andamento" : claudeQueue.length ? "Abra o próximo item da fila" : "Nada pede ação agora"}</h2><p>O conteúdo original, as buscas e o formulário ficam juntos para evitar releitura e cliques errados.</p>{working ? <button className="primary" onClick={() => setSelectedId(working.id)}>Retomar</button> : claudeQueue[0] && <button className="primary" onClick={() => claim(claudeQueue[0])}>Pegar próximo item</button>}</div>}
-          {selected && <TriagePanel item={selected} parsed={parsedSelected} mode={mode} form={form} updateForm={updateForm} customers={customers} duplicateCustomers={duplicateCustomers} services={services} appointments={appointments} finances={finances} busy={busy} reply={reply} setReply={setReply} onClaim={() => claim(selected)} onRelease={() => release(selected)} onAnswer={() => answer(selected)} onCustomer={() => finishCustomer(selected)} onAgenda={() => finishAgenda(selected)} onFinance={() => finishFinance(selected)} onAsk={() => askDiego(selected)} />}
+          {selected && <TriagePanel item={selected} parsed={parsedSelected} mode={mode} form={form} updateForm={updateForm} customers={customers} duplicateCustomers={duplicateCustomers} services={services} appointments={appointments} finances={finances} busy={busy} reply={reply} setReply={setReply} onClaim={() => claim(selected)} onRelease={() => release(selected)} onAnswer={() => answer(selected)} onCustomer={() => finishCustomer(selected)} onAgenda={() => finishAgenda(selected)} onFinance={() => finishFinance(selected)} onAsk={() => askDiego(selected)} onEdit={(texto) => editInboxNote(selected, texto)} onDelete={() => deleteInboxItem(selected)} />}
         </section>
       </div>}
 
@@ -631,11 +647,23 @@ function QueueItem({ item, selected, onOpen }) {
 function TriagePanel(props) {
   const { item, parsed, mode, form, updateForm, customers, duplicateCustomers, services, appointments, busy, reply, setReply } = props;
   const status = item.status || "novo";
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(parsed.text);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  useEffect(() => { setEditText(parsed.text); setEditing(false); setConfirmDelete(false); }, [item.id]);
   const relatedServices = form.customerId ? services.filter((entry) => entry.cliente_id === form.customerId && !["pago", "perdido"].includes(entry.status)) : [];
   const cityConflicts = form.due && form.agendaType === "presencial" ? appointments.filter((entry) => entry.data === form.due && entry.tipo === "presencial" && entry.cidade && form.city && entry.cidade.toLowerCase() !== form.city.toLowerCase()) : [];
   return <div className="triage-panel">
-    <div className="triage-head"><div><span className={`status-pill status-${status}`}>{statusLabel[status]}</span><h2>Entrada #{String(item.id).slice(0, 8)}</h2></div>{status === "em_processamento" && <button className="ghost" onClick={props.onRelease}>Devolver à fila</button>}</div>
-    <article className="source-card"><p className="kicker">CONTEÚDO ORIGINAL</p><p>{parsed.text || "Print sem texto adicional."}</p>{parsed.imageUrl && <a href={parsed.imageUrl} target="_blank" rel="noreferrer"><img src={parsed.imageUrl} alt={parsed.fileName || "Print da conversa"} /></a>}</article>
+    <div className="triage-head"><div><span className={`status-pill status-${status}`}>{statusLabel[status]}</span><h2>Entrada #{String(item.id).slice(0, 8)}</h2></div>
+      <div className="triage-head-actions">
+        {status === "em_processamento" && <button className="ghost" onClick={props.onRelease}>Devolver à fila</button>}
+        {!editing && !confirmDelete && <button className="ghost" onClick={() => setEditing(true)}>✎ Editar</button>}
+        {!confirmDelete && <button className="ghost" onClick={() => setConfirmDelete(true)}>🗑 Excluir</button>}
+      </div>
+    </div>
+    {confirmDelete && <div className="danger-box confirm-row"><span>Excluir esta entrada da caixa? Não dá pra desfazer.</span><div><button className="primary" onClick={props.onDelete}>Sim, excluir</button><button className="ghost" onClick={() => setConfirmDelete(false)}>Cancelar</button></div></div>}
+    {editing ? <article className="source-card"><p className="kicker">EDITAR ANOTAÇÃO</p><textarea className="edit-note" value={editText} onChange={(e) => setEditText(e.target.value)} />{parsed.imageUrl && <a href={parsed.imageUrl} target="_blank" rel="noreferrer"><img src={parsed.imageUrl} alt={parsed.fileName || "Print da conversa"} /></a>}<div className="ficha-actions"><button className="primary" onClick={() => { props.onEdit(editText); setEditing(false); }}>Salvar</button><button className="ghost" onClick={() => { setEditText(parsed.text); setEditing(false); }}>Cancelar</button></div></article>
+    : <article className="source-card"><p className="kicker">CONTEÚDO ORIGINAL</p><p>{parsed.text || "Print sem texto adicional."}</p>{parsed.imageUrl && <a href={parsed.imageUrl} target="_blank" rel="noreferrer"><img src={parsed.imageUrl} alt={parsed.fileName || "Print da conversa"} /></a>}</article>}
     {!!item.conversa?.length && <div className="conversation">{item.conversa.map((message, index) => <div key={`${message.em}-${index}`} className={`bubble ${message.de} ${message.tipo || ""}`}><span>{message.de === "ia" ? "Claude" : "Diego"}</span>{message.texto}</div>)}</div>}
     {status === "aguardando_voce" && <div className="answer-box"><label>Sua resposta para o Claude<textarea value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Responda aqui; a entrada voltará automaticamente para a fila do Claude." /></label><button className="primary" onClick={props.onAnswer} disabled={!reply.trim()}>Enviar resposta</button></div>}
     {["novo", "respondido"].includes(status) && <div className="claim-box"><h3>Esta entrada ainda não está travada.</h3><p>Assuma antes de alterar dados. Se outra sessão já pegou, esta operação será recusada.</p><button className="primary" onClick={props.onClaim} disabled={busy}>Iniciar triagem segura</button></div>}
