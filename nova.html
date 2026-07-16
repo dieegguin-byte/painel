@@ -770,8 +770,19 @@ function AddAgendaModal({ appointments, db, demo, notify, onClose, onDone }) {
 function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
   const [step, setStep] = useState("choose");
   const [pendente, setPendente] = useState("");
+  const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const openParcial = () => { setPendente(sugerirPendente(appt.titulo)); setStep("parcial"); };
+  const uploadFiles = async () => {
+    const uploaded = [];
+    for (const f of files) {
+      const path = `caixa-entrada/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { error: uploadError } = await db.storage.from("fotos-servicos").upload(path, f); if (uploadError) throw uploadError;
+      const { data, error } = await db.storage.from("fotos-servicos").createSignedUrl(path, 60 * 60 * 24 * 365); if (error) throw error;
+      uploaded.push({ url: data.signedUrl, fileName: f.name });
+    }
+    return uploaded;
+  };
   const doTotal = async () => {
     if (demo) { notify("Concluído (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: null }); return; }
     setBusy(true);
@@ -780,6 +791,11 @@ function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
       if (appt.servico_id) {
         const { error: sErr } = await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr;
         await db.from("historico").insert({ o_que: `"${appt.titulo}" concluído`, por: "diego" });
+      }
+      if (files.length) {
+        const uploaded = await uploadFiles();
+        const nota = `Concluído: "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}. Print(s) anexado(s) pro Claude ver e atualizar a ficha/foto.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}`;
+        const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       }
       notify("Concluído.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: null });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
@@ -790,22 +806,28 @@ function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
     setBusy(true);
     try {
       const nota = `Reagendar (parcial): "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}${appt.tipo === "remoto" ? " · remoto" : ""}. Ficou pendente: ${pendente.trim()}.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}`;
-      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: nota, status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
+      const uploaded = files.length ? await uploadFiles() : [];
+      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", appt.id); if (error) throw error;
       if (appt.servico_id) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: pendente.trim(), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr; }
       await db.from("historico").insert({ o_que: `"${appt.titulo}": parcial — Claude vai reagendar`, por: "diego", detalhe: "Pendente: " + pendente.trim() });
       notify("Anotado. O Claude reagenda na próxima vez que você chamar.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
+  const filePicker = <div className="composer-actions"><label className="file-button">{files.length ? `${files.length} print(s)` : "Anexar print(s) (opcional)"}<input type="file" accept="image/*" multiple onChange={(e) => setFiles((fs) => [...fs, ...Array.from(e.target.files || [])])} /></label></div>;
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="modal-card small">
       <div className="modal-head"><div><p className="kicker">CONCLUIR COMPROMISSO</p><h2>{appt.titulo}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
       {step === "choose" ? <div className="concluir-opcoes">
         <p className="modal-intro">Foi concluído totalmente ou ficou pendência?</p>
+        {files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}
+        {filePicker}
         <button className="primary wide" onClick={doTotal} disabled={busy}>✔ Concluído total — acabou</button>
         <button className="secondary wide" onClick={openParcial} disabled={busy}>🟡 Parcial — falta algo, o Claude reagenda</button>
       </div> : <div className="form-grid">
         <label>Explique o que ficou pendente<textarea value={pendente} onChange={(e) => setPendente(e.target.value)} /></label>
+        {files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}
+        {filePicker}
         <p className="ficha-note">Você só explica o que faltou — o Claude reagenda na próxima vez que você chamar. Não precisa escolher data agora.</p>
         <div className="ficha-actions"><button className="primary" onClick={doParcial} disabled={busy}>Registrar pro Claude</button><button className="ghost" onClick={() => setStep("choose")}>Voltar</button></div>
       </div>}
@@ -816,6 +838,7 @@ function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
 function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
   const ehReagendar = kind === "reagendar";
   const [texto, setTexto] = useState(ehReagendar ? sugerirPendente(item.titulo) : "");
+  const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     if (!texto.trim()) { notify("Escreva uma explicação pro Claude.", "error"); return; }
@@ -827,7 +850,14 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
       const cabec = ehReagendar ? "Reagendar" : "Concluir lead";
       const ctx = `${item.cliente ? item.cliente + " · " : ""}${item.titulo}${item.cidade ? " · " + item.cidade : ""}${item.tipo === "remoto" ? " · remoto" : ""}`;
       const nota = `${cabec}: ${ctx}. ${ehReagendar ? "Explicação" : "O que aconteceu"}: ${texto.trim()}. ${ref}`;
-      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: nota, status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
+      const uploaded = [];
+      for (const f of files) {
+        const path = `caixa-entrada/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const { error: uploadError } = await db.storage.from("fotos-servicos").upload(path, f); if (uploadError) throw uploadError;
+        const { data, error } = await db.storage.from("fotos-servicos").createSignedUrl(path, 60 * 60 * 24 * 365); if (error) throw error;
+        uploaded.push({ url: data.signedUrl, fileName: f.name });
+      }
+      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", item.id); if (error) throw error; }
       const alvoServico = item.tipoItem === "agenda" ? item.servico_id : item.id;
       if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
@@ -840,6 +870,8 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
       <div className="modal-head"><div><p className="kicker">{ehReagendar ? "REAGENDAR" : "CONCLUIR"}</p><h2>{item.titulo}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
       <div className="form-grid">
         <label>{ehReagendar ? "O que explicar pro Claude?" : "O que foi feito / o que o Claude deve fazer?"}<textarea value={texto} onChange={(e) => setTexto(e.target.value)} /></label>
+        {files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}
+        <div className="composer-actions"><label className="file-button">{files.length ? `${files.length} print(s)` : "Anexar print(s) (opcional)"}<input type="file" accept="image/*" multiple onChange={(e) => setFiles((fs) => [...fs, ...Array.from(e.target.files || [])])} /></label></div>
         <p className="ficha-note">{ehReagendar ? "Você só explica — o Claude abre o calendário e reagenda na próxima vez que você chamar. Não precisa escolher a data agora." : "Você explica o que rolou — o Claude atualiza o lead (status, próximo passo) na próxima vez que você chamar."}</p>
         <div className="ficha-actions"><button className="primary" onClick={submit} disabled={busy}>Registrar pro Claude</button><button className="ghost" onClick={onClose}>Cancelar</button></div>
       </div>
