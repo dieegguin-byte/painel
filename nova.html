@@ -820,6 +820,7 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
       const nota = `${cabec}: ${ctx}. ${ehReagendar ? "Explicação" : "O que aconteceu"}: ${texto.trim()}. ${ref}`;
       const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: nota, status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", item.id); if (error) throw error; }
+      if (item.tipoItem === "agenda" && item.servico_id) { await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", item.servico_id); }
       await db.from("historico").insert({ o_que: `${cabec}: ${item.titulo}`, por: "diego", detalhe: texto.trim() });
       notify("Anotado. O Claude cuida disso na próxima vez que você chamar.", "ok"); onDone();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
