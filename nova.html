@@ -532,6 +532,12 @@ function Home() {
 
   const abrirReagendar = (a) => setExplicar({ item: { tipoItem: "agenda", id: a.id, titulo: a.titulo, cidade: a.cidade, tipo: a.tipo, servico_id: a.servico_id }, kind: "reagendar" });
   const abrirLeadAcao = (s, kind) => setExplicar({ item: { tipoItem: "servico", id: s.id, titulo: s.titulo, cliente: s.clientes?.nome }, kind });
+  // Atualização otimista: some da tela na hora; o loadAll depois só reconcilia com o banco.
+  const aplicarResolucao = useCallback((patch) => {
+    if (!patch) return;
+    if (patch.servicoId) setServices((prev) => prev.map((s) => s.id === patch.servicoId ? { ...s, proxima_acao: patch.proximaAcao ?? null } : s));
+    if (patch.agendaId) setAppointments((prev) => prev.filter((a) => a.id !== patch.agendaId));
+  }, []);
 
   if (booting) return <div className="loading-screen"><div className="brand-seal">TB</div><p>Preparando a central…</p></div>;
   if (!session && !demo) return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">NOVA CENTRAL OPERACIONAL</p><h1>Tapeçaria Bahia</h1><p>Um ambiente separado para Diego e Claude trabalharem na mesma fila, sem apagar, duplicar ou perder o próximo passo.</p>{loginSent ? <div className="success-box">Link enviado. Abra seu e-mail neste aparelho.</div> : <><label>E-mail de acesso<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" onKeyDown={(event) => event.key === "Enter" && sendMagicLink()} /></label><button className="primary" onClick={sendMagicLink} disabled={busy || !email.trim()}>Enviar link de acesso</button></>}<button className="ghost demo-button" onClick={() => setDemo(true)}>Ver demonstração do novo site</button></div></div>;
@@ -577,8 +583,8 @@ function Home() {
     <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setSelectedId(null); }}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
     {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
     {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} onClose={() => setFichaId(null)} onChanged={loadAll} />}
-    {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={() => { setExplicar(null); loadAll(); }} />}
-    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} onClose={() => setConcluirAppt(null)} onDone={() => { setConcluirAppt(null); loadAll(); }} />}
+    {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
+    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {addAgendaOpen && <AddAgendaModal appointments={appointments} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
   </div>;
 }
@@ -765,28 +771,28 @@ function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const openParcial = () => { setPendente(sugerirPendente(appt.titulo)); setStep("parcial"); };
   const doTotal = async () => {
-    if (demo) { notify("Na demonstração não salva.", "info"); onClose(); return; }
+    if (demo) { notify("Concluído (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: null }); return; }
     setBusy(true);
     try {
       const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", appt.id); if (error) throw error;
       if (appt.servico_id) {
-        await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
+        const { error: sErr } = await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr;
         await db.from("historico").insert({ o_que: `"${appt.titulo}" concluído`, por: "diego" });
       }
-      notify("Concluído.", "ok"); onDone();
+      notify("Concluído.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: null });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
   const doParcial = async () => {
     if (!pendente.trim()) { notify("Explique o que ficou pendente.", "error"); return; }
-    if (demo) { notify("Na demonstração não salva.", "info"); onClose(); return; }
+    if (demo) { notify("Anotado (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() }); return; }
     setBusy(true);
     try {
       const nota = `Reagendar (parcial): "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}${appt.tipo === "remoto" ? " · remoto" : ""}. Ficou pendente: ${pendente.trim()}.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}`;
       const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: nota, status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", appt.id); if (error) throw error;
-      if (appt.servico_id) await db.from("servicos").update({ proxima_acao: pendente.trim(), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
+      if (appt.servico_id) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: pendente.trim(), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr; }
       await db.from("historico").insert({ o_que: `"${appt.titulo}": parcial — Claude vai reagendar`, por: "diego", detalhe: "Pendente: " + pendente.trim() });
-      notify("Anotado. O Claude reagenda na próxima vez que você chamar.", "ok"); onDone();
+      notify("Anotado. O Claude reagenda na próxima vez que você chamar.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -811,7 +817,8 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     if (!texto.trim()) { notify("Escreva uma explicação pro Claude.", "error"); return; }
-    if (demo) { notify("Na demonstração não salva.", "info"); onClose(); return; }
+    const alvoServicoDemo = item.tipoItem === "agenda" ? item.servico_id : item.id;
+    if (demo) { notify("Anotado (demo).", "ok"); onDone({ agendaId: (item.tipoItem === "agenda" && ehReagendar) ? item.id : null, servicoId: alvoServicoDemo || null, proximaAcao: null }); return; }
     setBusy(true);
     try {
       const ref = item.tipoItem === "agenda" ? `(agenda #${item.id}${item.servico_id ? ", serviço #" + item.servico_id : ""})` : `(serviço #${item.id})`;
@@ -820,9 +827,10 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
       const nota = `${cabec}: ${ctx}. ${ehReagendar ? "Explicação" : "O que aconteceu"}: ${texto.trim()}. ${ref}`;
       const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: nota, status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", item.id); if (error) throw error; }
-      if (item.tipoItem === "agenda" && item.servico_id) { await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", item.servico_id); }
+      const alvoServico = item.tipoItem === "agenda" ? item.servico_id : item.id;
+      if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
       await db.from("historico").insert({ o_que: `${cabec}: ${item.titulo}`, por: "diego", detalhe: texto.trim() });
-      notify("Anotado. O Claude cuida disso na próxima vez que você chamar.", "ok"); onDone();
+      notify("Anotado. Saiu da lista — o Claude cuida disso quando você chamar.", "ok"); onDone({ agendaId: (item.tipoItem === "agenda" && ehReagendar) ? item.id : null, servicoId: alvoServico || null, proximaAcao: null });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
