@@ -274,6 +274,7 @@ function Home() {
   const [email, setEmail] = useState("");
   const [loginSent, setLoginSent] = useState(false);
   const [tab, setTab] = useState("caixa");
+  const [leadsFiltroInicial, setLeadsFiltroInicial] = useState("todos");
   const [mode, setMode] = useState("diego");
   const [inbox, setInbox] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -632,8 +633,8 @@ function Home() {
         </section>
       </div>}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={appointments} finances={finances} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} />}
-      {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={appointments} finances={finances} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
+      {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={appointments} services={services} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} />}
       {tab === "vales" && <ValesView finances={finances} db={db} demo={demo} notify={notify} onChanged={loadAll} />}
@@ -807,13 +808,13 @@ function CompromissoCard({ a, svc, today, onConcluir, onReschedule }) {
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-function Dashboard({ inbox, services, appointments, finances, onOpenQueue, onConcluir, onReschedule }) {
+function Dashboard({ inbox, services, appointments, finances, onOpenQueue, onConcluir, onReschedule, onSemProximaAcao }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = new Date().toISOString().slice(0, 10); const dueAll = appointments.filter((entry) => entry.data <= today); const futurosAll = appointments.filter((entry) => entry.data > today); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
   const porTipo = (list) => filtroTipo === "todos" ? list : list.filter((entry) => (entry.tipo || "presencial") === filtroTipo);
   const due = porTipo(dueAll); const futuros = porTipo(futurosAll);
   const irParaVencendo = () => { if (dueAll.length === 0) return; setFiltroTipo("todos"); document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
-  return <div className="page-grid"><section className="hero-summary"><div><p className="kicker">VISÃO OPERACIONAL</p><h2>Clareza antes de velocidade.</h2><p>O site separa a vez do Claude, a sua vez e as decisões que exigem aprovação.</p></div><button className="primary" onClick={onOpenQueue}>Abrir fila de entrada</button></section><section className="metric-grid"><Metric label="Para Claude" value={inbox.filter((entry) => ["novo", "respondido"].includes(entry.status || "novo")).length} detail="Novos e respondidos" tone="orange" /><Metric label="Aguardando você" value={inbox.filter((entry) => entry.status === "aguardando_voce").length} detail="Perguntas no app" tone="red" /><Metric label="Agenda vencendo" value={dueAll.length} detail="Hoje ou atrasada" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" /></section>
+  return <div className="page-grid"><section className="hero-summary"><div><p className="kicker">VISÃO OPERACIONAL</p><h2>Clareza antes de velocidade.</h2><p>O site separa a vez do Claude, a sua vez e as decisões que exigem aprovação.</p></div><button className="primary" onClick={onOpenQueue}>Abrir fila de entrada</button></section><section className="metric-grid"><Metric label="Para Claude" value={inbox.filter((entry) => ["novo", "respondido"].includes(entry.status || "novo")).length} detail="Novos e respondidos" tone="orange" /><Metric label="Aguardando você" value={inbox.filter((entry) => entry.status === "aguardando_voce").length} detail="Perguntas no app" tone="red" /><Metric label="Agenda vencendo" value={dueAll.length} detail="Hoje ou atrasada" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     {(dueAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}</div>}
     {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Compromissos de hoje e atrasados</h3></div></div>{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} />)}</section>}
     {futuros.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Próximos compromissos</h3></div></div>{[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} />)}</section>}
@@ -822,10 +823,11 @@ function Dashboard({ inbox, services, appointments, finances, onOpenQueue, onCon
 }
 function Metric({ label, value, detail, tone, onClick }) { return <article className={`metric-card ${tone}${onClick ? " clickable" : ""}`} onClick={onClick || undefined}><span>{label}</span><b>{String(value).padStart(2, "0")}</b><small>{detail}</small></article>; }
 
-const FUNIL_FILTROS = [{ id: "todos", label: "Todos" }, { id: "lead", label: "Lead" }, { id: "orcamento", label: "Orçamento" }, { id: "agendado", label: "Agendado" }, { id: "producao", label: "Em produção" }, { id: "entregue", label: "Entregue" }];
-function LeadsView({ services, search, setSearch, onOpenFicha }) {
-  const [filtroStatus, setFiltroStatus] = useState("todos");
-  const visible = services.filter((service) => `${service.clientes?.nome} ${service.titulo}`.toLowerCase().includes(search.toLowerCase())).filter((service) => filtroStatus === "todos" || service.status === filtroStatus);
+const FUNIL_FILTROS = [{ id: "todos", label: "Todos" }, { id: "sem_acao", label: "Sem ação" }, { id: "lead", label: "Lead" }, { id: "orcamento", label: "Orçamento" }, { id: "agendado", label: "Agendado" }, { id: "producao", label: "Em produção" }, { id: "entregue", label: "Entregue" }];
+function LeadsView({ services, search, setSearch, onOpenFicha, initialFiltro, onConsumedInitialFiltro }) {
+  const [filtroStatus, setFiltroStatus] = useState(initialFiltro || "todos");
+  useEffect(() => { if (onConsumedInitialFiltro) onConsumedInitialFiltro(); }, []);
+  const visible = services.filter((service) => `${service.clientes?.nome} ${service.titulo}`.toLowerCase().includes(search.toLowerCase())).filter((service) => filtroStatus === "todos" || (filtroStatus === "sem_acao" ? !service.proxima_acao : service.status === filtroStatus));
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">FUNIL DE TRABALHO</p><h3>{visible.length} serviços ativos</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente ou serviço" /></div>
     <div className="funil-filtros">{FUNIL_FILTROS.map((f) => <button key={f.id} className={filtroStatus === f.id ? "active" : ""} onClick={() => setFiltroStatus(f.id)}>{f.label}</button>)}</div>
     <div className="funil-lista">{visible.map((service) => <article className={`funil-item st-${service.status || "lead"}`} key={service.id} onClick={() => onOpenFicha(service.cliente_id)}>
