@@ -770,17 +770,29 @@ function corCompromisso(data, hoje) { const amanha = new Date(hoje + "T12:00:00"
 // Presencial antes de remoto no mesmo dia, depois por hora.
 function ordenarCompromisso(a, b) { return (a.data + (a.tipo === "remoto" ? "1" : "0") + (a.hora || "99")).localeCompare(b.data + (b.tipo === "remoto" ? "1" : "0") + (b.hora || "99")); }
 
+function horaFalada(hora) {
+  if (!hora) return "";
+  const [h, m] = hora.slice(0, 5).split(":");
+  return m === "00" ? `${parseInt(h, 10)} horas` : `${parseInt(h, 10)}h${m}`;
+}
+// "hoje"/"amanhã" soa mais natural numa mensagem pro cliente do que a data cheia.
+function quandoFalado(data, hora, hoje) {
+  const amanha = new Date(hoje + "T12:00:00"); amanha.setDate(amanha.getDate() + 1);
+  const dia = data === hoje ? "hoje" : data === amanha.toISOString().slice(0, 10) ? "amanhã" : `no dia ${compactDate(data)}`;
+  const horaTxt = horaFalada(hora);
+  return ` ${dia}${horaTxt ? " às " + horaTxt : ""}`;
+}
 // Sempre gera uma mensagem pronta (mesmo sem sugestao_resposta salva) pra o botão do WhatsApp nunca abrir vazio.
-function mensagemPadraoCompromisso(a, svc) {
+function mensagemPadraoCompromisso(a, svc, hoje) {
   const nome = svc?.clientes?.nome ? svc.clientes.nome.split(" ")[0] : "";
   const oQueFazer = svc?.proxima_acao || a.titulo;
-  const quando = a.tipo === "remoto" ? "" : ` no dia ${compactDate(a.data)}${a.hora ? " às " + a.hora.slice(0, 5) : ""}`;
+  const quando = a.tipo === "remoto" ? "" : quandoFalado(a.data, a.hora, hoje || hojeISO());
   return `Oi${nome ? " " + nome : ""}, tudo bem? Passando pra confirmar: ${oQueFazer}${quando}.`;
 }
 
 // Card de AÇÃO do Painel: diz o que fazer, já com a mensagem pronta e o botão do WhatsApp.
 function CompromissoCard({ a, svc, today, onConcluir, onReschedule }) {
-  const sugestao = svc?.sugestao_resposta || mensagemPadraoCompromisso(a, svc);
+  const sugestao = svc?.sugestao_resposta || mensagemPadraoCompromisso(a, svc, today);
   const tel = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "";
   const oQueFazer = svc?.proxima_acao || a.titulo;
   return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}`}>
@@ -810,7 +822,7 @@ function CompromissoCard({ a, svc, today, onConcluir, onReschedule }) {
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
 function Dashboard({ inbox, services, appointments, finances, onOpenQueue, onConcluir, onReschedule, onSemProximaAcao }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
-  const today = new Date().toISOString().slice(0, 10); const dueAll = appointments.filter((entry) => entry.data <= today); const futurosAll = appointments.filter((entry) => entry.data > today); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
+  const today = hojeISO(); const dueAll = appointments.filter((entry) => entry.data <= today); const futurosAll = appointments.filter((entry) => entry.data > today); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
   const porTipo = (list) => filtroTipo === "todos" ? list : list.filter((entry) => (entry.tipo || "presencial") === filtroTipo);
   const due = porTipo(dueAll); const futuros = porTipo(futurosAll);
   const irParaVencendo = () => { if (dueAll.length === 0) return; setFiltroTipo("todos"); document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
@@ -852,9 +864,9 @@ function AgendaView({ appointments, services, onReschedule, onConcluir, onAdd })
   return <section className="content-card full">
     <div className="card-head"><div><p className="kicker">ROTINA E DESLOCAMENTO</p><h3>Agenda planejada</h3></div><button className="primary" onClick={onAdd}>+ Adicionar</button></div>
     {!dias.length && <div className="empty-state"><b>Sem compromissos planejados.</b><span>Toque em “+ Adicionar” para criar.</span></div>}
-    {dias.map((date) => { const items = groups[date]; const conf = conflitosDoDia(items); const hoje = new Date().toISOString().slice(0, 10); const corDia = { alta: "var(--red)", media: "var(--yellow)", baixa: "var(--green)" }[corCompromisso(date, hoje)]; return <div className="agenda-day" key={date}>
+    {dias.map((date) => { const items = groups[date]; const conf = conflitosDoDia(items); const hoje = hojeISO(); const corDia = { alta: "var(--red)", media: "var(--yellow)", baixa: "var(--green)" }[corCompromisso(date, hoje)]; return <div className="agenda-day" key={date}>
       <div className="day-label"><b>{compactDate(date)}</b><i style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: corDia, marginLeft: 7 }}></i><span>{items.length} compromisso(s)</span>{conf && <span className="agenda-conflito">⚠️ rota: {conf.join(" / ")}</span>}</div>
-      <div>{[...items].sort((a, b) => ((a.tipo === "remoto" ? "1" : "0") + (a.hora || "99")).localeCompare((b.tipo === "remoto" ? "1" : "0") + (b.hora || "99"))).map((item) => { const svc = services.find((s) => s.id === item.servico_id); const tel = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : ""; const sugestao = tel ? (svc?.sugestao_resposta || mensagemPadraoCompromisso(item, svc)) : ""; return <article className="agenda-row" style={{ borderLeft: `3px solid ${corDia}` }} key={item.id}><time>{item.hora?.slice(0, 5) || "—"}</time><i>{item.tipo === "remoto" ? "◌" : "⌖"}</i><div><strong>{item.titulo}</strong><span>{item.tipo === "remoto" ? "Remoto" : item.cidade || "Cidade não informada"}</span></div><div className="agenda-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">WhatsApp</a>}<button className="ghost" onClick={() => onConcluir(item)}>✓ Concluir</button><button className="ghost" onClick={() => onReschedule(item)}>Reagendar</button></div></article>; })}</div>
+      <div>{[...items].sort((a, b) => ((a.tipo === "remoto" ? "1" : "0") + (a.hora || "99")).localeCompare((b.tipo === "remoto" ? "1" : "0") + (b.hora || "99"))).map((item) => { const svc = services.find((s) => s.id === item.servico_id); const tel = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : ""; const sugestao = tel ? (svc?.sugestao_resposta || mensagemPadraoCompromisso(item, svc, hoje)) : ""; return <article className="agenda-row" style={{ borderLeft: `3px solid ${corDia}` }} key={item.id}><time>{item.hora?.slice(0, 5) || "—"}</time><i>{item.tipo === "remoto" ? "◌" : "⌖"}</i><div><strong>{item.titulo}</strong><span>{item.tipo === "remoto" ? "Remoto" : item.cidade || "Cidade não informada"}</span></div><div className="agenda-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">WhatsApp</a>}<button className="ghost" onClick={() => onConcluir(item)}>✓ Concluir</button><button className="ghost" onClick={() => onReschedule(item)}>Reagendar</button></div></article>; })}</div>
     </div>; })}
   </section>;
 }
