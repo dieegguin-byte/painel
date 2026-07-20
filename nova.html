@@ -900,6 +900,27 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
   </section>;
 }
 
+// PAINEL: capacidade por profissional - clica no nome pra ver os servicos dele (mesmo padrao da Agenda: colapsado, expande no clique)
+function CapacidadeCard({ services }) {
+  const [aberto, setAberto] = useState(null);
+  const porProfissional = useMemo(() => {
+    const map = {};
+    (services || []).forEach((s) => { if (s.responsavel && ["lead", "orcamento", "agendado", "producao"].includes(s.status)) { const k = s.responsavel.trim(); (map[k] ||= []).push(s); } });
+    return map;
+  }, [services]);
+  const nomes = Object.entries(porProfissional).sort((a, b) => b[1].length - a[1].length);
+  if (!nomes.length) return null;
+  return <section className="content-card">
+    <div className="card-head"><div><p className="kicker">CAPACIDADE</p><h3>Profissionais em serviço</h3></div></div>
+    <div className="capacidade-profissionais">{nomes.map(([nome, lista]) => { const isAberto = aberto === nome; return <div className={`capacidade-item${isAberto ? " active" : ""}`} key={nome}>
+      <button type="button" className="capacidade-item-head" onClick={() => setAberto(isAberto ? null : nome)}>
+        <span>{nome}</span><b>{lista.length} ativo{lista.length > 1 ? "s" : ""}</b><i>{isAberto ? "▲" : "▼"}</i>
+      </button>
+      {isAberto && <div className="capacidade-item-corpo">{lista.map((s) => <div className="capacidade-servico" key={s.id}><strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{statusLabel[s.status] || s.status}{s.prazo ? " · " + compactDate(s.prazo) : ""}</em></div>)}</div>}
+    </div>; })}</div>
+  </section>;
+}
+
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
 function Dashboard({ inbox, services, appointments, finances, rotinas, db, demo, notify, onRotinaChanged, onOpenQueue, onConcluir, onReschedule, onSemProximaAcao }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
@@ -909,6 +930,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, db, demo,
   const irParaVencendo = () => { if (dueAll.length === 0) return; setFiltroTipo("todos"); document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   return <div className="page-grid"><section className="hero-summary"><div><p className="kicker">VISÃO OPERACIONAL</p><h2>Clareza antes de velocidade.</h2><p>O site separa a vez do Claude, a sua vez e as decisões que exigem aprovação.</p></div><button className="primary" onClick={onOpenQueue}>Abrir fila de entrada</button></section><section className="metric-grid"><Metric label="Para Claude" value={inbox.filter((entry) => ["novo", "respondido"].includes(entry.status || "novo")).length} detail="Novos e respondidos" tone="orange" /><Metric label="Aguardando você" value={inbox.filter((entry) => entry.status === "aguardando_voce").length} detail="Perguntas no app" tone="red" /><Metric label="Agenda vencendo" value={dueAll.length} detail="Hoje ou atrasada" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
+    <CapacidadeCard services={services} />
     {(dueAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}</div>}
     {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Compromissos de hoje e atrasados</h3></div></div>{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} />)}</section>}
     {futuros.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Próximos compromissos</h3></div></div>{[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} />)}</section>}
