@@ -21,7 +21,7 @@
 .capacidade-item-corpo{border-top:1px solid var(--line);padding:2px 12px}
 .capacidade-servico{padding:8px 0;border-bottom:1px solid var(--line)}.capacidade-servico:last-child{border-bottom:0}
 .capacidade-servico strong{display:block;font-size:11px}.capacidade-servico span{display:block;font-size:10px;color:var(--muted);margin-top:2px}.capacidade-servico em{display:block;font-style:normal;font-size:9px;color:var(--dim);margin-top:3px}
-.responsavel-badge{display:inline-flex;align-items:center;gap:3px;background:var(--surface3);border:1px solid var(--line2);color:var(--muted);border-radius:999px;padding:3px 9px;font-size:9px;font-weight:600;margin-top:4px}button.responsavel-badge{cursor:pointer}button.responsavel-badge:hover{border-color:#8a5a3e;color:var(--cream)}.responsavel-edit-row{display:flex;gap:6px;align-items:center;margin-top:6px}.responsavel-edit-row input{width:150px;padding:6px 8px;font-size:11px;background:#0f0d0c;border:1px solid var(--line2);border-radius:8px;color:var(--text)}.responsavel-edit-row button{padding:5px 9px;font-size:9px}
+.responsavel-badge{display:inline-flex;align-items:center;gap:3px;background:var(--surface3);border:1px solid var(--line2);color:var(--muted);border-radius:999px;padding:3px 9px;font-size:9px;font-weight:600;margin-top:4px}button.responsavel-badge{cursor:pointer}button.responsavel-badge:hover{border-color:#8a5a3e;color:var(--cream)}.responsavel-edit-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.responsavel-edit-row input{width:150px;padding:6px 8px;font-size:11px;background:#0f0d0c;border:1px solid var(--line2);border-radius:8px;color:var(--text)}.responsavel-edit-row input[type=date]{width:132px}.responsavel-edit-row button{padding:5px 9px;font-size:9px}
 .duplicate-warning,.danger-box{border-radius:10px;padding:10px;font-size:10px}.duplicate-warning{background:#d4a64e10;border:1px solid #d4a64e3d;color:#edcc90}.duplicate-warning b{display:block;margin-bottom:5px}.duplicate-warning button,.duplicate-warning span{display:block;border:0;background:transparent;color:inherit;padding:3px 0;font-size:10px;text-decoration:underline}.danger-box{background:#df6a5d12;border:1px solid #df6a5d50;color:#f1a49c}.review-box{background:#75a9870c;border:1px solid #75a98735;border-radius:12px;padding:11px}.review-box span{display:block;color:#b8d8c1;font-size:10px;margin:4px 0}.ask-panel{background:#181412;border:1px solid var(--line);margin-top:14px}.audit-checks{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}.audit-checks label{display:flex;align-items:center;gap:5px;font-size:8px}.mode-claude .triage-panel{border-color:#75a98744}
 .page-grid{display:grid;gap:15px}.hero-summary{display:flex;justify-content:space-between;align-items:end;gap:20px;padding:26px;background:linear-gradient(115deg,#3a2015,#1d1511 70%);border:1px solid #68422e;border-radius:20px}.hero-summary h2{font:500 31px Georgia,serif;margin:0 0 7px}.hero-summary p:not(.kicker){color:var(--muted);font-size:12px;margin:0}.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric-card{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:15px;min-height:112px}.metric-card>span{font-size:8px;text-transform:uppercase;color:var(--dim);letter-spacing:.7px}.metric-card>b{display:block;font-size:26px;margin:11px 0 4px}.metric-card small{color:var(--muted);font-size:9px}.metric-card.orange>b{color:var(--orange2)}.metric-card.red>b{color:#e88477}.metric-card.yellow>b{color:#e4bd72}.metric-card.green>b{color:#9bc7a7}.metric-card.clickable{cursor:pointer;transition:border-color .15s,transform .15s}.metric-card.clickable:hover{border-color:var(--dim);transform:translateY(-1px)}.metric-card.clickable:active{transform:translateY(0)}.content-card{background:linear-gradient(145deg,#1b1613,#15110f);border:1px solid var(--line);border-radius:18px;padding:18px}.content-card.full{min-height:560px}.card-head{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:14px}.card-head h3{font:500 22px Georgia,serif;margin:0}.search{width:min(300px,45%);margin:0}.priority-row{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:11px;padding:11px 3px;border-bottom:1px solid var(--line)}.priority-row:last-child{border-bottom:0}.priority{width:8px;height:8px;border-radius:50%;background:var(--yellow)}.priority.alta{background:var(--red)}.priority.baixa{background:var(--green)}.priority-row strong,.priority-row span{display:block}.priority-row strong{font-size:11px;margin-bottom:3px}.priority-row span,.priority-row time{font-size:9px;color:var(--dim)}.warning-card{padding:15px 18px;border-radius:14px;background:#df6a5d12;border:1px solid #df6a5d3f}.warning-card b,.warning-card span{display:block}.warning-card b{font-size:12px}.warning-card span{font-size:9px;color:var(--muted);margin-top:3px}/* PAINEL: cards de acao grandes (o que fazer + mensagem pronta + WhatsApp) */
 .compromisso-card{display:grid;grid-template-columns:88px 1fr;gap:13px;background:linear-gradient(150deg,#1d1714,#171310);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:16px;padding:14px;margin-bottom:12px}
@@ -1238,6 +1238,8 @@ function FichaModal({ db, demo, notify, clienteId, onClose, onChanged }) {
   const [confirmPhoto, setConfirmPhoto] = useState(null);
   const [editandoResp, setEditandoResp] = useState(null);
   const [respDraft, setRespDraft] = useState("");
+  const [editandoMaterial, setEditandoMaterial] = useState(null);
+  const [materialDraft, setMaterialDraft] = useState({ loja: "", data: "" });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1299,6 +1301,19 @@ function FichaModal({ db, demo, notify, clienteId, onClose, onChanged }) {
     notify("Profissional atualizado.", "ok"); setEditandoResp(null); await load(); onChanged?.();
   };
 
+  const salvarMaterial = async (servicoId) => {
+    if (demo) { notify("Na demonstração a ficha não é salva.", "info"); setEditandoMaterial(null); return; }
+    const loja = materialDraft.loja.trim();
+    const data = materialDraft.data;
+    const { error } = await db.from("servicos").update({ loja_material: loja || null, data_entrega_material: data || null }).eq("id", servicoId);
+    if (error) { notify("Erro: " + error.message, "error"); return; }
+    if (loja && data) {
+      const { error: agErr } = await db.from("agenda").insert({ titulo: `Comprar material - ${loja}`, tipo: "remoto", cidade: null, data, hora: null, status: "planejado", servico_id: servicoId });
+      if (agErr) { notify("Material salvo, mas erro ao criar a ação: " + agErr.message, "error"); setEditandoMaterial(null); await load(); return; }
+    }
+    notify("Material atualizado.", "ok"); setEditandoMaterial(null); await load(); onChanged?.();
+  };
+
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="modal-card">
       <div className="modal-head"><div><p className="kicker">FICHA DO CLIENTE</p><h2>{cliente?.nome || "Cliente"}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
@@ -1321,6 +1336,9 @@ function FichaModal({ db, demo, notify, clienteId, onClose, onChanged }) {
           {editandoResp === s.id
             ? <div className="responsavel-edit-row"><input value={respDraft} onChange={(e) => setRespDraft(e.target.value)} placeholder="Nome do profissional" autoFocus /><button className="ghost" onClick={() => salvarResponsavel(s.id)}>Salvar</button><button className="ghost" onClick={() => setEditandoResp(null)}>✕</button></div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEditandoResp(s.id); setRespDraft(s.responsavel || ""); }}>{s.responsavel ? `👤 ${s.responsavel}` : "+ Atribuir profissional"}</button>}
+          {s.status === "producao" && (editandoMaterial === s.id
+            ? <div className="responsavel-edit-row"><input value={materialDraft.loja} onChange={(e) => setMaterialDraft((m) => ({ ...m, loja: e.target.value }))} placeholder="Loja do material" /><input type="date" value={materialDraft.data} onChange={(e) => setMaterialDraft((m) => ({ ...m, data: e.target.value }))} /><button className="ghost" onClick={() => salvarMaterial(s.id)}>Salvar</button><button className="ghost" onClick={() => setEditandoMaterial(null)}>✕</button></div>
+            : <button type="button" className="responsavel-badge" onClick={() => { setEditandoMaterial(s.id); setMaterialDraft({ loja: s.loja_material || "", data: s.data_entrega_material || "" }); }}>{s.loja_material ? `🧵 ${s.loja_material}${s.data_entrega_material ? " · entrega " + compactDate(s.data_entrega_material) : ""}` : "+ Registrar loja/entrega do material"}</button>)}
         </div><div className="ficha-servico-meta">{s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <span>—</span>}{s.prazo && <time>{compactDate(s.prazo)}</time>}{(sugestao || tel) && <div className="ficha-servico-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">WhatsApp</a>}</div>}</div></div>; })}</div>}
         <p className="ficha-note">Mudança de status e financeiro continuam no app atual por enquanto.</p>
 
