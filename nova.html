@@ -21,6 +21,7 @@
 .capacidade-item-corpo{border-top:1px solid var(--line);padding:2px 12px}
 .capacidade-servico{padding:8px 0;border-bottom:1px solid var(--line)}.capacidade-servico:last-child{border-bottom:0}
 .capacidade-servico strong{display:block;font-size:11px}.capacidade-servico span{display:block;font-size:10px;color:var(--muted);margin-top:2px}.capacidade-servico em{display:block;font-style:normal;font-size:9px;color:var(--dim);margin-top:3px}
+.material-edit-block{margin-top:6px}.fornecedor-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.fornecedor-chips button{border:1px solid var(--line2);background:var(--surface2);color:var(--muted);border-radius:999px;padding:6px 11px;font-size:10px;font-weight:600}.fornecedor-chips button.active{background:#c95f2e;color:white;border-color:#db7542}
 .responsavel-badge{display:inline-flex;align-items:center;gap:3px;background:var(--surface3);border:1px solid var(--line2);color:var(--muted);border-radius:999px;padding:3px 9px;font-size:9px;font-weight:600;margin-top:4px}button.responsavel-badge{cursor:pointer}button.responsavel-badge:hover{border-color:#8a5a3e;color:var(--cream)}.responsavel-edit-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.responsavel-edit-row input{width:150px;padding:6px 8px;font-size:11px;background:#0f0d0c;border:1px solid var(--line2);border-radius:8px;color:var(--text)}.responsavel-edit-row input[type=date]{width:132px}.responsavel-edit-row button{padding:5px 9px;font-size:9px}
 .duplicate-warning,.danger-box{border-radius:10px;padding:10px;font-size:10px}.duplicate-warning{background:#d4a64e10;border:1px solid #d4a64e3d;color:#edcc90}.duplicate-warning b{display:block;margin-bottom:5px}.duplicate-warning button,.duplicate-warning span{display:block;border:0;background:transparent;color:inherit;padding:3px 0;font-size:10px;text-decoration:underline}.danger-box{background:#df6a5d12;border:1px solid #df6a5d50;color:#f1a49c}.review-box{background:#75a9870c;border:1px solid #75a98735;border-radius:12px;padding:11px}.review-box span{display:block;color:#b8d8c1;font-size:10px;margin:4px 0}.ask-panel{background:#181412;border:1px solid var(--line);margin-top:14px}.audit-checks{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}.audit-checks label{display:flex;align-items:center;gap:5px;font-size:8px}.mode-claude .triage-panel{border-color:#75a98744}
 .page-grid{display:grid;gap:15px}.hero-summary{display:flex;justify-content:space-between;align-items:end;gap:20px;padding:26px;background:linear-gradient(115deg,#3a2015,#1d1511 70%);border:1px solid #68422e;border-radius:20px}.hero-summary h2{font:500 31px Georgia,serif;margin:0 0 7px}.hero-summary p:not(.kicker){color:var(--muted);font-size:12px;margin:0}.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric-card{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:15px;min-height:112px}.metric-card>span{font-size:8px;text-transform:uppercase;color:var(--dim);letter-spacing:.7px}.metric-card>b{display:block;font-size:26px;margin:11px 0 4px}.metric-card small{color:var(--muted);font-size:9px}.metric-card.orange>b{color:var(--orange2)}.metric-card.red>b{color:#e88477}.metric-card.yellow>b{color:#e4bd72}.metric-card.green>b{color:#9bc7a7}.metric-card.clickable{cursor:pointer;transition:border-color .15s,transform .15s}.metric-card.clickable:hover{border-color:var(--dim);transform:translateY(-1px)}.metric-card.clickable:active{transform:translateY(0)}.content-card{background:linear-gradient(145deg,#1b1613,#15110f);border:1px solid var(--line);border-radius:18px;padding:18px}.content-card.full{min-height:560px}.card-head{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:14px}.card-head h3{font:500 22px Georgia,serif;margin:0}.search{width:min(300px,45%);margin:0}.priority-row{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:11px;padding:11px 3px;border-bottom:1px solid var(--line)}.priority-row:last-child{border-bottom:0}.priority{width:8px;height:8px;border-radius:50%;background:var(--yellow)}.priority.alta{background:var(--red)}.priority.baixa{background:var(--green)}.priority-row strong,.priority-row span{display:block}.priority-row strong{font-size:11px;margin-bottom:3px}.priority-row span,.priority-row time{font-size:9px;color:var(--dim)}.warning-card{padding:15px 18px;border-radius:14px;background:#df6a5d12;border:1px solid #df6a5d3f}.warning-card b,.warning-card span{display:block}.warning-card b{font-size:12px}.warning-card span{font-size:9px;color:var(--muted);margin-top:3px}/* PAINEL: cards de acao grandes (o que fazer + mensagem pronta + WhatsApp) */
@@ -141,6 +142,10 @@ const demoRotinas = [
   { id: "r1", titulo: "Calibrar pneu do carro", intervalo_dias: 3, hora: null, observacao: null, ultima_execucao: null, ativo: true },
   { id: "r2", titulo: "Olhar nivel de agua e oleo", intervalo_dias: 2, hora: "07:00", observacao: "Ou quando achar melhor", ultima_execucao: null, ativo: true },
   { id: "r3", titulo: "Cortar cabelo e barba", intervalo_dias: 14, hora: "17:00", observacao: null, ultima_execucao: "2026-07-18", ativo: true },
+];
+const demoFornecedores = [
+  { id: "f1", nome: "Afibracom", contato_nome: "Rafael", telefone: "6185580041", produtos: "Tecidos (linho Klee, Chagall), PVC couro, pés de PVC, insumos", dias_entrega: "terca,quinta", observacao: "Pedido 1 dia antes" },
+  { id: "f2", nome: "Ellis Tecidos", contato_nome: "Edmania", telefone: "6193178065", produtos: "Espuma D40/D45, veludo slim", dias_entrega: null, observacao: "Sem dia fixo" },
 ];
 
 function normalizePhone(value) {
@@ -277,6 +282,15 @@ const TEMPO_ESTRADA_MIN = { "brasilia|luziania": 75, "luziania|valparaiso": 25, 
 const DURACAO_SERVICO_MIN = 60;
 const CIDADE_BASE = "luziania";
 function hojeISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+const DIAS_SEMANA_MAP = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
+function proximaEntregaFornecedor(diasEntrega) {
+  if (!diasEntrega) return null;
+  const permitidos = diasEntrega.split(",").map((d) => DIAS_SEMANA_MAP[d.trim()]).filter((n) => n !== undefined);
+  if (!permitidos.length) return null;
+  const hoje = new Date(); hoje.setHours(12, 0, 0, 0);
+  for (let i = 1; i <= 14; i++) { const cand = new Date(hoje); cand.setDate(cand.getDate() + i); if (permitidos.includes(cand.getDay())) return `${cand.getFullYear()}-${String(cand.getMonth() + 1).padStart(2, "0")}-${String(cand.getDate()).padStart(2, "0")}`; }
+  return null;
+}
 function gerarSlots(ini, fim) { const slots = []; let [h, m] = ini.split(":").map(Number); const [hf, mf] = fim.split(":").map(Number); while (h < hf || (h === hf && m < mf)) { slots.push(String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0")); m += 60; if (m >= 60) { m -= 60; h += 1; } } return slots; }
 function horariosParaTipo(dataISO, tipo, ocupados) { if (tipo === "remoto") return gerarSlots(JANELA_REMOTO[0], JANELA_REMOTO[1]); const dia = new Date(dataISO + "T00:00:00").getDay(); const occ = new Set((ocupados || []).filter(Boolean).map((h) => h.slice(0, 5))); const livres = []; for (const [ini, fim] of (JANELAS_SEMANA[dia] || [])) gerarSlots(ini, fim).forEach((h) => { if (!occ.has(h)) livres.push(h); }); return livres; }
 function minutosDoHorario(h) { const [hh, mm] = String(h || "").split(":").map(Number); return (hh || 0) * 60 + (mm || 0); }
@@ -301,6 +315,7 @@ function Home() {
   const [appointments, setAppointments] = useState([]);
   const [finances, setFinances] = useState([]);
   const [rotinas, setRotinas] = useState([]);
+  const [fornecedores, setFornecedores] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [composer, setComposer] = useState("");
@@ -345,21 +360,22 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox); setCustomers(demoCustomers); setServices(demoServices); setAppointments(demoAppointments); setFinances(demoFinance); setRotinas(demoRotinas); setLoading(false); return;
+      setInbox(demoInbox); setCustomers(demoCustomers); setServices(demoServices); setAppointments(demoAppointments); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
-    const [cx, cl, sv, ag, fn, rt] = await Promise.all([
+    const [cx, cl, sv, ag, fn, rt, fo] = await Promise.all([
       db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
       db.from("clientes").select("*").order("nome", { ascending: true }),
       db.from("servicos").select("*,clientes(id,nome,telefone,cidade)").order("criado_em", { ascending: false }),
       db.from("agenda").select("*").eq("status", "planejado").order("data", { ascending: true }).order("hora", { ascending: true }),
       db.from("financeiro").select("*").order("data", { ascending: false }),
       db.from("rotinas").select("*").eq("ativo", true).order("criado_em", { ascending: true }),
+      db.from("fornecedores").select("*").order("nome", { ascending: true }),
     ]);
-    const firstError = [cx, cl, sv, ag, fn, rt].find((result) => result.error)?.error;
+    const firstError = [cx, cl, sv, ag, fn, rt, fo].find((result) => result.error)?.error;
     if (firstError) notify(`Erro ao carregar: ${firstError.message}`, "error");
-    setInbox(cx.data || []); setCustomers(cl.data || []); setServices(sv.data || []); setAppointments(ag.data || []); setFinances(fn.data || []); setRotinas(rt.data || []); setLoading(false);
+    setInbox(cx.data || []); setCustomers(cl.data || []); setServices(sv.data || []); setAppointments(ag.data || []); setFinances(fn.data || []); setRotinas(rt.data || []); setFornecedores(fo.data || []); setLoading(false);
   }, [db, demo, notify, session]);
 
   useEffect(() => { if (demo || session) loadAll(); }, [demo, session, loadAll]);
@@ -626,7 +642,7 @@ function Home() {
   const nav = [
     { id: "caixa", label: "Caixa", icon: "◎", count: inbox.length }, { id: "painel", label: "Painel", icon: "⌂" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
     { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "vales", label: "Vales", icon: "✎", count: valesPendentes },
-    { id: "clientes", label: "Clientes", icon: "○" },
+    { id: "clientes", label: "Clientes", icon: "○" }, { id: "fornecedores", label: "Fornecedores", icon: "▤" },
   ];
 
   return <div className={`product-shell mode-${mode}`}>
@@ -660,10 +676,11 @@ function Home() {
       {tab === "financeiro" && <FinanceView finances={finances} />}
       {tab === "vales" && <ValesView finances={finances} db={db} demo={demo} notify={notify} onChanged={loadAll} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
+      {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
     </main>
     <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setSelectedId(null); }}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
     {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
-    {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} onClose={() => setFichaId(null)} onChanged={loadAll} />}
+    {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} />}
     {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {addAgendaOpen && <AddAgendaModal appointments={appointments} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
@@ -1221,12 +1238,29 @@ function ValesView({ finances, db, demo, notify, onChanged }) {
   </div>;
 }
 
+const DIA_LABEL = { domingo: "domingo", segunda: "segunda", terca: "terça", quarta: "quarta", quinta: "quinta", sexta: "sexta", sabado: "sábado" };
+function FornecedoresView({ fornecedores }) {
+  return <section className="content-card full"><div className="card-head"><div><p className="kicker">FORNECEDORES</p><h3>{fornecedores.length} cadastrado(s)</h3></div></div>
+    <div className="customer-list">{fornecedores.map((f) => <article key={f.id}>
+      <div className="customer-avatar">{f.nome.slice(0, 2).toUpperCase()}</div>
+      <div>
+        <strong>{f.nome}</strong>
+        <span>{f.contato_nome ? f.contato_nome + " · " : ""}{f.telefone || "Sem telefone"}</span>
+        {f.produtos && <span>{f.produtos}</span>}
+        {f.dias_entrega && <span>Entrega {f.dias_entrega.split(",").map((d) => DIA_LABEL[d.trim()] || d.trim()).join(" e ")}</span>}
+        {f.observacao && <span>{f.observacao}</span>}
+      </div>
+      {f.telefone && <a className="ghost" href={`https://wa.me/55${normalizePhone(f.telefone)}`} target="_blank" rel="noreferrer">WhatsApp</a>}
+    </article>)}
+    {!fornecedores.length && <div className="empty-state"><b>Nenhum fornecedor cadastrado.</b></div>}</div>
+  </section>;
+}
 function CustomersView({ customers, services, search, setSearch, onOpenFicha }) {
   const visible = customers.filter((customer) => `${customer.nome} ${customer.telefone} ${customer.cidade}`.toLowerCase().includes(search.toLowerCase()));
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">BASE ÚNICA</p><h3>{visible.length} clientes</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome, telefone ou cidade" /></div><div className="customer-list">{visible.map((customer) => <article className="clickable" key={customer.id} onClick={() => onOpenFicha(customer.id)}><div className="customer-avatar">{customer.nome.slice(0, 2).toUpperCase()}</div><div><strong>{customer.nome}</strong><span>{customer.telefone || "Sem telefone"} · {customer.cidade || "Sem cidade"}</span></div><b>{services.filter((service) => service.cliente_id === customer.id && !["pago", "perdido"].includes(service.status)).length} ativo(s)</b></article>)}</div></section>;
 }
 
-function FichaModal({ db, demo, notify, clienteId, onClose, onChanged }) {
+function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChanged }) {
   const [cliente, setCliente] = useState(null);
   const [servicos, setServicos] = useState([]);
   const [fotos, setFotos] = useState([]);
@@ -1337,7 +1371,10 @@ function FichaModal({ db, demo, notify, clienteId, onClose, onChanged }) {
             ? <div className="responsavel-edit-row"><input value={respDraft} onChange={(e) => setRespDraft(e.target.value)} placeholder="Nome do profissional" autoFocus /><button className="ghost" onClick={() => salvarResponsavel(s.id)}>Salvar</button><button className="ghost" onClick={() => setEditandoResp(null)}>✕</button></div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEditandoResp(s.id); setRespDraft(s.responsavel || ""); }}>{s.responsavel ? `👤 ${s.responsavel}` : "+ Atribuir profissional"}</button>}
           {s.status === "producao" && (editandoMaterial === s.id
-            ? <div className="responsavel-edit-row"><input value={materialDraft.loja} onChange={(e) => setMaterialDraft((m) => ({ ...m, loja: e.target.value }))} placeholder="Loja do material" /><input type="date" value={materialDraft.data} onChange={(e) => setMaterialDraft((m) => ({ ...m, data: e.target.value }))} /><button className="ghost" onClick={() => salvarMaterial(s.id)}>Salvar</button><button className="ghost" onClick={() => setEditandoMaterial(null)}>✕</button></div>
+            ? <div className="material-edit-block">
+                <div className="responsavel-edit-row"><input value={materialDraft.loja} onChange={(e) => setMaterialDraft((m) => ({ ...m, loja: e.target.value }))} placeholder="Loja do material" /><input type="date" value={materialDraft.data} onChange={(e) => setMaterialDraft((m) => ({ ...m, data: e.target.value }))} /><button className="ghost" onClick={() => salvarMaterial(s.id)}>Salvar</button><button className="ghost" onClick={() => setEditandoMaterial(null)}>✕</button></div>
+                {!!(fornecedores || []).length && <div className="fornecedor-chips">{fornecedores.map((f) => <button type="button" key={f.id} className={materialDraft.loja.trim() === f.nome ? "active" : ""} onClick={() => setMaterialDraft({ loja: f.nome, data: proximaEntregaFornecedor(f.dias_entrega) || materialDraft.data })}>{f.nome}</button>)}</div>}
+              </div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEditandoMaterial(s.id); setMaterialDraft({ loja: s.loja_material || "", data: s.data_entrega_material || "" }); }}>{s.loja_material ? `🧵 ${s.loja_material}${s.data_entrega_material ? " · entrega " + compactDate(s.data_entrega_material) : ""}` : "+ Registrar loja/entrega do material"}</button>)}
         </div><div className="ficha-servico-meta">{s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <span>—</span>}{s.prazo && <time>{compactDate(s.prazo)}</time>}{(sugestao || tel) && <div className="ficha-servico-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">WhatsApp</a>}</div>}</div></div>; })}</div>}
         <p className="ficha-note">Mudança de status e financeiro continuam no app atual por enquanto.</p>
