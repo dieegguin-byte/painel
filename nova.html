@@ -956,13 +956,16 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
   const pendentes = rotinas.map((r) => ({ r, st: statusRotina(r, hoje) })).filter((x) => x.st.estado !== "futura")
     .sort((a, b) => a.st.dias - b.st.dias);
   if (!pendentes.length) return null;
-  const marcarFeita = async (rotina) => {
+  // Nem sempre ele marca no dia em que fez - lembra depois, ou marca de madrugada quando o dia já virou.
+  // Sem o "ontem" a única saída era gravar a data errada e conviver com ela.
+  const ontem = (() => { const d = new Date(hoje + "T12:00:00"); d.setDate(d.getDate() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const marcarFeita = async (rotina, quando) => {
     if (demo) { notify("Na demonstração a rotina não é salva.", "info"); return; }
     setBusyId(rotina.id);
     try {
-      const { error } = await db.from("rotinas").update({ ultima_execucao: hoje }).eq("id", rotina.id);
+      const { error } = await db.from("rotinas").update({ ultima_execucao: quando }).eq("id", rotina.id);
       if (error) throw error;
-      notify(`"${rotina.titulo}" marcada como feita hoje.`, "ok"); onChanged();
+      notify(`"${rotina.titulo}" marcada como feita ${quando === hoje ? "hoje" : "ontem"}.`, "ok"); onChanged();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusyId(null); }
   };
   return <section className="content-card">
@@ -974,7 +977,10 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
       </div>
       <div className="rotina-dir">
         <em className={st.estado === "vencida" ? "atrasada" : ""}>{textoRotina(st)}</em>
-        <button className="ghost" disabled={busyId === r.id} onClick={() => marcarFeita(r)}>{busyId === r.id ? "..." : "✓ Fiz hoje"}</button>
+        <div className="agenda-acoes">
+          <button className="ghost" disabled={busyId === r.id} onClick={() => marcarFeita(r, hoje)}>{busyId === r.id ? "..." : "✓ Fiz hoje"}</button>
+          <button className="ghost" disabled={busyId === r.id} onClick={() => marcarFeita(r, ontem)}>Fiz ontem</button>
+        </div>
       </div>
     </article>)}</div>
   </section>;
