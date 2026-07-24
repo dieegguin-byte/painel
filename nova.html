@@ -1029,6 +1029,20 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     <CapacidadeCard services={services} />
     {(dueAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}</div>}
     {(() => {
+      // CONTA CHEGANDO: entra sozinho no Painel na véspera do vencimento (e fica enquanto estiver vencida),
+      // com o caixa possível do lado — porque a pergunta que ele faz é "tenho de onde tirar?".
+      const r = resumoContas(finances, services, today);
+      if (!r.vencidas.length && !r.urgentes.length) return null;
+      const linha = (f) => `${f.descricao || f.categoria} · ${money(f.valor)} · ${(f.data || "") < today ? "venceu " + compactDate(f.data) : (f.data === today ? "vence HOJE" : "vence amanhã")}`;
+      return <section className="warning-card">
+        <b>{money(r.totalVencidas + r.totalUrgentes)} a pagar {r.vencidas.length ? "— tem conta vencida" : "nas próximas 24h"}</b>
+        {[...r.vencidas, ...r.urgentes].slice(0, 5).map((f) => <span key={f.id}>{linha(f)}</span>)}
+        {r.potencialCaixa > 0
+          ? <span>💰 Dá pra levantar {money(r.potencialCaixa)}{r.prontosSemCobranca.length ? ` — ${r.prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")} sem pagamento registrado` : ""}</span>
+          : <span>Nenhum serviço pronto pra cobrar no momento.</span>}
+      </section>;
+    })()}
+    {(() => {
       // Material que ainda não virou compromisso é o único que pode passar batido — o resto já aparece
       // como compromisso do dia, sem precisar de card próprio no Painel.
       const solto = (finances || []).filter((f) => ehCompraMaterial(f) && f.status === "a_pagar" && !f.agenda_id);
@@ -1291,37 +1305,15 @@ function FinanceView({ finances, services, onVerAPagar }) {
   const visiveis = aba === "todos" ? realizados
     : aba === "pro_labore" ? realizados.filter((item) => item.categoria === "Pró-labore" && item.tipo === "entrada")
     : realizados.filter((item) => (item.escopo || "empresa") === aba);
-  // CARD DE PLANEJAMENTO: o que venceu, o que vai vencer, o que já foi pago no mês — e do outro lado o que
-  // pode virar caixa pra cobrir. Serviço pronto e não pago é dinheiro parado; é o que o Diego olha pra decidir
-  // se corre atrás de receber antes de uma conta chegar. É só alerta, não mexe em nada.
+  // O alerta de vencimento mora no Painel (é lá que ele olha todo dia). Aqui fica só uma linha de resumo,
+  // pra tela não virar uma parede de cards.
   const hoje = hojeISO();
-  const limite = somaDiaMes(hoje, 1);
-  const mesCorrente = mesISO(hoje);
-  const aPagar = finances.filter((item) => item.status === "a_pagar" && item.tipo === "saida" && item.categoria !== "Vale");
-  const venceu = aPagar.filter((item) => (item.data || "") < hoje);
-  const vaiVencer = aPagar.filter((item) => (item.data || "") >= hoje && (item.data || "") <= limite);
-  const pagoNoMes = finances.filter((item) => item.tipo === "saida" && item.status !== "a_pagar" && mesISO(item.data) === mesCorrente);
-  const soma = (lista) => lista.reduce((s, item) => s + Number(item.valor), 0);
-  const aReceber = finances.filter((item) => item.tipo === "entrada" && item.status === "a_receber");
-  // Serviço entregue sem nenhuma entrada lançada: trabalho feito que ainda não virou dinheiro no sistema.
-  const comLancamento = new Set(finances.filter((item) => item.tipo === "entrada" && item.servico_id).map((item) => item.servico_id));
-  const prontosSemCobranca = (services || []).filter((s) => ["entregue", "producao"].includes(s.status) && Number(s.valor_orcamento) > 0 && !comLancamento.has(s.id));
-  const potencialCaixa = soma(aReceber) + prontosSemCobranca.reduce((s, item) => s + Number(item.valor_orcamento), 0);
-  const temAlerta = venceu.length || vaiVencer.length || potencialCaixa > 0;
+  const resumo = resumoContas(finances, services, hoje);
   const paidIn = visiveis.filter((item) => item.tipo === "entrada" && (!item.status || item.status === "pago")).reduce((sum, item) => sum + Number(item.valor), 0); const paidOut = visiveis.filter((item) => item.tipo === "saida" && (!item.status || item.status === "pago")).reduce((sum, item) => sum + Number(item.valor), 0);
   return <div className="page-grid"><div className="funil-filtros">{FINANCE_ABAS.map((a) => <button key={a.id} className={aba === a.id ? "active" : ""} onClick={() => setAba(a.id)}>{a.label}</button>)}</div>
-    {temAlerta && <section className="content-card">
-      <div className="card-head"><div><p className="kicker">PARA PLANEJAR</p><h3>Contas e caixa</h3></div>{onVerAPagar && <button className="ghost" onClick={onVerAPagar}>Ver em A pagar</button>}</div>
-      <section className="metric-grid finance-metrics">
-        <Metric label="Venceu" value={money(soma(venceu))} detail={venceu.length ? `${venceu.length} atrasada(s)` : "Nada atrasado"} tone="red" />
-        <Metric label="Vai vencer" value={money(soma(vaiVencer))} detail={`Até ${compactDate(limite)} · ${vaiVencer.length} conta(s)`} tone="orange" />
-        <Metric label="Já foi pago no mês" value={money(soma(pagoNoMes))} detail={mesLabel(mesCorrente)} tone="green" />
-      </section>
-      {potencialCaixa > 0 && <p className="ficha-note">💰 Pode virar caixa: <b>{money(potencialCaixa)}</b>
-        {aReceber.length ? ` · ${aReceber.length} a receber já lançado(s)` : ""}
-        {prontosSemCobranca.length ? ` · ${prontosSemCobranca.length} serviço(s) pronto(s) sem pagamento registrado: ${prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")}${prontosSemCobranca.length > 3 ? "…" : ""}` : ""}
-      </p>}
-    </section>}
+    {resumo.aPagar.length > 0 && <p className="ficha-note">{money(resumo.totalAPagar)} em {resumo.aPagar.length} conta(s) ainda por pagar
+      {resumo.vencidas.length ? ` · ${resumo.vencidas.length} já vencida(s)` : ""}
+      {onVerAPagar && <> · <button type="button" className="ficha-link" onClick={onVerAPagar}>ver em A pagar</button></>}</p>}
     <section className="metric-grid finance-metrics"><Metric label="Entradas" value={money(paidIn)} detail="Confirmadas" tone="green" /><Metric label="Saídas" value={money(paidOut)} detail="Confirmadas" tone="red" /><Metric label="Saldo" value={money(paidIn - paidOut)} detail="Visão operacional" tone="orange" /></section><section className="content-card"><div className="card-head"><div><p className="kicker">SOMENTE LEITURA NO MODO CLAUDE</p><h3>Lançamentos realizados</h3></div></div>{visiveis.map((item) => <div className="finance-row" key={item.id}><div><strong>{item.descricao || item.categoria || "Lançamento"}</strong><span>{compactDate(item.data)} · {item.status || "pago"}</span></div><b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b></div>)}{!visiveis.length && <div className="empty-state"><b>Nada por aqui ainda.</b></div>}</section></div>;
 }
 
@@ -1374,6 +1366,24 @@ const COMPRA_CONFERIDA_TAG = "[CONFERIDO] ";
 // precisa fazer é PEDIR — vira compromisso remoto, um dia antes da entrega (é o "pedido 1 dia antes" que já
 // está na observação dos fornecedores). Fornecedor sem dia fixo não entrega: aí é viagem presencial e precisa
 // de cidade e hora, senão quebra a Regra Nº 4. Ver [[feedback-operacao-drive-direto-sem-caixa]].
+// Conta a pagar e caixa possível num lugar só, porque a decisão é sempre a mesma: "vou ter que pagar isso,
+// tenho de onde tirar?". Usado no Painel (alerta com 1 dia de antecedência) e no Financeiro (linha de resumo).
+function resumoContas(finances, services, hoje) {
+  const amanha = (() => { const d = new Date(hoje + "T12:00:00"); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  const aPagar = (finances || []).filter((f) => f.status === "a_pagar" && f.tipo === "saida" && f.categoria !== "Vale");
+  const vencidas = aPagar.filter((f) => (f.data || "") < hoje);
+  // 1 dia de antecedência: entra no Painel na véspera, não no dia, pra dar tempo de correr atrás do dinheiro.
+  const urgentes = aPagar.filter((f) => (f.data || "") === hoje || (f.data || "") === amanha);
+  const aReceber = (finances || []).filter((f) => f.tipo === "entrada" && f.status === "a_receber");
+  const comEntrada = new Set((finances || []).filter((f) => f.tipo === "entrada" && f.servico_id).map((f) => f.servico_id));
+  const prontosSemCobranca = (services || []).filter((s) => ["entregue", "producao"].includes(s.status) && Number(s.valor_orcamento) > 0 && !comEntrada.has(s.id));
+  const soma = (l, campo) => l.reduce((s, i) => s + Number(campo ? i[campo] : i.valor), 0);
+  return {
+    amanha, aPagar, vencidas, urgentes, aReceber, prontosSemCobranca,
+    totalVencidas: soma(vencidas), totalUrgentes: soma(urgentes), totalAPagar: soma(aPagar),
+    potencialCaixa: soma(aReceber) + soma(prontosSemCobranca, "valor_orcamento"),
+  };
+}
 function materiaisDoCompromisso(finances, agendaId) { return (finances || []).filter((f) => f.agenda_id === agendaId && f.status === "a_pagar" && ehCompraMaterial(f)); }
 function planoDeCompra(fornecedor) {
   if (!fornecedor) return null;
