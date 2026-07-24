@@ -137,6 +137,8 @@ const demoAppointments = [
 const demoFinance = [
   { id: "f1", tipo: "entrada", valor: 675, descricao: "Entrada 50% — Carlos", status: "pago", data: "2026-07-09" },
   { id: "f2", tipo: "entrada", valor: 675, descricao: "Saldo na entrega — Carlos", status: "a_receber", data: "2026-07-15" },
+  { id: "f3", tipo: "saida", escopo: "empresa", categoria: "Material", valor: 480, descricao: "6m de linho Klee", status: "pago", data: "2026-07-08", fornecedor_id: "f1", servico_id: "s1" },
+  { id: "f4", tipo: "saida", escopo: "empresa", categoria: "Material", valor: 210, descricao: "Espuma D40 — estoque", status: "pago", data: "2026-07-09", fornecedor_id: "f2", servico_id: null },
 ];
 const demoRotinas = [
   { id: "r1", titulo: "Calibrar pneu do carro", intervalo_dias: 3, hora: null, observacao: null, ultima_execucao: null, ativo: true },
@@ -258,6 +260,7 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - REGRA Nº 5: toda vez que o Diego falar que retirou pró-labore (ex: "peguei 100 reais de pró-labore"), lançar automaticamente TRÊS lançamentos no financeiro: (1) o valor como SAÍDA escopo "empresa", categoria "Retirada de pró-labore" (o dinheiro sai do caixa da empresa); (2) o mesmo valor como ENTRADA escopo "pessoal", categoria "Pró-labore" (entra no bolso pessoal dele — é a base do dízimo, e a aba Pró-labore é uma vista dessas entradas); (3) 10% do valor como SAÍDA escopo "pessoal", categoria "Dízimo". Pró-labore NÃO é um escopo próprio (é categoria dentro de pessoal) — nunca usar escopo "pro_labore" em lançamento novo. Regra fixa confirmada pelo Diego (16/07/2026).
 - REGRA Nº 6: ao criar ficha de cliente/serviço a partir de print ou nota, se algum dado essencial (nome, telefone, cidade, valor) estiver ambíguo, ilegível ou incerto — NÃO adivinhar e lançar. Perguntar ao Diego pra confirmar antes de gravar. Só lançar direto quando o dado estiver claro no print/texto.
 - REGRA Nº 7: quando o Diego disser "remove"/"tira"/"pode remover" sobre um lead (ex: parou de responder, não vale mais insistir), NUNCA excluir o registro. Mudar o status do serviço para "perdido" (mantém o histórico, some da contagem de ativos). Todo serviço ativo (lead/orcamento/agendado/producao) é OBRIGADO a ter prazo preenchido (travado no banco, constraint servicos_ativo_precisa_prazo) — nunca tentar gravar serviço ativo sem prazo, vai dar erro.
+- REGRA Nº 8: compra de material NUNCA entra como saída solta no financeiro. Toda compra de insumo (tecido, espuma, PVC, pés, linha, cola, percinta) é lançada com categoria "Material", escopo "empresa", SEMPRE com fornecedor_id preenchido (o fornecedor cadastrado que vendeu) e, quando o material foi comprado pra um trabalho específico, também com servico_id (o serviço que consumiu). É isso que faz a aba Compras mostrar gasto por mês, por fornecedor e a margem real de cada serviço. Se o material foi pra estoque geral, deixar servico_id vazio — mas fornecedor_id nunca. Combustível, almoço e vale NÃO são material: continuam nas categorias próprias.
 - Novo lead, orçamento e agendado não geram lançamento financeiro.
 - O valor informado nesses status é apenas valor de orçamento.
 - Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
@@ -306,7 +309,7 @@ function Home() {
   const [booting, setBooting] = useState(true);
   const [email, setEmail] = useState("");
   const [loginSent, setLoginSent] = useState(false);
-  const [tab, setTab] = useState("caixa");
+  const [tab, setTab] = useState("painel");
   const [leadsFiltroInicial, setLeadsFiltroInicial] = useState("todos");
   const [mode, setMode] = useState("diego");
   const [inbox, setInbox] = useState([]);
@@ -640,8 +643,8 @@ function Home() {
 
   const valesPendentes = finances.filter((f) => f.categoria === "Vale" && f.status === "a_pagar").length;
   const nav = [
-    { id: "caixa", label: "Caixa", icon: "◎", count: inbox.length }, { id: "painel", label: "Painel", icon: "⌂" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
-    { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "vales", label: "Vales", icon: "✎", count: valesPendentes },
+    { id: "painel", label: "Painel", icon: "⌂" }, { id: "caixa", label: "Caixa", icon: "◎", count: inbox.length }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
+    { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "compras", label: "Compras", icon: "▣" }, { id: "vales", label: "Vales", icon: "✎", count: valesPendentes },
     { id: "clientes", label: "Clientes", icon: "○" }, { id: "fornecedores", label: "Fornecedores", icon: "▤" },
   ];
 
@@ -674,6 +677,7 @@ function Home() {
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={appointments} services={services} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} />}
+      {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "vales" && <ValesView finances={finances} db={db} demo={demo} notify={notify} onChanged={loadAll} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
@@ -1235,6 +1239,121 @@ function ValesView({ finances, db, demo, notify, onChanged }) {
       </div>; })}
     </section>
     {abatidos.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">HISTÓRICO</p><h3>Vales já abatidos</h3></div></div>{abatidos.map((v) => <div className="finance-row" key={v.id}><div><strong>{v.descricao.replace(VALE_ABATIDO_TAG, "")}</strong><span>{compactDate(v.data)} · abatido</span></div><b className="saida">− {money(v.valor)}</b></div>)}</section>}
+  </div>;
+}
+
+// Compra de material NÃO é uma tabela separada: é um lançamento normal do financeiro (categoria "Material", escopo empresa)
+// com fornecedor_id e, quando o material foi pra um trabalho específico, servico_id. Assim o saldo da empresa nunca
+// desencontra e a aba Compras é só uma VISTA - mesmo padrão de Vales e Pró-labore. Ver REGRA Nº 8 no Guia da IA.
+const CATEGORIA_MATERIAL = "Material";
+function ehCompraMaterial(item) { return item.tipo === "saida" && (item.categoria === CATEGORIA_MATERIAL || !!item.fornecedor_id); }
+function mesISO(data) { return (data || "").slice(0, 7); }
+function mesLabel(chave) {
+  if (!chave) return "Sem data";
+  const d = new Date(`${chave}-01T12:00:00`);
+  return Number.isNaN(d.getTime()) ? chave : d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+}
+const COMPRAS_ABAS = [{ id: "mes", label: "Por mês" }, { id: "fornecedor", label: "Por fornecedor" }, { id: "servico", label: "Por serviço" }];
+
+function ComprasView({ finances, fornecedores, services, db, demo, mode, notify, onChanged }) {
+  const [aba, setAba] = useState("mes");
+  const [formOpen, setFormOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const vazio = { fornecedorId: "", servicoId: "", valor: "", descricao: "", data: hojeISO() };
+  const [draft, setDraft] = useState(vazio);
+
+  const compras = finances.filter(ehCompraMaterial);
+  const nomeFornecedor = (id) => fornecedores.find((f) => f.id === id)?.nome || "Sem fornecedor";
+  const servicoDe = (id) => services.find((s) => s.id === id);
+  const total = compras.reduce((soma, c) => soma + Number(c.valor), 0);
+  const mesAtual = mesISO(hojeISO());
+  const totalMes = compras.filter((c) => mesISO(c.data) === mesAtual).reduce((soma, c) => soma + Number(c.valor), 0);
+
+  const agrupar = (chaveDe) => {
+    const grupos = {};
+    compras.forEach((c) => { const k = chaveDe(c); (grupos[k] ||= []).push(c); });
+    return grupos;
+  };
+  const grupos = aba === "mes" ? agrupar((c) => mesISO(c.data)) : aba === "fornecedor" ? agrupar((c) => nomeFornecedor(c.fornecedor_id)) : agrupar((c) => c.servico_id || "");
+  const chaves = Object.keys(grupos).sort((a, b) => (aba === "mes" ? b.localeCompare(a) : a.localeCompare(b)));
+
+  const labelServico = (id) => {
+    if (!id) return "Sem serviço vinculado (estoque geral)";
+    const s = servicoDe(id);
+    return s ? `${s.clientes?.nome || "Cliente"} — ${s.titulo}` : "Serviço não encontrado";
+  };
+  const tituloGrupo = (chave) => aba === "mes" ? mesLabel(chave) : aba === "fornecedor" ? chave : labelServico(chave);
+
+  const salvar = async () => {
+    if (mode === "claude") { notify("Financeiro exige Diego.", "error"); return; }
+    if (!draft.fornecedorId) { notify("Escolha o fornecedor.", "error"); return; }
+    const valor = Number(String(draft.valor).replace(",", "."));
+    if (!valor || valor <= 0) { notify("Informe um valor válido.", "error"); return; }
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusy(true);
+    try {
+      const payload = {
+        tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MATERIAL, status: "pago",
+        valor, data: draft.data || hojeISO(),
+        descricao: draft.descricao.trim() || `Material — ${nomeFornecedor(draft.fornecedorId)}`,
+        fornecedor_id: draft.fornecedorId, servico_id: draft.servicoId || null,
+      };
+      const { error } = await db.from("financeiro").insert(payload); if (error) throw error;
+      notify("Compra registrada.", "ok"); setDraft(vazio); setFormOpen(false); await onChanged();
+    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
+  };
+
+  const servicosVinculaveis = services.filter((s) => !["perdido"].includes(s.status));
+
+  return <div className="page-grid">
+    <section className="metric-grid finance-metrics">
+      <Metric label="Material neste mês" value={money(totalMes)} detail={mesLabel(mesAtual)} tone="red" />
+      <Metric label="Total em material" value={money(total)} detail={`${compras.length} compra(s)`} tone="orange" />
+      <Metric label="Fornecedores usados" value={String(new Set(compras.map((c) => c.fornecedor_id).filter(Boolean)).size)} detail="Com compra registrada" tone="green" />
+    </section>
+
+    <section className="content-card">
+      <div className="card-head"><div><p className="kicker">COMPRAS DE MATERIAL</p><h3>Registrar nova compra</h3></div>
+        <button className="ghost" onClick={() => setFormOpen(!formOpen)} disabled={mode === "claude"}>{formOpen ? "Cancelar" : mode === "claude" ? "Só o Diego lança" : "+ Nova compra"}</button></div>
+      {formOpen && mode === "diego" && <div className="form-grid">
+        <label>Fornecedor*
+          <div className="fornecedor-chips">{fornecedores.map((f) => <button type="button" key={f.id} className={draft.fornecedorId === f.id ? "active" : ""} onClick={() => setDraft({ ...draft, fornecedorId: f.id })}>{f.nome}</button>)}</div>
+        </label>
+        <div className="row three">
+          <label>Valor R$*<input value={draft.valor} onChange={(e) => setDraft({ ...draft, valor: e.target.value })} placeholder="0,00" /></label>
+          <label>Data*<input type="date" value={draft.data} onChange={(e) => setDraft({ ...draft, data: e.target.value })} /></label>
+          <label>Serviço (opcional)<select value={draft.servicoId} onChange={(e) => setDraft({ ...draft, servicoId: e.target.value })}>
+            <option value="">Estoque geral — sem serviço</option>
+            {servicosVinculaveis.map((s) => <option key={s.id} value={s.id}>{(s.clientes?.nome || "Cliente") + " — " + s.titulo}</option>)}
+          </select></label>
+        </div>
+        <label>O que comprou<input value={draft.descricao} onChange={(e) => setDraft({ ...draft, descricao: e.target.value })} placeholder="Ex: 4m de linho Klee + espuma D33" /></label>
+        <ReviewBox lines={[draft.fornecedorId ? nomeFornecedor(draft.fornecedorId) : "Sem fornecedor", `${money(String(draft.valor).replace(",", "."))} · ${draft.data || "sem data"}`, draft.servicoId ? labelServico(draft.servicoId) : "Estoque geral"]} />
+        <button className="primary wide" onClick={salvar} disabled={busy}>{busy ? "Salvando…" : "Registrar compra"}</button>
+      </div>}
+      {!formOpen && <p className="ficha-note">Sai como saída da Empresa, categoria Material — o saldo do Financeiro continua batendo.</p>}
+    </section>
+
+    <div className="funil-filtros">{COMPRAS_ABAS.map((a) => <button key={a.id} className={aba === a.id ? "active" : ""} onClick={() => setAba(a.id)}>{a.label}</button>)}</div>
+
+    <section className="content-card">
+      <div className="card-head"><div><p className="kicker">{aba === "servico" ? "MARGEM REAL POR SERVIÇO" : "GASTO AGRUPADO"}</p><h3>{compras.length} compra(s)</h3></div></div>
+      {!compras.length && <div className="empty-state"><b>Nenhuma compra de material registrada ainda.</b><span>Compras antigas lançadas soltas no Financeiro aparecem aqui depois de reclassificadas.</span></div>}
+      {chaves.map((chave) => {
+        const itens = grupos[chave];
+        const subtotal = itens.reduce((s, c) => s + Number(c.valor), 0);
+        const servico = aba === "servico" && chave ? servicoDe(chave) : null;
+        const orcamento = Number(servico?.valor_orcamento || 0);
+        return <div key={chave || "sem"} className="vale-fornecedor">
+          <div className="vale-fornecedor-head"><strong>{tituloGrupo(chave)}</strong><b>{money(subtotal)}</b></div>
+          {servico && orcamento > 0 && <div className="finance-row"><div><strong>Margem real</strong><span>Orçamento {money(orcamento)} − material {money(subtotal)}</span></div><b className={orcamento - subtotal >= 0 ? "entrada" : "saida"}>{money(orcamento - subtotal)}</b></div>}
+          {itens.map((c) => <div className="finance-row" key={c.id}>
+            <div><strong>{c.descricao || "Material"}</strong><span>{compactDate(c.data)}{aba !== "fornecedor" ? ` · ${nomeFornecedor(c.fornecedor_id)}` : ""}{aba !== "servico" && c.servico_id ? ` · ${labelServico(c.servico_id)}` : ""}</span></div>
+            <b className="saida">− {money(c.valor)}</b>
+          </div>)}
+        </div>;
+      })}
+    </section>
   </div>;
 }
 
