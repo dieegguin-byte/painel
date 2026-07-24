@@ -733,7 +733,7 @@ function Home() {
       {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={appointments} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onOpenFicha={setFichaId} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={appointments} services={services} finances={finances} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
-      {tab === "financeiro" && <FinanceView finances={finances} />}
+      {tab === "financeiro" && <FinanceView finances={finances} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={appointments} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "vales" && <ValesView finances={finances} db={db} demo={demo} notify={notify} onChanged={loadAll} />}
@@ -1271,14 +1271,26 @@ function AgendaPicker({ appointments, appt, onClose, onPicked }) {
 }
 
 const FINANCE_ABAS = [{ id: "todos", label: "Todos" }, { id: "empresa", label: "Empresa" }, { id: "pro_labore", label: "Pró-labore" }, { id: "pessoal", label: "Pessoal" }];
-function FinanceView({ finances }) {
+function FinanceView({ finances, onVerAPagar }) {
   const [aba, setAba] = useState("todos");
-  // Pró-labore é uma VISTA (renda que o Diego se pagou, base do dízimo), não um bolso separado: filtra a entrada pessoal categoria "Pró-labore".
-  const visiveis = aba === "todos" ? finances
-    : aba === "pro_labore" ? finances.filter((item) => item.categoria === "Pró-labore" && item.tipo === "entrada")
-    : finances.filter((item) => (item.escopo || "empresa") === aba);
+  // O Financeiro mostra o que JÁ ACONTECEU. Conta futura (a_pagar) fica de fora da lista porque ela ordena por
+  // data: um parcelamento de 12 meses ia empilhar 2027 em cima do que aconteceu hoje e esconder o dia. O que
+  // está por vencer aparece resumido na faixa do topo, que leva pra aba "A pagar".
+  const realizados = finances.filter((item) => item.status !== "a_pagar");
+  const visiveis = aba === "todos" ? realizados
+    : aba === "pro_labore" ? realizados.filter((item) => item.categoria === "Pró-labore" && item.tipo === "entrada")
+    : realizados.filter((item) => (item.escopo || "empresa") === aba);
+  const hoje = hojeISO();
+  const limite = somaDiaMes(hoje, 1);
+  const vencendo = finances.filter((item) => item.status === "a_pagar" && item.tipo === "saida" && (item.data || "") <= limite);
+  const totalVencendo = vencendo.reduce((s, item) => s + Number(item.valor), 0);
+  const atrasadas = vencendo.filter((item) => (item.data || "") < hoje);
   const paidIn = visiveis.filter((item) => item.tipo === "entrada" && (!item.status || item.status === "pago")).reduce((sum, item) => sum + Number(item.valor), 0); const paidOut = visiveis.filter((item) => item.tipo === "saida" && (!item.status || item.status === "pago")).reduce((sum, item) => sum + Number(item.valor), 0);
-  return <div className="page-grid"><div className="funil-filtros">{FINANCE_ABAS.map((a) => <button key={a.id} className={aba === a.id ? "active" : ""} onClick={() => setAba(a.id)}>{a.label}</button>)}</div><section className="metric-grid finance-metrics"><Metric label="Entradas" value={money(paidIn)} detail="Confirmadas" tone="green" /><Metric label="Saídas" value={money(paidOut)} detail="Confirmadas" tone="red" /><Metric label="Saldo" value={money(paidIn - paidOut)} detail="Visão operacional" tone="orange" /></section><section className="content-card"><div className="card-head"><div><p className="kicker">SOMENTE LEITURA NO MODO CLAUDE</p><h3>Lançamentos</h3></div></div>{visiveis.map((item) => <div className="finance-row" key={item.id}><div><strong>{item.descricao || item.categoria || "Lançamento"}</strong><span>{compactDate(item.data)} · {item.status || "pago"}</span></div><b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b></div>)}{!visiveis.length && <div className="empty-state"><b>Nada por aqui ainda.</b></div>}</section></div>;
+  return <div className="page-grid"><div className="funil-filtros">{FINANCE_ABAS.map((a) => <button key={a.id} className={aba === a.id ? "active" : ""} onClick={() => setAba(a.id)}>{a.label}</button>)}</div>
+    {vencendo.length > 0 && <section className="warning-card"><b>{money(totalVencendo)} a vencer até {compactDate(limite)}</b>
+      <span>{vencendo.length} conta(s){atrasadas.length ? ` · ${atrasadas.length} já vencida(s)` : ""} — ainda não saíram do caixa. {onVerAPagar && <button type="button" className="ficha-link" onClick={onVerAPagar}>ver em A pagar</button>}</span>
+    </section>}
+    <section className="metric-grid finance-metrics"><Metric label="Entradas" value={money(paidIn)} detail="Confirmadas" tone="green" /><Metric label="Saídas" value={money(paidOut)} detail="Confirmadas" tone="red" /><Metric label="Saldo" value={money(paidIn - paidOut)} detail="Visão operacional" tone="orange" /></section><section className="content-card"><div className="card-head"><div><p className="kicker">SOMENTE LEITURA NO MODO CLAUDE</p><h3>Lançamentos realizados</h3></div></div>{visiveis.map((item) => <div className="finance-row" key={item.id}><div><strong>{item.descricao || item.categoria || "Lançamento"}</strong><span>{compactDate(item.data)} · {item.status || "pago"}</span></div><b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b></div>)}{!visiveis.length && <div className="empty-state"><b>Nada por aqui ainda.</b></div>}</section></div>;
 }
 
 function nomeFornecedorVale(descricao) {
