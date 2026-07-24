@@ -260,7 +260,8 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - REGRA Nº 5: toda vez que o Diego falar que retirou pró-labore (ex: "peguei 100 reais de pró-labore"), lançar automaticamente TRÊS lançamentos no financeiro: (1) o valor como SAÍDA escopo "empresa", categoria "Retirada de pró-labore" (o dinheiro sai do caixa da empresa); (2) o mesmo valor como ENTRADA escopo "pessoal", categoria "Pró-labore" (entra no bolso pessoal dele — é a base do dízimo, e a aba Pró-labore é uma vista dessas entradas); (3) 10% do valor como SAÍDA escopo "pessoal", categoria "Dízimo". Pró-labore NÃO é um escopo próprio (é categoria dentro de pessoal) — nunca usar escopo "pro_labore" em lançamento novo. Regra fixa confirmada pelo Diego (16/07/2026).
 - REGRA Nº 6: ao criar ficha de cliente/serviço a partir de print ou nota, se algum dado essencial (nome, telefone, cidade, valor) estiver ambíguo, ilegível ou incerto — NÃO adivinhar e lançar. Perguntar ao Diego pra confirmar antes de gravar. Só lançar direto quando o dado estiver claro no print/texto.
 - REGRA Nº 7: quando o Diego disser "remove"/"tira"/"pode remover" sobre um lead (ex: parou de responder, não vale mais insistir), NUNCA excluir o registro. Mudar o status do serviço para "perdido" (mantém o histórico, some da contagem de ativos). Todo serviço ativo (lead/orcamento/agendado/producao) é OBRIGADO a ter prazo preenchido (travado no banco, constraint servicos_ativo_precisa_prazo) — nunca tentar gravar serviço ativo sem prazo, vai dar erro.
-- REGRA Nº 8: compra de material NUNCA entra como saída solta no financeiro. Toda compra de insumo (tecido, espuma, PVC, pés, linha, cola, percinta) é lançada com categoria "Material", escopo "empresa", SEMPRE com fornecedor_id preenchido (o fornecedor cadastrado que vendeu) e, quando o material foi comprado pra um trabalho específico, também com servico_id (o serviço que consumiu). É isso que faz a aba Compras mostrar gasto por mês, por fornecedor e a margem real de cada serviço. Se o material foi pra estoque geral, deixar servico_id vazio — mas fornecedor_id nunca. Combustível, almoço e vale NÃO são material: continuam nas categorias próprias.
+- REGRA Nº 8: compra de material NUNCA entra como saída solta no financeiro. Toda compra de insumo (tecido, espuma, PVC, pés, linha, cola, percinta) é lançada com categoria "Material", escopo "empresa", SEMPRE com fornecedor_id preenchido (o fornecedor cadastrado que vendeu) e, quando o material foi comprado pra um trabalho específico, também com servico_id (o serviço que consumiu). É isso que faz a aba Compras mostrar gasto por mês, por fornecedor e a margem real de cada serviço. Se o material foi pra estoque geral, deixar servico_id vazio — mas fornecedor_id nunca. Combustível, almoço e vale NÃO são material: continuam nas categorias próprias. Material que ainda vai ser comprado entra com status "a_pagar" (lista de compras, não mexe no caixa) e só vira "pago" quando o Diego marcar como comprado no app.
+- REGRA Nº 9: vale é LEMBRETE DE DÍVIDA, não gasto. Lançar sempre categoria "Vale" com status "a_pagar" — assim ele aparece na aba Vales mas NÃO influencia o saldo do Financeiro. Só quando o Diego marcar como abatido (o momento em que paga de verdade) é que vira status "pago" e pesa no caixa. Nunca lançar vale já como "pago" achando que o dinheiro saiu.
 - Novo lead, orçamento e agendado não geram lançamento financeiro.
 - O valor informado nesses status é apenas valor de orçamento.
 - Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
@@ -1215,7 +1216,9 @@ const VALE_ABATIDO_TAG = "[ABATIDO] ";
 function ValesView({ finances, db, demo, notify, onChanged }) {
   const [busyId, setBusyId] = useState(null);
   const vales = finances.filter((f) => f.categoria === "Vale");
-  // "abatido" é só uma marcação administrativa (prefixo na descrição) - o valor sempre conta no saldo desde o dia em que o vale foi dado, status fica sempre "pago" (o dinheiro já saiu de verdade).
+  // Vale é lembrete de dívida, NÃO gasto: enquanto pendente fica status "a_pagar" e por isso não entra no saldo do
+  // Financeiro (que só soma pago). Ao marcar abatido - o momento em que o Diego realmente paga - vira "pago" e aí sim
+  // pesa no caixa. O prefixo [ABATIDO] na descrição é só a marcação administrativa que move o item pro histórico.
   const pendentes = vales.filter((v) => !(v.descricao || "").startsWith(VALE_ABATIDO_TAG));
   const abatidos = vales.filter((v) => (v.descricao || "").startsWith(VALE_ABATIDO_TAG));
   const porFornecedor = {};
@@ -1225,8 +1228,8 @@ function ValesView({ finances, db, demo, notify, onChanged }) {
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusyId(item.id);
     try {
-      const { error } = await db.from("financeiro").update({ descricao: VALE_ABATIDO_TAG + item.descricao }).eq("id", item.id); if (error) throw error;
-      notify("Vale marcado como abatido.", "ok"); await onChanged();
+      const { error } = await db.from("financeiro").update({ descricao: VALE_ABATIDO_TAG + item.descricao, status: "pago" }).eq("id", item.id); if (error) throw error;
+      notify("Vale abatido — agora conta como saída no caixa.", "ok"); await onChanged();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusyId(null); }
   };
   return <div className="page-grid">
@@ -1259,13 +1262,18 @@ function ComprasView({ finances, fornecedores, services, db, demo, mode, notify,
   const [aba, setAba] = useState("mes");
   const [formOpen, setFormOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const vazio = { fornecedorId: "", servicoId: "", valor: "", descricao: "", data: hojeISO() };
+  const vazio = { fornecedorId: "", servicoId: "", valor: "", descricao: "", data: hojeISO(), jaComprei: true };
   const [draft, setDraft] = useState(vazio);
+  const [confirmando, setConfirmando] = useState(null); // { id, servicoId } - item da lista sendo marcado como comprado
 
-  const compras = finances.filter(ehCompraMaterial);
+  const todas = finances.filter(ehCompraMaterial);
+  // "a comprar" é lista de compras (ainda não saiu dinheiro, status a_pagar); só o que já foi comprado conta como gasto.
+  const aComprar = todas.filter((c) => c.status === "a_pagar");
+  const compras = todas.filter((c) => c.status !== "a_pagar");
   const nomeFornecedor = (id) => fornecedores.find((f) => f.id === id)?.nome || "Sem fornecedor";
   const servicoDe = (id) => services.find((s) => s.id === id);
   const total = compras.reduce((soma, c) => soma + Number(c.valor), 0);
+  const totalAComprar = aComprar.reduce((soma, c) => soma + Number(c.valor), 0);
   const mesAtual = mesISO(hojeISO());
   const totalMes = compras.filter((c) => mesISO(c.data) === mesAtual).reduce((soma, c) => soma + Number(c.valor), 0);
 
@@ -1293,45 +1301,76 @@ function ComprasView({ finances, fornecedores, services, db, demo, mode, notify,
     setBusy(true);
     try {
       const payload = {
-        tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MATERIAL, status: "pago",
+        tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MATERIAL, status: draft.jaComprei ? "pago" : "a_pagar",
         valor, data: draft.data || hojeISO(),
         descricao: draft.descricao.trim() || `Material — ${nomeFornecedor(draft.fornecedorId)}`,
         fornecedor_id: draft.fornecedorId, servico_id: draft.servicoId || null,
       };
       const { error } = await db.from("financeiro").insert(payload); if (error) throw error;
-      notify("Compra registrada.", "ok"); setDraft(vazio); setFormOpen(false); await onChanged();
+      notify(draft.jaComprei ? "Compra registrada." : "Item adicionado à lista de compras.", "ok"); setDraft(vazio); setFormOpen(false); await onChanged();
+    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
+  };
+
+  // Marcar como já comprado: vira gasto de verdade (status pago, data de hoje) e é a ÚLTIMA chance de dizer
+  // pra qual serviço foi o material — muitas vezes na hora de anotar ele ainda não sabia.
+  const marcarComprado = async (item) => {
+    if (mode === "claude") { notify("Financeiro exige Diego.", "error"); return; }
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusy(true);
+    try {
+      const patch = { status: "pago", data: hojeISO() };
+      if (confirmando && confirmando.id === item.id && confirmando.servicoId) patch.servico_id = confirmando.servicoId;
+      const { error } = await db.from("financeiro").update(patch).eq("id", item.id); if (error) throw error;
+      notify("Marcado como comprado.", "ok"); setConfirmando(null); await onChanged();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
 
   const servicosVinculaveis = services.filter((s) => !["perdido"].includes(s.status));
+  const seletorServico = (valor, onPick) => <select value={valor} onChange={(e) => onPick(e.target.value)}>
+    <option value="">Estoque geral — sem serviço</option>
+    {servicosVinculaveis.map((s) => <option key={s.id} value={s.id}>{(s.clientes?.nome || "Cliente") + " — " + s.titulo}</option>)}
+  </select>;
 
   return <div className="page-grid">
     <section className="metric-grid finance-metrics">
       <Metric label="Material neste mês" value={money(totalMes)} detail={mesLabel(mesAtual)} tone="red" />
-      <Metric label="Total em material" value={money(total)} detail={`${compras.length} compra(s)`} tone="orange" />
-      <Metric label="Fornecedores usados" value={String(new Set(compras.map((c) => c.fornecedor_id).filter(Boolean)).size)} detail="Com compra registrada" tone="green" />
+      <Metric label="A comprar" value={money(totalAComprar)} detail={`${aComprar.length} item(ns) na lista`} tone="orange" />
+      <Metric label="Total em material" value={money(total)} detail={`${compras.length} compra(s)`} tone="green" />
     </section>
+
+    {aComprar.length > 0 && <section className="content-card">
+      <div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>Ainda não comprado</h3></div></div>
+      <p className="ficha-note">Enquanto está aqui não conta como gasto nem no Financeiro. Ao marcar como comprado vira saída da Empresa com a data de hoje.</p>
+      {aComprar.map((c) => <div className="finance-row" key={c.id}>
+        <div><strong>{c.descricao || "Material"}</strong><span>{nomeFornecedor(c.fornecedor_id)}{c.servico_id ? ` · ${labelServico(c.servico_id)}` : " · sem serviço vinculado"}</span>
+          {confirmando && confirmando.id === c.id && !c.servico_id && <label className="material-edit-block">Foi pra qual serviço?{seletorServico(confirmando.servicoId, (v) => setConfirmando({ ...confirmando, servicoId: v }))}</label>}
+        </div>
+        <div className="agenda-acoes"><b className="saida">{money(c.valor)}</b>
+          {confirmando && confirmando.id === c.id
+            ? <><button className="primary" disabled={busy} onClick={() => marcarComprado(c)}>Confirmar compra</button><button className="ghost" onClick={() => setConfirmando(null)}>Cancelar</button></>
+            : <button className="ghost" disabled={mode === "claude"} onClick={() => setConfirmando({ id: c.id, servicoId: c.servico_id || "" })}>✓ Já comprei</button>}
+        </div>
+      </div>)}
+    </section>}
 
     <section className="content-card">
       <div className="card-head"><div><p className="kicker">COMPRAS DE MATERIAL</p><h3>Registrar nova compra</h3></div>
         <button className="ghost" onClick={() => setFormOpen(!formOpen)} disabled={mode === "claude"}>{formOpen ? "Cancelar" : mode === "claude" ? "Só o Diego lança" : "+ Nova compra"}</button></div>
       {formOpen && mode === "diego" && <div className="form-grid">
+        <div className="classify">{[[true, "Já comprei"], [false, "Ainda vou comprar"]].map(([v, label]) => <button key={label} className={draft.jaComprei === v ? "active" : ""} onClick={() => setDraft({ ...draft, jaComprei: v })}>{label}</button>)}</div>
         <label>Fornecedor*
           <div className="fornecedor-chips">{fornecedores.map((f) => <button type="button" key={f.id} className={draft.fornecedorId === f.id ? "active" : ""} onClick={() => setDraft({ ...draft, fornecedorId: f.id })}>{f.nome}</button>)}</div>
         </label>
         <div className="row three">
           <label>Valor R$*<input value={draft.valor} onChange={(e) => setDraft({ ...draft, valor: e.target.value })} placeholder="0,00" /></label>
-          <label>Data*<input type="date" value={draft.data} onChange={(e) => setDraft({ ...draft, data: e.target.value })} /></label>
-          <label>Serviço (opcional)<select value={draft.servicoId} onChange={(e) => setDraft({ ...draft, servicoId: e.target.value })}>
-            <option value="">Estoque geral — sem serviço</option>
-            {servicosVinculaveis.map((s) => <option key={s.id} value={s.id}>{(s.clientes?.nome || "Cliente") + " — " + s.titulo}</option>)}
-          </select></label>
+          <label>{draft.jaComprei ? "Data*" : "Precisa até*"}<input type="date" value={draft.data} onChange={(e) => setDraft({ ...draft, data: e.target.value })} /></label>
+          <label>Serviço (opcional){seletorServico(draft.servicoId, (v) => setDraft({ ...draft, servicoId: v }))}</label>
         </div>
         <label>O que comprou<input value={draft.descricao} onChange={(e) => setDraft({ ...draft, descricao: e.target.value })} placeholder="Ex: 4m de linho Klee + espuma D33" /></label>
-        <ReviewBox lines={[draft.fornecedorId ? nomeFornecedor(draft.fornecedorId) : "Sem fornecedor", `${money(String(draft.valor).replace(",", "."))} · ${draft.data || "sem data"}`, draft.servicoId ? labelServico(draft.servicoId) : "Estoque geral"]} />
-        <button className="primary wide" onClick={salvar} disabled={busy}>{busy ? "Salvando…" : "Registrar compra"}</button>
+        <ReviewBox lines={[draft.jaComprei ? "Compra já feita — entra como saída da Empresa" : "Lista de compras — não entra no caixa até você confirmar", draft.fornecedorId ? nomeFornecedor(draft.fornecedorId) : "Sem fornecedor", `${money(String(draft.valor).replace(",", "."))} · ${draft.data || "sem data"}`, draft.servicoId ? labelServico(draft.servicoId) : "Estoque geral"]} />
+        <button className="primary wide" onClick={salvar} disabled={busy}>{busy ? "Salvando…" : draft.jaComprei ? "Registrar compra" : "Adicionar à lista de compras"}</button>
       </div>}
-      {!formOpen && <p className="ficha-note">Sai como saída da Empresa, categoria Material — o saldo do Financeiro continua batendo.</p>}
+      {!formOpen && <p className="ficha-note">Compra feita sai como saída da Empresa (categoria Material) — o saldo do Financeiro continua batendo. O que ainda vai comprar fica na lista sem mexer no caixa.</p>}
     </section>
 
     <div className="funil-filtros">{COMPRAS_ABAS.map((a) => <button key={a.id} className={aba === a.id ? "active" : ""} onClick={() => setAba(a.id)}>{a.label}</button>)}</div>
