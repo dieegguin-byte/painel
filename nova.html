@@ -922,21 +922,25 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
   </section>;
 }
 
+const SEM_PROFISSIONAL = "Sem profissional atribuído";
 // PAINEL: capacidade por profissional - clica no nome pra ver os servicos dele (mesmo padrao da Agenda: colapsado, expande no clique)
 function CapacidadeCard({ services }) {
   const [aberto, setAberto] = useState(null);
   const porProfissional = useMemo(() => {
     const map = {};
-    (services || []).forEach((s) => { if (s.responsavel && ["lead", "orcamento", "agendado", "producao"].includes(s.status)) { const k = s.responsavel.trim(); (map[k] ||= []).push(s); } });
+    // Serviço ativo SEM responsável também entra (grupo "Sem profissional"): é trabalho fechado de verdade
+    // ocupando a produção, e some do radar de capacidade justo quando mais importa saber.
+    (services || []).forEach((s) => { if (["lead", "orcamento", "agendado", "producao"].includes(s.status)) { const k = s.responsavel?.trim() || SEM_PROFISSIONAL; (map[k] ||= []).push(s); } });
     return map;
   }, [services]);
-  const nomes = Object.entries(porProfissional).sort((a, b) => b[1].length - a[1].length);
+  // "Sem profissional" fica sempre por último, mesmo sendo o maior grupo - é pendência, não capacidade.
+  const nomes = Object.entries(porProfissional).sort((a, b) => (a[0] === SEM_PROFISSIONAL) - (b[0] === SEM_PROFISSIONAL) || b[1].length - a[1].length);
   if (!nomes.length) return null;
   return <section className="content-card">
     <div className="card-head"><div><p className="kicker">CAPACIDADE</p><h3>Profissionais em serviço</h3></div></div>
     <div className="capacidade-profissionais">{nomes.map(([nome, lista]) => { const isAberto = aberto === nome; return <div className={`capacidade-item${isAberto ? " active" : ""}`} key={nome}>
       <button type="button" className="capacidade-item-head" onClick={() => setAberto(isAberto ? null : nome)}>
-        <span>{nome}</span><b>{lista.length} ativo{lista.length > 1 ? "s" : ""}</b><i>{isAberto ? "▲" : "▼"}</i>
+        <span>{nome === SEM_PROFISSIONAL ? "⚠ " + nome : nome}</span><b>{lista.length} ativo{lista.length > 1 ? "s" : ""}</b><i>{isAberto ? "▲" : "▼"}</i>
       </button>
       {isAberto && <div className="capacidade-item-corpo">{lista.map((s) => <div className="capacidade-servico" key={s.id}><strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{statusLabel[s.status] || s.status}{s.prazo ? " · " + compactDate(s.prazo) : ""}</em></div>)}</div>}
     </div>; })}</div>
