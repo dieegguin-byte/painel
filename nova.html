@@ -1644,8 +1644,10 @@ function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
   const vazio = { descricao: "", valor: "", parcelas: "1", primeiroVenc: somaDiaMes(hojeISO(), 1), escopo: "empresa", categoria: "Conta fixa" };
   const [draft, setDraft] = useState(vazio);
   const [verTudo, setVerTudo] = useState(false);
+  const [escopoAba, setEscopoAba] = useState("todos"); // Diego: dinheiro pessoal (aluguel) separado do da empresa (cartão)
 
-  const contas = finances.filter(ehSaidaFutura).slice().sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  const todasContas = finances.filter(ehSaidaFutura);
+  const contas = todasContas.filter((c) => escopoAba === "todos" || (c.escopo || "empresa") === escopoAba).slice().sort((a, b) => (a.data || "").localeCompare(b.data || ""));
   const hoje = hojeISO();
   const atrasadas = contas.filter((c) => (c.data || "") < hoje);
   const mesAtual = mesISO(hoje);
@@ -1693,7 +1695,9 @@ function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
 
+  const EF_ABAS = [{ id: "todos", label: "Todos" }, { id: "empresa", label: "Empresa" }, { id: "pessoal", label: "Pessoal" }];
   return <div className="page-grid">
+    <div className="funil-filtros">{EF_ABAS.map((a) => <button key={a.id} className={escopoAba === a.id ? "active" : ""} onClick={() => setEscopoAba(a.id)}>{a.label}</button>)}</div>
     <section className="metric-grid finance-metrics">
       <Metric label="Vence neste mês" value={money(doMes.reduce((s, c) => s + Number(c.valor), 0))} detail={`${doMes.length} conta(s)`} tone="orange" />
       <Metric label="Atrasadas" value={money(atrasadas.reduce((s, c) => s + Number(c.valor), 0))} detail={atrasadas.length ? `${atrasadas.length} vencida(s)` : "Nada vencido"} tone="red" />
