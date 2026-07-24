@@ -953,7 +953,11 @@ function CompromissoCard({ a, svc, today, onConcluir, onReschedule, materiais })
 // Rotinas que vencem hoje ou estão atrasadas aparecem no Painel; "✓ Fiz hoje" reinicia a contagem.
 function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
   const [busyId, setBusyId] = useState(null);
-  const pendentes = rotinas.map((r) => ({ r, st: statusRotina(r, hoje) })).filter((x) => x.st.estado !== "futura")
+  // Atualização otimista: o onChanged recarrega tudo e demora, então a linha só sumiria segundos depois e
+  // parecia que o clique não pegou. Aqui a data nova vale na hora e o recarregamento só reconcilia.
+  const [feitasAgora, setFeitasAgora] = useState({});
+  const comOverride = rotinas.map((r) => feitasAgora[r.id] ? { ...r, ultima_execucao: feitasAgora[r.id] } : r);
+  const pendentes = comOverride.map((r) => ({ r, st: statusRotina(r, hoje) })).filter((x) => x.st.estado !== "futura")
     .sort((a, b) => a.st.dias - b.st.dias);
   if (!pendentes.length) return null;
   // Nem sempre ele marca no dia em que fez - lembra depois, ou marca de madrugada quando o dia já virou.
@@ -963,8 +967,9 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
     if (demo) { notify("Na demonstração a rotina não é salva.", "info"); return; }
     setBusyId(rotina.id);
     try {
+      setFeitasAgora((atual) => ({ ...atual, [rotina.id]: quando }));
       const { error } = await db.from("rotinas").update({ ultima_execucao: quando }).eq("id", rotina.id);
-      if (error) throw error;
+      if (error) { setFeitasAgora((atual) => { const copia = { ...atual }; delete copia[rotina.id]; return copia; }); throw error; }
       notify(`"${rotina.titulo}" marcada como feita ${quando === hoje ? "hoje" : "ontem"}.`, "ok"); onChanged();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusyId(null); }
   };
