@@ -282,7 +282,10 @@ const JANELAS_SEMANA = { 0: [], 1: [["08:00", "11:00"], ["13:00", "18:00"]], 2: 
 // Tarefa remota (ligar, mandar mensagem) não disputa horário: janela ampla, todo dia, nunca bloqueia horário ocupado.
 const JANELA_REMOTO = ["07:00", "22:00"];
 // Tempo típico de estrada entre as praças do Diego, em minutos (par de cidadeChave em ordem alfabética). Estimativa pro ALERTA, não pra bloquear.
-const TEMPO_ESTRADA_MIN = { "brasilia|luziania": 75, "luziania|valparaiso": 25, "cidade ocidental|luziania": 30, "luziania|novo gama": 35, "jardim inga|luziania": 15, "aguas lindas de goias|luziania": 105, "aguas claras|luziania": 60, "aguas claras|brasilia": 25, "brasilia|valparaiso": 45, "brasilia|novo gama": 50, "brasilia|cidade ocidental": 50, "aguas lindas de goias|brasilia": 50, "novo gama|valparaiso": 15, "cidade ocidental|valparaiso": 15, "cidade ocidental|novo gama": 20 };
+const TEMPO_ESTRADA_MIN = { "brasilia|luziania": 75, "luziania|valparaiso": 25, "cidade ocidental|luziania": 30, "luziania|novo gama": 35, "jardim inga|luziania": 15, "aguas lindas de goias|luziania": 105, "aguas claras|luziania": 60, "aguas claras|brasilia": 25, "brasilia|valparaiso": 45, "brasilia|novo gama": 50, "brasilia|cidade ocidental": 50, "aguas lindas de goias|brasilia": 50, "novo gama|valparaiso": 15, "cidade ocidental|valparaiso": 15, "cidade ocidental|novo gama": 20, "luziania|riacho fundo": 50, "riacho fundo|valparaiso": 30, "aguas claras|riacho fundo": 20, "brasilia|riacho fundo": 25, "novo gama|riacho fundo": 30, "cidade ocidental|riacho fundo": 45, "aguas lindas de goias|riacho fundo": 60, "aguas claras|valparaiso": 40, "aguas claras|novo gama": 45, "aguas claras|cidade ocidental": 55, "aguas claras|aguas lindas de goias": 60 };
+// Riacho Fundo e os pares com Águas Claras entraram em 23/07/2026 porque o par que não existe aqui cai num
+// default cego de 60min - era o que fazia a rota Luziânia > Valparaíso > Riacho Fundo > Águas Claras não bater.
+// Esses tempos são ESTIMATIVA pelo corredor da BR-040; corrigir com o tempo real quando o Diego apontar.
 const DURACAO_SERVICO_MIN = 60;
 const CIDADE_BASE = "luziania";
 function hojeISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
