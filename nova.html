@@ -717,7 +717,7 @@ function Home() {
         </section>
       </div>}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={appointments} finances={finances} rotinas={rotinas} customers={customers} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onOpenFicha={setFichaId} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={appointments} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onOpenFicha={setFichaId} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={appointments} services={services} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} />}
@@ -992,7 +992,7 @@ function CapacidadeCard({ services }) {
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-function Dashboard({ inbox, services, appointments, finances, rotinas, customers, db, demo, notify, onRotinaChanged, onOpenQueue, onConcluir, onReschedule, onSemProximaAcao, onOpenFicha }) {
+function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, db, demo, notify, onRotinaChanged, onOpenQueue, onConcluir, onReschedule, onSemProximaAcao, onOpenFicha }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO(); const dueAll = appointments.filter((entry) => entry.data <= today); const futurosAll = appointments.filter((entry) => entry.data > today); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
   const porTipo = (list) => filtroTipo === "todos" ? list : list.filter((entry) => (entry.tipo || "presencial") === filtroTipo);
@@ -1002,6 +1002,24 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CapacidadeCard services={services} />
     {(dueAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}</div>}
+    {(() => {
+      // LEMBRETE DE PEDIDO: material na lista de compras não adianta nada se ele esquecer de PEDIR.
+      // O fornecedor só entrega em dias fixos, então o que importa é a próxima janela de entrega dele.
+      const aPedir = (finances || []).filter((f) => ehCompraMaterial(f) && f.status === "a_pagar");
+      if (!aPedir.length) return null;
+      return <section className="warning-card"><b>{aPedir.length} material(is) na lista para pedir</b>
+        {aPedir.map((c) => {
+          const forn = (fornecedores || []).find((f) => f.id === c.fornecedor_id);
+          const entrega = forn ? proximaEntregaFornecedor(forn.dias_entrega) : null;
+          const precisaAte = c.data || "";
+          const atrasa = entrega && precisaAte && entrega > precisaAte;
+          return <span key={c.id}>{c.descricao || "Material"} · {forn ? forn.nome : "sem fornecedor"}
+            {entrega ? ` · próxima entrega ${compactDate(entrega)}` : " · sem dia fixo de entrega"}
+            {precisaAte ? ` · precisa até ${compactDate(precisaAte)}` : ""}
+            {atrasa ? " · ⚠ NÃO CHEGA A TEMPO, pedir hoje ou combinar outro dia" : ""}</span>;
+        })}
+      </section>;
+    })()}
     {(() => {
       // Só cobra telefone de quem tem serviço ativo — ficha velha sem contato não é urgência.
       const ativos = new Set((services || []).map((s) => s.cliente_id));
@@ -1308,6 +1326,10 @@ function ValesView({ finances, db, demo, notify, onChanged }) {
 // desencontra e a aba Compras é só uma VISTA - mesmo padrão de Vales e Pró-labore. Ver REGRA Nº 8 no Guia da IA.
 const CATEGORIA_MATERIAL = "Material";
 function ehCompraMaterial(item) { return item.tipo === "saida" && (item.categoria === CATEGORIA_MATERIAL || !!item.fornecedor_id); }
+// Compra antiga entrou sem fornecedor e fica pedindo atenção. "Conferido" é só a marca de que o Diego já olhou
+// e está certo - nunca apaga o lançamento (Regra Nº 7), só tira do que precisa de revisão.
+const COMPRA_CONFERIDA_TAG = "[CONFERIDO] ";
+function compraPrecisaRevisao(item) { return !item.fornecedor_id && !(item.descricao || "").startsWith(COMPRA_CONFERIDA_TAG); }
 function mesISO(data) { return (data || "").slice(0, 7); }
 function mesLabel(chave) {
   if (!chave) return "Sem data";
@@ -1383,6 +1405,19 @@ function ComprasView({ finances, fornecedores, services, db, demo, mode, notify,
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
 
+  // Compra sem fornecedor (lançada antes desta aba existir): o Diego atribui o fornecedor ou marca conferida.
+  const revisar = compras.filter(compraPrecisaRevisao);
+  const resolverRevisao = async (item, fornecedorId) => {
+    if (mode === "claude") { notify("Financeiro exige Diego.", "error"); return; }
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusy(true);
+    try {
+      const patch = fornecedorId ? { fornecedor_id: fornecedorId } : { descricao: COMPRA_CONFERIDA_TAG + (item.descricao || "Material") };
+      const { error } = await db.from("financeiro").update(patch).eq("id", item.id); if (error) throw error;
+      notify(fornecedorId ? "Fornecedor vinculado." : "Conferida — sai da revisão.", "ok"); await onChanged();
+    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
+  };
+
   const servicosVinculaveis = services.filter((s) => !["perdido"].includes(s.status));
   const seletorServico = (valor, onPick) => <select value={valor} onChange={(e) => onPick(e.target.value)}>
     <option value="">Estoque geral — sem serviço</option>
@@ -1395,6 +1430,17 @@ function ComprasView({ finances, fornecedores, services, db, demo, mode, notify,
       <Metric label="A comprar" value={money(totalAComprar)} detail={`${aComprar.length} item(ns) na lista`} tone="orange" />
       <Metric label="Total em material" value={money(total)} detail={`${compras.length} compra(s)`} tone="green" />
     </section>
+
+    {revisar.length > 0 && <section className="content-card">
+      <div className="card-head"><div><p className="kicker">PRECISA DE REVISÃO</p><h3>{revisar.length} compra(s) sem fornecedor</h3></div></div>
+      <p className="ficha-note">Lançamentos antigos, de antes desta aba existir. Diga de qual fornecedor foi — ou marque como conferida se já está certo. Nada é apagado.</p>
+      {revisar.map((c) => <div className="finance-row" key={c.id}>
+        <div><strong>{c.descricao || "Material"}</strong><span>{compactDate(c.data)} · {money(c.valor)}</span>
+          <div className="fornecedor-chips">{fornecedores.map((f) => <button type="button" key={f.id} disabled={busy || mode === "claude"} onClick={() => resolverRevisao(c, f.id)}>{f.nome}</button>)}</div>
+        </div>
+        <div className="agenda-acoes"><button className="ghost" disabled={busy || mode === "claude"} onClick={() => resolverRevisao(c, null)}>✓ Conferida</button></div>
+      </div>)}
+    </section>}
 
     {aComprar.length > 0 && <section className="content-card">
       <div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>Ainda não comprado</h3></div></div>
