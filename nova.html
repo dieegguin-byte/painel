@@ -1643,16 +1643,22 @@ function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
   const [busy, setBusy] = useState(false);
   const vazio = { descricao: "", valor: "", parcelas: "1", primeiroVenc: somaDiaMes(hojeISO(), 1), escopo: "empresa", categoria: "Conta fixa" };
   const [draft, setDraft] = useState(vazio);
+  const [verTudo, setVerTudo] = useState(false);
 
   const contas = finances.filter(ehSaidaFutura).slice().sort((a, b) => (a.data || "").localeCompare(b.data || ""));
   const hoje = hojeISO();
   const atrasadas = contas.filter((c) => (c.data || "") < hoje);
   const mesAtual = mesISO(hoje);
   const doMes = contas.filter((c) => mesISO(c.data) === mesAtual);
-  const totalComprometido = contas.reduce((s, c) => s + Number(c.valor), 0);
 
+  // Um parcelamento longo (aluguel de 12 meses) enchia a tela de meses que não mudam decisão nenhuma hoje.
+  // Por padrão mostra só o horizonte de decisão - vencidas e os próximos 60 dias - e resume o resto numa linha.
+  const horizonte = somaDiaMes(hoje, 2);
+  const noHorizonte = contas.filter((c) => (c.data || "") <= horizonte);
+  const depois = contas.filter((c) => (c.data || "") > horizonte);
+  const visiveis = verTudo ? contas : noHorizonte;
   const porMes = {};
-  contas.forEach((c) => { (porMes[mesISO(c.data)] ||= []).push(c); });
+  visiveis.forEach((c) => { (porMes[mesISO(c.data)] ||= []).push(c); });
   const meses = Object.keys(porMes).sort();
 
   const pagar = async (item) => {
@@ -1691,7 +1697,7 @@ function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
     <section className="metric-grid finance-metrics">
       <Metric label="Vence neste mês" value={money(doMes.reduce((s, c) => s + Number(c.valor), 0))} detail={`${doMes.length} conta(s)`} tone="orange" />
       <Metric label="Atrasadas" value={money(atrasadas.reduce((s, c) => s + Number(c.valor), 0))} detail={atrasadas.length ? `${atrasadas.length} vencida(s)` : "Nada vencido"} tone="red" />
-      <Metric label="Total comprometido" value={money(totalComprometido)} detail={`${contas.length} lançamento(s)`} tone="green" />
+      <Metric label="Próximos 60 dias" value={money(noHorizonte.reduce((s, c) => s + Number(c.valor), 0))} detail={`De ${contas.length} conta(s) no total`} tone="green" />
     </section>
 
     <section className="content-card">
@@ -1715,8 +1721,9 @@ function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
     </section>
 
     <section className="content-card">
-      <div className="card-head"><div><p className="kicker">POR VENCIMENTO</p><h3>{contas.length} conta(s) a pagar</h3></div></div>
+      <div className="card-head"><div><p className="kicker">POR VENCIMENTO</p><h3>{verTudo ? `${contas.length} conta(s) a pagar` : `${noHorizonte.length} conta(s) até ${compactDate(horizonte)}`}</h3></div></div>
       {!contas.length && <div className="empty-state"><b>Nenhuma saída futura agendada.</b><span>Parcela de cartão, aluguel e conta fixa entram aqui e aparecem no mês em que vão pesar.</span></div>}
+      {!!contas.length && !noHorizonte.length && !verTudo && <div className="empty-state"><b>Nada vence nos próximos 60 dias.</b></div>}
       {meses.map((m) => <div key={m} className="vale-fornecedor">
         <div className="vale-fornecedor-head"><strong>{mesLabel(m)}</strong><b>{money(porMes[m].reduce((s, c) => s + Number(c.valor), 0))}</b></div>
         {porMes[m].map((c) => <div className="finance-row" key={c.id}>
@@ -1724,6 +1731,9 @@ function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
           <div className="agenda-acoes"><b className="saida">{money(c.valor)}</b><button className="ghost" disabled={busy || mode === "claude"} onClick={() => pagar(c)}>Marcar pago</button></div>
         </div>)}
       </div>)}
+      {depois.length > 0 && <p className="ficha-note">{verTudo
+        ? <>Mostrando tudo, inclusive o que vence depois de {compactDate(horizonte)}. <button type="button" className="ficha-link" onClick={() => setVerTudo(false)}>voltar pros próximos 60 dias</button></>
+        : <>Mais {money(depois.reduce((s, c) => s + Number(c.valor), 0))} em {depois.length} conta(s) depois de {compactDate(horizonte)} — parcelas já agendadas, nada pra decidir agora. <button type="button" className="ficha-link" onClick={() => setVerTudo(true)}>ver tudo</button></>}</p>}
     </section>
   </div>;
 }
