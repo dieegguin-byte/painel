@@ -1060,7 +1060,10 @@ function CapacidadeCard({ services }) {
       <button type="button" className="capacidade-item-head" onClick={() => setAberto(isAberto ? null : nome)}>
         <span>{nome === SEM_PROFISSIONAL ? "⚠ " + nome : nome}</span><b>{lista.length} ativo{lista.length > 1 ? "s" : ""}</b><i>{isAberto ? "▲" : "▼"}</i>
       </button>
-      {isAberto && <div className="capacidade-item-corpo">{lista.map((s) => <div className="capacidade-servico" key={s.id}><strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{statusLabel[s.status] || s.status}{s.prazo ? " · " + compactDate(s.prazo) : ""}</em></div>)}</div>}
+      {/* PRODUÇÃO NA FRENTE, AGENDADO NO FINAL DA FILA. Regra do Diego (25/07): "agendado tem que ir para o
+          final da fila". Produção é peça na bancada com prazo correndo; agendado é trabalho fechado que ainda
+          não começou. Dentro de cada grupo, prazo mais apertado primeiro. */}
+      {isAberto && <div className="capacidade-item-corpo">{[...lista].sort((a, b) => (a.status === "agendado") - (b.status === "agendado") || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999"))).map((s) => <div className="capacidade-servico" key={s.id}><strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{statusLabel[s.status] || s.status}{s.prazo ? " · " + compactDate(s.prazo) : ""}</em></div>)}</div>}
     </div>; })}</div>
   </section>;
 }
@@ -1117,12 +1120,14 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       // e depois de fechado o serviço com entrada mesmo". Visita de orçamento marcada como agendado entrava
       // no card de Capacidade como trabalho precisando de profissional — foi o caso da Shirlei e da Margot.
       // O sinal objetivo de "fechado" é ter entrada registrada no financeiro.
+      // Cuidado com falso alarme: tem serviço fechado com recibo que só é PAGO na entrega (Vanusa, OS 00483) —
+      // esse não tem entrada e está certo. O sinal de "não fechou nada" é não ter NEM valor NEM entrada.
       const comEntrada = new Set((finances || []).filter((f) => f.tipo === "entrada" && f.servico_id).map((f) => f.servico_id));
-      const falsos = services.filter((s) => ["agendado", "producao"].includes(s.status) && !comEntrada.has(s.id));
+      const falsos = services.filter((s) => ["agendado", "producao"].includes(s.status) && !comEntrada.has(s.id) && !(Number(s.valor_orcamento) > 0));
       if (!falsos.length) return null;
-      return <section className="warning-card"><b>{falsos.length} serviço(s) como agendado/produção sem nenhuma entrada registrada</b>
+      return <section className="warning-card"><b>{falsos.length} serviço(s) como agendado/produção sem valor e sem entrada</b>
         {falsos.slice(0, 6).map((s) => <span key={s.id}>{s.clientes?.nome || "Cliente"} · {statusLabel[s.status] || s.status} · {s.titulo}</span>)}
-        <span>Agendado é trabalho fechado com entrada. Se ainda é visita ou orçamento, volte pra Orçamento — senão entra na conta de capacidade como trabalho que não existe.</span>
+        <span>Agendado é trabalho fechado. Sem valor nem entrada não tem nada fechado — se ainda é visita ou orçamento, volte pra Orçamento; senão entra na conta de capacidade como trabalho que não existe.</span>
       </section>;
     })()}
     {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Compromissos de hoje e atrasados</h3></div></div><AvisoRota compromissos={due.filter((a) => a.data === today)} />{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</section>}
@@ -1136,7 +1141,11 @@ const FUNIL_FILTROS = [{ id: "todos", label: "Todos" }, { id: "sem_acao", label:
 function LeadsView({ services, search, setSearch, onOpenFicha, initialFiltro, onConsumedInitialFiltro }) {
   const [filtroStatus, setFiltroStatus] = useState(initialFiltro || "todos");
   useEffect(() => { if (onConsumedInitialFiltro) onConsumedInitialFiltro(); }, []);
-  const visible = services.filter((service) => `${service.clientes?.nome} ${service.titulo}`.toLowerCase().includes(search.toLowerCase())).filter((service) => filtroStatus === "todos" || (filtroStatus === "sem_acao" ? !service.proxima_acao : service.status === filtroStatus));
+  // Mesma fila do card de Capacidade: produção primeiro (peça na bancada, prazo correndo), agendado no
+  // final (fechado mas nem começou), e dentro de cada faixa o prazo mais apertado na frente.
+  const ORDEM_FILA = { producao: 0, lead: 1, orcamento: 1, agendado: 2, entregue: 3, pago: 4, perdido: 5 };
+  const visible = services.filter((service) => `${service.clientes?.nome} ${service.titulo}`.toLowerCase().includes(search.toLowerCase())).filter((service) => filtroStatus === "todos" || (filtroStatus === "sem_acao" ? !service.proxima_acao : service.status === filtroStatus))
+    .sort((a, b) => (ORDEM_FILA[a.status] ?? 9) - (ORDEM_FILA[b.status] ?? 9) || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">FUNIL DE TRABALHO</p><h3>{visible.length} serviços ativos</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente ou serviço" /></div>
     <div className="funil-filtros">{FUNIL_FILTROS.map((f) => <button key={f.id} className={filtroStatus === f.id ? "active" : ""} onClick={() => setFiltroStatus(f.id)}>{f.label}</button>)}</div>
     <div className="funil-lista">{visible.map((service) => <article className={`funil-item st-${service.status || "lead"}`} key={service.id} onClick={() => onOpenFicha(service.cliente_id)}>
