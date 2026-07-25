@@ -274,6 +274,7 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - REGRA Nº 8: compra de material NUNCA entra como saída solta no financeiro. Toda compra de insumo (tecido, espuma, PVC, pés, linha, cola, percinta) é lançada com categoria "Material", escopo "empresa", SEMPRE com fornecedor_id preenchido (o fornecedor cadastrado que vendeu) e, quando o material foi comprado pra um trabalho específico, também com servico_id (o serviço que consumiu). É isso que faz a aba Compras mostrar gasto por mês, por fornecedor e a margem real de cada serviço. Se o material foi pra estoque geral, deixar servico_id vazio — mas fornecedor_id nunca. Combustível, almoço e vale NÃO são material: continuam nas categorias próprias. Material que ainda vai ser comprado entra com status "a_pagar" (lista de compras, não mexe no caixa) e só vira "pago" quando o Diego marcar como comprado no app.
 - REGRA Nº 9: vale é LEMBRETE DE DÍVIDA, não gasto. Lançar sempre categoria "Vale" com status "a_pagar" — assim ele aparece na aba Vales mas NÃO influencia o saldo do Financeiro. Só quando o Diego marcar como abatido (o momento em que paga de verdade) é que vira status "pago" e pesa no caixa. Nunca lançar vale já como "pago" achando que o dinheiro saiu.
 - REGRA Nº 10: gasto que ainda vai sair (parcela de cartão, aluguel, conta fixa) NÃO é saída paga. Lançar com status "a_pagar" e o campo data = DIA DO VENCIMENTO, um lançamento por parcela (ex: 4x de R$110 vira 4 linhas, 10/08, 10/09, 10/10, 10/11). Assim aparece na aba "A pagar" no mês em que vai pesar e o saldo do caixa só muda quando o Diego marcar como pago. Nunca jogar o valor cheio de um parcelamento como saída de hoje.
+- REGRA Nº 11: a identidade de um cliente é o TELEFONE, nunca o nome. Nome se repete no cadastro real (já teve "Ju", "Carla", "Marlom", "Alice" repetidos) — nunca concluir que são duas pessoas diferentes só porque o nome bate, nem que são a mesma só porque o nome é igual. Antes de criar cliente novo, procurar pelo telefone. E telefone com o tamanho certo NÃO quer dizer telefone certo: comparar o número pelo conjunto de dígitos ORDENADO contra os já cadastrados — se bater com alguém, é a mesma pessoa com erro de digitação, não cliente novo. Validação que dá pra resolver sozinho sem perguntar ao Diego: celular brasileiro é 9 + 8 dígitos e o primeiro desses 8 é sempre 6, 7, 8 ou 9 — número tipo "9 2742-2663" (começa com 2) é inválido de cara, então dá pra saber qual dos dois cadastros duplicados está errado. Caso real (24/07/2026): "Ju" cadastrada duas vezes, mesma cidade, com +55 61 99274-2663 e +55 61 92742-2663 — mesmos dígitos fora de ordem, os dois passavam na checagem de 13 dígitos. Era uma pessoa só; o número válido é o 99274-2663.
 - Novo lead, orçamento e agendado não geram lançamento financeiro.
 - O valor informado nesses status é apenas valor de orçamento.
 - Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
@@ -744,7 +745,7 @@ function Home() {
     {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
     {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} />}
     {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
-    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
+    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {addAgendaOpen && <AddAgendaModal appointments={appointments} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
   </div>;
 }
@@ -1152,12 +1153,17 @@ function AddAgendaModal({ appointments, db, demo, notify, onClose, onDone }) {
   </>;
 }
 
-function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
+function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, onClose, onDone }) {
   const [step, setStep] = useState("choose");
   const [pendente, setPendente] = useState("");
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [valorCompra, setValorCompra] = useState("");
+  const [fornecedorId, setFornecedorId] = useState((materiais || [])[0]?.fornecedor_id || "");
+  const ehCompra = ehCompromissoDeCompra(appt, materiais);
   const openParcial = () => { setPendente(sugerirPendente(appt.titulo)); setStep("parcial"); };
+  // Compromisso de compra passa pela pergunta do valor antes de fechar; o resto conclui direto como sempre.
+  const concluirTotal = () => ehCompra ? setStep("compra") : doTotal();
   const uploadFiles = async () => {
     const uploaded = [];
     for (const f of files) {
@@ -1172,7 +1178,10 @@ function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
     if (demo) { notify("Concluído (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: null }); return; }
     setBusy(true);
     try {
-      const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", appt.id); if (error) throw error;
+      // RESOLVEU ANTES DA HORA: ele adianta compromisso o tempo todo (liga hoje o que estava marcado pro dia 25).
+      // A data tem que virar o dia em que ACONTECEU, senão fica registro de algo "feito" numa data futura — foi
+      // assim que 14 clientes sumiram da tela. A trava trg_agenda_feito_no_futuro no banco recusa o contrário.
+      const { error } = await db.from("agenda").update({ status: "feito", data: appt.data > hojeISO() ? hojeISO() : appt.data }).eq("id", appt.id); if (error) throw error;
       if (appt.servico_id) {
         const { error: sErr } = await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr;
         await db.from("historico").insert({ o_que: `"${appt.titulo}" concluído`, por: "diego" });
@@ -1185,6 +1194,41 @@ function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
       notify("Concluído.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: null });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
+  // Lança o gasto e SÓ DEPOIS conclui: se a gravação do dinheiro falhar, o compromisso continua aberto,
+  // porque compromisso fechado sem o gasto lançado é exatamente o que a gente está tentando evitar.
+  const doCompra = async () => {
+    const valor = Number(String(valorCompra).replace(",", "."));
+    if (!valor || valor <= 0) { notify("Quanto ficou a compra?", "error"); return; }
+    if (!fornecedorId) { notify("De qual fornecedor? (Regra Nº 8: material sempre com fornecedor)", "error"); return; }
+    if (demo) { notify("Compra lançada (demo).", "ok"); doTotal(); return; }
+    setBusy(true);
+    try {
+      const pendentes = (materiais || []);
+      if (pendentes.length === 1) {
+        // Já estava na lista de compras: vira gasto pago, não duplica lançamento.
+        const { error } = await db.from("financeiro").update({ status: "pago", valor, fornecedor_id: fornecedorId, data: hojeISO() }).eq("id", pendentes[0].id); if (error) throw error;
+      } else {
+        const { error } = await db.from("financeiro").insert({
+          tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MATERIAL, valor, status: "pago", data: hojeISO(),
+          descricao: appt.titulo, fornecedor_id: fornecedorId, servico_id: appt.servico_id || null, agenda_id: appt.id,
+        }); if (error) throw error;
+        // Mais de um material pendurado no mesmo compromisso: os outros continuam na lista, ele fecha um por um.
+        if (pendentes.length > 1) notify(`Lançado. Ainda tem ${pendentes.length} material(is) na lista desse compromisso.`, "ok");
+      }
+      setBusy(false); doTotal();
+    } catch (e) { notify("Erro ao lançar a compra: " + e.message, "error"); setBusy(false); }
+  };
+  // Saída sem atrito: comprou mas não tem o valor agora. Não trava o dia dele, mas também não deixa sumir —
+  // cai na caixa pro Claude cobrar depois. Ver [[feedback-travas-inteligentes-no-app]].
+  const doCompraDepois = async () => {
+    if (demo) { doTotal(); return; }
+    setBusy(true);
+    try {
+      const nota = `Compra sem valor lançado: "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}. Ele comprou mas não informou quanto — perguntar o valor e lançar na aba Compras (Regra Nº 8).${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""} (agenda #${appt.id})`;
+      const { error } = await db.from("caixa_entrada").insert({ texto: nota, status: "novo", conversa: [], processado: false }); if (error) throw error;
+      setBusy(false); doTotal();
+    } catch (e) { notify("Erro: " + e.message, "error"); setBusy(false); }
+  };
   const doParcial = async () => {
     if (!pendente.trim()) { notify("Explique o que ficou pendente.", "error"); return; }
     if (demo) { notify("Anotado (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() }); return; }
@@ -1193,7 +1237,7 @@ function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
       const nota = `Reagendar (parcial): "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}${appt.tipo === "remoto" ? " · remoto" : ""}. Ficou pendente: ${pendente.trim()}.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}`;
       const uploaded = files.length ? await uploadFiles() : [];
       const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
-      const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", appt.id); if (error) throw error;
+      const { error } = await db.from("agenda").update({ status: "feito", data: appt.data > hojeISO() ? hojeISO() : appt.data }).eq("id", appt.id); if (error) throw error;
       if (appt.servico_id) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: pendente.trim(), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr; }
       await db.from("historico").insert({ o_que: `"${appt.titulo}": parcial — Claude vai reagendar`, por: "diego", detalhe: "Pendente: " + pendente.trim() });
       notify("Anotado. O Claude reagenda na próxima vez que você chamar.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() });
@@ -1207,8 +1251,18 @@ function ConcluirModal({ db, demo, notify, appt, onClose, onDone }) {
         <p className="modal-intro">Foi concluído totalmente ou ficou pendência?</p>
         {files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}
         {filePicker}
-        <button className="primary wide" onClick={doTotal} disabled={busy}>✔ Concluído total — acabou</button>
+        <button className="primary wide" onClick={concluirTotal} disabled={busy}>✔ Concluído total — acabou</button>
         <button className="secondary wide" onClick={openParcial} disabled={busy}>🟡 Parcial — falta algo, o Claude reagenda</button>
+      </div> : step === "compra" ? <div className="form-grid">
+        <p className="modal-intro">Isso é uma compra de material. Quanto ficou? Lanço agora pra não sumir da aba Compras.</p>
+        <label>Valor da compra*<input inputMode="decimal" value={valorCompra} onChange={(e) => setValorCompra(e.target.value)} placeholder="Ex: 85,00" /></label>
+        <label>Fornecedor*<select value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)}>
+          <option value="">Selecione…</option>
+          {(fornecedores || []).map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+        </select></label>
+        {appt.servico_id && <p className="ficha-note">Vai entrar vinculado ao serviço deste compromisso — é o que faz a margem real aparecer.</p>}
+        <div className="ficha-actions"><button className="primary" onClick={doCompra} disabled={busy}>Lançar e concluir</button><button className="ghost" onClick={doTotal} disabled={busy}>Não comprei nada</button></div>
+        <button className="ghost wide" onClick={doCompraDepois} disabled={busy}>Comprei, mas o valor eu passo depois</button>
       </div> : <div className="form-grid">
         <label>Explique o que ficou pendente<textarea value={pendente} onChange={(e) => setPendente(e.target.value)} /></label>
         {files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}
@@ -1385,6 +1439,17 @@ function resumoContas(finances, services, hoje) {
   };
 }
 function materiaisDoCompromisso(finances, agendaId) { return (finances || []).filter((f) => f.agenda_id === agendaId && f.status === "a_pagar" && ehCompraMaterial(f)); }
+// O BURACO QUE ISSO TAPA (24/07/2026): ele comprou material de verdade e concluiu o compromisso, e o gasto
+// nunca foi lançado — a aba Compras ficou vazia e a margem do serviço, mentirosa. Compromisso de comprar/pedir
+// material não pode ser concluído em silêncio: na hora de concluir o app pergunta o valor e lança na mesma
+// hora (Regra Nº 8). Avisa, não bloqueia — tem saída pra "não comprei" e pra "lanço depois".
+const RE_COMPRA = /\b(comprar|compra|pedir|pedido|buscar|retirar|levar)\b/i;
+const RE_INSUMO = /\b(material|materiais|tecido|espuma|percinta|madeira|cord[ãa]o|cola|linha|pvc|p[ée]s?\b|elastico|el[áa]stico|courino|zíper|ziper|grampo|verniz)\b/i;
+function ehCompromissoDeCompra(appt, materiais) {
+  if ((materiais || []).length) return true;
+  const t = appt?.titulo || "";
+  return RE_COMPRA.test(t) && RE_INSUMO.test(t);
+}
 function planoDeCompra(fornecedor) {
   if (!fornecedor) return null;
   const entrega = proximaEntregaFornecedor(fornecedor.dias_entrega);
