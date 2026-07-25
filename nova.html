@@ -954,6 +954,10 @@ function CompromissoCard({ a, svc, today, onConcluir, onReschedule, materiais })
       <h4>{a.titulo}</h4>
       <p className="compromisso-local">{a.tipo === "remoto" ? "◌ Remoto" : `⌖ ${a.cidade || "Cidade não informada"}`}</p>
       {!!(materiais || []).length && <p className="compromisso-material">⚑ Aproveitar para o material: {(materiais || []).map((m) => m.descricao || "material").join(" · ")}</p>}
+      {/* CONTATO IMPOSSÍVEL: o app mandava "tentar contato de novo" sem existir telefone na ficha, e o Diego
+          ficou perguntando "cadê o WhatsApp" desde 16/07 sem resposta (caso Fabiana; a Sandra Cunha tem até
+          ENTREGA marcada sem número). Pedir o que não dá pra fazer é pior que não pedir. */}
+      {!tel && svc?.cliente_id && <p className="compromisso-material">⚠ Sem telefone na ficha — não dá pra fazer esse contato. Pegue o número antes.</p>}
       <div className="compromisso-info">
         {svc?.clientes?.nome && <><span className="ci-label">CLIENTE</span><strong>{svc.clientes.nome}</strong></>}
         <span className="ci-label">O QUE FAZER</span><strong>{oQueFazer}</strong>
@@ -1068,6 +1072,16 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       if (!solto.length) return null;
       return <section className="warning-card"><b>{solto.length} material(is) sem dia marcado para pedir</b>
         <span>Abra Compras e agende a ida ou pendure numa viagem que você já tem.</span>
+      </section>;
+    })()}
+    {(() => {
+      // SERVIÇO VIVO SEM TELEFONE: trabalho que não anda por falta do dado mais básico. Some da vista porque
+      // o card do compromisso parece normal — só na hora de abrir o WhatsApp é que ele descobre. Sobe pro Painel.
+      const mudos = services.filter((s) => s.clientes && !s.clientes.telefone);
+      if (!mudos.length) return null;
+      return <section className="warning-card"><b>{mudos.length} cliente(s) com serviço em aberto e sem telefone na ficha</b>
+        {mudos.slice(0, 5).map((s) => <span key={s.id}>{s.clientes.nome} · {statusLabel[s.status] || s.status} · {s.titulo}</span>)}
+        <span>Sem número não tem como cobrar, confirmar nem entregar. Pegue o contato ou marque o serviço como perdido.</span>
       </section>;
     })()}
     {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Compromissos de hoje e atrasados</h3></div></div><AvisoRota compromissos={due.filter((a) => a.data === today)} />{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</section>}
