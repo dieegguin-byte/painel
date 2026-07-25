@@ -1444,7 +1444,7 @@ function materiaisDoCompromisso(finances, agendaId) { return (finances || []).fi
 // material não pode ser concluído em silêncio: na hora de concluir o app pergunta o valor e lança na mesma
 // hora (Regra Nº 8). Avisa, não bloqueia — tem saída pra "não comprei" e pra "lanço depois".
 const RE_COMPRA = /\b(comprar|compra|pedir|pedido|buscar|retirar|levar)\b/i;
-const RE_INSUMO = /\b(material|materiais|tecido|espuma|percinta|madeira|cord[ãa]o|cola|linha|pvc|p[ée]s?\b|elastico|el[áa]stico|courino|zíper|ziper|grampo|verniz)\b/i;
+const RE_INSUMO = /\b(material|materiais|tecido|espuma|percinta|madeira|cord[ãa]o|cola|linha|pvc|p[ée]s?\b|elastico|el[áa]stico|courino|courvim|couro|suede|veludo|chenille|linho|zíper|ziper|grampo|verniz)\b/i;
 function ehCompromissoDeCompra(appt, materiais) {
   if ((materiais || []).length) return true;
   const t = appt?.titulo || "";
