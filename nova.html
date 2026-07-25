@@ -1116,6 +1116,24 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       </section>;
     })()}
     {(() => {
+      // FALTANDO MATERIAL: é um ESTADO DERIVADO, não um status no banco. Pedido do Diego (25/07): entre
+      // "fechado" e "produção" existe um degrau — o material ainda não está na mão do profissional, e isso
+      // tem que acender um alerta que só apaga quando o material chega. Derivar em vez de criar status novo
+      // evita dessincronizar: se a compra está lançada como paga, o alerta apaga sozinho.
+      // Falta material quando o serviço fechado tem compra de material ainda "a pagar" (lista de compras),
+      // ou tem loja registrada na ficha e nenhuma compra paga vinculada a ele.
+      const matPendente = (finances || []).filter((f) => ehCompraMaterial(f) && f.status === "a_pagar" && f.servico_id);
+      const idsPendentes = new Set(matPendente.map((f) => f.servico_id));
+      const comMatPago = new Set((finances || []).filter((f) => ehCompraMaterial(f) && f.status === "pago" && f.servico_id).map((f) => f.servico_id));
+      const faltando = services.filter((s) => ["agendado", "producao"].includes(s.status)
+        && (idsPendentes.has(s.id) || (s.loja_material && !comMatPago.has(s.id))));
+      if (!faltando.length) return null;
+      return <section className="warning-card"><b>{faltando.length} serviço(s) esperando material</b>
+        {faltando.slice(0, 6).map((s) => <span key={s.id}>{s.clientes?.nome || "Cliente"} · {s.titulo}{s.loja_material ? " · " + s.loja_material : ""}{s.prazo ? " · prazo " + compactDate(s.prazo) : ""}</span>)}
+        <span>O profissional não começa sem o material. Este aviso apaga sozinho quando a compra for lançada como paga.</span>
+      </section>;
+    })()}
+    {(() => {
       // AGENDADO É TRABALHO FECHADO, NÃO VISITA DE ORÇAMENTO. Regra do Diego (25/07): "agendado que cair lá
       // e depois de fechado o serviço com entrada mesmo". Visita de orçamento marcada como agendado entrava
       // no card de Capacidade como trabalho precisando de profissional — foi o caso da Shirlei e da Margot.
@@ -2055,9 +2073,24 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
     const data = materialDraft.data;
     const { error } = await db.from("servicos").update({ loja_material: loja || null, data_entrega_material: data || null }).eq("id", servicoId);
     if (error) { notify("Erro: " + error.message, "error"); return; }
-    if (loja && data) {
-      const { error: agErr } = await db.from("agenda").insert({ titulo: `Comprar material - ${loja}`, tipo: "remoto", cidade: null, data, hora: null, status: "planejado", servico_id: servicoId });
+    // O DIEGO NÃO ESCOLHE DATA. Antes isso só criava a ação se ele preenchesse loja E data — informar só a
+    // loja não gerava nada, e o material ficava sem dia marcado (foi o que aconteceu com o suede da Vanusa).
+    // Agora basta a loja: se ele não deu data, o app usa o plano do fornecedor (planoDeCompra), que sabe se
+    // aquele fornecedor ENTREGA — nesse caso é pedido remoto na véspera — ou se é viagem, e aí sai presencial
+    // com cidade e hora, respeitando a Regra Nº 4. Sem fornecedor cadastrado, cai no próximo dia útil.
+    if (loja) {
+      const forn = (fornecedores || []).find((f) => (f.nome || "").trim().toLowerCase() === loja.toLowerCase());
+      const plano = forn ? planoDeCompra(forn) : null;
+      const novo = data
+        ? { titulo: `Comprar material - ${loja}`, tipo: plano?.tipo || "remoto", cidade: plano?.tipo === "presencial" ? (forn?.cidade || null) : null, data, hora: plano?.tipo === "presencial" ? (plano.hora || "08:00") : null }
+        : plano
+          ? { titulo: plano.rotulo, tipo: plano.tipo, cidade: plano.tipo === "presencial" ? (forn?.cidade || null) : null, data: plano.data, hora: plano.tipo === "presencial" ? (plano.hora || "08:00") : null }
+          : { titulo: `Comprar material - ${loja}`, tipo: "remoto", cidade: null, data: proximoDiaUtil(hojeISO()), hora: null };
+      // Presencial sem cidade quebra a Regra Nº 4 e a trava do banco: sem cidade do fornecedor, vira remoto.
+      if (novo.tipo === "presencial" && !novo.cidade) { novo.tipo = "remoto"; novo.hora = null; }
+      const { error: agErr } = await db.from("agenda").insert({ ...novo, status: "planejado", servico_id: servicoId });
       if (agErr) { notify("Material salvo, mas erro ao criar a ação: " + agErr.message, "error"); setEditandoMaterial(null); await load(); return; }
+      notify(`Material salvo. Compra marcada para ${compactDate(novo.data)}.`, "ok");
     }
     notify("Material atualizado.", "ok"); setEditandoMaterial(null); await load(); onChanged?.();
   };
