@@ -276,6 +276,7 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - REGRA Nº 10: gasto que ainda vai sair (parcela de cartão, aluguel, conta fixa) NÃO é saída paga. Lançar com status "a_pagar" e o campo data = DIA DO VENCIMENTO, um lançamento por parcela (ex: 4x de R$110 vira 4 linhas, 10/08, 10/09, 10/10, 10/11). Assim aparece na aba "A pagar" no mês em que vai pesar e o saldo do caixa só muda quando o Diego marcar como pago. Nunca jogar o valor cheio de um parcelamento como saída de hoje.
 - REGRA Nº 11: a identidade de um cliente é o TELEFONE, nunca o nome. Nome se repete no cadastro real (já teve "Ju", "Carla", "Marlom", "Alice" repetidos) — nunca concluir que são duas pessoas diferentes só porque o nome bate, nem que são a mesma só porque o nome é igual. Antes de criar cliente novo, procurar pelo telefone. E telefone com o tamanho certo NÃO quer dizer telefone certo: comparar o número pelo conjunto de dígitos ORDENADO contra os já cadastrados — se bater com alguém, é a mesma pessoa com erro de digitação, não cliente novo. Validação que dá pra resolver sozinho sem perguntar ao Diego: celular brasileiro é 9 + 8 dígitos e o primeiro desses 8 é sempre 6, 7, 8 ou 9 — número tipo "9 2742-2663" (começa com 2) é inválido de cara, então dá pra saber qual dos dois cadastros duplicados está errado. Caso real (24/07/2026): "Ju" cadastrada duas vezes, mesma cidade, com +55 61 99274-2663 e +55 61 92742-2663 — mesmos dígitos fora de ordem, os dois passavam na checagem de 13 dígitos. Era uma pessoa só; o número válido é o 99274-2663.
 - REGRA Nº 12: quando o Diego pede reagendamento ou conclui parcial, o APP JÁ CRIA o próximo compromisso com uma DATA PROVISÓRIA (próximo dia útil, sábado conta e domingo não), herdando tipo/cidade/hora do anterior. A nota que chega na caixa traz o id desse compromisso escrito assim: "DATA PROVISÓRIA: o app já criou o próximo compromisso para AAAA-MM-DD (agenda #id)". Ao processar essa nota, o Claude tem duas obrigações: (1) AJUSTAR a data/hora DAQUELE compromisso (PATCH no id informado) conforme a explicação que o Diego escreveu — "ele quer amanhã 13h" vira 13h no dia certo, "aguardar resposta" vira uns dias pra frente respeitando a Regra Nº 3, "semana que vem" vira a segunda seguinte; (2) NUNCA criar um segundo compromisso pro mesmo serviço — isso gera a duplicata que a gente passou meses limpando. A data provisória existe só pra o cliente não desaparecer da tela enquanto nenhuma sessão roda (o app carrega apenas status 'planejado'); ela NÃO é uma decisão, é um marcador. O Diego nunca escolhe data: ele explica o que aconteceu, o app segura o lugar, o Claude decide a data.
+- REGRA Nº 13 (canal certo pra cada coisa — pedido do Diego em 25/07/2026: "deveria usar a função perguntas no app de qualquer dúvida"): DÚVIDA DO CLAUDE vai pra caixa_entrada com status "aguardando_voce" e a pergunta dentro de `conversa` no formato [{de:'ia', texto:'...', em:ISO}] — é o único canal que tem campo de resposta e conta na métrica "Aguardando você" do Painel. NUNCA transformar dúvida em card de aviso no Painel nem em compromisso na agenda: card de aviso é pra ESTADO que o app deduz sozinho e o Diego decide olhando (faltando material, agendado sem valor, conta vencendo), e compromisso na agenda é pra TRABALHO que ele vai fazer. Erro real cometido em 25/07: telefone faltando da Sandra Cunha e da Taisa virou card de aviso, e "confirmar o valor de serviço entregue" virou 7 compromissos na agenda — os dois eram pergunta, não aviso nem tarefa. Sintoma de que você errou o canal: se a única saída do Diego é te dar uma informação que só ele tem, é pergunta.
 - Novo lead, orçamento e agendado não geram lançamento financeiro.
 - O valor informado nesses status é apenas valor de orçamento.
 - Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
@@ -1102,19 +1103,11 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
         <span>Abra Compras e agende a ida ou pendure numa viagem que você já tem.</span>
       </section>;
     })()}
-    {(() => {
-      // SERVIÇO VIVO SEM TELEFONE: trabalho que não anda por falta do dado mais básico. Some da vista porque
-      // o card do compromisso parece normal — só na hora de abrir o WhatsApp é que ele descobre. Sobe pro Painel.
-      // "entregue" NÃO entra: `activeServices` só tira pago/perdido, então entregue chegava aqui e o aviso
-      // cobrava telefone de trabalho já concluído (a Taisa apareceu assim em 25/07). Só quem ainda vai andar.
-      const VIVOS = ["lead", "orcamento", "agendado", "producao"];
-      const mudos = services.filter((s) => s.clientes && !s.clientes.telefone && VIVOS.includes(s.status));
-      if (!mudos.length) return null;
-      return <section className="warning-card"><b>{mudos.length} cliente(s) com serviço em aberto e sem telefone na ficha</b>
-        {mudos.slice(0, 5).map((s) => <span key={s.id}>{s.clientes.nome} · {statusLabel[s.status] || s.status} · {s.titulo}</span>)}
-        <span>Sem número não tem como cobrar, confirmar nem entregar. Pegue o contato ou marque o serviço como perdido.</span>
-      </section>;
-    })()}
+    {/* CLIENTE SEM TELEFONE NÃO É CARD DE AVISO, É PERGUNTA. Diego em 25/07: "deveria usar a função perguntas
+        no app de qualquer dúvida". Faltar telefone não é estado que ele resolve olhando o Painel — é dado que
+        só ele tem. Então o Claude manda pra caixa como `aguardando_voce`, que já tem campo de resposta e conta
+        na métrica "Aguardando você". Card de aviso fica reservado pra estado que o app deduz e ele decide
+        (faltando material, agendado sem valor). Ver Regra Nº 13. */}
     {(() => {
       // FALTANDO MATERIAL: é um ESTADO DERIVADO, não um status no banco. Pedido do Diego (25/07): entre
       // "fechado" e "produção" existe um degrau — o material ainda não está na mão do profissional, e isso
@@ -1680,8 +1673,25 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
         descricao: draft.descricao.trim() || `Material — ${nomeFornecedor(draft.fornecedorId)}`,
         fornecedor_id: draft.fornecedorId, servico_id: draft.servicoId || null,
       };
-      const { error } = await db.from("financeiro").insert(payload); if (error) throw error;
-      notify(draft.jaComprei ? "Compra registrada." : "Item adicionado à lista de compras.", "ok"); setDraft(vazio); setFormOpen(false); await onChanged();
+      const { data: criado, error } = await db.from("financeiro").insert(payload).select("id").single(); if (error) throw error;
+      // MATERIAL A COMPRAR JÁ NASCE COM DIA MARCADO. Regra do Diego (25/07): "compra de material você tem que
+      // agendar o compromisso automaticamente, se não der eu reagendo, mas não pode sumir da visão". Antes o
+      // item entrava na lista de compras sem compromisso e só aparecia num aviso genérico do Painel — some da
+      // rotina. O dia sai do plano do fornecedor: quem entrega vira pedido remoto na véspera, quem não entrega
+      // vira viagem presencial com cidade e hora (Regra Nº 4). Ele reagenda pelo botão normal se não der.
+      let quando = null;
+      if (!draft.jaComprei) {
+        const forn = (fornecedores || []).find((f) => f.id === draft.fornecedorId);
+        const plano = forn ? planoDeCompra(forn) : null;
+        const novo = plano
+          ? { titulo: plano.rotulo, tipo: plano.tipo, data: plano.data, hora: plano.tipo === "presencial" ? (plano.hora || "08:00") : null, cidade: plano.tipo === "presencial" ? (forn?.cidade || null) : null }
+          : { titulo: `Comprar material - ${nomeFornecedor(draft.fornecedorId)}`, tipo: "remoto", data: proximoDiaUtil(hojeISO()), hora: null, cidade: null };
+        if (novo.tipo === "presencial" && !novo.cidade) { novo.tipo = "remoto"; novo.hora = null; }
+        const { data: ag, error: agErr } = await db.from("agenda").insert({ ...novo, status: "planejado", servico_id: draft.servicoId || null }).select("id").single();
+        if (agErr) notify("Item salvo, mas não deu pra marcar o dia da compra: " + agErr.message, "error");
+        else { quando = novo.data; await db.from("financeiro").update({ agenda_id: ag.id }).eq("id", criado.id); }
+      }
+      notify(draft.jaComprei ? "Compra registrada." : `Na lista de compras${quando ? ", com dia marcado pra " + compactDate(quando) : ""}.`, "ok"); setDraft(vazio); setFormOpen(false); await onChanged();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
 
