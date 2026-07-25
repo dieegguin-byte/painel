@@ -916,11 +916,27 @@ function quandoFalado(data, hora, hoje) {
   return ` ${dia}${horaTxt ? " às " + horaTxt : ""}`;
 }
 // Sempre gera uma mensagem pronta (mesmo sem sugestao_resposta salva) pra o botão do WhatsApp nunca abrir vazio.
+// NUNCA colar a anotação interna dentro da mensagem do cliente. A versão antiga fazia
+// `Passando pra confirmar: ${proxima_acao}` e saiu no WhatsApp da Rubilene como "Passando pra
+// confirmar: Cobrar retorno — ia decidir com o marido" — recado do Diego pra ele mesmo, mandado
+// pra cliente. Diego apontou em 24/07: "tem que ser algo mais natural como eu fiz".
+// O título/próxima ação agora só ESCOLHE o texto; o que vai pro cliente é frase de gente.
 function mensagemPadraoCompromisso(a, svc, hoje) {
   const nome = svc?.clientes?.nome ? svc.clientes.nome.split(" ")[0] : "";
-  const oQueFazer = svc?.proxima_acao || a.titulo;
-  const quando = a.tipo === "remoto" ? "" : quandoFalado(a.data, a.hora, hoje || hojeISO());
-  return `Oi${nome ? " " + nome : ""}, tudo bem? Passando pra confirmar: ${oQueFazer}${quando}.`;
+  const oi = `Oi${nome ? " " + nome : ""}, tudo bem?`;
+  const alvo = `${svc?.proxima_acao || ""} ${a.titulo || ""}`.toLowerCase();
+  if (a.tipo !== "remoto") {
+    const quando = quandoFalado(a.data, a.hora, hoje || hojeISO());
+    if (/entreg/.test(alvo)) return `${oi} Sua peça está pronta! Posso levar${quando}?`;
+    if (/buscar|retirad|retirar|pegar/.test(alvo)) return `${oi} Consigo passar${quando} pra buscar a peça. Fica bom pra você?`;
+    return `${oi} Consigo passar aí${quando}. Fica bom pra você?`;
+  }
+  if (/or[çc]amento pendente|mandar or[çc]amento|enviar or[çc]amento|passar or[çc]amento/.test(alvo)) return `${oi} Terminei de fazer seu orçamento aqui. Posso te mandar?`;
+  if (/confirmar hor[áa]rio|encaixar na rota|confirmar data/.test(alvo)) return `${oi} Consegue me confirmar um horário bom pra você? É pra eu encaixar direito na rota.`;
+  if (/medida/.test(alvo)) return `${oi} Preciso passar aí pra tirar as medidas. Que dia fica melhor pra você?`;
+  if (/decidir|marido|esposa|pensar|ver com/.test(alvo)) return `${oi} Passando pra saber se vocês já conseguiram decidir. Qualquer dúvida do orçamento eu explico.`;
+  if (/cobrar|retorno|resposta|aguardar|retomar|tentar contato|contato/.test(alvo)) return `${oi} Passando pra saber se você ainda tem interesse. Se tiver qualquer dúvida do orçamento, é só falar.`;
+  return `${oi} Passando pra falar do seu estofado. Consegue me dar um retorno?`;
 }
 
 // Card de AÇÃO do Painel: diz o que fazer, já com a mensagem pronta e o botão do WhatsApp.
