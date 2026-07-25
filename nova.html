@@ -302,6 +302,14 @@ const TEMPO_ESTRADA_MIN = { "brasilia|luziania": 75, "luziania|valparaiso": 25, 
 const DURACAO_SERVICO_MIN = 60;
 const CIDADE_BASE = "luziania";
 function hojeISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+// Próximo dia de trabalho: sábado conta (o Diego trabalha), domingo não. Usado sempre que o app precisa
+// escolher uma data sozinho — reagendamento e conclusão parcial nunca podem ficar sem data marcada.
+function proximoDiaUtil(baseISO, pulos) {
+  const d = new Date((baseISO || hojeISO()) + "T12:00:00");
+  let faltam = pulos || 1;
+  while (faltam > 0) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0) faltam--; }
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 const DIAS_SEMANA_MAP = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
 function proximaEntregaFornecedor(diasEntrega) {
   if (!diasEntrega) return null;
@@ -687,7 +695,7 @@ function Home() {
 
   // `data` vai junto porque o reagendamento fecha o compromisso antigo: se ele estava marcado pra
   // frente e o Diego resolveu antes, a data tem que virar hoje (mesmo motivo do Concluir).
-  const abrirReagendar = (a) => setExplicar({ item: { tipoItem: "agenda", id: a.id, titulo: a.titulo, cidade: a.cidade, tipo: a.tipo, servico_id: a.servico_id, data: a.data }, kind: "reagendar" });
+  const abrirReagendar = (a) => setExplicar({ item: { tipoItem: "agenda", id: a.id, titulo: a.titulo, cidade: a.cidade, tipo: a.tipo, servico_id: a.servico_id, data: a.data, hora: a.hora }, kind: "reagendar" });
   // Atualização otimista: some da tela na hora; o loadAll depois só reconcilia com o banco.
   const aplicarResolucao = useCallback((patch) => {
     if (!patch) return;
@@ -1270,7 +1278,19 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, onClos
       const uploaded = files.length ? await uploadFiles() : [];
       const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       const { error } = await db.from("agenda").update({ status: "feito", data: appt.data > hojeISO() ? hojeISO() : appt.data }).eq("id", appt.id); if (error) throw error;
-      if (appt.servico_id) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: pendente.trim(), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr; }
+      // O PRÓXIMO PASSO NASCE AQUI, NÃO NA PRÓXIMA SESSÃO. Antes o parcial só deixava recado na caixa e a
+      // data nova dependia do Claude rodar — o Francisco pediu reagendamento 4x e ficou 8 dias invisível,
+      // porque compromisso fechado sem sucessor não aparece em lugar nenhum (o app só carrega 'planejado').
+      // O Claude ainda refina a data depois lendo a caixa; o que não pode é o cliente ficar sem data.
+      if (appt.servico_id) {
+        const proxData = proximoDiaUtil(hojeISO());
+        const { error: agErr } = await db.from("agenda").insert({
+          servico_id: appt.servico_id, titulo: pendente.trim().slice(0, 150), data: proxData,
+          hora: appt.tipo === "presencial" ? (appt.hora || "09:00") : null,
+          tipo: appt.tipo || "remoto", cidade: appt.tipo === "presencial" ? appt.cidade : null, status: "planejado",
+        }); if (agErr) throw agErr;
+        const { error: sErr } = await db.from("servicos").update({ proxima_acao: pendente.trim(), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr;
+      }
       await db.from("historico").insert({ o_que: `"${appt.titulo}": parcial — Claude vai reagendar`, por: "diego", detalhe: "Pendente: " + pendente.trim() });
       notify("Anotado. O Claude reagenda na próxima vez que você chamar.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
@@ -1331,7 +1351,17 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
       const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito", data: item.data && item.data > hojeISO() ? hojeISO() : item.data }).eq("id", item.id); if (error) throw error; }
       const alvoServico = item.tipoItem === "agenda" ? item.servico_id : item.id;
-      if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
+      // REAGENDAR JÁ MARCA A DATA NOVA. Fechar o compromisso antigo e esperar o Claude criar o próximo fazia o
+      // cliente desaparecer da tela (caso Francisco: 4 pedidos de reagendamento, 8 dias invisível). O Claude
+      // ainda ajusta a data depois lendo a explicação na caixa — mas nunca mais fica sem data nenhuma.
+      if (item.tipoItem === "agenda" && ehReagendar && alvoServico) {
+        const { error: agErr } = await db.from("agenda").insert({
+          servico_id: alvoServico, titulo: item.titulo, data: proximoDiaUtil(hojeISO()),
+          hora: item.tipo === "presencial" ? (item.hora || "09:00") : null,
+          tipo: item.tipo || "remoto", cidade: item.tipo === "presencial" ? item.cidade : null, status: "planejado",
+        }); if (agErr) throw agErr;
+      }
+      if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: ehReagendar ? item.titulo : null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
       await db.from("historico").insert({ o_que: `${cabec}: ${item.titulo}`, por: "diego", detalhe: texto.trim() });
       notify("Anotado. Saiu da lista — o Claude cuida disso quando você chamar.", "ok"); onDone({ agendaId: (item.tipoItem === "agenda" && ehReagendar) ? item.id : null, servicoId: alvoServico || null, proximaAcao: null });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
