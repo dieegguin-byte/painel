@@ -272,7 +272,7 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - REGRA Nº 6: ao criar ficha de cliente/serviço a partir de print ou nota, se algum dado essencial (nome, telefone, cidade, valor) estiver ambíguo, ilegível ou incerto — NÃO adivinhar e lançar. Perguntar ao Diego pra confirmar antes de gravar. Só lançar direto quando o dado estiver claro no print/texto.
 - REGRA Nº 7: quando o Diego disser "remove"/"tira"/"pode remover" sobre um lead (ex: parou de responder, não vale mais insistir), NUNCA excluir o registro. Mudar o status do serviço para "perdido" (mantém o histórico, some da contagem de ativos). Todo serviço ativo (lead/orcamento/agendado/producao) é OBRIGADO a ter prazo preenchido (travado no banco, constraint servicos_ativo_precisa_prazo) — nunca tentar gravar serviço ativo sem prazo, vai dar erro.
 - REGRA Nº 8: compra de material NUNCA entra como saída solta no financeiro. Toda compra de insumo (tecido, espuma, PVC, pés, linha, cola, percinta) é lançada com categoria "Material", escopo "empresa", SEMPRE com fornecedor_id preenchido (o fornecedor cadastrado que vendeu) e, quando o material foi comprado pra um trabalho específico, também com servico_id (o serviço que consumiu). É isso que faz a aba Compras mostrar gasto por mês, por fornecedor e a margem real de cada serviço. Se o material foi pra estoque geral, deixar servico_id vazio — mas fornecedor_id nunca. Combustível, almoço e vale NÃO são material: continuam nas categorias próprias. Material que ainda vai ser comprado entra com status "a_pagar" (lista de compras, não mexe no caixa) e só vira "pago" quando o Diego marcar como comprado no app.
-- REGRA Nº 9: vale é LEMBRETE DE DÍVIDA, não gasto. Lançar sempre categoria "Vale" com status "a_pagar" — assim ele aparece na aba Vales mas NÃO influencia o saldo do Financeiro. Só quando o Diego marcar como abatido (o momento em que paga de verdade) é que vira status "pago" e pesa no caixa. Nunca lançar vale já como "pago" achando que o dinheiro saiu.
+- REGRA Nº 9 (CORRIGIDA em 25/07/2026 pelo Diego: "todos vales já saem na hora"): vale é dinheiro que SAI NA HORA — Pix ou dinheiro na mão pro profissional. Lançar SEMPRE categoria "Vale", escopo "empresa", status "pago" e data do dia em que foi entregue: o caixa tem que sentir na hora. O que fica pendente NÃO é o pagamento, é o DESCONTO — na hora de pagar aquele profissional pelo serviço, o valor do vale sai do que ele tem a receber. Marcar "abatido" na aba Vales só acrescenta o prefixo [ABATIDO] na descrição e NÃO mexe no status nem no caixa; se mexesse, o mesmo dinheiro sairia duas vezes. Vale pendente = categoria Vale sem o prefixo [ABATIDO]. A versão anterior desta regra dizia o contrário (lançar como "a_pagar" e virar saída ao abater) e por isso 6 vales somando R$465,70 ficaram fora do caixa com o dinheiro já tendo saído.
 - REGRA Nº 10: gasto que ainda vai sair (parcela de cartão, aluguel, conta fixa) NÃO é saída paga. Lançar com status "a_pagar" e o campo data = DIA DO VENCIMENTO, um lançamento por parcela (ex: 4x de R$110 vira 4 linhas, 10/08, 10/09, 10/10, 10/11). Assim aparece na aba "A pagar" no mês em que vai pesar e o saldo do caixa só muda quando o Diego marcar como pago. Nunca jogar o valor cheio de um parcelamento como saída de hoje.
 - REGRA Nº 11: a identidade de um cliente é o TELEFONE, nunca o nome. Nome se repete no cadastro real (ja aconteceu de quatro nomes se repetirem no cadastro) — nunca concluir que são duas pessoas diferentes só porque o nome bate, nem que são a mesma só porque o nome é igual. Antes de criar cliente novo, procurar pelo telefone. E telefone com o tamanho certo NÃO quer dizer telefone certo: comparar o número pelo conjunto de dígitos ORDENADO contra os já cadastrados — se bater com alguém, é a mesma pessoa com erro de digitação, não cliente novo. Validação que dá pra resolver sozinho sem perguntar ao Diego: celular brasileiro é 9 + 8 dígitos e o primeiro desses 8 é sempre 6, 7, 8 ou 9 — número em que esse dígito é 2, por exemplo, é inválido de cara, então dá pra saber qual dos dois cadastros duplicados está errado. Já aconteceu de um mesmo cliente entrar duas vezes na mesma cidade com o número digitado fora de ordem: os dois passavam na checagem de 13 dígitos e só o formato denunciava qual era o certo.
 - REGRA Nº 12: quando o Diego pede reagendamento ou conclui parcial, o APP JÁ CRIA o próximo compromisso com uma DATA PROVISÓRIA (próximo dia útil, sábado conta e domingo não), herdando tipo/cidade/hora do anterior. A nota que chega na caixa traz o id desse compromisso escrito assim: "DATA PROVISÓRIA: o app já criou o próximo compromisso para AAAA-MM-DD (agenda #id)". Ao processar essa nota, o Claude tem duas obrigações: (1) AJUSTAR a data/hora DAQUELE compromisso (PATCH no id informado) conforme a explicação que o Diego escreveu — "ele quer amanhã 13h" vira 13h no dia certo, "aguardar resposta" vira uns dias pra frente respeitando a Regra Nº 3, "semana que vem" vira a segunda seguinte; (2) NUNCA criar um segundo compromisso pro mesmo serviço — isso gera a duplicata que a gente passou meses limpando. A data provisória existe só pra o cliente não desaparecer da tela enquanto nenhuma sessão roda (o app carrega apenas status 'planejado'); ela NÃO é uma decisão, é um marcador. O Diego nunca escolhe data: ele explica o que aconteceu, o app segura o lugar, o Claude decide a data.
@@ -801,7 +801,9 @@ function Home() {
   if (!demo && pinState === "bloqueado") return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">BLOQUEADO</p><h1>Não deu pra verificar o PIN</h1><p>A central não conseguiu ler a configuração de bloqueio e este aparelho ainda não tem o PIN guardado. Conecte à internet uma vez e abra de novo — depois disso ele passa a funcionar offline.</p><button className="primary" onClick={() => window.location.reload()}>Tentar de novo</button></div></div>;
   if (!demo && (pinState === "define" || pinState === "enter")) return <PinScreen mode={pinState} onDefine={definePin} onEnter={tryPin} />;
 
-  const valesPendentes = finances.filter((f) => f.categoria === "Vale" && f.status === "a_pagar").length;
+  // Vale pendente = ainda não foi descontado do profissional. O dinheiro já saiu (status pago), então o
+  // que marca a pendência é a ausência do [ABATIDO], não o status. Ver Regra Nº 9.
+  const valesPendentes = finances.filter((f) => f.categoria === "Vale" && !(f.descricao || "").startsWith(VALE_ABATIDO_TAG)).length;
   const contasFuturas = finances.filter(ehSaidaFutura).length;
   const nav = [
     { id: "painel", label: "Painel", icon: "⌂" }, { id: "caixa", label: "Caixa", icon: "◎", count: inbox.length }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
@@ -1172,15 +1174,9 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
           : <span>Nenhum serviço pronto pra cobrar no momento.</span>}
       </section>;
     })()}
-    {(() => {
-      // Material que ainda não virou compromisso é o único que pode passar batido — o resto já aparece
-      // como compromisso do dia, sem precisar de card próprio no Painel.
-      const solto = (finances || []).filter((f) => ehCompraMaterial(f) && f.status === "a_pagar" && !f.agenda_id);
-      if (!solto.length) return null;
-      return <section className="warning-card"><b>{solto.length} material(is) sem dia marcado para pedir</b>
-        <span>Abra Compras e agende a ida ou pendure numa viagem que você já tem.</span>
-      </section>;
-    })()}
+    {/* SAIU o card "material sem dia marcado pra pedir": desde 25/07 o material que entra na lista de compras
+        já nasce com compromisso na agenda, então esse aviso só acenderia pra lançamento velho — ruído diário
+        pra um caso que não se repete. O que trava produção continua avisado no card "esperando material". */}
     {/* CLIENTE SEM TELEFONE NÃO É CARD DE AVISO, É PERGUNTA. Diego em 25/07: "deveria usar a função perguntas
         no app de qualquer dúvida". Faltar telefone não é estado que ele resolve olhando o Painel — é dado que
         só ele tem. Então o Claude manda pra caixa como `aguardando_voce`, que já tem campo de resposta e conta
@@ -1211,18 +1207,16 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       // O sinal objetivo de "fechado" é ter entrada registrada no financeiro.
       // Cuidado com falso alarme: tem serviço fechado com recibo que so e PAGO na entrega (caso real com recibo emitido) —
       // esse não tem entrada e está certo. O sinal de "não fechou nada" é não ter NEM valor NEM entrada.
-      const comEntrada = new Set((finances || []).filter((f) => f.tipo === "entrada" && f.servico_id).map((f) => f.servico_id));
-      const falsos = services.filter((s) => ["agendado", "producao"].includes(s.status) && !comEntrada.has(s.id) && !(Number(s.valor_orcamento) > 0));
-      if (!falsos.length) return null;
-      return <section className="warning-card"><b>{falsos.length} serviço(s) como agendado/produção sem valor e sem entrada</b>
-        {falsos.slice(0, 6).map((s) => <span key={s.id}>{s.clientes?.nome || "Cliente"} · {statusLabel[s.status] || s.status} · {s.titulo}</span>)}
-        <span>Agendado é trabalho fechado. Sem valor nem entrada não tem nada fechado — se ainda é visita ou orçamento, volte pra Orçamento; senão entra na conta de capacidade como trabalho que não existe.</span>
-      </section>;
+      // SAIU DO PAINEL em 25/07 a pedido do Diego: isto é diagnóstico de arrumação, não decisão do dia.
+      // Ver serviço mal classificado é trabalho de varredura, não coisa pra encarar toda manhã. A regra
+      // continua valendo (agendado = fechado); o que saiu foi o card diário.
+      return null;
     })()}
     {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Compromissos de hoje e atrasados</h3></div></div><AvisoRota compromissos={due.filter((a) => a.data === today)} />{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</section>}
     {futuros.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Próximos compromissos</h3></div></div>{[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</section>}
     {filtroTipo !== "todos" && due.length === 0 && futuros.length === 0 && (dueAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
-    {openFin.length > 0 && <section className="warning-card"><b>{openFin.length} item(ns) financeiro(s) vencendo ou atrasados</b><span>Somente Diego pode alterar ou confirmar pagamentos.</span></section>}</div>;
+    {/* SAIU o aviso financeiro do rodapé: era o mesmo assunto do card "a pagar" lá em cima, só que sem o
+        valor e sem o caixa possível — repetia a preocupação sem ajudar a decidir. Diego, 25/07. */}</div>;
 }
 function Metric({ label, value, detail, tone, onClick }) { return <article className={`metric-card ${tone}${onClick ? " clickable" : ""}`} onClick={onClick || undefined}><span>{label}</span><b>{String(value).padStart(2, "0")}</b><small>{detail}</small></article>; }
 
@@ -1399,6 +1393,11 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
         }); if (error) throw error;
         // Mais de um material pendurado no mesmo compromisso: os outros continuam na lista, ele fecha um por um.
         if (pendentes.length > 1) notify(`Lançado. Ainda tem ${pendentes.length} material(is) na lista desse compromisso.`, "ok");
+      }
+      // Mesma ligação do botão "marcar comprado" da aba Compras: material na mão, o serviço sai de agendado
+      // e entra em produção. Este é o caminho que ele usa na rua, então precisa se comportar igual.
+      if (appt.servico_id && svc && svc.status === "agendado") {
+        await db.from("servicos").update({ status: "producao", atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
       }
       setBusy(false); doTotal();
     } catch (e) { notify("Erro ao lançar a compra: " + e.message, "error"); setBusy(false); }
@@ -1605,12 +1604,14 @@ function ValesView({ finances, db, demo, mode, notify, onChanged }) {
   // Vale é lembrete de dívida, NÃO gasto: enquanto pendente fica status "a_pagar" e por isso não entra no saldo do
   // Financeiro (que só soma pago). Ao marcar abatido - o momento em que o Diego realmente paga - vira "pago" e aí sim
   // pesa no caixa. O prefixo [ABATIDO] na descrição é só a marcação administrativa que move o item pro histórico.
-  // QUEM MANDA É O STATUS, NÃO O TEXTO. Antes esta aba decidia pendente/abatido pelo prefixo [ABATIDO] na
-  // descrição, enquanto o contador do menu usava status = a_pagar — os dois divergiam. Em 25/07/2026 havia
-  // 4 vales com status "pago" e sem o prefixo: apareciam como pendentes aqui e não contavam no menu.
-  // O prefixo continua valendo como marca visual, mas quem define o estado é o status (Regra Nº 9).
-  const pendentes = vales.filter((v) => v.status === "a_pagar" && !(v.descricao || "").startsWith(VALE_ABATIDO_TAG));
-  const abatidos = vales.filter((v) => v.status !== "a_pagar" || (v.descricao || "").startsWith(VALE_ABATIDO_TAG));
+  // O DINHEIRO DO VALE SAI NA HORA (Diego confirmou em 25/07/2026: "todos vales já saem na hora" — Pix ou
+  // dinheiro na mão). Então TODO vale nasce como saída PAGA: o caixa sente no dia em que ele entrega.
+  // O que fica pendente NÃO é pagamento, é o DESCONTO no que ele vai pagar pro profissional depois.
+  // Por isso "abatido" é marcado no texto e NÃO mexe no status — se mexesse, o mesmo dinheiro sairia duas
+  // vezes. Antes o modelo estava invertido (vale entrava como "a pagar" e virava saída ao abater), e por
+  // isso 6 vales de R$465,70 não apareciam no caixa mesmo com o dinheiro já tendo saído.
+  const pendentes = vales.filter((v) => !(v.descricao || "").startsWith(VALE_ABATIDO_TAG));
+  const abatidos = vales.filter((v) => (v.descricao || "").startsWith(VALE_ABATIDO_TAG));
   const porFornecedor = {};
   pendentes.forEach((v) => { const nome = nomeFornecedorVale(v.descricao); (porFornecedor[nome] ||= []).push(v); });
   const totalPendente = pendentes.reduce((sum, v) => sum + Number(v.valor), 0);
@@ -1621,8 +1622,10 @@ function ValesView({ finances, db, demo, mode, notify, onChanged }) {
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusyId(item.id);
     try {
-      const { error } = await db.from("financeiro").update({ descricao: VALE_ABATIDO_TAG + item.descricao, status: "pago" }).eq("id", item.id); if (error) throw error;
-      notify("Vale abatido — agora conta como saída no caixa.", "ok"); await onChanged();
+      // Só marca o texto. NÃO mexe no status: o dinheiro já saiu no dia do vale, e mudar pra "pago" aqui
+      // faria a mesma saída pesar duas vezes no caixa.
+      const { error } = await db.from("financeiro").update({ descricao: VALE_ABATIDO_TAG + item.descricao }).eq("id", item.id); if (error) throw error;
+      notify("Vale abatido — descontado do que você paga ao profissional. O caixa não muda: esse dinheiro já saiu no dia do vale.", "ok"); await onChanged();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusyId(null); }
   };
   return <div className="page-grid">
@@ -1790,7 +1793,20 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
       const patch = { status: "pago", data: hojeISO() };
       if (confirmando && confirmando.id === item.id && confirmando.servicoId) patch.servico_id = confirmando.servicoId;
       const { error } = await db.from("financeiro").update(patch).eq("id", item.id); if (error) throw error;
-      notify("Marcado como comprado.", "ok"); setConfirmando(null); await onChanged();
+      // COMPREI O MATERIAL -> O SERVIÇO ANDA. Pedido do Diego (25/07): "quando falar que comprei o material,
+      // mudar status". O material era o que segurava a produção; comprado, o serviço sai de "agendado"
+      // (fechado, esperando) e entra em "producao". Só mexe em quem estava agendado — quem já está em
+      // produção fica como está, e lead/orçamento não sobe de fase por causa de compra.
+      const alvo = patch.servico_id || item.servico_id;
+      let virou = false;
+      if (alvo) {
+        const svc = (services || []).find((s) => s.id === alvo);
+        if (svc && svc.status === "agendado") {
+          const { error: sErr } = await db.from("servicos").update({ status: "producao", atualizado_em: new Date().toISOString() }).eq("id", alvo);
+          if (!sErr) virou = true;
+        }
+      }
+      notify(virou ? "Comprado. O serviço entrou em produção." : "Marcado como comprado.", "ok"); setConfirmando(null); await onChanged();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
 
