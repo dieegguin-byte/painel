@@ -305,6 +305,22 @@ const CIDADE_BASE = "luziania";
 function hojeISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 // Próximo dia de trabalho: sábado conta (o Diego trabalha), domingo não. Usado sempre que o app precisa
 // escolher uma data sozinho — reagendamento e conclusão parcial nunca podem ficar sem data marcada.
+// O RECADO TEM QUE SER ENTENDIDO SEM BOA VONTADE. Instrução solta no fim de um parágrafo passa batido — então
+// o pedido de ajuste de data vira um bloco fixo na PRIMEIRA linha do item da caixa, no mesmo estilo dos outros
+// marcadores [[TB_...]] do app (dá pra achar com busca de texto). Pedido do Diego em 25/07/2026: "tem que ser
+// algo que você veja o recado e entenda realmente o que tem que fazer". Ver Regra Nº 12 no Guia da IA.
+function cabecalhoAjusteDeData(agendaId, dataProvisoria, explicacao) {
+  if (!agendaId) return "";
+  return [
+    "[[TB_AJUSTAR_DATA]]",
+    `AÇÃO OBRIGATÓRIA: ajustar a data do compromisso agenda #${agendaId}`,
+    `DATA PROVISÓRIA QUE O APP MARCOU: ${dataProvisoria} (só pra o cliente não sumir da tela — NÃO é decisão)`,
+    `O QUE O DIEGO EXPLICOU: ${explicacao || "(sem explicação)"}`,
+    "COMO RESOLVER: faça PATCH em agenda #" + agendaId + " mudando data (e hora, se presencial) para o que a explicação pede.",
+    "NÃO crie outro compromisso pra esse serviço — isso gera duplicata. NÃO pergunte a data ao Diego: ele explica, você decide.",
+    "---",
+  ].join("\n");
+}
 function proximoDiaUtil(baseISO, pulos) {
   const d = new Date((baseISO || hojeISO()) + "T12:00:00");
   let faltam = pulos || 1;
@@ -1292,9 +1308,10 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, onClos
         novoId = novo?.id || null;
         const { error: sErr } = await db.from("servicos").update({ proxima_acao: pendente.trim(), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr;
       }
-      // A nota vai DEPOIS e leva o id do compromisso novo: é assim que a próxima sessão sabe que a data é
-      // provisória e que deve AJUSTAR aquele compromisso em vez de criar um segundo. Ver Regra Nº 12.
-      const nota = `Reagendar (parcial): "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}${appt.tipo === "remoto" ? " · remoto" : ""}. Ficou pendente: ${pendente.trim()}.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}${novoId ? ` — DATA PROVISÓRIA: o app já criou o próximo compromisso para ${proxData} (agenda #${novoId}). AJUSTE a data/hora DESSE compromisso conforme a explicação; NÃO crie outro.` : ""}`;
+      // A nota vai DEPOIS e leva o id do compromisso novo. A ordem importa: a INSTRUÇÃO vem na PRIMEIRA linha,
+      // em bloco fixo, porque instrução no fim de parágrafo passa batido na leitura. Ver Regra Nº 12.
+      const nota = cabecalhoAjusteDeData(novoId, proxData, pendente.trim())
+        + `Reagendar (parcial): "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}${appt.tipo === "remoto" ? " · remoto" : ""}. Ficou pendente: ${pendente.trim()}.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}`;
       const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       await db.from("historico").insert({ o_que: `"${appt.titulo}": parcial — Claude vai reagendar`, por: "diego", detalhe: "Pendente: " + pendente.trim() });
       notify("Anotado. O Claude reagenda na próxima vez que você chamar.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() });
@@ -1369,9 +1386,9 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
         novoId = novo?.id || null;
       }
       if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: ehReagendar ? item.titulo : null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
-      // Nota por último, carregando o id do compromisso novo — é o que diz pra próxima sessão que a data é
-      // provisória e que ela deve AJUSTAR aquele compromisso, nunca criar um segundo. Ver Regra Nº 12.
-      const notaFinal = nota + (novoId ? ` — DATA PROVISÓRIA: o app já criou o próximo compromisso para ${proxData} (agenda #${novoId}). AJUSTE a data/hora DESSE compromisso conforme a explicação; NÃO crie outro.` : "");
+      // Nota por último, com a INSTRUÇÃO NA PRIMEIRA LINHA (bloco fixo) — instrução no fim do texto passa
+      // batido. É o que garante que a sessão ajuste o compromisso certo em vez de criar outro. Regra Nº 12.
+      const notaFinal = cabecalhoAjusteDeData(novoId, proxData, texto.trim()) + nota;
       const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, notaFinal), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       await db.from("historico").insert({ o_que: `${cabec}: ${item.titulo}`, por: "diego", detalhe: texto.trim() });
       notify("Anotado. Saiu da lista — o Claude cuida disso quando você chamar.", "ok"); onDone({ agendaId: (item.tipoItem === "agenda" && ehReagendar) ? item.id : null, servicoId: alvoServico || null, proximaAcao: null });
