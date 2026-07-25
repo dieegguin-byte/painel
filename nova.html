@@ -685,7 +685,9 @@ function Home() {
     await navigator.clipboard.writeText(lines.join("\n")); notify("Contexto enxuto copiado.", "ok");
   }
 
-  const abrirReagendar = (a) => setExplicar({ item: { tipoItem: "agenda", id: a.id, titulo: a.titulo, cidade: a.cidade, tipo: a.tipo, servico_id: a.servico_id }, kind: "reagendar" });
+  // `data` vai junto porque o reagendamento fecha o compromisso antigo: se ele estava marcado pra
+  // frente e o Diego resolveu antes, a data tem que virar hoje (mesmo motivo do Concluir).
+  const abrirReagendar = (a) => setExplicar({ item: { tipoItem: "agenda", id: a.id, titulo: a.titulo, cidade: a.cidade, tipo: a.tipo, servico_id: a.servico_id, data: a.data }, kind: "reagendar" });
   // Atualização otimista: some da tela na hora; o loadAll depois só reconcilia com o banco.
   const aplicarResolucao = useCallback((patch) => {
     if (!patch) return;
@@ -1297,7 +1299,7 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
         uploaded.push({ url: data.signedUrl, fileName: f.name });
       }
       const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
-      if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", item.id); if (error) throw error; }
+      if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito", data: item.data && item.data > hojeISO() ? hojeISO() : item.data }).eq("id", item.id); if (error) throw error; }
       const alvoServico = item.tipoItem === "agenda" ? item.servico_id : item.id;
       if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
       await db.from("historico").insert({ o_que: `${cabec}: ${item.titulo}`, por: "diego", detalhe: texto.trim() });
