@@ -772,7 +772,7 @@ function Home() {
     {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
     {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} />}
     {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
-    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
+    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {addAgendaOpen && <AddAgendaModal appointments={appointments} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
   </div>;
 }
@@ -1102,11 +1102,27 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     {(() => {
       // SERVIÇO VIVO SEM TELEFONE: trabalho que não anda por falta do dado mais básico. Some da vista porque
       // o card do compromisso parece normal — só na hora de abrir o WhatsApp é que ele descobre. Sobe pro Painel.
-      const mudos = services.filter((s) => s.clientes && !s.clientes.telefone);
+      // "entregue" NÃO entra: `activeServices` só tira pago/perdido, então entregue chegava aqui e o aviso
+      // cobrava telefone de trabalho já concluído (a Taisa apareceu assim em 25/07). Só quem ainda vai andar.
+      const VIVOS = ["lead", "orcamento", "agendado", "producao"];
+      const mudos = services.filter((s) => s.clientes && !s.clientes.telefone && VIVOS.includes(s.status));
       if (!mudos.length) return null;
       return <section className="warning-card"><b>{mudos.length} cliente(s) com serviço em aberto e sem telefone na ficha</b>
         {mudos.slice(0, 5).map((s) => <span key={s.id}>{s.clientes.nome} · {statusLabel[s.status] || s.status} · {s.titulo}</span>)}
         <span>Sem número não tem como cobrar, confirmar nem entregar. Pegue o contato ou marque o serviço como perdido.</span>
+      </section>;
+    })()}
+    {(() => {
+      // AGENDADO É TRABALHO FECHADO, NÃO VISITA DE ORÇAMENTO. Regra do Diego (25/07): "agendado que cair lá
+      // e depois de fechado o serviço com entrada mesmo". Visita de orçamento marcada como agendado entrava
+      // no card de Capacidade como trabalho precisando de profissional — foi o caso da Shirlei e da Margot.
+      // O sinal objetivo de "fechado" é ter entrada registrada no financeiro.
+      const comEntrada = new Set((finances || []).filter((f) => f.tipo === "entrada" && f.servico_id).map((f) => f.servico_id));
+      const falsos = services.filter((s) => ["agendado", "producao"].includes(s.status) && !comEntrada.has(s.id));
+      if (!falsos.length) return null;
+      return <section className="warning-card"><b>{falsos.length} serviço(s) como agendado/produção sem nenhuma entrada registrada</b>
+        {falsos.slice(0, 6).map((s) => <span key={s.id}>{s.clientes?.nome || "Cliente"} · {statusLabel[s.status] || s.status} · {s.titulo}</span>)}
+        <span>Agendado é trabalho fechado com entrada. Se ainda é visita ou orçamento, volte pra Orçamento — senão entra na conta de capacidade como trabalho que não existe.</span>
       </section>;
     })()}
     {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Compromissos de hoje e atrasados</h3></div></div><AvisoRota compromissos={due.filter((a) => a.data === today)} />{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</section>}
@@ -1210,17 +1226,31 @@ function AddAgendaModal({ appointments, db, demo, notify, onClose, onDone }) {
   </>;
 }
 
-function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, onClose, onDone }) {
+function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, onClose, onDone }) {
   const [step, setStep] = useState("choose");
   const [pendente, setPendente] = useState("");
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [valorCompra, setValorCompra] = useState("");
   const [fornecedorId, setFornecedorId] = useState((materiais || [])[0]?.fornecedor_id || "");
+  const [valorEntrega, setValorEntrega] = useState(svc?.valor_orcamento ? String(svc.valor_orcamento) : "");
   const ehCompra = ehCompromissoDeCompra(appt, materiais);
+  const ehEntrega = ehCompromissoDeEntrega(appt, svc);
   const openParcial = () => { setPendente(sugerirPendente(appt.titulo)); setStep("parcial"); };
-  // Compromisso de compra passa pela pergunta do valor antes de fechar; o resto conclui direto como sempre.
-  const concluirTotal = () => ehCompra ? setStep("compra") : doTotal();
+  // Compra pergunta o valor; entrega pergunta se o serviço acabou. O resto conclui direto como sempre.
+  const concluirTotal = () => ehCompra ? setStep("compra") : ehEntrega ? setStep("entrega") : doTotal();
+  // Entregou de verdade: o SERVIÇO vira Entregue e sai da lista de trabalho ativo. A trava do banco
+  // (servicos_entregue_precisa_valor) exige valor, então se a ficha não tiver, o app pede aqui.
+  const doEntrega = async () => {
+    const valor = Number(String(valorEntrega).replace(",", "."));
+    if (!valor || valor <= 0) { notify("Qual foi o valor do serviço? Sem isso não dá pra marcar como entregue.", "error"); return; }
+    if (demo) { notify("Entregue (demo).", "ok"); doTotal(); return; }
+    setBusy(true);
+    try {
+      const { error } = await db.from("servicos").update({ status: "entregue", valor_orcamento: valor, proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", svc.id); if (error) throw error;
+      setBusy(false); doTotal();
+    } catch (e) { notify("Erro ao fechar o serviço: " + e.message, "error"); setBusy(false); }
+  };
   const uploadFiles = async () => {
     const uploaded = [];
     for (const f of files) {
@@ -1337,6 +1367,11 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, onClos
         {appt.servico_id && <p className="ficha-note">Vai entrar vinculado ao serviço deste compromisso — é o que faz a margem real aparecer.</p>}
         <div className="ficha-actions"><button className="primary" onClick={doCompra} disabled={busy}>Lançar e concluir</button><button className="ghost" onClick={doTotal} disabled={busy}>Não comprei nada</button></div>
         <button className="ghost wide" onClick={doCompraDepois} disabled={busy}>Comprei, mas o valor eu passo depois</button>
+      </div> : step === "entrega" ? <div className="form-grid">
+        <p className="modal-intro">Entregou mesmo? Então o serviço de {svc?.clientes?.nome || "esse cliente"} fecha aqui e sai da sua lista.</p>
+        <label>Valor do serviço*<input inputMode="decimal" value={valorEntrega} onChange={(e) => setValorEntrega(e.target.value)} placeholder="Ex: 450,00" /></label>
+        <p className="ficha-note">Sem valor o serviço não pode ser marcado como entregue — é o que evita trabalho entregue sem faturamento registrado.</p>
+        <div className="ficha-actions"><button className="primary" onClick={doEntrega} disabled={busy}>Entreguei — fechar o serviço</button><button className="ghost" onClick={doTotal} disabled={busy}>Só esse compromisso, o serviço continua</button></div>
       </div> : <div className="form-grid">
         <label>Explique o que ficou pendente<textarea value={pendente} onChange={(e) => setPendente(e.target.value)} /></label>
         {files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}
@@ -1539,6 +1574,15 @@ function ehCompromissoDeCompra(appt, materiais) {
   if ((materiais || []).length) return true;
   const t = appt?.titulo || "";
   return RE_COMPRA.test(t) && RE_INSUMO.test(t);
+}
+// ENTREGA CONCLUÍDA TEM QUE FECHAR O SERVIÇO. Antes, concluir "Entregar poltrona - Débora" fechava só o
+// compromisso: o serviço continuava 'agendado', então voltava pra lista de trabalho ativo e o cliente não
+// saía do Painel (Diego em 25/07: "Débora já foi entregue, não deixe acontecer mais esse erro de não sumir
+// de lá"). Agora o app pergunta na hora e move o serviço pra Entregue — que é o que faz ele sumir.
+const STATUS_VIVOS = ["lead", "orcamento", "agendado", "producao"];
+function ehCompromissoDeEntrega(appt, svc) {
+  if (!svc || !STATUS_VIVOS.includes(svc.status)) return false;
+  return /\bentreg/i.test(appt?.titulo || "");
 }
 function planoDeCompra(fornecedor) {
   if (!fornecedor) return null;
