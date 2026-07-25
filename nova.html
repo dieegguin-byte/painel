@@ -275,6 +275,7 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - REGRA Nº 9: vale é LEMBRETE DE DÍVIDA, não gasto. Lançar sempre categoria "Vale" com status "a_pagar" — assim ele aparece na aba Vales mas NÃO influencia o saldo do Financeiro. Só quando o Diego marcar como abatido (o momento em que paga de verdade) é que vira status "pago" e pesa no caixa. Nunca lançar vale já como "pago" achando que o dinheiro saiu.
 - REGRA Nº 10: gasto que ainda vai sair (parcela de cartão, aluguel, conta fixa) NÃO é saída paga. Lançar com status "a_pagar" e o campo data = DIA DO VENCIMENTO, um lançamento por parcela (ex: 4x de R$110 vira 4 linhas, 10/08, 10/09, 10/10, 10/11). Assim aparece na aba "A pagar" no mês em que vai pesar e o saldo do caixa só muda quando o Diego marcar como pago. Nunca jogar o valor cheio de um parcelamento como saída de hoje.
 - REGRA Nº 11: a identidade de um cliente é o TELEFONE, nunca o nome. Nome se repete no cadastro real (já teve "Ju", "Carla", "Marlom", "Alice" repetidos) — nunca concluir que são duas pessoas diferentes só porque o nome bate, nem que são a mesma só porque o nome é igual. Antes de criar cliente novo, procurar pelo telefone. E telefone com o tamanho certo NÃO quer dizer telefone certo: comparar o número pelo conjunto de dígitos ORDENADO contra os já cadastrados — se bater com alguém, é a mesma pessoa com erro de digitação, não cliente novo. Validação que dá pra resolver sozinho sem perguntar ao Diego: celular brasileiro é 9 + 8 dígitos e o primeiro desses 8 é sempre 6, 7, 8 ou 9 — número tipo "9 2742-2663" (começa com 2) é inválido de cara, então dá pra saber qual dos dois cadastros duplicados está errado. Caso real (24/07/2026): "Ju" cadastrada duas vezes, mesma cidade, com +55 61 99274-2663 e +55 61 92742-2663 — mesmos dígitos fora de ordem, os dois passavam na checagem de 13 dígitos. Era uma pessoa só; o número válido é o 99274-2663.
+- REGRA Nº 12: quando o Diego pede reagendamento ou conclui parcial, o APP JÁ CRIA o próximo compromisso com uma DATA PROVISÓRIA (próximo dia útil, sábado conta e domingo não), herdando tipo/cidade/hora do anterior. A nota que chega na caixa traz o id desse compromisso escrito assim: "DATA PROVISÓRIA: o app já criou o próximo compromisso para AAAA-MM-DD (agenda #id)". Ao processar essa nota, o Claude tem duas obrigações: (1) AJUSTAR a data/hora DAQUELE compromisso (PATCH no id informado) conforme a explicação que o Diego escreveu — "ele quer amanhã 13h" vira 13h no dia certo, "aguardar resposta" vira uns dias pra frente respeitando a Regra Nº 3, "semana que vem" vira a segunda seguinte; (2) NUNCA criar um segundo compromisso pro mesmo serviço — isso gera a duplicata que a gente passou meses limpando. A data provisória existe só pra o cliente não desaparecer da tela enquanto nenhuma sessão roda (o app carrega apenas status 'planejado'); ela NÃO é uma decisão, é um marcador. O Diego nunca escolhe data: ele explica o que aconteceu, o app segura o lugar, o Claude decide a data.
 - Novo lead, orçamento e agendado não geram lançamento financeiro.
 - O valor informado nesses status é apenas valor de orçamento.
 - Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
@@ -1274,23 +1275,27 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, onClos
     if (demo) { notify("Anotado (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() }); return; }
     setBusy(true);
     try {
-      const nota = `Reagendar (parcial): "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}${appt.tipo === "remoto" ? " · remoto" : ""}. Ficou pendente: ${pendente.trim()}.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}`;
       const uploaded = files.length ? await uploadFiles() : [];
-      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       const { error } = await db.from("agenda").update({ status: "feito", data: appt.data > hojeISO() ? hojeISO() : appt.data }).eq("id", appt.id); if (error) throw error;
       // O PRÓXIMO PASSO NASCE AQUI, NÃO NA PRÓXIMA SESSÃO. Antes o parcial só deixava recado na caixa e a
       // data nova dependia do Claude rodar — o Francisco pediu reagendamento 4x e ficou 8 dias invisível,
       // porque compromisso fechado sem sucessor não aparece em lugar nenhum (o app só carrega 'planejado').
       // O Claude ainda refina a data depois lendo a caixa; o que não pode é o cliente ficar sem data.
+      let novoId = null, proxData = null;
       if (appt.servico_id) {
-        const proxData = proximoDiaUtil(hojeISO());
-        const { error: agErr } = await db.from("agenda").insert({
+        proxData = proximoDiaUtil(hojeISO());
+        const { data: novo, error: agErr } = await db.from("agenda").insert({
           servico_id: appt.servico_id, titulo: pendente.trim().slice(0, 150), data: proxData,
           hora: appt.tipo === "presencial" ? (appt.hora || "09:00") : null,
           tipo: appt.tipo || "remoto", cidade: appt.tipo === "presencial" ? appt.cidade : null, status: "planejado",
-        }); if (agErr) throw agErr;
+        }).select("id").single(); if (agErr) throw agErr;
+        novoId = novo?.id || null;
         const { error: sErr } = await db.from("servicos").update({ proxima_acao: pendente.trim(), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr;
       }
+      // A nota vai DEPOIS e leva o id do compromisso novo: é assim que a próxima sessão sabe que a data é
+      // provisória e que deve AJUSTAR aquele compromisso em vez de criar um segundo. Ver Regra Nº 12.
+      const nota = `Reagendar (parcial): "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}${appt.tipo === "remoto" ? " · remoto" : ""}. Ficou pendente: ${pendente.trim()}.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}${novoId ? ` — DATA PROVISÓRIA: o app já criou o próximo compromisso para ${proxData} (agenda #${novoId}). AJUSTE a data/hora DESSE compromisso conforme a explicação; NÃO crie outro.` : ""}`;
+      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       await db.from("historico").insert({ o_que: `"${appt.titulo}": parcial — Claude vai reagendar`, por: "diego", detalhe: "Pendente: " + pendente.trim() });
       notify("Anotado. O Claude reagenda na próxima vez que você chamar.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
@@ -1348,20 +1353,26 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
         const { data, error } = await db.storage.from("fotos-servicos").createSignedUrl(path, 60 * 60 * 24 * 365); if (error) throw error;
         uploaded.push({ url: data.signedUrl, fileName: f.name });
       }
-      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito", data: item.data && item.data > hojeISO() ? hojeISO() : item.data }).eq("id", item.id); if (error) throw error; }
       const alvoServico = item.tipoItem === "agenda" ? item.servico_id : item.id;
       // REAGENDAR JÁ MARCA A DATA NOVA. Fechar o compromisso antigo e esperar o Claude criar o próximo fazia o
       // cliente desaparecer da tela (caso Francisco: 4 pedidos de reagendamento, 8 dias invisível). O Claude
       // ainda ajusta a data depois lendo a explicação na caixa — mas nunca mais fica sem data nenhuma.
+      let novoId = null, proxData = null;
       if (item.tipoItem === "agenda" && ehReagendar && alvoServico) {
-        const { error: agErr } = await db.from("agenda").insert({
-          servico_id: alvoServico, titulo: item.titulo, data: proximoDiaUtil(hojeISO()),
+        proxData = proximoDiaUtil(hojeISO());
+        const { data: novo, error: agErr } = await db.from("agenda").insert({
+          servico_id: alvoServico, titulo: item.titulo, data: proxData,
           hora: item.tipo === "presencial" ? (item.hora || "09:00") : null,
           tipo: item.tipo || "remoto", cidade: item.tipo === "presencial" ? item.cidade : null, status: "planejado",
-        }); if (agErr) throw agErr;
+        }).select("id").single(); if (agErr) throw agErr;
+        novoId = novo?.id || null;
       }
       if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: ehReagendar ? item.titulo : null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
+      // Nota por último, carregando o id do compromisso novo — é o que diz pra próxima sessão que a data é
+      // provisória e que ela deve AJUSTAR aquele compromisso, nunca criar um segundo. Ver Regra Nº 12.
+      const notaFinal = nota + (novoId ? ` — DATA PROVISÓRIA: o app já criou o próximo compromisso para ${proxData} (agenda #${novoId}). AJUSTE a data/hora DESSE compromisso conforme a explicação; NÃO crie outro.` : "");
+      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, notaFinal), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
       await db.from("historico").insert({ o_que: `${cabec}: ${item.titulo}`, por: "diego", detalhe: texto.trim() });
       notify("Anotado. Saiu da lista — o Claude cuida disso quando você chamar.", "ok"); onDone({ agendaId: (item.tipoItem === "agenda" && ehReagendar) ? item.id : null, servicoId: alvoServico || null, proximaAcao: null });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
