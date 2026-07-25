@@ -116,7 +116,7 @@ const statusLabel = {
 };
 
 const demoInbox = [
-  { id: "cx-101", texto: "Oi, quero reformar meu sofá retrátil. Sou Mariana, moro no Jardim Ingá. Pode fazer orçamento? Meu WhatsApp é (61) 99914-2020.", status: "respondido", conversa: [{ de: "ia", texto: "Você prefere visita presencial ou enviar as medidas?", em: new Date().toISOString() }, { de: "diego", texto: "Ela quer visita presencial amanhã à tarde.", em: new Date().toISOString() }], criado_em: "2026-07-10T10:20:00Z", processado: false },
+  { id: "cx-101", texto: "Oi, quero reformar meu sofá retrátil. Sou Mariana, moro no Jardim Ingá. Pode fazer orçamento? Meu WhatsApp é (61) 90000-0000.", status: "respondido", conversa: [{ de: "ia", texto: "Você prefere visita presencial ou enviar as medidas?", em: new Date().toISOString() }, { de: "diego", texto: "Ela quer visita presencial amanhã à tarde.", em: new Date().toISOString() }], criado_em: "2026-07-10T10:20:00Z", processado: false },
   { id: "cx-102", texto: "Carlos pediu retorno sobre as 6 cadeiras. Disse que aprovou o tecido bege.", status: "novo", conversa: [], criado_em: "2026-07-10T11:00:00Z", processado: false },
   { id: "cx-103", texto: "Conta da Vivo apareceu em duplicidade, verificar antes de mexer.", status: "aguardando_voce", conversa: [{ de: "ia", texto: "Conferi o Financeiro: há apenas um lançamento. Você viu a duplicidade no app ou na fatura?", em: new Date().toISOString() }], criado_em: "2026-07-10T12:00:00Z", processado: false },
 ];
@@ -274,9 +274,9 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - REGRA Nº 8: compra de material NUNCA entra como saída solta no financeiro. Toda compra de insumo (tecido, espuma, PVC, pés, linha, cola, percinta) é lançada com categoria "Material", escopo "empresa", SEMPRE com fornecedor_id preenchido (o fornecedor cadastrado que vendeu) e, quando o material foi comprado pra um trabalho específico, também com servico_id (o serviço que consumiu). É isso que faz a aba Compras mostrar gasto por mês, por fornecedor e a margem real de cada serviço. Se o material foi pra estoque geral, deixar servico_id vazio — mas fornecedor_id nunca. Combustível, almoço e vale NÃO são material: continuam nas categorias próprias. Material que ainda vai ser comprado entra com status "a_pagar" (lista de compras, não mexe no caixa) e só vira "pago" quando o Diego marcar como comprado no app.
 - REGRA Nº 9: vale é LEMBRETE DE DÍVIDA, não gasto. Lançar sempre categoria "Vale" com status "a_pagar" — assim ele aparece na aba Vales mas NÃO influencia o saldo do Financeiro. Só quando o Diego marcar como abatido (o momento em que paga de verdade) é que vira status "pago" e pesa no caixa. Nunca lançar vale já como "pago" achando que o dinheiro saiu.
 - REGRA Nº 10: gasto que ainda vai sair (parcela de cartão, aluguel, conta fixa) NÃO é saída paga. Lançar com status "a_pagar" e o campo data = DIA DO VENCIMENTO, um lançamento por parcela (ex: 4x de R$110 vira 4 linhas, 10/08, 10/09, 10/10, 10/11). Assim aparece na aba "A pagar" no mês em que vai pesar e o saldo do caixa só muda quando o Diego marcar como pago. Nunca jogar o valor cheio de um parcelamento como saída de hoje.
-- REGRA Nº 11: a identidade de um cliente é o TELEFONE, nunca o nome. Nome se repete no cadastro real (já teve "Ju", "Carla", "Marlom", "Alice" repetidos) — nunca concluir que são duas pessoas diferentes só porque o nome bate, nem que são a mesma só porque o nome é igual. Antes de criar cliente novo, procurar pelo telefone. E telefone com o tamanho certo NÃO quer dizer telefone certo: comparar o número pelo conjunto de dígitos ORDENADO contra os já cadastrados — se bater com alguém, é a mesma pessoa com erro de digitação, não cliente novo. Validação que dá pra resolver sozinho sem perguntar ao Diego: celular brasileiro é 9 + 8 dígitos e o primeiro desses 8 é sempre 6, 7, 8 ou 9 — número tipo "9 2742-2663" (começa com 2) é inválido de cara, então dá pra saber qual dos dois cadastros duplicados está errado. Caso real (24/07/2026): "Ju" cadastrada duas vezes, mesma cidade, com +55 61 99274-2663 e +55 61 92742-2663 — mesmos dígitos fora de ordem, os dois passavam na checagem de 13 dígitos. Era uma pessoa só; o número válido é o 99274-2663.
+- REGRA Nº 11: a identidade de um cliente é o TELEFONE, nunca o nome. Nome se repete no cadastro real (ja aconteceu de quatro nomes se repetirem no cadastro) — nunca concluir que são duas pessoas diferentes só porque o nome bate, nem que são a mesma só porque o nome é igual. Antes de criar cliente novo, procurar pelo telefone. E telefone com o tamanho certo NÃO quer dizer telefone certo: comparar o número pelo conjunto de dígitos ORDENADO contra os já cadastrados — se bater com alguém, é a mesma pessoa com erro de digitação, não cliente novo. Validação que dá pra resolver sozinho sem perguntar ao Diego: celular brasileiro é 9 + 8 dígitos e o primeiro desses 8 é sempre 6, 7, 8 ou 9 — número em que esse dígito é 2, por exemplo, é inválido de cara, então dá pra saber qual dos dois cadastros duplicados está errado. Já aconteceu de um mesmo cliente entrar duas vezes na mesma cidade com o número digitado fora de ordem: os dois passavam na checagem de 13 dígitos e só o formato denunciava qual era o certo.
 - REGRA Nº 12: quando o Diego pede reagendamento ou conclui parcial, o APP JÁ CRIA o próximo compromisso com uma DATA PROVISÓRIA (próximo dia útil, sábado conta e domingo não), herdando tipo/cidade/hora do anterior. A nota que chega na caixa traz o id desse compromisso escrito assim: "DATA PROVISÓRIA: o app já criou o próximo compromisso para AAAA-MM-DD (agenda #id)". Ao processar essa nota, o Claude tem duas obrigações: (1) AJUSTAR a data/hora DAQUELE compromisso (PATCH no id informado) conforme a explicação que o Diego escreveu — "ele quer amanhã 13h" vira 13h no dia certo, "aguardar resposta" vira uns dias pra frente respeitando a Regra Nº 3, "semana que vem" vira a segunda seguinte; (2) NUNCA criar um segundo compromisso pro mesmo serviço — isso gera a duplicata que a gente passou meses limpando. A data provisória existe só pra o cliente não desaparecer da tela enquanto nenhuma sessão roda (o app carrega apenas status 'planejado'); ela NÃO é uma decisão, é um marcador. O Diego nunca escolhe data: ele explica o que aconteceu, o app segura o lugar, o Claude decide a data.
-- REGRA Nº 13 (canal certo pra cada coisa — pedido do Diego em 25/07/2026: "deveria usar a função perguntas no app de qualquer dúvida"): DÚVIDA DO CLAUDE vai pra caixa_entrada com status "aguardando_voce" e a pergunta dentro do campo "conversa" no formato [{de:'ia', texto:'...', em:ISO}] — é o único canal que tem campo de resposta e conta na métrica "Aguardando você" do Painel. NUNCA transformar dúvida em card de aviso no Painel nem em compromisso na agenda: card de aviso é pra ESTADO que o app deduz sozinho e o Diego decide olhando (faltando material, agendado sem valor, conta vencendo), e compromisso na agenda é pra TRABALHO que ele vai fazer. Erro real cometido em 25/07: telefone faltando da Sandra Cunha e da Taisa virou card de aviso, e "confirmar o valor de serviço entregue" virou 7 compromissos na agenda — os dois eram pergunta, não aviso nem tarefa. Sintoma de que você errou o canal: se a única saída do Diego é te dar uma informação que só ele tem, é pergunta.
+- REGRA Nº 13 (canal certo pra cada coisa — pedido do Diego em 25/07/2026: "deveria usar a função perguntas no app de qualquer dúvida"): DÚVIDA DO CLAUDE vai pra caixa_entrada com status "aguardando_voce" e a pergunta dentro do campo "conversa" no formato [{de:'ia', texto:'...', em:ISO}] — é o único canal que tem campo de resposta e conta na métrica "Aguardando você" do Painel. NUNCA transformar dúvida em card de aviso no Painel nem em compromisso na agenda: card de aviso é pra ESTADO que o app deduz sozinho e o Diego decide olhando (faltando material, agendado sem valor, conta vencendo), e compromisso na agenda é pra TRABALHO que ele vai fazer. Erro real cometido em 25/07: telefone faltando de duas clientes virou card de aviso, e "confirmar o valor de serviço entregue" virou 7 compromissos na agenda — os dois eram pergunta, não aviso nem tarefa. Sintoma de que você errou o canal: se a única saída do Diego é te dar uma informação que só ele tem, é pergunta.
 - Novo lead, orçamento e agendado não geram lançamento financeiro.
 - O valor informado nesses status é apenas valor de orçamento.
 - Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
@@ -289,7 +289,11 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - Antes de criar cliente, procurar telefone existente para evitar duplicidade.
 - Alterações de valor, pagamento, prazo e status devem ser resumidas ao usuário.
 - No modo Claude, nunca mexer no Financeiro nem excluir nada — isso é do Diego.`;
-const TABELAS_BACKUP = ["clientes", "servicos", "fotos", "agenda", "financeiro", "estoque", "caixa_entrada", "historico", "guia_ia"];
+// Backup incompleto é backup que engana. Faltavam config, fornecedores e rotinas — três tabelas que o app
+// usa todo dia (o PIN mora em config, e sem fornecedores a aba Compras e o plano de compra não voltam).
+// Auditoria de 25/07/2026. Isto cobre só os DADOS: schema, políticas, usuários do Auth e os arquivos do
+// bucket fotos-servicos continuam de fora e precisam de dump próprio.
+const TABELAS_BACKUP = ["clientes", "servicos", "fotos", "agenda", "financeiro", "estoque", "caixa_entrada", "historico", "guia_ia", "config", "fornecedores", "rotinas"];
 
 // ===== Cérebro de rota/agenda (portado do app v1, definido pelo Diego 08-09/07/2026) =====
 // Rotina semanal: seg/qua/sex 08-11h e 13-18h; ter/qui/sáb 08-21h; domingo sem expediente.
@@ -325,6 +329,10 @@ function cabecalhoAjusteDeData(agendaId, dataProvisoria, explicacao) {
 // LEITURA OFFLINE (25/07/2026). Guarda a última carga boa do Supabase no aparelho. Não é sincronização:
 // é só pra o app abrir com a agenda, os telefones e os endereços quando o sinal cai no meio da rota.
 const CACHE_OFFLINE = "tb-novo-cache-offline";
+// Hash do PIN guardado no aparelho pra o bloqueio funcionar offline e pra a falha de leitura ser FECHADA.
+// Não é segredo novo: é SHA-256 de 4 dígitos, quebrável em milissegundos por quem já tem o aparelho na mão.
+// O PIN é bloqueio de tela, não autenticação — a autorização de verdade tem que estar no banco (RLS).
+const PIN_HASH_LOCAL = "tb-novo-pin-hash";
 function lerCacheOffline() {
   try {
     const bruto = window.localStorage.getItem(CACHE_OFFLINE);
@@ -520,7 +528,17 @@ function Home() {
     (async () => {
       const { data, error } = await db.from("config").select("pin_hash").eq("id", 1).single();
       if (cancelled) return;
-      if (error) { setPinState("ok"); return; }
+      // FALHA FECHADA. Antes, qualquer erro ao ler a config LIBERAVA a tela (setPinState("ok")) — bastava a
+      // consulta falhar pra o bloqueio sumir. Agora o hash conhecido fica guardado no aparelho, então sem
+      // sinal o PIN continua sendo pedido e continua funcionando; e se nunca vimos o hash e a leitura falha,
+      // a tela fica travada pedindo pra tentar de novo, em vez de abrir. Auditoria de 25/07/2026.
+      if (error) {
+        const conhecido = window.localStorage.getItem(PIN_HASH_LOCAL);
+        if (!conhecido) { setPinState("bloqueado"); return; }
+        setPinState(window.sessionStorage.getItem("tb_pin_ok") === "1" ? "ok" : "enter");
+        return;
+      }
+      if (data?.pin_hash) window.localStorage.setItem(PIN_HASH_LOCAL, data.pin_hash);
       if (!data?.pin_hash) setPinState("define");
       else if (window.sessionStorage.getItem("tb_pin_ok") === "1") setPinState("ok");
       else setPinState("enter");
@@ -540,7 +558,9 @@ function Home() {
   const tryPin = useCallback(async (pin) => {
     const hash = await sha256(pin);
     const { data } = await db.from("config").select("pin_hash").eq("id", 1).single();
-    if (data && data.pin_hash === hash) { window.sessionStorage.setItem("tb_pin_ok", "1"); setPinState("ok"); return true; }
+    // Sem sinal a consulta não responde: cai no hash guardado, senão o PIN nunca abriria offline.
+    const esperado = data?.pin_hash || window.localStorage.getItem(PIN_HASH_LOCAL);
+    if (esperado && esperado === hash) { window.sessionStorage.setItem("tb_pin_ok", "1"); setPinState("ok"); return true; }
     return false;
   }, [db]);
 
@@ -596,7 +616,12 @@ function Home() {
   async function sendMagicLink() {
     if (!db || !email.trim()) return;
     setBusy(true);
-    const { error } = await db.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.origin + window.location.pathname } });
+    // shouldCreateUser: false — o login NÃO cria conta. Sem isso, qualquer pessoa digitava o próprio e-mail,
+    // recebia o magic link e virava usuário autenticado; e as políticas do banco hoje liberam tudo pra
+    // qualquer autenticado, então isso era acesso ao negócio inteiro. Auditoria de 25/07/2026.
+    // ATENÇÃO: isto fecha o caminho pelo app. Fechar de verdade exige desligar o cadastro público no painel
+    // do Supabase (Auth > disable_signup) — enquanto isso não for feito, a API de auth continua aceitando.
+    const { error } = await db.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: false, emailRedirectTo: window.location.origin + window.location.pathname } });
     setBusy(false);
     if (error) notify(error.message, "error"); else setLoginSent(true);
   }
@@ -772,6 +797,8 @@ function Home() {
   if (booting) return <div className="loading-screen"><div className="brand-seal">TB</div><p>Preparando a central…</p></div>;
   if (!session && !demo) return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">NOVA CENTRAL OPERACIONAL</p><h1>Tapeçaria Bahia</h1><p>Um ambiente separado para Diego e Claude trabalharem na mesma fila, sem apagar, duplicar ou perder o próximo passo.</p>{loginSent ? <div className="success-box">Link enviado. Abra seu e-mail neste aparelho.</div> : <><label>E-mail de acesso<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" onKeyDown={(event) => event.key === "Enter" && sendMagicLink()} /></label><button className="primary" onClick={sendMagicLink} disabled={busy || !email.trim()}>Enviar link de acesso</button></>}<button className="ghost demo-button" onClick={() => setDemo(true)}>Ver demonstração do novo site</button></div></div>;
   if (!demo && pinState === "checking") return <div className="loading-screen"><div className="brand-seal">TB</div><p>Verificando o bloqueio…</p></div>;
+  // Falha fechada: não deu pra verificar o bloqueio e não existe hash guardado neste aparelho — não abre.
+  if (!demo && pinState === "bloqueado") return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">BLOQUEADO</p><h1>Não deu pra verificar o PIN</h1><p>A central não conseguiu ler a configuração de bloqueio e este aparelho ainda não tem o PIN guardado. Conecte à internet uma vez e abra de novo — depois disso ele passa a funcionar offline.</p><button className="primary" onClick={() => window.location.reload()}>Tentar de novo</button></div></div>;
   if (!demo && (pinState === "define" || pinState === "enter")) return <PinScreen mode={pinState} onDefine={definePin} onEnter={tryPin} />;
 
   const valesPendentes = finances.filter((f) => f.categoria === "Vale" && f.status === "a_pagar").length;
@@ -816,7 +843,7 @@ function Home() {
       {tab === "financeiro" && <FinanceView finances={finances} services={services} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={appointments} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
-      {tab === "vales" && <ValesView finances={finances} db={db} demo={demo} notify={notify} onChanged={loadAll} />}
+      {tab === "vales" && <ValesView finances={finances} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
     </main>
@@ -994,7 +1021,7 @@ function quandoFalado(data, hora, hoje) {
 }
 // Sempre gera uma mensagem pronta (mesmo sem sugestao_resposta salva) pra o botão do WhatsApp nunca abrir vazio.
 // NUNCA colar a anotação interna dentro da mensagem do cliente. A versão antiga fazia
-// `Passando pra confirmar: ${proxima_acao}` e saiu no WhatsApp da Rubilene como "Passando pra
+// `Passando pra confirmar: ${proxima_acao}` e saiu no WhatsApp de uma cliente como "Passando pra
 // confirmar: Cobrar retorno — ia decidir com o marido" — recado do Diego pra ele mesmo, mandado
 // pra cliente. Diego apontou em 24/07: "tem que ser algo mais natural como eu fiz".
 // O título/próxima ação agora só ESCOLHE o texto; o que vai pro cliente é frase de gente.
@@ -1032,7 +1059,7 @@ function CompromissoCard({ a, svc, today, onConcluir, onReschedule, materiais })
       <p className="compromisso-local">{a.tipo === "remoto" ? "◌ Remoto" : `⌖ ${a.cidade || "Cidade não informada"}`}</p>
       {!!(materiais || []).length && <p className="compromisso-material">⚑ Aproveitar para o material: {(materiais || []).map((m) => m.descricao || "material").join(" · ")}</p>}
       {/* CONTATO IMPOSSÍVEL: o app mandava "tentar contato de novo" sem existir telefone na ficha, e o Diego
-          ficou perguntando "cadê o WhatsApp" desde 16/07 sem resposta (caso Fabiana; a Sandra Cunha tem até
+          ficou perguntando "cadê o WhatsApp" desde 16/07 sem resposta (caso real; havia até cliente com ENTREGA marcada e
           ENTREGA marcada sem número). Pedir o que não dá pra fazer é pior que não pedir. */}
       {!tel && svc?.cliente_id && <p className="compromisso-material">⚠ Sem telefone na ficha — não dá pra fazer esse contato. Pegue o número antes.</p>}
       <div className="compromisso-info">
@@ -1180,9 +1207,9 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     {(() => {
       // AGENDADO É TRABALHO FECHADO, NÃO VISITA DE ORÇAMENTO. Regra do Diego (25/07): "agendado que cair lá
       // e depois de fechado o serviço com entrada mesmo". Visita de orçamento marcada como agendado entrava
-      // no card de Capacidade como trabalho precisando de profissional — foi o caso da Shirlei e da Margot.
+      // no card de Capacidade como trabalho precisando de profissional — ja aconteceu com duas visitas de orcamento.
       // O sinal objetivo de "fechado" é ter entrada registrada no financeiro.
-      // Cuidado com falso alarme: tem serviço fechado com recibo que só é PAGO na entrega (Vanusa, OS 00483) —
+      // Cuidado com falso alarme: tem serviço fechado com recibo que so e PAGO na entrega (caso real com recibo emitido) —
       // esse não tem entrada e está certo. O sinal de "não fechou nada" é não ter NEM valor NEM entrada.
       const comEntrada = new Set((finances || []).filter((f) => f.tipo === "entrada" && f.servico_id).map((f) => f.servico_id));
       const falsos = services.filter((s) => ["agendado", "producao"].includes(s.status) && !comEntrada.has(s.id) && !(Number(s.valor_orcamento) > 0));
@@ -1395,7 +1422,7 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
       const uploaded = files.length ? await uploadFiles() : [];
       const { error } = await db.from("agenda").update({ status: "feito", data: appt.data > hojeISO() ? hojeISO() : appt.data }).eq("id", appt.id); if (error) throw error;
       // O PRÓXIMO PASSO NASCE AQUI, NÃO NA PRÓXIMA SESSÃO. Antes o parcial só deixava recado na caixa e a
-      // data nova dependia do Claude rodar — o Francisco pediu reagendamento 4x e ficou 8 dias invisível,
+      // data nova dependia do Claude rodar — um cliente pediu reagendamento 4x e ficou 8 dias invisivel,
       // porque compromisso fechado sem sucessor não aparece em lugar nenhum (o app só carrega 'planejado').
       // O Claude ainda refina a data depois lendo a caixa; o que não pode é o cliente ficar sem data.
       let novoId = null, proxData = null;
@@ -1479,7 +1506,7 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
       if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito", data: item.data && item.data > hojeISO() ? hojeISO() : item.data }).eq("id", item.id); if (error) throw error; }
       const alvoServico = item.tipoItem === "agenda" ? item.servico_id : item.id;
       // REAGENDAR JÁ MARCA A DATA NOVA. Fechar o compromisso antigo e esperar o Claude criar o próximo fazia o
-      // cliente desaparecer da tela (caso Francisco: 4 pedidos de reagendamento, 8 dias invisível). O Claude
+      // cliente desaparecer da tela (caso real: 4 pedidos de reagendamento, 8 dias invisivel). O Claude
       // ainda ajusta a data depois lendo a explicação na caixa — mas nunca mais fica sem data nenhuma.
       let novoId = null, proxData = null;
       if (item.tipoItem === "agenda" && ehReagendar && alvoServico) {
@@ -1572,18 +1599,25 @@ function nomeFornecedorVale(descricao) {
   return semPrefixo.split(/[\(,]/)[0].trim() || "Sem nome";
 }
 const VALE_ABATIDO_TAG = "[ABATIDO] ";
-function ValesView({ finances, db, demo, notify, onChanged }) {
+function ValesView({ finances, db, demo, mode, notify, onChanged }) {
   const [busyId, setBusyId] = useState(null);
   const vales = finances.filter((f) => f.categoria === "Vale");
   // Vale é lembrete de dívida, NÃO gasto: enquanto pendente fica status "a_pagar" e por isso não entra no saldo do
   // Financeiro (que só soma pago). Ao marcar abatido - o momento em que o Diego realmente paga - vira "pago" e aí sim
   // pesa no caixa. O prefixo [ABATIDO] na descrição é só a marcação administrativa que move o item pro histórico.
-  const pendentes = vales.filter((v) => !(v.descricao || "").startsWith(VALE_ABATIDO_TAG));
-  const abatidos = vales.filter((v) => (v.descricao || "").startsWith(VALE_ABATIDO_TAG));
+  // QUEM MANDA É O STATUS, NÃO O TEXTO. Antes esta aba decidia pendente/abatido pelo prefixo [ABATIDO] na
+  // descrição, enquanto o contador do menu usava status = a_pagar — os dois divergiam. Em 25/07/2026 havia
+  // 4 vales com status "pago" e sem o prefixo: apareciam como pendentes aqui e não contavam no menu.
+  // O prefixo continua valendo como marca visual, mas quem define o estado é o status (Regra Nº 9).
+  const pendentes = vales.filter((v) => v.status === "a_pagar" && !(v.descricao || "").startsWith(VALE_ABATIDO_TAG));
+  const abatidos = vales.filter((v) => v.status !== "a_pagar" || (v.descricao || "").startsWith(VALE_ABATIDO_TAG));
   const porFornecedor = {};
   pendentes.forEach((v) => { const nome = nomeFornecedorVale(v.descricao); (porFornecedor[nome] ||= []).push(v); });
   const totalPendente = pendentes.reduce((sum, v) => sum + Number(v.valor), 0);
   const marcarAbatido = async (item) => {
+    // Abater vale é mexer em dinheiro: vira saída paga no caixa. É do Diego, como as outras ações
+    // financeiras — faltava esta checagem aqui (a aba Compras já tinha). Auditoria de 25/07/2026.
+    if (mode === "claude") { notify("Financeiro exige Diego.", "error"); return; }
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusyId(item.id);
     try {
@@ -1646,9 +1680,9 @@ function ehCompromissoDeCompra(appt, materiais) {
   const t = appt?.titulo || "";
   return RE_COMPRA.test(t) && RE_INSUMO.test(t);
 }
-// ENTREGA CONCLUÍDA TEM QUE FECHAR O SERVIÇO. Antes, concluir "Entregar poltrona - Débora" fechava só o
+// ENTREGA CONCLUÍDA TEM QUE FECHAR O SERVIÇO. Antes, concluir um compromisso de entrega fechava so o
 // compromisso: o serviço continuava 'agendado', então voltava pra lista de trabalho ativo e o cliente não
-// saía do Painel (Diego em 25/07: "Débora já foi entregue, não deixe acontecer mais esse erro de não sumir
+// saía do Painel (Diego em 25/07: "ja foi entregue, nao deixe acontecer mais esse erro de nao sumir
 // de lá"). Agora o app pergunta na hora e move o serviço pra Entregue — que é o que faz ele sumir.
 const STATUS_VIVOS = ["lead", "orcamento", "agendado", "producao"];
 function ehCompromissoDeEntrega(appt, svc) {
@@ -2135,7 +2169,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
     const { error } = await db.from("servicos").update({ loja_material: loja || null, data_entrega_material: data || null }).eq("id", servicoId);
     if (error) { notify("Erro: " + error.message, "error"); return; }
     // O DIEGO NÃO ESCOLHE DATA. Antes isso só criava a ação se ele preenchesse loja E data — informar só a
-    // loja não gerava nada, e o material ficava sem dia marcado (foi o que aconteceu com o suede da Vanusa).
+    // loja não gerava nada, e o material ficava sem dia marcado (ja aconteceu com uma compra de tecido).
     // Agora basta a loja: se ele não deu data, o app usa o plano do fornecedor (planoDeCompra), que sabe se
     // aquele fornecedor ENTREGA — nesse caso é pedido remoto na véspera — ou se é viagem, e aí sai presencial
     // com cidade e hora, respeitando a Regra Nº 4. Sem fornecedor cadastrado, cai no próximo dia útil.
