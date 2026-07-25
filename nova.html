@@ -322,6 +322,28 @@ function cabecalhoAjusteDeData(agendaId, dataProvisoria, explicacao) {
     "---",
   ].join("\n");
 }
+// LEITURA OFFLINE (25/07/2026). Guarda a última carga boa do Supabase no aparelho. Não é sincronização:
+// é só pra o app abrir com a agenda, os telefones e os endereços quando o sinal cai no meio da rota.
+const CACHE_OFFLINE = "tb-novo-cache-offline";
+function lerCacheOffline() {
+  try {
+    const bruto = window.localStorage.getItem(CACHE_OFFLINE);
+    if (!bruto) return null;
+    const salvo = JSON.parse(bruto);
+    return salvo && salvo.pacote ? salvo : null;
+  } catch (e) { return null; }
+}
+// Idade do dado em palavra de gente — "agora", "há 3h", "ontem". Mostrar a hora crua faria ele ter que
+// calcular de cabeça no meio da rua.
+function idadeDoDado(em) {
+  const min = Math.round((Date.now() - em) / 60000);
+  if (min < 2) return "agora";
+  if (min < 60) return `há ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `há ${h}h`;
+  const d = Math.round(h / 24);
+  return d === 1 ? "de ontem" : `de ${d} dias atrás`;
+}
 function proximoDiaUtil(baseISO, pulos) {
   const d = new Date((baseISO || hojeISO()) + "T12:00:00");
   let faltam = pulos || 1;
@@ -407,6 +429,8 @@ function Home() {
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Quando não é null, a tela está mostrando a última carga guardada no aparelho (sem sinal).
+  const [offlineDesde, setOfflineDesde] = useState(null);
   const [notice, setNotice] = useState(null);
   const [search, setSearch] = useState("");
   const [pinState, setPinState] = useState("checking");
@@ -442,25 +466,49 @@ function Home() {
     return () => { cancelled = true; authSub?.unsubscribe(); };
   }, [notify]);
 
+  // Um lugar só pra preencher as listas: usado tanto pela carga online quanto pelo cache offline, pra as
+  // duas seguirem exatamente o mesmo caminho e não divergirem com o tempo.
+  const aplicarPacote = useCallback((p) => {
+    setInbox(p.inbox || []); setCustomers(p.customers || []); setServices(p.services || []);
+    setAppointments(p.appointments || []); setFinances(p.finances || []); setRotinas(p.rotinas || []);
+    setFornecedores(p.fornecedores || []);
+  }, []);
+
   const loadAll = useCallback(async () => {
     if (demo) {
       setInbox(demoInbox); setCustomers(demoCustomers); setServices(demoServices); setAppointments(demoAppointments); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
-    const [cx, cl, sv, ag, fn, rt, fo] = await Promise.all([
-      db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
-      db.from("clientes").select("*").order("nome", { ascending: true }),
-      db.from("servicos").select("*,clientes(id,nome,telefone,cidade)").order("criado_em", { ascending: false }),
-      db.from("agenda").select("*").eq("status", "planejado").order("data", { ascending: true }).order("hora", { ascending: true }),
-      db.from("financeiro").select("*").order("data", { ascending: false }),
-      db.from("rotinas").select("*").eq("ativo", true).order("criado_em", { ascending: true }),
-      db.from("fornecedores").select("*").order("nome", { ascending: true }),
-    ]);
-    const firstError = [cx, cl, sv, ag, fn, rt, fo].find((result) => result.error)?.error;
-    if (firstError) notify(`Erro ao carregar: ${firstError.message}`, "error");
-    setInbox(cx.data || []); setCustomers(cl.data || []); setServices(sv.data || []); setAppointments(ag.data || []); setFinances(fn.data || []); setRotinas(rt.data || []); setFornecedores(fo.data || []); setLoading(false);
-  }, [db, demo, notify, session]);
+    let cx, cl, sv, ag, fn, rt, fo, firstError;
+    try {
+      [cx, cl, sv, ag, fn, rt, fo] = await Promise.all([
+        db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
+        db.from("clientes").select("*").order("nome", { ascending: true }),
+        db.from("servicos").select("*,clientes(id,nome,telefone,cidade)").order("criado_em", { ascending: false }),
+        db.from("agenda").select("*").eq("status", "planejado").order("data", { ascending: true }).order("hora", { ascending: true }),
+        db.from("financeiro").select("*").order("data", { ascending: false }),
+        db.from("rotinas").select("*").eq("ativo", true).order("criado_em", { ascending: true }),
+        db.from("fornecedores").select("*").order("nome", { ascending: true }),
+      ]);
+      firstError = [cx, cl, sv, ag, fn, rt, fo].find((result) => result.error)?.error;
+    } catch (e) { firstError = e; }
+    // SEM SINAL: em vez de tela vazia, abre com a última carga guardada e avisa a idade dela.
+    if (firstError) {
+      const guardado = lerCacheOffline();
+      if (guardado) { aplicarPacote(guardado.pacote); setOfflineDesde(guardado.em); setLoading(false); return; }
+      notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
+    }
+    setOfflineDesde(null);
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [] };
+    aplicarPacote(pacote);
+    // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
+    // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
+    // sinal é rotina. Só leitura: gravação offline ficaria numa fila que duplicaria compromisso e bateria
+    // nas travas do banco depois, sem ele ver o erro.
+    if (!firstError) { try { window.localStorage.setItem(CACHE_OFFLINE, JSON.stringify({ em: Date.now(), pacote })); } catch (e) { /* aparelho sem espaço: segue sem cache */ } }
+    setLoading(false);
+  }, [db, demo, notify, session, aplicarPacote]);
 
   useEffect(() => { if (demo || session) loadAll(); }, [demo, session, loadAll]);
   useEffect(() => { window.localStorage.setItem("tb-novo-modo", mode); }, [mode]);
@@ -736,6 +784,9 @@ function Home() {
 
   return <div className={`product-shell mode-${mode}`}>
     {notice && <div className={`notice ${notice.kind}`}>{notice.text}</div>}
+    {/* SEM SINAL: a tela precisa dizer que está velha, senão ele decide em cima de dado defasado sem saber.
+        Fica fixo no topo, acima de tudo, porque nesse estado nada mais na tela pode ser confiado às cegas. */}
+    {offlineDesde && <div className="notice error">Sem conexão — mostrando os dados baixados {idadeDoDado(offlineDesde)}. Dá pra consultar agenda, telefone e endereço, mas nada que você mudar agora será salvo.</div>}
     <aside className="side-nav">
       <div className="side-brand"><div className="brand-seal small">TB</div><div><strong>Tapeçaria Bahia</strong><span>Central operacional</span></div></div>
       <nav>{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setSelectedId(null); }}><i>{item.icon}</i><span>{item.label}</span>{item.count !== undefined && <b>{item.count}</b>}</button>)}</nav>
@@ -2160,6 +2211,13 @@ root.render(<Home />);
   script.textContent = output;
   document.body.appendChild(script);
 })();
+
+// O nova.html NÃO registrava o service worker — só o index.html registrava. Quem abrisse direto o app novo
+// (que é o caso do dia a dia) nunca instalava o cache, e por isso nada funcionava offline. Registrar aqui
+// também: o escopo './' cobre a pasta inteira, então os dois compartilham o mesmo SW.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10').catch(() => {}));
+}
 </script>
 </body>
 </html>
