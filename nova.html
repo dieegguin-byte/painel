@@ -275,7 +275,7 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - REGRA Nº 9 (CORRIGIDA em 25/07/2026 pelo Diego: "todos vales já saem na hora"): vale é dinheiro que SAI NA HORA — Pix ou dinheiro na mão pro profissional. Lançar SEMPRE categoria "Vale", escopo "empresa", status "pago" e data do dia em que foi entregue: o caixa tem que sentir na hora. O que fica pendente NÃO é o pagamento, é o DESCONTO — na hora de pagar aquele profissional pelo serviço, o valor do vale sai do que ele tem a receber. Marcar "abatido" na aba Vales só acrescenta o prefixo [ABATIDO] na descrição e NÃO mexe no status nem no caixa; se mexesse, o mesmo dinheiro sairia duas vezes. Vale pendente = categoria Vale sem o prefixo [ABATIDO]. A versão anterior desta regra dizia o contrário (lançar como "a_pagar" e virar saída ao abater) e por isso 6 vales somando R$465,70 ficaram fora do caixa com o dinheiro já tendo saído.
 - REGRA Nº 10: gasto que ainda vai sair (parcela de cartão, aluguel, conta fixa) NÃO é saída paga. Lançar com status "a_pagar" e o campo data = DIA DO VENCIMENTO, um lançamento por parcela (ex: 4x de R$110 vira 4 linhas, 10/08, 10/09, 10/10, 10/11). Assim aparece na aba "A pagar" no mês em que vai pesar e o saldo do caixa só muda quando o Diego marcar como pago. Nunca jogar o valor cheio de um parcelamento como saída de hoje.
 - REGRA Nº 11: a identidade de um cliente é o TELEFONE, nunca o nome. Nome se repete no cadastro real (ja aconteceu de quatro nomes se repetirem no cadastro) — nunca concluir que são duas pessoas diferentes só porque o nome bate, nem que são a mesma só porque o nome é igual. Antes de criar cliente novo, procurar pelo telefone. E telefone com o tamanho certo NÃO quer dizer telefone certo: comparar o número pelo conjunto de dígitos ORDENADO contra os já cadastrados — se bater com alguém, é a mesma pessoa com erro de digitação, não cliente novo. Validação que dá pra resolver sozinho sem perguntar ao Diego: celular brasileiro é 9 + 8 dígitos e o primeiro desses 8 é sempre 6, 7, 8 ou 9 — número em que esse dígito é 2, por exemplo, é inválido de cara, então dá pra saber qual dos dois cadastros duplicados está errado. Já aconteceu de um mesmo cliente entrar duas vezes na mesma cidade com o número digitado fora de ordem: os dois passavam na checagem de 13 dígitos e só o formato denunciava qual era o certo.
-- REGRA Nº 12: quando o Diego pede reagendamento ou conclui parcial, o APP JÁ CRIA o próximo compromisso com uma DATA PROVISÓRIA (próximo dia útil, sábado conta e domingo não), herdando tipo/cidade/hora do anterior. A nota que chega na caixa traz o id desse compromisso escrito assim: "DATA PROVISÓRIA: o app já criou o próximo compromisso para AAAA-MM-DD (agenda #id)". Ao processar essa nota, o Claude tem duas obrigações: (1) AJUSTAR a data/hora DAQUELE compromisso (PATCH no id informado) conforme a explicação que o Diego escreveu — "ele quer amanhã 13h" vira 13h no dia certo, "aguardar resposta" vira uns dias pra frente respeitando a Regra Nº 3, "semana que vem" vira a segunda seguinte; (2) NUNCA criar um segundo compromisso pro mesmo serviço — isso gera a duplicata que a gente passou meses limpando. A data provisória existe só pra o cliente não desaparecer da tela enquanto nenhuma sessão roda (o app carrega apenas status 'planejado'); ela NÃO é uma decisão, é um marcador. O Diego nunca escolhe data: ele explica o que aconteceu, o app segura o lugar, o Claude decide a data.
+- REGRA Nº 12 (reescrita em 25/07/2026 — desenho debatido pelo Diego com um segundo modelo, documento decisao-design-reagendamento.md): quando um compromisso NÃO ACONTECE (o Diego pede reagendamento ou conclui parcial), o app NUNCA MAIS inventa uma data de compromisso. Em vez disso cria uma PENDÊNCIA em caixa_entrada — uma linha normal, status "novo", com uma mensagem em conversa carregando meta.tipo_operacional = "remarcacao", meta.agenda_origem_id (o id do compromisso antigo), meta.servico_id, meta.motivo (o texto que o Diego escreveu) e meta.revisar_em (data interna, nunca prometida a cliente). Essa pendência nasce ANTES de qualquer outra gravação — se o resto falhar, o cliente continua visível. O compromisso antigo só vira "feito" quando a data dele já tinha chegado (hoje ou passado); se ainda era futuro quando foi desmarcado, ele fica "planejado" no banco mesmo — o Painel esconde o card sozinho enquanto existir pendência apontando pra ele, então ninguém precisa mentir a data. NUNCA criar um segundo compromisso pro mesmo agenda_origem_id enquanto a pendência estiver aberta — antes de gravar, procurar em caixa_entrada por um item não processado com esse mesmo agenda_origem_id (é a checagem de idempotência). Ao processar essa pendência: se o texto do Diego já traz uma data ("ele quer amanhã 13h"), o Claude cria o compromisso real com aquela data/hora e SÓ ENTÃO marca a pendência como resolvida; se depende de resposta do cliente ("aguardar resposta"), a pendência continua aberta e o Claude só ajusta revisar_em; NUNCA marcar uma pendência de remarcação como resolvida (processado=true) sem que exista um compromisso sucessor real com status planejado ou o serviço tenha virado perdido, entregue ou pago. O Diego nunca escolhe data pelo app: ele explica o que aconteceu, e só existe compromisso quando alguém de fato decidiu uma data — ele mesmo na explicação, ou o Claude interpretando o que ele já informou.
 - REGRA Nº 13 (canal certo pra cada coisa — pedido do Diego em 25/07/2026: "deveria usar a função perguntas no app de qualquer dúvida"): DÚVIDA DO CLAUDE vai pra caixa_entrada com status "aguardando_voce" e a pergunta dentro do campo "conversa" no formato [{de:'ia', texto:'...', em:ISO}] — é o único canal que tem campo de resposta e conta na métrica "Aguardando você" do Painel. NUNCA transformar dúvida em card de aviso no Painel nem em compromisso na agenda: card de aviso é pra ESTADO que o app deduz sozinho e o Diego decide olhando (faltando material, agendado sem valor, conta vencendo), e compromisso na agenda é pra TRABALHO que ele vai fazer. Erro real cometido em 25/07: telefone faltando de duas clientes virou card de aviso, e "confirmar o valor de serviço entregue" virou 7 compromissos na agenda — os dois eram pergunta, não aviso nem tarefa. Sintoma de que você errou o canal: se a única saída do Diego é te dar uma informação que só ele tem, é pergunta.
 - Novo lead, orçamento e agendado não geram lançamento financeiro.
 - O valor informado nesses status é apenas valor de orçamento.
@@ -310,10 +310,9 @@ const CIDADE_BASE = "luziania";
 function hojeISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
 // Próximo dia de trabalho: sábado conta (o Diego trabalha), domingo não. Usado sempre que o app precisa
 // escolher uma data sozinho — reagendamento e conclusão parcial nunca podem ficar sem data marcada.
-// O RECADO TEM QUE SER ENTENDIDO SEM BOA VONTADE. Instrução solta no fim de um parágrafo passa batido — então
-// o pedido de ajuste de data vira um bloco fixo na PRIMEIRA linha do item da caixa, no mesmo estilo dos outros
-// marcadores [[TB_...]] do app (dá pra achar com busca de texto). Pedido do Diego em 25/07/2026: "tem que ser
-// algo que você veja o recado e entenda realmente o que tem que fazer". Ver Regra Nº 12 no Guia da IA.
+// APOSENTADA em 25/07/2026: a data provisória automática saiu (Diego não gostou de ver na agenda um
+// compromisso que ninguém combinou — ver decisao-design-reagendamento.md). Ninguém chama mais esta função;
+// fica só de referência de como o marcador [[TB_...]] funcionava. O lugar dela é criarPendenciaRemarcacao.
 function cabecalhoAjusteDeData(agendaId, dataProvisoria, explicacao) {
   if (!agendaId) return "";
   return [
@@ -357,6 +356,37 @@ function proximoDiaUtil(baseISO, pulos) {
   let faltam = pulos || 1;
   while (faltam > 0) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0) faltam--; }
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+// PENDÊNCIA DE REMARCAÇÃO — Fase 1 do desenho de 25/07/2026 (Diego + GPT, doc decisao-design-reagendamento.md).
+// Substitui a criação automática de compromisso provisório: "não aconteceu" nunca mais vira um dado que
+// parece real. Vive em caixa_entrada como uma linha normal (status "novo"), com o metadado estruturado
+// dentro de conversa[].meta — não muda o schema do banco. Ver REGRA Nº 12 no Guia da IA.
+async function criarPendenciaRemarcacao(db, args) {
+  const { agendaOrigemId, servicoId, clienteNome, tituloOriginal, cidadeOriginal, tipoOriginal, dataOriginal, horaOriginal, motivo, subestado, uploaded } = args;
+  // Idempotência: consulta fresca no banco (não confia em estado local) — dois cliques não podem abrir
+  // duas pendências pro mesmo compromisso.
+  if (agendaOrigemId) {
+    const { data: abertos } = await db.from("caixa_entrada").select("id,conversa").eq("processado", false);
+    const existente = (abertos || []).find((it) => (it.conversa || []).some((m) => m?.meta?.tipo_operacional === "remarcacao" && m?.meta?.agenda_origem_id === agendaOrigemId));
+    if (existente) return { id: existente.id, jaExistia: true };
+  }
+  const agora = new Date().toISOString();
+  const resumo = "Precisa remarcar: " + (clienteNome ? clienteNome + " · " : "") + tituloOriginal + (cidadeOriginal ? " · " + cidadeOriginal : "") + ". " + motivo;
+  const texto = (uploaded && uploaded.length) ? buildInboxPayload(uploaded, resumo) : resumo;
+  const meta = {
+    tipo_operacional: "remarcacao", versao: 1,
+    agenda_origem_id: agendaOrigemId || null, servico_id: servicoId || null,
+    subestado: subestado || "precisa_remarcar",
+    data_original: dataOriginal || null, hora_original: horaOriginal || null,
+    tipo_original: tipoOriginal || null, cidade_original: cidadeOriginal || null,
+    motivo, revisar_em: proximoDiaUtil(hojeISO()), agenda_sucessora_id: null,
+  };
+  const { data, error } = await db.from("caixa_entrada").insert({
+    texto, status: "novo", processado: false,
+    conversa: [{ de: "ia", tipo: "sistema", texto: "Pendência de remarcação criada pelo app.", em: agora, meta }],
+  }).select("id").single();
+  if (error) throw error;
+  return { id: data.id, jaExistia: false };
 }
 const DIAS_SEMANA_MAP = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
 function proximaEntregaFornecedor(diasEntrega) {
@@ -1152,13 +1182,47 @@ function CapacidadeCard({ services }) {
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
 function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, db, demo, notify, onRotinaChanged, onOpenQueue, onConcluir, onReschedule, onSemProximaAcao, onOpenFicha }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
-  const today = hojeISO(); const dueAll = appointments.filter((entry) => entry.data <= today); const futurosAll = appointments.filter((entry) => entry.data > today); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
+  const today = hojeISO();
+  // PENDÊNCIA DE REMARCAÇÃO ESCONDE O COMPROMISSO ORIGINAL DA LISTA. Desenho de 25/07/2026: enquanto existir
+  // uma pendência aberta apontando pra este agenda.id, ele não é um compromisso confiável — pode estar
+  // "planejado" no banco (compromisso futuro desmarcado antes de acontecer, sem DDL pra status novo) ou
+  // "feito" só como encerramento. Nos dois casos ele sai da vista normal; quem mostra é a seção própria.
+  const idsComPendencia = new Set((inbox || []).flatMap((it) => (it.conversa || [])
+    .filter((m) => m?.meta?.tipo_operacional === "remarcacao").map((m) => m.meta.agenda_origem_id)).filter(Boolean));
+  const dueAll = appointments.filter((entry) => entry.data <= today && !idsComPendencia.has(entry.id)); const futurosAll = appointments.filter((entry) => entry.data > today && !idsComPendencia.has(entry.id)); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
   const porTipo = (list) => filtroTipo === "todos" ? list : list.filter((entry) => (entry.tipo || "presencial") === filtroTipo);
   const due = porTipo(dueAll); const futuros = porTipo(futurosAll);
   const irParaVencendo = () => { if (dueAll.length === 0) return; setFiltroTipo("todos"); document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   return <div className="page-grid"><section className="hero-summary"><div><p className="kicker">VISÃO OPERACIONAL</p><h2>Clareza antes de velocidade.</h2><p>O site separa a vez do Claude, a sua vez e as decisões que exigem aprovação.</p></div><button className="primary" onClick={onOpenQueue}>Abrir fila de entrada</button></section><section className="metric-grid"><Metric label="Para Claude" value={inbox.filter((entry) => ["novo", "respondido"].includes(entry.status || "novo")).length} detail="Novos e respondidos" tone="orange" /><Metric label="Aguardando você" value={inbox.filter((entry) => entry.status === "aguardando_voce").length} detail="Perguntas no app" tone="red" /><Metric label="Agenda vencendo" value={dueAll.length} detail="Hoje ou atrasada" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CapacidadeCard services={services} />
+    {(() => {
+      // "PRECISA REMARCAR" — Fase 1 do desenho de 25/07/2026. Nenhuma data aqui é combinada; é só visibilidade
+      // enquanto ninguém decidiu a próxima. Vem logo no topo porque é exatamente o tipo de coisa que não pode
+      // ficar invisível esperando uma sessão rodar.
+      const pend = (inbox || []).map((it) => {
+        const msg = (it.conversa || []).find((m) => m?.meta?.tipo_operacional === "remarcacao");
+        return msg ? { item: it, meta: msg.meta } : null;
+      }).filter(Boolean);
+      if (!pend.length) return null;
+      const ordenado = [...pend].sort((a, b) => {
+        const av = (a.meta.revisar_em || "9999") <= today ? 0 : 1;
+        const bv = (b.meta.revisar_em || "9999") <= today ? 0 : 1;
+        if (av !== bv) return av - bv;
+        return (a.item.criado_em || "").localeCompare(b.item.criado_em || "");
+      });
+      return <section className="warning-card">
+        <b>{ordenado.length} cliente(s) esperando remarcação</b>
+        {ordenado.slice(0, 6).map(({ item, meta }) => {
+          const svcRef = services.find((s) => s.id === meta.servico_id);
+          const nome = svcRef?.clientes?.nome || "Cliente";
+          const idadeDias = Math.max(0, Math.round((Date.now() - new Date(item.criado_em).getTime()) / 86400000));
+          const vencida = meta.revisar_em && meta.revisar_em <= today;
+          return <span key={item.id}>{nome} — {(meta.motivo || "").slice(0, 60)} · {idadeDias === 0 ? "hoje" : idadeDias + "d"}{vencida ? " · revisar" : ""}</span>;
+        })}
+        <span>Nenhuma data aqui é combinada — vira compromisso só quando alguém decidir de verdade. <button className="ghost" onClick={onOpenQueue}>Abrir na fila</button></span>
+      </section>;
+    })()}
     {(dueAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}</div>}
     {(() => {
       // CONTA CHEGANDO: entra sozinho no Painel na véspera do vencimento (e fica enquanto estiver vencida),
@@ -1422,31 +1486,28 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
     setBusy(true);
     try {
       const uploaded = files.length ? await uploadFiles() : [];
-      // O PRÓXIMO PASSO NASCE AQUI, NÃO NA PRÓXIMA SESSÃO — e nasce ANTES de fechar o antigo. Ordem invertida
-      // em 25/07/2026: se a criação do sucessor falhar, o compromisso antigo tem que continuar planejado, senão
-      // o cliente some da tela (o app só carrega 'planejado'). Já aconteceu de um cliente ficar 8 dias
-      // invisível assim. O Claude ainda refina a data depois lendo a caixa.
-      let novoId = null, proxData = null;
+      // PENDÊNCIA, NÃO COMPROMISSO INVENTADO — desenho de 25/07/2026 (Diego não gostou de ver na agenda uma
+      // data que ninguém combinou; ver decisao-design-reagendamento.md). Nasce PRIMEIRO, antes de qualquer
+      // outra gravação: se o resto falhar, o cliente continua visível na fila "Precisa remarcar".
+      const pend = await criarPendenciaRemarcacao(db, {
+        agendaOrigemId: appt.id, servicoId: appt.servico_id || null,
+        clienteNome: svc?.clientes?.nome || null, tituloOriginal: appt.titulo,
+        cidadeOriginal: appt.cidade || null, tipoOriginal: appt.tipo || null,
+        dataOriginal: appt.data, horaOriginal: appt.hora || null,
+        motivo: pendente.trim(), subestado: "precisa_remarcar", uploaded,
+      });
+      await db.from("historico").insert({ o_que: `"${appt.titulo}": não concluído`, por: "diego", detalhe: "Ficou pendente: " + pendente.trim() + (pend.jaExistia ? " (pendência já existia)" : "") });
       if (appt.servico_id) {
-        proxData = proximoDiaUtil(hojeISO());
-        const { data: novo, error: agErr } = await db.from("agenda").insert({
-          servico_id: appt.servico_id, titulo: pendente.trim().slice(0, 150), data: proxData,
-          hora: appt.tipo === "presencial" ? (appt.hora || "09:00") : null,
-          tipo: appt.tipo || "remoto", cidade: appt.tipo === "presencial" ? appt.cidade : null, status: "planejado",
-        }).select("id").single(); if (agErr) throw agErr;
-        novoId = novo?.id || null;
+        await db.from("servicos").update({ proxima_acao: "Remarcar — " + pendente.trim().slice(0, 140), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
       }
-      const { error } = await db.from("agenda").update({ status: "feito", data: appt.data > hojeISO() ? hojeISO() : appt.data }).eq("id", appt.id); if (error) throw error;
-      if (appt.servico_id) {
-        const { error: sErr } = await db.from("servicos").update({ proxima_acao: pendente.trim(), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr;
+      // Só encerra como "feito" quando a data já tinha chegado (hoje ou passado) — aí é resultado verdadeiro.
+      // Se ainda era futuro quando foi desmarcado, fica "planejado" no banco mesmo: forçar "feito" mentiria a
+      // data (o trigger empurraria pra hoje) sobre algo que não aconteceu. A pendência já esconde o card.
+      if (appt.data <= hojeISO()) {
+        const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", appt.id); if (error) throw error;
       }
-      // A nota vai DEPOIS e leva o id do compromisso novo. A ordem importa: a INSTRUÇÃO vem na PRIMEIRA linha,
-      // em bloco fixo, porque instrução no fim de parágrafo passa batido na leitura. Ver Regra Nº 12.
-      const nota = cabecalhoAjusteDeData(novoId, proxData, pendente.trim())
-        + `Reagendar (parcial): "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}${appt.tipo === "remoto" ? " · remoto" : ""}. Ficou pendente: ${pendente.trim()}.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}`;
-      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
-      await db.from("historico").insert({ o_que: `"${appt.titulo}": parcial — Claude vai reagendar`, por: "diego", detalhe: "Pendente: " + pendente.trim() });
-      notify("Anotado. O Claude reagenda na próxima vez que você chamar.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() });
+      notify("Anotado. Foi pra \"Precisa remarcar\" — o Claude organiza a nova data quando processar.", "ok");
+      onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
   const filePicker = <div className="composer-actions"><label className="file-button">{files.length ? `${files.length} print(s)` : "Anexar print(s) (opcional)"}<input type="file" accept="image/*" multiple onChange={(e) => setFiles((fs) => [...fs, ...Array.from(e.target.files || [])])} /></label></div>;
@@ -1496,10 +1557,6 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
     if (demo) { notify("Anotado (demo).", "ok"); onDone({ agendaId: (item.tipoItem === "agenda" && ehReagendar) ? item.id : null, servicoId: alvoServicoDemo || null, proximaAcao: null }); return; }
     setBusy(true);
     try {
-      const ref = item.tipoItem === "agenda" ? `(agenda #${item.id}${item.servico_id ? ", serviço #" + item.servico_id : ""})` : `(serviço #${item.id})`;
-      const cabec = ehReagendar ? "Reagendar" : "Concluir lead";
-      const ctx = `${item.cliente ? item.cliente + " · " : ""}${item.titulo}${item.cidade ? " · " + item.cidade : ""}${item.tipo === "remoto" ? " · remoto" : ""}`;
-      const nota = `${cabec}: ${ctx}. ${ehReagendar ? "Explicação" : "O que aconteceu"}: ${texto.trim()}. ${ref}`;
       const uploaded = [];
       for (const f of files) {
         const path = `caixa-entrada/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
@@ -1508,32 +1565,35 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
         uploaded.push({ url: data.signedUrl, fileName: f.name });
       }
       const alvoServico = item.tipoItem === "agenda" ? item.servico_id : item.id;
-      // ORDEM INVERTIDA em 25/07/2026. Antes fechava o compromisso antigo PRIMEIRO e só depois criava o
-      // sucessor — se a criação falhasse, o antigo já estava fechado e o cliente sumia da agenda (foi
-      // exatamente o caso do cliente que pediu reagendamento 4x e ficou 8 dias invisível). Agora o sucessor
-      // nasce antes; o antigo só fecha depois que ele existe. Falhando no meio, nada se perde: o
-      // compromisso antigo continua planejado e o Diego tenta de novo.
-      let novoId = null, proxData = null;
-      if (item.tipoItem === "agenda" && ehReagendar && alvoServico) {
-        proxData = proximoDiaUtil(hojeISO());
-        const { data: novo, error: agErr } = await db.from("agenda").insert({
-          servico_id: alvoServico, titulo: item.titulo, data: proxData,
-          hora: item.tipo === "presencial" ? (item.hora || "09:00") : null,
-          tipo: item.tipo || "remoto", cidade: item.tipo === "presencial" ? item.cidade : null, status: "planejado",
-        }).select("id").single(); if (agErr) throw agErr;
-        novoId = novo?.id || null;
+      if (item.tipoItem === "agenda" && ehReagendar) {
+        // PENDÊNCIA, NÃO COMPROMISSO INVENTADO — mesmo desenho do doParcial (ConcluirModal). Ver Regra Nº 12.
+        const pend = await criarPendenciaRemarcacao(db, {
+          agendaOrigemId: item.id, servicoId: alvoServico,
+          clienteNome: item.cliente || null, tituloOriginal: item.titulo,
+          cidadeOriginal: item.cidade || null, tipoOriginal: item.tipo || null,
+          dataOriginal: item.data || null, horaOriginal: item.hora || null,
+          motivo: texto.trim(), subestado: "precisa_remarcar", uploaded,
+        });
+        await db.from("historico").insert({ o_que: `Reagendar: ${item.titulo}`, por: "diego", detalhe: texto.trim() + (pend.jaExistia ? " (pendência já existia)" : "") });
+        if (alvoServico) {
+          await db.from("servicos").update({ proxima_acao: "Remarcar — " + texto.trim().slice(0, 140), atualizado_em: new Date().toISOString() }).eq("id", alvoServico);
+        }
+        // Só encerra como "feito" quando a data já tinha chegado — ver mesmo raciocínio no doParcial.
+        if (item.data && item.data <= hojeISO()) {
+          const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", item.id); if (error) throw error;
+        }
+        notify("Anotado. Foi pra \"Precisa remarcar\" — o Claude organiza a nova data quando processar.", "ok");
+        onDone({ agendaId: item.id, servicoId: alvoServico || null, proximaAcao: null });
+      } else {
+        // "Concluir lead" — caminho hoje sem botão que o chame, comportamento anterior preservado.
+        const ref = `(serviço #${item.id})`;
+        const nota = `Concluir lead: ${item.titulo}. O que aconteceu: ${texto.trim()}. ${ref}`;
+        const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
+        if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
+        await db.from("historico").insert({ o_que: `Concluir lead: ${item.titulo}`, por: "diego", detalhe: texto.trim() });
+        notify("Anotado. Saiu da lista — o Claude cuida disso quando você chamar.", "ok");
+        onDone({ agendaId: null, servicoId: alvoServico || null, proximaAcao: null });
       }
-      if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito", data: item.data && item.data > hojeISO() ? hojeISO() : item.data }).eq("id", item.id); if (error) throw error; }
-      // A próxima ação passa a ser a EXPLICAÇÃO que ele escreveu, não o título velho do compromisso. Antes,
-      // "ele quer amanhã 13h" era descartado e a ficha continuava com o texto antigo — a informação que
-      // importava sumia justamente na hora em que ele parou pra escrever.
-      if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: ehReagendar ? texto.trim().slice(0, 150) : null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
-      // Nota por último, com a INSTRUÇÃO NA PRIMEIRA LINHA (bloco fixo) — instrução no fim do texto passa
-      // batido. É o que garante que a sessão ajuste o compromisso certo em vez de criar outro. Regra Nº 12.
-      const notaFinal = cabecalhoAjusteDeData(novoId, proxData, texto.trim()) + nota;
-      const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, notaFinal), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
-      await db.from("historico").insert({ o_que: `${cabec}: ${item.titulo}`, por: "diego", detalhe: texto.trim() });
-      notify("Anotado. Saiu da lista — o Claude cuida disso quando você chamar.", "ok"); onDone({ agendaId: (item.tipoItem === "agenda" && ehReagendar) ? item.id : null, servicoId: alvoServico || null, proximaAcao: null });
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
