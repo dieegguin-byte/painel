@@ -275,7 +275,7 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - REGRA Nº 9 (CORRIGIDA em 25/07/2026 pelo Diego: "todos vales já saem na hora"): vale é dinheiro que SAI NA HORA — Pix ou dinheiro na mão pro profissional. Lançar SEMPRE categoria "Vale", escopo "empresa", status "pago" e data do dia em que foi entregue: o caixa tem que sentir na hora. O que fica pendente NÃO é o pagamento, é o DESCONTO — na hora de pagar aquele profissional pelo serviço, o valor do vale sai do que ele tem a receber. Marcar "abatido" na aba Vales só acrescenta o prefixo [ABATIDO] na descrição e NÃO mexe no status nem no caixa; se mexesse, o mesmo dinheiro sairia duas vezes. Vale pendente = categoria Vale sem o prefixo [ABATIDO]. A versão anterior desta regra dizia o contrário (lançar como "a_pagar" e virar saída ao abater) e por isso 6 vales somando R$465,70 ficaram fora do caixa com o dinheiro já tendo saído.
 - REGRA Nº 10: gasto que ainda vai sair (parcela de cartão, aluguel, conta fixa) NÃO é saída paga. Lançar com status "a_pagar" e o campo data = DIA DO VENCIMENTO, um lançamento por parcela (ex: 4x de R$110 vira 4 linhas, 10/08, 10/09, 10/10, 10/11). Assim aparece na aba "A pagar" no mês em que vai pesar e o saldo do caixa só muda quando o Diego marcar como pago. Nunca jogar o valor cheio de um parcelamento como saída de hoje.
 - REGRA Nº 11: a identidade de um cliente é o TELEFONE, nunca o nome. Nome se repete no cadastro real (ja aconteceu de quatro nomes se repetirem no cadastro) — nunca concluir que são duas pessoas diferentes só porque o nome bate, nem que são a mesma só porque o nome é igual. Antes de criar cliente novo, procurar pelo telefone. E telefone com o tamanho certo NÃO quer dizer telefone certo: comparar o número pelo conjunto de dígitos ORDENADO contra os já cadastrados — se bater com alguém, é a mesma pessoa com erro de digitação, não cliente novo. Validação que dá pra resolver sozinho sem perguntar ao Diego: celular brasileiro é 9 + 8 dígitos e o primeiro desses 8 é sempre 6, 7, 8 ou 9 — número em que esse dígito é 2, por exemplo, é inválido de cara, então dá pra saber qual dos dois cadastros duplicados está errado. Já aconteceu de um mesmo cliente entrar duas vezes na mesma cidade com o número digitado fora de ordem: os dois passavam na checagem de 13 dígitos e só o formato denunciava qual era o certo.
-- REGRA Nº 12 (reescrita em 25/07/2026 — desenho debatido pelo Diego com um segundo modelo, documento decisao-design-reagendamento.md): quando um compromisso NÃO ACONTECE (o Diego pede reagendamento ou conclui parcial), o app NUNCA MAIS inventa uma data de compromisso. Em vez disso cria uma PENDÊNCIA em caixa_entrada — uma linha normal, status "novo", com uma mensagem em conversa carregando meta.tipo_operacional = "remarcacao", meta.agenda_origem_id (o id do compromisso antigo), meta.servico_id, meta.motivo (o texto que o Diego escreveu) e meta.revisar_em (data interna, nunca prometida a cliente). Essa pendência nasce ANTES de qualquer outra gravação — se o resto falhar, o cliente continua visível. O compromisso antigo só vira "feito" quando a data dele já tinha chegado (hoje ou passado); se ainda era futuro quando foi desmarcado, ele fica "planejado" no banco mesmo — o Painel esconde o card sozinho enquanto existir pendência apontando pra ele, então ninguém precisa mentir a data. NUNCA criar um segundo compromisso pro mesmo agenda_origem_id enquanto a pendência estiver aberta — antes de gravar, procurar em caixa_entrada por um item não processado com esse mesmo agenda_origem_id (é a checagem de idempotência). Ao processar essa pendência: se o texto do Diego já traz uma data ("ele quer amanhã 13h"), o Claude cria o compromisso real com aquela data/hora e SÓ ENTÃO marca a pendência como resolvida; se depende de resposta do cliente ("aguardar resposta"), a pendência continua aberta e o Claude só ajusta revisar_em; NUNCA marcar uma pendência de remarcação como resolvida (processado=true) sem que exista um compromisso sucessor real com status planejado ou o serviço tenha virado perdido, entregue ou pago. O Diego nunca escolhe data pelo app: ele explica o que aconteceu, e só existe compromisso quando alguém de fato decidiu uma data — ele mesmo na explicação, ou o Claude interpretando o que ele já informou.
+- REGRA Nº 12 (reescrita em 25/07/2026 — desenho debatido pelo Diego com um segundo modelo, revisado por um terceiro review no mesmo dia; docs decisao-design-reagendamento.md): quando um compromisso NÃO ACONTECE (o Diego pede reagendamento ou conclui parcial), o app NUNCA inventa uma data. Cria uma PENDÊNCIA em caixa_entrada — status "novo", com meta.tipo_operacional="remarcacao", meta.agenda_origem_id, meta.servico_id, meta.titulo_original, meta.motivo e meta.revisar_em (data interna, nunca prometida a cliente) — ANTES de qualquer upload ou alteração destrutiva na agenda. Enquanto meta.agenda_sucessora_id estiver vazio a pendência está ABERTA, e o compromisso original (agenda_origem_id) SOME de toda tela — Painel, Agenda, rota, seletores de horário, Compras, ficha — porque todo consumidor lê a coleção central compromissosOperacionais()/agendaVisivel, nunca appointments bruto. NUNCA excluir uma pendência aberta (recusaSeForPendenciaAberta bloqueia isso no app; mesma regra vale pra qualquer sessão mexendo direto no banco). NUNCA criar um segundo compromisso pro mesmo agenda_origem_id enquanto a pendência estiver aberta — antes de gravar, procurar em caixa_entrada por um item não processado com esse agenda_origem_id. Pra resolver com data real, usar a MESMA lógica de resolverPendenciaComSucessor: consultar o status ATUAL da origem — se ainda está "planejado" (nunca foi tentativa que aconteceu), ATUALIZAR a própria linha com a data nova, sem criar outra; se já está "feito" (foi tentado e encerrado), CRIAR um compromisso novo vinculado ao serviço. Nos dois casos gravar agenda_sucessora_id ANTES de marcar a pendência como resolvida (processado=true) — nunca resolver sem sucessor confirmado. A ÚNICA exceção é o serviço ter virado entregue, perdido ou pago (resolverPendenciaTerminal) — cliente desistiu ou serviço encerrou, não existe mais o que remarcar. Se o texto do Diego já traz uma data ("ele quer amanhã 13h"), resolver na hora com aquela data; se depende de resposta do cliente ("aguardar resposta"), deixar aberta e só ajustar revisar_em. O Diego nunca escolhe data pelo app: ele explica o que aconteceu, e só existe compromisso quando alguém de fato decidiu uma data.
 - REGRA Nº 13 (canal certo pra cada coisa — pedido do Diego em 25/07/2026: "deveria usar a função perguntas no app de qualquer dúvida"): DÚVIDA DO CLAUDE vai pra caixa_entrada com status "aguardando_voce" e a pergunta dentro do campo "conversa" no formato [{de:'ia', texto:'...', em:ISO}] — é o único canal que tem campo de resposta e conta na métrica "Aguardando você" do Painel. NUNCA transformar dúvida em card de aviso no Painel nem em compromisso na agenda: card de aviso é pra ESTADO que o app deduz sozinho e o Diego decide olhando (faltando material, agendado sem valor, conta vencendo), e compromisso na agenda é pra TRABALHO que ele vai fazer. Erro real cometido em 25/07: telefone faltando de duas clientes virou card de aviso, e "confirmar o valor de serviço entregue" virou 7 compromissos na agenda — os dois eram pergunta, não aviso nem tarefa. Sintoma de que você errou o canal: se a única saída do Diego é te dar uma informação que só ele tem, é pergunta.
 - Novo lead, orçamento e agendado não geram lançamento financeiro.
 - O valor informado nesses status é apenas valor de orçamento.
@@ -357,36 +357,157 @@ function proximoDiaUtil(baseISO, pulos) {
   while (faltam > 0) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0) faltam--; }
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-// PENDÊNCIA DE REMARCAÇÃO — Fase 1 do desenho de 25/07/2026 (Diego + GPT, doc decisao-design-reagendamento.md).
-// Substitui a criação automática de compromisso provisório: "não aconteceu" nunca mais vira um dado que
-// parece real. Vive em caixa_entrada como uma linha normal (status "novo"), com o metadado estruturado
-// dentro de conversa[].meta — não muda o schema do banco. Ver REGRA Nº 12 no Guia da IA.
+// PENDÊNCIA DE REMARCAÇÃO — Fase 1 do desenho de 25/07/2026 (Diego + GPT, revisado por um segundo review em
+// 25/07/2026 — docs decisao-design-reagendamento.md). Substitui a criação automática de compromisso
+// provisório: "não aconteceu" nunca mais vira um dado que parece real. Vive em caixa_entrada como uma linha
+// normal (status "novo"), com o metadado estruturado dentro de conversa[].meta — não muda o schema do banco.
+// Ver REGRA Nº 12 no Guia da IA.
+
+// ÚLTIMA MENSAGEM COM META DE REMARCAÇÃO de um item da caixa — é sempre a mais recente, porque motivo novo
+// vira mensagem nova (nunca sobrescreve a anterior, ver criarPendenciaRemarcacao).
+function ultimaMetaRemarcacao(item) {
+  const msgs = (item?.conversa || []).filter((m) => m?.meta?.tipo_operacional === "remarcacao");
+  return msgs.length ? msgs[msgs.length - 1].meta : null;
+}
+// PENDÊNCIA "ABERTA" = tem meta de remarcação e ainda não tem agenda_sucessora_id. Uma vez resolvida
+// (sucessora gravada), o compromisso original volta a valer pelo próprio status dele.
+function pendenciasRemarcacaoAbertas(inbox) {
+  return (inbox || []).map((it) => ({ item: it, meta: ultimaMetaRemarcacao(it) }))
+    .filter(({ meta }) => meta && !meta.agenda_sucessora_id);
+}
+// COLEÇÃO CENTRAL DE COMPROMISSOS OPERACIONAIS. Enquanto existir pendência aberta apontando pro agenda.id,
+// aquele registro NÃO é um compromisso confiável em NENHUMA tela — Painel, Agenda, rota, seletores de
+// horário, Compras. Antes só o Painel filtrava; qualquer outro consumidor da lista bruta `appointments`
+// continuava mostrando/permitindo agendar em cima de um compromisso fantasma. Correção de 25/07/2026.
+function compromissosOperacionais(appointments, inbox) {
+  const idsEscondidos = new Set(pendenciasRemarcacaoAbertas(inbox).map(({ meta }) => meta.agenda_origem_id).filter(Boolean));
+  return (appointments || []).filter((a) => !idsEscondidos.has(a.id));
+}
+
 async function criarPendenciaRemarcacao(db, args) {
-  const { agendaOrigemId, servicoId, clienteNome, tituloOriginal, cidadeOriginal, tipoOriginal, dataOriginal, horaOriginal, motivo, subestado, uploaded } = args;
-  // Idempotência: consulta fresca no banco (não confia em estado local) — dois cliques não podem abrir
-  // duas pendências pro mesmo compromisso.
-  if (agendaOrigemId) {
-    const { data: abertos } = await db.from("caixa_entrada").select("id,conversa").eq("processado", false);
-    const existente = (abertos || []).find((it) => (it.conversa || []).some((m) => m?.meta?.tipo_operacional === "remarcacao" && m?.meta?.agenda_origem_id === agendaOrigemId));
-    if (existente) return { id: existente.id, jaExistia: true };
-  }
+  const { agendaOrigemId, servicoId, clienteNome, tituloOriginal, cidadeOriginal, tipoOriginal, dataOriginal, horaOriginal, motivo } = args;
+  const motivoLimpo = (motivo || "").trim();
   const agora = new Date().toISOString();
-  const resumo = "Precisa remarcar: " + (clienteNome ? clienteNome + " · " : "") + tituloOriginal + (cidadeOriginal ? " · " + cidadeOriginal : "") + ". " + motivo;
-  const texto = (uploaded && uploaded.length) ? buildInboxPayload(uploaded, resumo) : resumo;
+  // Idempotência SEQUENCIAL — consulta fresca no banco antes de gravar, não confia em estado local. Isto NÃO
+  // é uma garantia contra concorrência real (duas abas gravando ao mesmo tempo podem escapar de um
+  // SELECT-antes-de-INSERT sem constraint no banco); cobre o caso real, que é duplo clique na mesma aba.
+  if (agendaOrigemId) {
+    const { data: abertos, error: buscaErr } = await db.from("caixa_entrada").select("id,conversa").eq("processado", false);
+    if (buscaErr) throw buscaErr;
+    const existente = (abertos || []).find((it) => (it.conversa || []).some((m) => m?.meta?.tipo_operacional === "remarcacao" && m?.meta?.agenda_origem_id === agendaOrigemId));
+    if (existente) {
+      // JÁ EXISTIA — não descarta motivo novo em silêncio: se o texto é diferente do último registrado,
+      // anexa como mensagem nova (histórico completo de tentativas). Se for o MESMO texto (duplo clique
+      // literal), não anexa nada — é isso que evita duas entradas de Histórico pro mesmo evento.
+      const msgs = existente.conversa || [];
+      const ultima = ultimaMetaRemarcacao(existente) || {};
+      const motivoRepetido = (ultima.motivo || "").trim() === motivoLimpo;
+      if (!motivoRepetido) {
+        const conversaNova = [...msgs, { de: "diego", tipo: "atualizacao_remarcacao", texto: motivoLimpo, em: agora, meta: { ...ultima, motivo: motivoLimpo, agenda_sucessora_id: null } }];
+        const { error: upErr } = await db.from("caixa_entrada").update({ conversa: conversaNova }).eq("id", existente.id); if (upErr) throw upErr;
+      }
+      return { id: existente.id, jaExistia: true, motivoRepetido };
+    }
+  }
+  const resumo = "Precisa remarcar: " + (clienteNome ? clienteNome + " · " : "") + tituloOriginal + (cidadeOriginal ? " · " + cidadeOriginal : "") + ". " + motivoLimpo;
   const meta = {
     tipo_operacional: "remarcacao", versao: 1,
     agenda_origem_id: agendaOrigemId || null, servico_id: servicoId || null,
-    subestado: subestado || "precisa_remarcar",
+    subestado: "precisa_remarcar", titulo_original: tituloOriginal || null,
     data_original: dataOriginal || null, hora_original: horaOriginal || null,
     tipo_original: tipoOriginal || null, cidade_original: cidadeOriginal || null,
-    motivo, revisar_em: proximoDiaUtil(hojeISO()), agenda_sucessora_id: null,
+    motivo: motivoLimpo, revisar_em: proximoDiaUtil(hojeISO()), agenda_sucessora_id: null,
   };
   const { data, error } = await db.from("caixa_entrada").insert({
-    texto, status: "novo", processado: false,
+    texto: resumo, status: "novo", processado: false,
     conversa: [{ de: "ia", tipo: "sistema", texto: "Pendência de remarcação criada pelo app.", em: agora, meta }],
   }).select("id").single();
   if (error) throw error;
-  return { id: data.id, jaExistia: false };
+  return { id: data.id, jaExistia: false, motivoRepetido: false };
+}
+// UPLOAD É O PASSO MAIS LENTO E MAIS PROPENSO A FALHAR (conexão ruim na estrada) — por isso vem DEPOIS da
+// pendência já existir, nunca antes. Se isto falhar, a pendência (a garantia real) já está de pé; só os
+// prints é que não anexaram, e quem chama trata isso como aviso, não como erro que desfaz o resto.
+async function anexarArquivosNaPendencia(db, pendenciaId, uploaded) {
+  if (!uploaded || !uploaded.length) return;
+  const { data: atual, error: leituraErr } = await db.from("caixa_entrada").select("conversa").eq("id", pendenciaId).single();
+  if (leituraErr) throw leituraErr;
+  const bloco = uploaded.map((img) => "[[TB_INBOX_IMG]]" + img.url + "\n[[TB_INBOX_FILE]]" + img.fileName).join("\n");
+  const conversaNova = [...(atual.conversa || []), { de: "diego", tipo: "anexo", texto: bloco, em: new Date().toISOString() }];
+  const { error } = await db.from("caixa_entrada").update({ conversa: conversaNova }).eq("id", pendenciaId);
+  if (error) throw error;
+}
+// RESOLVER quando existe DATA REAL combinada. Duas estratégias, decididas pelo estado ATUAL da origem (não
+// por suposição): se ela ainda está "planejado", nunca foi uma tentativa que aconteceu — é só remarcada NO
+// MESMO REGISTRO, sem criar linha nova. Se já está "feito", a origem foi mesmo tentada e encerrada; nasce um
+// compromisso NOVO vinculado ao serviço. Nos dois casos grava agenda_sucessora_id ANTES de marcar resolvida.
+async function resolverPendenciaComSucessor(db, { pendenciaId, agendaOrigemId, servicoId, data, hora, tipo, cidade, tituloNovo }) {
+  const { data: pend, error: leituraErr } = await db.from("caixa_entrada").select("id,conversa").eq("id", pendenciaId).single();
+  if (leituraErr) throw leituraErr;
+  const meta = ultimaMetaRemarcacao(pend);
+  if (!meta) throw new Error("Item não é uma pendência de remarcação em aberto.");
+  if (meta.agenda_sucessora_id) return { ok: true, jaResolvida: true, sucessoraId: meta.agenda_sucessora_id };
+  if (!data) throw new Error("Informe a data combinada antes de resolver.");
+
+  const { data: origem, error: origemErr } = agendaOrigemId ? await db.from("agenda").select("id,status").eq("id", agendaOrigemId).maybeSingle() : { data: null, error: null };
+  if (origemErr) throw origemErr;
+
+  let sucessoraId;
+  if (origem && origem.status === "planejado") {
+    // Nunca aconteceu (só foi remarcada antes da data chegar) — atualiza a própria linha, não cria outra.
+    const { error: upErr } = await db.from("agenda").update({
+      data, hora: tipo === "presencial" ? (hora || "09:00") : null, tipo: tipo || "remoto",
+      cidade: tipo === "presencial" ? (cidade || null) : null, status: "planejado",
+    }).eq("id", agendaOrigemId);
+    if (upErr) throw upErr;
+    sucessoraId = agendaOrigemId;
+  } else {
+    // Foi tentativa real (origem já "feito", ou não existe mais) — nasce um compromisso novo.
+    const { data: novo, error: novoErr } = await db.from("agenda").insert({
+      servico_id: servicoId || null, titulo: tituloNovo || meta.titulo_original || "Compromisso remarcado",
+      data, hora: tipo === "presencial" ? (hora || "09:00") : null, tipo: tipo || "remoto",
+      cidade: tipo === "presencial" ? (cidade || null) : null, status: "planejado",
+    }).select("id").single();
+    if (novoErr) throw novoErr;
+    sucessoraId = novo.id;
+    if (agendaOrigemId) { await db.from("historico").insert({ o_que: "Remarcado", por: "diego", detalhe: "Compromisso de " + (meta.data_original || "?") + " virou novo compromisso em " + data + " (agenda #" + sucessoraId + ")" }); }
+  }
+
+  // Grava a sucessora ANTES de resolver — se cair aqui, o compromisso já existe; só falta marcar a
+  // pendência como tratada, e uma nova tentativa de resolução vai achar agenda_sucessora_id preenchido
+  // (linha seguinte já devolve jaResolvida:true) em vez de duplicar.
+  const conversaNova = pend.conversa.map((m) => m === pend.conversa[pend.conversa.length - 1] && m?.meta?.tipo_operacional === "remarcacao"
+    ? { ...m, meta: { ...m.meta, agenda_sucessora_id: sucessoraId } } : m);
+  const { error: metaErr } = await db.from("caixa_entrada").update({ conversa: conversaNova }).eq("id", pendenciaId);
+  if (metaErr) throw metaErr;
+
+  const { error: resErr } = await db.from("caixa_entrada").update({ status: "resolvido", processado: true, processado_em: new Date().toISOString() }).eq("id", pendenciaId);
+  if (resErr) throw resErr;
+  return { ok: true, jaResolvida: false, sucessoraId };
+}
+// RESOLVER SEM SUCESSOR — só permitido quando o serviço chegou num estado terminal (entregue, perdido ou
+// pago). É a única exceção a "toda pendência precisa de compromisso novo": cliente desistiu, serviço
+// encerrou, não existe mais o que remarcar.
+async function resolverPendenciaTerminal(db, { pendenciaId, servicoId }) {
+  const { data: pend, error: leituraErr } = await db.from("caixa_entrada").select("id,conversa").eq("id", pendenciaId).single();
+  if (leituraErr) throw leituraErr;
+  const meta = ultimaMetaRemarcacao(pend);
+  if (!meta) throw new Error("Item não é uma pendência de remarcação em aberto.");
+  if (meta.agenda_sucessora_id) return { ok: true, jaResolvida: true };
+  if (!servicoId) throw new Error("Pendência sem serviço vinculado não pode encerrar como terminal.");
+  const { data: svc, error: svcErr } = await db.from("servicos").select("status").eq("id", servicoId).maybeSingle();
+  if (svcErr) throw svcErr;
+  if (!svc || !["entregue", "perdido", "pago"].includes(svc.status)) throw new Error("Serviço não está em estado terminal (entregue/perdido/pago) — não pode encerrar sem sucessor.");
+  const { error: resErr } = await db.from("caixa_entrada").update({ status: "resolvido", processado: true, processado_em: new Date().toISOString() }).eq("id", pendenciaId);
+  if (resErr) throw resErr;
+  return { ok: true, jaResolvida: false };
+}
+// EXCLUIR PENDÊNCIA OPERACIONAL É SEMPRE RECUSADO — Regra Nº 7 (nunca apagar) vale em dobro aqui: apagar uma
+// pendência aberta faz o cliente desaparecer de novo, exatamente o problema que este desenho existe pra
+// resolver. Chamado pelo botão genérico de excluir item da caixa antes de gravar o DELETE.
+function recusaSeForPendenciaAberta(item) {
+  const meta = ultimaMetaRemarcacao(item);
+  if (meta && !meta.agenda_sucessora_id) throw new Error("Isso é uma pendência de remarcação aberta — não pode ser excluída. Resolva com uma data nova ou encerre o serviço.");
 }
 const DIAS_SEMANA_MAP = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
 function proximaEntregaFornecedor(diasEntrega) {
@@ -614,6 +735,11 @@ function Home() {
   }, [db, notify]);
 
   const activeServices = useMemo(() => services.filter((service) => !["pago", "perdido"].includes(service.status)), [services]);
+  // COLEÇÃO CENTRAL — todo consumidor de "compromissos que existem de verdade" usa ISTO, nunca o estado
+  // bruto `appointments` diretamente. Correção de 25/07/2026: antes só o Painel escondia o card de um
+  // compromisso com pendência de remarcação aberta; Agenda, rota, Compras e o seletor de horário do
+  // "+ Adicionar" continuavam mostrando/permitindo agendar em cima de um compromisso fantasma.
+  const agendaVisivel = useMemo(() => compromissosOperacionais(appointments, inbox), [appointments, inbox]);
   const claudeQueue = useMemo(() => inbox.filter((item) => ["respondido", "novo"].includes(item.status || "novo")).sort((a, b) => {
     const priority = (value) => value === "respondido" ? 0 : 1;
     return priority(a.status) - priority(b.status) || new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
@@ -706,7 +832,7 @@ function Home() {
         if (error) throw error; service = data;
       }
       if (form.addAgenda) {
-        const occupied = appointments.filter((entry) => entry.data === form.due && entry.tipo === "presencial").map((entry) => entry.hora?.slice(0, 5));
+        const occupied = agendaVisivel.filter((entry) => entry.data === form.due && entry.tipo === "presencial").map((entry) => entry.hora?.slice(0, 5));
         const fallback = horariosParaTipo(form.due, form.agendaType, occupied)[0] || "18:00";
         const appointment = { titulo: `${customer.nome} — ${form.service.trim()}`, data: form.due, hora: form.time || fallback, cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType, status: "planejado", servico_id: service.id };
         const { data: linked } = await db.from("agenda").select("id").eq("servico_id", service.id).eq("status", "planejado").limit(1);
@@ -729,7 +855,7 @@ function Home() {
     if (demo) { await resolveInbox(item, "Compromisso criado na demonstração"); notify("Compromisso registrado.", "ok"); return; }
     setBusy(true);
     try {
-      const occupied = appointments.filter((entry) => entry.data === form.due && entry.tipo === "presencial").map((entry) => entry.hora?.slice(0, 5));
+      const occupied = agendaVisivel.filter((entry) => entry.data === form.due && entry.tipo === "presencial").map((entry) => entry.hora?.slice(0, 5));
       const fallback = horariosParaTipo(form.due, form.agendaType, occupied)[0] || "18:00";
       const payload = { titulo: form.service.trim(), data: form.due, hora: form.time || fallback, cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType, status: "planejado" };
       const { data: same } = await db.from("agenda").select("id").eq("titulo", payload.titulo).eq("data", payload.data).eq("status", "planejado").limit(1);
@@ -774,6 +900,8 @@ function Home() {
   }
 
   async function deleteInboxItem(item) {
+    // Pendência de remarcação aberta nunca pode ser excluída — apagar faz o cliente desaparecer de novo.
+    try { recusaSeForPendenciaAberta(item); } catch (e) { notify(e.message, "error"); return; }
     if (demo) { setInbox((items) => items.filter((entry) => entry.id !== item.id)); setSelectedId(null); notify("Na demonstração não salva.", "info"); return; }
     const { error } = await db.from("caixa_entrada").delete().eq("id", item.id);
     if (error) notify("Erro: " + error.message, "error"); else { setSelectedId(null); await loadAll(); notify("Item excluído.", "ok"); }
@@ -865,15 +993,15 @@ function Home() {
         </section>
         <section className="triage-column">
           {!selected && <div className="triage-welcome"><div className="big-orb">◎</div><p className="kicker">UMA TAREFA POR VEZ</p><h2>{working ? "Retome a triagem em andamento" : claudeQueue.length ? "Abra o próximo item da fila" : "Nada pede ação agora"}</h2><p>O conteúdo original, as buscas e o formulário ficam juntos para evitar releitura e cliques errados.</p>{working ? <button className="primary" onClick={() => setSelectedId(working.id)}>Retomar</button> : claudeQueue[0] && <button className="primary" onClick={() => claim(claudeQueue[0])}>Pegar próximo item</button>}</div>}
-          {selected && <TriagePanel item={selected} parsed={parsedSelected} mode={mode} form={form} updateForm={updateForm} customers={customers} duplicateCustomers={duplicateCustomers} services={services} appointments={appointments} finances={finances} busy={busy} reply={reply} setReply={setReply} onClaim={() => claim(selected)} onRelease={() => release(selected)} onAnswer={() => answer(selected)} onCustomer={() => finishCustomer(selected)} onAgenda={() => finishAgenda(selected)} onFinance={() => finishFinance(selected)} onAsk={() => askDiego(selected)} onEdit={(texto) => editInboxNote(selected, texto)} onDelete={() => deleteInboxItem(selected)} />}
+          {selected && <TriagePanel item={selected} parsed={parsedSelected} mode={mode} form={form} updateForm={updateForm} customers={customers} duplicateCustomers={duplicateCustomers} services={services} appointments={agendaVisivel} finances={finances} busy={busy} reply={reply} setReply={setReply} onClaim={() => claim(selected)} onRelease={() => release(selected)} onAnswer={() => answer(selected)} onCustomer={() => finishCustomer(selected)} onAgenda={() => finishAgenda(selected)} onFinance={() => finishFinance(selected)} onAsk={() => askDiego(selected)} onEdit={(texto) => editInboxNote(selected, texto)} onDelete={() => deleteInboxItem(selected)} />}
         </section>
       </div>}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={appointments} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onOpenFicha={setFichaId} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onOpenFicha={setFichaId} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
-      {tab === "agenda" && <AgendaView appointments={appointments} services={services} finances={finances} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
+      {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} finances={finances} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} services={services} onVerAPagar={() => setTab("futuro")} />}
-      {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={appointments} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
+      {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "vales" && <ValesView finances={finances} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
@@ -884,7 +1012,7 @@ function Home() {
     {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} />}
     {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
-    {addAgendaOpen && <AddAgendaModal appointments={appointments} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
+    {addAgendaOpen && <AddAgendaModal appointments={agendaVisivel} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
   </div>;
 }
 
@@ -1183,13 +1311,9 @@ const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial"
 function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, db, demo, notify, onRotinaChanged, onOpenQueue, onConcluir, onReschedule, onSemProximaAcao, onOpenFicha }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
-  // PENDÊNCIA DE REMARCAÇÃO ESCONDE O COMPROMISSO ORIGINAL DA LISTA. Desenho de 25/07/2026: enquanto existir
-  // uma pendência aberta apontando pra este agenda.id, ele não é um compromisso confiável — pode estar
-  // "planejado" no banco (compromisso futuro desmarcado antes de acontecer, sem DDL pra status novo) ou
-  // "feito" só como encerramento. Nos dois casos ele sai da vista normal; quem mostra é a seção própria.
-  const idsComPendencia = new Set((inbox || []).flatMap((it) => (it.conversa || [])
-    .filter((m) => m?.meta?.tipo_operacional === "remarcacao").map((m) => m.meta.agenda_origem_id)).filter(Boolean));
-  const dueAll = appointments.filter((entry) => entry.data <= today && !idsComPendencia.has(entry.id)); const futurosAll = appointments.filter((entry) => entry.data > today && !idsComPendencia.has(entry.id)); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
+  // `appointments` já chega filtrado pela coleção central (compromissosOperacionais, calculada uma vez na
+  // raiz) — compromisso com pendência de remarcação aberta nunca chega até aqui. Só resta separar por data.
+  const dueAll = appointments.filter((entry) => entry.data <= today); const futurosAll = appointments.filter((entry) => entry.data > today); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
   const porTipo = (list) => filtroTipo === "todos" ? list : list.filter((entry) => (entry.tipo || "presencial") === filtroTipo);
   const due = porTipo(dueAll); const futuros = porTipo(futurosAll);
   const irParaVencendo = () => { if (dueAll.length === 0) return; setFiltroTipo("todos"); document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
@@ -1200,10 +1324,10 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       // "PRECISA REMARCAR" — Fase 1 do desenho de 25/07/2026. Nenhuma data aqui é combinada; é só visibilidade
       // enquanto ninguém decidiu a próxima. Vem logo no topo porque é exatamente o tipo de coisa que não pode
       // ficar invisível esperando uma sessão rodar.
-      const pend = (inbox || []).map((it) => {
-        const msg = (it.conversa || []).find((m) => m?.meta?.tipo_operacional === "remarcacao");
-        return msg ? { item: it, meta: msg.meta } : null;
-      }).filter(Boolean);
+      // Usa o MESMO helper que decide o que sai da agenda (pendenciasRemarcacaoAbertas) — pendência já
+      // resolvida (com agenda_sucessora_id) não aparece mais aqui, senão mostraria cliente já remarcado
+      // como se ainda estivesse esperando.
+      const pend = pendenciasRemarcacaoAbertas(inbox);
       if (!pend.length) return null;
       const ordenado = [...pend].sort((a, b) => {
         const av = (a.meta.revisar_em || "9999") <= today ? 0 : 1;
@@ -1485,26 +1609,37 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
     if (demo) { notify("Anotado (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() }); return; }
     setBusy(true);
     try {
-      const uploaded = files.length ? await uploadFiles() : [];
-      // PENDÊNCIA, NÃO COMPROMISSO INVENTADO — desenho de 25/07/2026 (Diego não gostou de ver na agenda uma
-      // data que ninguém combinou; ver decisao-design-reagendamento.md). Nasce PRIMEIRO, antes de qualquer
-      // outra gravação: se o resto falhar, o cliente continua visível na fila "Precisa remarcar".
+      // ORDEM (corrigida em 25/07/2026 após revisão): a pendência nasce ANTES de qualquer upload ou
+      // alteração destrutiva na agenda — upload é o passo mais lento e mais propenso a falhar (conexão
+      // ruim na estrada), e se ele travasse ANTES da pendência existir, o cliente ficaria sem nenhuma
+      // garantia de visibilidade até o Diego tentar de novo.
       const pend = await criarPendenciaRemarcacao(db, {
         agendaOrigemId: appt.id, servicoId: appt.servico_id || null,
         clienteNome: svc?.clientes?.nome || null, tituloOriginal: appt.titulo,
         cidadeOriginal: appt.cidade || null, tipoOriginal: appt.tipo || null,
         dataOriginal: appt.data, horaOriginal: appt.hora || null,
-        motivo: pendente.trim(), subestado: "precisa_remarcar", uploaded,
+        motivo: pendente.trim(),
       });
-      await db.from("historico").insert({ o_que: `"${appt.titulo}": não concluído`, por: "diego", detalhe: "Ficou pendente: " + pendente.trim() + (pend.jaExistia ? " (pendência já existia)" : "") });
-      if (appt.servico_id) {
-        await db.from("servicos").update({ proxima_acao: "Remarcar — " + pendente.trim().slice(0, 140), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
+      // Histórico só se o motivo for de fato novo — duplo clique com o MESMO texto não duplica o registro.
+      if (!pend.motivoRepetido) {
+        const { error: hErr } = await db.from("historico").insert({ o_que: `"${appt.titulo}": não concluído`, por: "diego", detalhe: "Ficou pendente: " + pendente.trim() });
+        if (hErr) throw hErr;
       }
-      // Só encerra como "feito" quando a data já tinha chegado (hoje ou passado) — aí é resultado verdadeiro.
-      // Se ainda era futuro quando foi desmarcado, fica "planejado" no banco mesmo: forçar "feito" mentiria a
-      // data (o trigger empurraria pra hoje) sobre algo que não aconteceu. A pendência já esconde o card.
+      if (appt.servico_id) {
+        const { error: sErr } = await db.from("servicos").update({ proxima_acao: "Remarcar — " + pendente.trim().slice(0, 140), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
+        if (sErr) throw sErr;
+      }
+      // SÓ AGORA a alteração destrutiva na agenda original. "Feito" só quando a data já tinha chegado (hoje
+      // ou passado) — resultado verdadeiro. Se ainda era futuro quando foi desmarcado, fica "planejado" no
+      // banco mesmo: forçar "feito" mentiria a data (o trigger empurraria pra hoje) sobre algo que não
+      // aconteceu. resolverPendenciaComSucessor decide o resto quando a data nova existir.
       if (appt.data <= hojeISO()) {
         const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", appt.id); if (error) throw error;
+      }
+      // Upload por último, best-effort: a garantia real (a pendência) já está de pé.
+      if (files.length) {
+        try { const uploaded = await uploadFiles(); await anexarArquivosNaPendencia(db, pend.id, uploaded); }
+        catch (upErr) { notify("Anotado, mas o(s) print(s) não anexaram: " + upErr.message, "error"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() }); return; }
       }
       notify("Anotado. Foi pra \"Precisa remarcar\" — o Claude organiza a nova data quando processar.", "ok");
       onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: pendente.trim() });
@@ -1556,41 +1691,53 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
     const alvoServicoDemo = item.tipoItem === "agenda" ? item.servico_id : item.id;
     if (demo) { notify("Anotado (demo).", "ok"); onDone({ agendaId: (item.tipoItem === "agenda" && ehReagendar) ? item.id : null, servicoId: alvoServicoDemo || null, proximaAcao: null }); return; }
     setBusy(true);
-    try {
-      const uploaded = [];
+    const alvoServico = item.tipoItem === "agenda" ? item.servico_id : item.id;
+    const fazerUpload = async () => {
+      const up = [];
       for (const f of files) {
         const path = `caixa-entrada/${Date.now()}_${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         const { error: uploadError } = await db.storage.from("fotos-servicos").upload(path, f); if (uploadError) throw uploadError;
         const { data, error } = await db.storage.from("fotos-servicos").createSignedUrl(path, 60 * 60 * 24 * 365); if (error) throw error;
-        uploaded.push({ url: data.signedUrl, fileName: f.name });
+        up.push({ url: data.signedUrl, fileName: f.name });
       }
-      const alvoServico = item.tipoItem === "agenda" ? item.servico_id : item.id;
+      return up;
+    };
+    try {
       if (item.tipoItem === "agenda" && ehReagendar) {
-        // PENDÊNCIA, NÃO COMPROMISSO INVENTADO — mesmo desenho do doParcial (ConcluirModal). Ver Regra Nº 12.
+        // ORDEM: pendência primeiro (garantia de visibilidade), upload por último (mais lento, mais
+        // propenso a falhar) — mesmo raciocínio do doParcial (ConcluirModal). Ver Regra Nº 12.
         const pend = await criarPendenciaRemarcacao(db, {
           agendaOrigemId: item.id, servicoId: alvoServico,
           clienteNome: item.cliente || null, tituloOriginal: item.titulo,
           cidadeOriginal: item.cidade || null, tipoOriginal: item.tipo || null,
           dataOriginal: item.data || null, horaOriginal: item.hora || null,
-          motivo: texto.trim(), subestado: "precisa_remarcar", uploaded,
+          motivo: texto.trim(),
         });
-        await db.from("historico").insert({ o_que: `Reagendar: ${item.titulo}`, por: "diego", detalhe: texto.trim() + (pend.jaExistia ? " (pendência já existia)" : "") });
-        if (alvoServico) {
-          await db.from("servicos").update({ proxima_acao: "Remarcar — " + texto.trim().slice(0, 140), atualizado_em: new Date().toISOString() }).eq("id", alvoServico);
+        if (!pend.motivoRepetido) {
+          const { error: hErr } = await db.from("historico").insert({ o_que: `Reagendar: ${item.titulo}`, por: "diego", detalhe: texto.trim() });
+          if (hErr) throw hErr;
         }
-        // Só encerra como "feito" quando a data já tinha chegado — ver mesmo raciocínio no doParcial.
+        if (alvoServico) {
+          const { error: sErr } = await db.from("servicos").update({ proxima_acao: "Remarcar — " + texto.trim().slice(0, 140), atualizado_em: new Date().toISOString() }).eq("id", alvoServico);
+          if (sErr) throw sErr;
+        }
         if (item.data && item.data <= hojeISO()) {
           const { error } = await db.from("agenda").update({ status: "feito" }).eq("id", item.id); if (error) throw error;
+        }
+        if (files.length) {
+          try { const uploaded = await fazerUpload(); await anexarArquivosNaPendencia(db, pend.id, uploaded); }
+          catch (upErr) { notify("Anotado, mas o(s) print(s) não anexaram: " + upErr.message, "error"); onDone({ agendaId: item.id, servicoId: alvoServico || null, proximaAcao: null }); return; }
         }
         notify("Anotado. Foi pra \"Precisa remarcar\" — o Claude organiza a nova data quando processar.", "ok");
         onDone({ agendaId: item.id, servicoId: alvoServico || null, proximaAcao: null });
       } else {
         // "Concluir lead" — caminho hoje sem botão que o chame, comportamento anterior preservado.
+        const uploaded = await fazerUpload();
         const ref = `(serviço #${item.id})`;
         const nota = `Concluir lead: ${item.titulo}. O que aconteceu: ${texto.trim()}. ${ref}`;
         const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
         if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
-        await db.from("historico").insert({ o_que: `Concluir lead: ${item.titulo}`, por: "diego", detalhe: texto.trim() });
+        const { error: hErr2 } = await db.from("historico").insert({ o_que: `Concluir lead: ${item.titulo}`, por: "diego", detalhe: texto.trim() }); if (hErr2) throw hErr2;
         notify("Anotado. Saiu da lista — o Claude cuida disso quando você chamar.", "ok");
         onDone({ agendaId: null, servicoId: alvoServico || null, proximaAcao: null });
       }
