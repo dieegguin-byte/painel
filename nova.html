@@ -1382,22 +1382,25 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
     if (demo) { notify("Compra lançada (demo).", "ok"); doTotal(); return; }
     setBusy(true);
     try {
+      // GASTO EM DOBRO — corrigido em 25/07/2026. Antes, com DOIS OU MAIS materiais pendentes neste
+      // compromisso, o código caía no `else` e INSERIA uma saída nova, deixando as antigas na lista: o Diego
+      // pagava uma vez e o app registrava duas. Agora sempre quita um pendente (o primeiro da lista) e só
+      // insere quando realmente não existe nenhum. Os outros continuam pendentes pra ele fechar um por um.
       const pendentes = (materiais || []);
-      if (pendentes.length === 1) {
-        // Já estava na lista de compras: vira gasto pago, não duplica lançamento.
+      if (pendentes.length >= 1) {
         const { error } = await db.from("financeiro").update({ status: "pago", valor, fornecedor_id: fornecedorId, data: hojeISO() }).eq("id", pendentes[0].id); if (error) throw error;
+        if (pendentes.length > 1) notify(`Lançado. Ainda faltam ${pendentes.length - 1} material(is) deste compromisso.`, "ok");
       } else {
         const { error } = await db.from("financeiro").insert({
           tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MATERIAL, valor, status: "pago", data: hojeISO(),
           descricao: appt.titulo, fornecedor_id: fornecedorId, servico_id: appt.servico_id || null, agenda_id: appt.id,
         }); if (error) throw error;
-        // Mais de um material pendurado no mesmo compromisso: os outros continuam na lista, ele fecha um por um.
-        if (pendentes.length > 1) notify(`Lançado. Ainda tem ${pendentes.length} material(is) na lista desse compromisso.`, "ok");
       }
-      // Mesma ligação do botão "marcar comprado" da aba Compras: material na mão, o serviço sai de agendado
-      // e entra em produção. Este é o caminho que ele usa na rua, então precisa se comportar igual.
+      // Material na mão => o serviço anda. Se ESTA gravação falhar, o Diego precisa saber: antes o erro era
+      // engolido e a tela dizia "comprado" com o serviço parado em agendado.
       if (appt.servico_id && svc && svc.status === "agendado") {
-        await db.from("servicos").update({ status: "producao", atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
+        const { error: sErr } = await db.from("servicos").update({ status: "producao", atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
+        if (sErr) notify("Compra lançada, mas o serviço NÃO entrou em produção: " + sErr.message, "error");
       }
       setBusy(false); doTotal();
     } catch (e) { notify("Erro ao lançar a compra: " + e.message, "error"); setBusy(false); }
@@ -1419,11 +1422,10 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
     setBusy(true);
     try {
       const uploaded = files.length ? await uploadFiles() : [];
-      const { error } = await db.from("agenda").update({ status: "feito", data: appt.data > hojeISO() ? hojeISO() : appt.data }).eq("id", appt.id); if (error) throw error;
-      // O PRÓXIMO PASSO NASCE AQUI, NÃO NA PRÓXIMA SESSÃO. Antes o parcial só deixava recado na caixa e a
-      // data nova dependia do Claude rodar — um cliente pediu reagendamento 4x e ficou 8 dias invisivel,
-      // porque compromisso fechado sem sucessor não aparece em lugar nenhum (o app só carrega 'planejado').
-      // O Claude ainda refina a data depois lendo a caixa; o que não pode é o cliente ficar sem data.
+      // O PRÓXIMO PASSO NASCE AQUI, NÃO NA PRÓXIMA SESSÃO — e nasce ANTES de fechar o antigo. Ordem invertida
+      // em 25/07/2026: se a criação do sucessor falhar, o compromisso antigo tem que continuar planejado, senão
+      // o cliente some da tela (o app só carrega 'planejado'). Já aconteceu de um cliente ficar 8 dias
+      // invisível assim. O Claude ainda refina a data depois lendo a caixa.
       let novoId = null, proxData = null;
       if (appt.servico_id) {
         proxData = proximoDiaUtil(hojeISO());
@@ -1433,6 +1435,9 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
           tipo: appt.tipo || "remoto", cidade: appt.tipo === "presencial" ? appt.cidade : null, status: "planejado",
         }).select("id").single(); if (agErr) throw agErr;
         novoId = novo?.id || null;
+      }
+      const { error } = await db.from("agenda").update({ status: "feito", data: appt.data > hojeISO() ? hojeISO() : appt.data }).eq("id", appt.id); if (error) throw error;
+      if (appt.servico_id) {
         const { error: sErr } = await db.from("servicos").update({ proxima_acao: pendente.trim(), atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr;
       }
       // A nota vai DEPOIS e leva o id do compromisso novo. A ordem importa: a INSTRUÇÃO vem na PRIMEIRA linha,
@@ -1502,11 +1507,12 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
         const { data, error } = await db.storage.from("fotos-servicos").createSignedUrl(path, 60 * 60 * 24 * 365); if (error) throw error;
         uploaded.push({ url: data.signedUrl, fileName: f.name });
       }
-      if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito", data: item.data && item.data > hojeISO() ? hojeISO() : item.data }).eq("id", item.id); if (error) throw error; }
       const alvoServico = item.tipoItem === "agenda" ? item.servico_id : item.id;
-      // REAGENDAR JÁ MARCA A DATA NOVA. Fechar o compromisso antigo e esperar o Claude criar o próximo fazia o
-      // cliente desaparecer da tela (caso real: 4 pedidos de reagendamento, 8 dias invisivel). O Claude
-      // ainda ajusta a data depois lendo a explicação na caixa — mas nunca mais fica sem data nenhuma.
+      // ORDEM INVERTIDA em 25/07/2026. Antes fechava o compromisso antigo PRIMEIRO e só depois criava o
+      // sucessor — se a criação falhasse, o antigo já estava fechado e o cliente sumia da agenda (foi
+      // exatamente o caso do cliente que pediu reagendamento 4x e ficou 8 dias invisível). Agora o sucessor
+      // nasce antes; o antigo só fecha depois que ele existe. Falhando no meio, nada se perde: o
+      // compromisso antigo continua planejado e o Diego tenta de novo.
       let novoId = null, proxData = null;
       if (item.tipoItem === "agenda" && ehReagendar && alvoServico) {
         proxData = proximoDiaUtil(hojeISO());
@@ -1517,7 +1523,11 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
         }).select("id").single(); if (agErr) throw agErr;
         novoId = novo?.id || null;
       }
-      if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: ehReagendar ? item.titulo : null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
+      if (item.tipoItem === "agenda" && ehReagendar) { const { error } = await db.from("agenda").update({ status: "feito", data: item.data && item.data > hojeISO() ? hojeISO() : item.data }).eq("id", item.id); if (error) throw error; }
+      // A próxima ação passa a ser a EXPLICAÇÃO que ele escreveu, não o título velho do compromisso. Antes,
+      // "ele quer amanhã 13h" era descartado e a ficha continuava com o texto antigo — a informação que
+      // importava sumia justamente na hora em que ele parou pra escrever.
+      if (alvoServico) { const { error: sErr } = await db.from("servicos").update({ proxima_acao: ehReagendar ? texto.trim().slice(0, 150) : null, atualizado_em: new Date().toISOString() }).eq("id", alvoServico); if (sErr) throw sErr; }
       // Nota por último, com a INSTRUÇÃO NA PRIMEIRA LINHA (bloco fixo) — instrução no fim do texto passa
       // batido. É o que garante que a sessão ajuste o compromisso certo em vez de criar outro. Regra Nº 12.
       const notaFinal = cabecalhoAjusteDeData(novoId, proxData, texto.trim()) + nota;
@@ -1803,7 +1813,10 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
         const svc = (services || []).find((s) => s.id === alvo);
         if (svc && svc.status === "agendado") {
           const { error: sErr } = await db.from("servicos").update({ status: "producao", atualizado_em: new Date().toISOString() }).eq("id", alvo);
-          if (!sErr) virou = true;
+          // Falha aqui não pode passar batido: a compra fica paga e o serviço parado em agendado, com a
+          // tela dizendo "comprado". Melhor avisar do que fingir que deu certo.
+          if (sErr) notify("Compra registrada, mas o serviço NÃO entrou em produção: " + sErr.message, "error");
+          else virou = true;
         }
       }
       notify(virou ? "Comprado. O serviço entrou em produção." : "Marcado como comprado.", "ok"); setConfirmando(null); await onChanged();
@@ -1833,6 +1846,9 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
       const { data, error } = await db.from("agenda").insert({
         titulo: plano.rotulo, data: plano.data, hora: plano.hora, tipo: plano.tipo,
         cidade: plano.tipo === "presencial" ? forn.cidade : null, local: plano.tipo === "presencial" ? forn.cidade : null,
+        // servico_id faltava aqui: o compromisso nascia solto do serviço, então não aparecia na ficha do
+        // cliente nem contava como material daquele trabalho. Os outros caminhos de compra já amarravam.
+        servico_id: item.servico_id || null,
         status: "planejado",
       }).select("id").single();
       if (error) throw error;
