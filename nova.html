@@ -106,6 +106,7 @@ const SUPABASE_KEY = "sb_publishable_kGmPlLLQdFSxdslH6Y9f2w_Cuox7hFm";
 const emptyForm = {
   kind: "cliente", customerId: "", name: "", phone: "", city: "", address: "", service: "", responsavel: "",
   serviceStatus: "lead", priority: "media", nextAction: "Responder o cliente e confirmar os detalhes", due: "", value: "",
+  precisaMaterial: true, fornecedorId: "",
   addAgenda: false, agendaType: "remoto", time: "", financeType: "saida", financeStatus: "a_pagar", financeScope: "empresa",
   question: "", checkedCustomers: false, checkedAgenda: false, checkedFinance: false,
 };
@@ -114,6 +115,7 @@ const statusLabel = {
   novo: "Novo", em_processamento: "Claude trabalhando", aguardando_voce: "Aguardando você", respondido: "Respondido",
   lead: "Novo lead", orcamento: "Orçamento", agendado: "Agendado", producao: "Em produção", entregue: "Entregue", pago: "Pago", perdido: "Perdido",
 };
+const STATUS_VIVOS = ["lead", "orcamento", "agendado", "producao"];
 
 const demoInbox = [
   { id: "cx-101", texto: "Oi, quero reformar meu sofá retrátil. Sou Mariana, moro no Jardim Ingá. Pode fazer orçamento? Meu WhatsApp é (61) 90000-0000.", status: "respondido", conversa: [{ de: "ia", texto: "Você prefere visita presencial ou enviar as medidas?", em: new Date().toISOString() }, { de: "diego", texto: "Ela quer visita presencial amanhã à tarde.", em: new Date().toISOString() }], criado_em: "2026-07-10T10:20:00Z", processado: false },
@@ -261,17 +263,20 @@ async function sha256(txt) {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt));
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+function novoIdLocal() {
+  return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+}
 
 const SECAO_LABEL = { empresa: "Sobre a empresa", como_agir: "Como a IA deve agir", regras: "Regras invioláveis" };
 const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - REGRA Nº 1 (antes de qualquer decisão): todo item da caixa que tem print/imagem, ABRIR e LER o print ANTES de criar ficha, decidir ou perguntar ao Diego. O print quase sempre traz nome, telefone e cidade do cliente (tela de contato do WhatsApp) — nunca pular essa leitura.
-- REGRA Nº 2: todo "Reagendar" ou "Concluir parcial" que representa um compromisso real (visita, retirada, ligação marcada, cobrança agendada) tem que virar uma linha na tabela agenda com data (hora quando fizer sentido), nunca só um texto em servicos.proxima_acao. Só atualizar proxima_acao sozinho quando NÃO existe nenhuma ação agendável (ex: aguardar resposta espontânea do cliente sem prazo certo). Lead fechado sem data marcada (ex: preço combinado mas sem dia de retirada) também precisa de um compromisso remoto tipo "Combinar dia de X", nunca ficar só como texto solto — Painel e Agenda só leem a tabela agenda, texto sozinho em proxima_acao não aparece em compromisso nenhum.
+- REGRA Nº 2: Agenda guarda somente compromisso com data realmente decidida. "Aguardar resposta", "precisa remarcar" e "combinar um dia" ficam visíveis em caixa_entrada e em servicos.proxima_acao, sem data inventada. Quando cliente ou Diego decidirem uma data, resolver pela operação central de remarcação e só então gravar Agenda. Data interna de revisão não é promessa ao cliente.
 - REGRA Nº 3: quando o Diego acabou de mandar mensagem/cobrança pro cliente (ex: "mandei mensagem, ainda não visualizou", "cobrei a resposta dela"), NÃO marcar novo follow-up pra hoje mesmo — dar pelo menos ~24h de margem pra ela responder antes de agendar cobrar de novo. Só voltar a cobrar antes disso se o próprio Diego pedir explicitamente urgência.
 - REGRA Nº 4: todo compromisso presencial (entrega, compra+entrega, retirada, visita — qualquer coisa que exija ele estar fisicamente no lugar, não resolve por ligação/WhatsApp) precisa ter uma HORA definida, mesmo sendo tarefa pessoal/fornecedor e mesmo sendo na própria Luziânia. Nunca deixar hora em branco num presencial — só remoto (ligar, mandar mensagem, cobrar) pode ficar sem hora.
 - REGRA Nº 5: toda vez que o Diego falar que retirou pró-labore (ex: "peguei 100 reais de pró-labore"), lançar automaticamente TRÊS lançamentos no financeiro: (1) o valor como SAÍDA escopo "empresa", categoria "Retirada de pró-labore" (o dinheiro sai do caixa da empresa); (2) o mesmo valor como ENTRADA escopo "pessoal", categoria "Pró-labore" (entra no bolso pessoal dele — é a base do dízimo, e a aba Pró-labore é uma vista dessas entradas); (3) 10% do valor como SAÍDA escopo "pessoal", categoria "Dízimo". Pró-labore NÃO é um escopo próprio (é categoria dentro de pessoal) — nunca usar escopo "pro_labore" em lançamento novo. Regra fixa confirmada pelo Diego (16/07/2026).
 - REGRA Nº 6: ao criar ficha de cliente/serviço a partir de print ou nota, se algum dado essencial (nome, telefone, cidade, valor) estiver ambíguo, ilegível ou incerto — NÃO adivinhar e lançar. Perguntar ao Diego pra confirmar antes de gravar. Só lançar direto quando o dado estiver claro no print/texto.
 - REGRA Nº 7: quando o Diego disser "remove"/"tira"/"pode remover" sobre um lead (ex: parou de responder, não vale mais insistir), NUNCA excluir o registro. Mudar o status do serviço para "perdido" (mantém o histórico, some da contagem de ativos). Todo serviço ativo (lead/orcamento/agendado/producao) é OBRIGADO a ter prazo preenchido (travado no banco, constraint servicos_ativo_precisa_prazo) — nunca tentar gravar serviço ativo sem prazo, vai dar erro.
-- REGRA Nº 8: compra de material NUNCA entra como saída solta no financeiro. Toda compra de insumo (tecido, espuma, PVC, pés, linha, cola, percinta) é lançada com categoria "Material", escopo "empresa", SEMPRE com fornecedor_id preenchido (o fornecedor cadastrado que vendeu) e, quando o material foi comprado pra um trabalho específico, também com servico_id (o serviço que consumiu). É isso que faz a aba Compras mostrar gasto por mês, por fornecedor e a margem real de cada serviço. Se o material foi pra estoque geral, deixar servico_id vazio — mas fornecedor_id nunca. Combustível, almoço e vale NÃO são material: continuam nas categorias próprias. Material que ainda vai ser comprado entra com status "a_pagar" (lista de compras, não mexe no caixa) e só vira "pago" quando o Diego marcar como comprado no app.
+- REGRA Nº 8: compra de material NUNCA entra como saída solta no financeiro. Toda compra de insumo (tecido, espuma, PVC, pés, linha, cola, percinta) é lançada com categoria "Material", escopo "empresa", SEMPRE com fornecedor_id preenchido e, quando for para um trabalho específico, também com servico_id. Material que ainda vai ser comprado entra como "a_pagar". "Pedi", "encomendei" ou "paguei e vai chegar" significa material em trânsito: pode virar pago no Financeiro, mas NÃO inicia produção. Só "busquei", "trouxe", "chegou" ou "material está comigo" significa material em mãos e permite agendado virar producao. Diego ou Claude podem registrar o fato, mas ambos usam a mesma operação central tipada.
 - REGRA Nº 9 (CORRIGIDA em 25/07/2026 pelo Diego: "todos vales já saem na hora"): vale é dinheiro que SAI NA HORA — Pix ou dinheiro na mão pro profissional. Lançar SEMPRE categoria "Vale", escopo "empresa", status "pago" e data do dia em que foi entregue: o caixa tem que sentir na hora. O que fica pendente NÃO é o pagamento, é o DESCONTO — na hora de pagar aquele profissional pelo serviço, o valor do vale sai do que ele tem a receber. Marcar "abatido" na aba Vales só acrescenta o prefixo [ABATIDO] na descrição e NÃO mexe no status nem no caixa; se mexesse, o mesmo dinheiro sairia duas vezes. Vale pendente = categoria Vale sem o prefixo [ABATIDO]. A versão anterior desta regra dizia o contrário (lançar como "a_pagar" e virar saída ao abater) e por isso 6 vales somando R$465,70 ficaram fora do caixa com o dinheiro já tendo saído.
 - REGRA Nº 10: gasto que ainda vai sair (parcela de cartão, aluguel, conta fixa) NÃO é saída paga. Lançar com status "a_pagar" e o campo data = DIA DO VENCIMENTO, um lançamento por parcela (ex: 4x de R$110 vira 4 linhas, 10/08, 10/09, 10/10, 10/11). Assim aparece na aba "A pagar" no mês em que vai pesar e o saldo do caixa só muda quando o Diego marcar como pago. Nunca jogar o valor cheio de um parcelamento como saída de hoje.
 - REGRA Nº 11: a identidade de um cliente é o TELEFONE, nunca o nome. Nome se repete no cadastro real (ja aconteceu de quatro nomes se repetirem no cadastro) — nunca concluir que são duas pessoas diferentes só porque o nome bate, nem que são a mesma só porque o nome é igual. Antes de criar cliente novo, procurar pelo telefone. E telefone com o tamanho certo NÃO quer dizer telefone certo: comparar o número pelo conjunto de dígitos ORDENADO contra os já cadastrados — se bater com alguém, é a mesma pessoa com erro de digitação, não cliente novo. Validação que dá pra resolver sozinho sem perguntar ao Diego: celular brasileiro é 9 + 8 dígitos e o primeiro desses 8 é sempre 6, 7, 8 ou 9 — número em que esse dígito é 2, por exemplo, é inválido de cara, então dá pra saber qual dos dois cadastros duplicados está errado. Já aconteceu de um mesmo cliente entrar duas vezes na mesma cidade com o número digitado fora de ordem: os dois passavam na checagem de 13 dígitos e só o formato denunciava qual era o certo.
@@ -288,7 +293,73 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - Nunca excluir ficha, foto, serviço ou lançamento sem confirmação humana.
 - Antes de criar cliente, procurar telefone existente para evitar duplicidade.
 - Alterações de valor, pagamento, prazo e status devem ser resumidas ao usuário.
-- No modo Claude, nunca mexer no Financeiro nem excluir nada — isso é do Diego.`;
+- Claude pode organizar Financeiro, Agenda e Serviço somente pelas operações tipadas expostas em window.TB_OPERACOES. Nunca criar outro cliente Supabase, nunca chamar auth.setSession e nunca repetir manualmente as alterações de uma cadeia em tabelas separadas.
+- No modo Claude, nunca excluir nada. Botões críticos genéricos podem continuar bloqueados: o caminho autorizado é a operação tipada, idempotente e verificável.`;
+
+// INSTRUÇÕES PARA OS DOIS CHATS. Ficam fora do template literal das regras para poderem ser copiadas sem
+// risco de uma crase ou interpolação quebrar o arquivo inteiro.
+const PROTOCOLO_CHAT_OPERACAO = [
+  "PROTOCOLO DO CHAT QUE ESCREVE O DOCUMENTO OPERACAO BAHIA",
+  "",
+  "1. Diego fala naturalmente. Nunca peça que ele preencha formulario, escolha codigo ou digite identificador. O chat cria os identificadores.",
+  "2. Cada documento de entrada recebe TIPO_DOCUMENTO: ENTRADA_DO_DIA, PROTOCOLO: OB-1, um LOTE estavel e DIA_RELATADO.",
+  "3. Cada fato real recebe uma referencia E01, E02, E03. O identificador completo e LOTE mais referencia.",
+  "4. Um fato aparece uma unica vez. Se afetar Logistica e Financeiro, registrar como um evento com duas consequencias. Em outra secao escrever somente REF E01.",
+  "5. Entrega com recebimento do mesmo servico e um evento unico. Entrega e gasto de combustivel sao dois eventos.",
+  "6. Nunca apagar nem reescrever fato anterior. Correcao recebe C01 e declara CORRIGE E01. Repeticao sem informacao nova usa REF E01.",
+  "7. Guardar o texto original do Diego. Classificacao e campos normalizados ficam separados do relato.",
+  "8. Agenda representa somente data realmente combinada. Aguardar resposta e precisa remarcar nunca viram data inventada.",
+  "9. Data de comprar material e prazo interno e pode ser calculada. Data de visita, retirada ou entrega ao cliente so existe quando foi combinada.",
+  "10. Agendado no status do servico significa trabalho fechado. Visita de orcamento marcada e compromisso, nao servico agendado.",
+  "11. Pedi, encomendei ou paguei e vai chegar significa MATERIAL_EM_TRANSITO. Busquei, trouxe, chegou ou esta comigo significa MATERIAL_EM_MAOS.",
+  "12. Se cliente, servico, fornecedor, valor ou data estiver ambiguo, conservar o fato e marcar o dado faltante. Nao adivinhar.",
+  "13. Documento de resultado recebe TIPO_DOCUMENTO: COMPROVANTE_DE_EXECUCAO e NAO_PROCESSAR_COMO_ENTRADA.",
+  "",
+  "FORMATO MINIMO",
+  "TIPO_DOCUMENTO: ENTRADA_DO_DIA",
+  "PROTOCOLO: OB-1",
+  "LOTE: OB-AAAAMMDD-NN",
+  "DIA_RELATADO: AAAA-MM-DD",
+  "[E01] texto original do primeiro fato",
+  "TIPO_PROVAVEL: nome_do_evento",
+].join("\n");
+
+const PROTOCOLO_CLAUDE_OPERACAO = [
+  "PROTOCOLO DO CLAUDE QUE PROCESSA OPERACAO BAHIA",
+  "",
+  "1. Ler somente TIPO_DOCUMENTO: ENTRADA_DO_DIA. Ignorar COMPROVANTE_DE_EXECUCAO como fonte de fatos.",
+  "2. Processar um evento por vez. O eventoId e o LOTE mais a referencia, por exemplo OB-20260726-01-E03.",
+  "3. Usar somente await window.TB_OPERACOES.processar({ tipo: \"...\", eventoId: \"...\", dados: {...} }).",
+  "4. Nunca criar outro cliente Supabase, nunca usar auth.setSession e nunca escrever a cadeia manualmente em tabelas separadas.",
+  "5. Repetir o mesmo eventoId deve devolver o resultado existente. Se o texto mudou, usar uma correcao com novo id; nunca reutilizar o id com dados diferentes.",
+  "6. Claude pode organizar o Financeiro pela operacao tipada. Nunca usar categoria Outro para Material, Vale, Pro-labore, entrada de servico ou conta futura.",
+  "6A. Entrada recebida de um servico usa entrada_servico. Ela fecha lead ou orcamento como agendado, cria o saldo a receber quando houver e planeja material; nunca registrar a entrada isolada e deixar o servico para tras.",
+  "7. Cliente fechou significa servico agendado e planejamento de material. Fornecedor que entrega gera pedido remoto na vespera; sem entrega gera ida presencial no proximo dia de trabalho, com cidade e hora.",
+  "8. MATERIAL_EM_TRANSITO registra pedido ou pagamento, mas conserva o servico agendado. MATERIAL_EM_MAOS fecha a compra, muda agendado para producao e atualiza a proxima acao.",
+  "9. ENTREGA_CONCLUIDA exige valor, fecha Agenda e Servico e so registra recebimento se o relato disser que recebeu.",
+  "10. Reagendamento e parcial sem data permanecem na Caixa. Resolver somente com data real ou servico terminal.",
+  "11. Vale entregue e saida paga no dia. Vale abatido so recebe a marca de abatimento e nao mexe no caixa.",
+  "12. Depois da chamada, conferir ok, jaConcluido e resultado. Em erro, nao improvisar: a operacao fica visivel na Caixa para retomada.",
+  "13. Ao terminar o lote, gerar um COMPROVANTE_DE_EXECUCAO com evento, resultado e ids. Esse comprovante nunca volta como entrada.",
+  "",
+  "TIPOS DISPONIVEIS EM window.TB_OPERACOES",
+  "financeiro, entrada_servico, pro_labore, vale_entregue, vale_abatido, servico_fechado, material_planejado, material_em_transito, material_em_maos, compromisso_concluido, entrega_concluida, remarcacao_com_data e remarcacao_terminal.",
+  "",
+  "CAMPOS MINIMOS EM dados",
+  "financeiro: tipo, escopo, categoria, valor, status, data e descricao. Para alterar linha existente, financeiroId e somente os campos que mudam.",
+  "entrada_servico: servicoId, valor da entrada, valorServico, prazo e fornecedorId quando precisar material. O saldo e criado automaticamente.",
+  "pro_labore: valor, data e descricao opcional.",
+  "vale_entregue: valor, data, profissional ou descricao.",
+  "vale_abatido: financeiroId do Vale já pago.",
+  "servico_fechado: servicoId, prazo, valorServico, precisaMaterial e fornecedorId quando aplicavel.",
+  "material_planejado: fornecedorId, servicoId quando for de cliente, valor se conhecido, dataNecessidade e descricao.",
+  "material_em_transito: fornecedorId, servicoId, valor, data, dataEntrega e financeiroId ou agendaId quando ja existirem.",
+  "material_em_maos: fornecedorId, servicoId, valor, data e financeiroId ou agendaId quando ja existirem. semValor true cria pergunta sem segurar a producao.",
+  "compromisso_concluido: agendaId, servicoId quando houver e data real.",
+  "entrega_concluida: agendaId, servicoId, valor e data real. recebimento e opcional e so entra quando o relato disser que recebeu.",
+  "remarcacao_com_data: pendenciaId, data, hora, tipo e cidade. Presencial exige hora e cidade.",
+  "remarcacao_terminal: pendenciaId e servicoId terminal.",
+].join("\n");
 // Backup incompleto é backup que engana. Faltavam config, fornecedores e rotinas — três tabelas que o app
 // usa todo dia (o PIN mora em config, e sem fornecedores a aba Compras e o plano de compra não voltam).
 // Auditoria de 25/07/2026. Isto cobre só os DADOS: schema, políticas, usuários do Auth e os arquivos do
@@ -442,41 +513,60 @@ async function anexarArquivosNaPendencia(db, pendenciaId, uploaded) {
 // MESMO REGISTRO, sem criar linha nova. Se já está "feito", a origem foi mesmo tentada e encerrada; nasce um
 // compromisso NOVO vinculado ao serviço. Nos dois casos grava agenda_sucessora_id ANTES de marcar resolvida.
 async function resolverPendenciaComSucessor(db, { pendenciaId, agendaOrigemId, servicoId, data, hora, tipo, cidade, tituloNovo }) {
-  const { data: pend, error: leituraErr } = await db.from("caixa_entrada").select("id,conversa").eq("id", pendenciaId).single();
+  const { data: pend, error: leituraErr } = await db.from("caixa_entrada").select("id,conversa,processado,status").eq("id", pendenciaId).single();
   if (leituraErr) throw leituraErr;
   const meta = ultimaMetaRemarcacao(pend);
   if (!meta) throw new Error("Item não é uma pendência de remarcação em aberto.");
-  if (meta.agenda_sucessora_id) return { ok: true, jaResolvida: true, sucessoraId: meta.agenda_sucessora_id };
+  const origemId = meta.agenda_origem_id || agendaOrigemId || null;
+  const alvoServicoId = meta.servico_id || servicoId || null;
+  if (agendaOrigemId && meta.agenda_origem_id && agendaOrigemId !== meta.agenda_origem_id) throw new Error("A agenda informada não pertence a esta pendência.");
+  if (servicoId && meta.servico_id && servicoId !== meta.servico_id) throw new Error("O serviço informado não pertence a esta pendência.");
+  if (meta.agenda_sucessora_id) {
+    // A sucessora pode ter sido gravada e a aba fechado antes do último UPDATE. Retomar termina a pendência,
+    // não cria outro compromisso.
+    if (!pend.processado) {
+      const { error: resErr } = await db.from("caixa_entrada").update({ status: "resolvido", processado: true, processado_em: new Date().toISOString() }).eq("id", pendenciaId);
+      if (resErr) throw resErr;
+    }
+    return { ok: true, jaResolvida: true, sucessoraId: meta.agenda_sucessora_id };
+  }
   if (!data) throw new Error("Informe a data combinada antes de resolver.");
+  const tipoFinal = tipo || meta.tipo_original || "remoto";
+  const cidadeFinal = tipoFinal === "presencial" ? (cidade || meta.cidade_original || null) : null;
+  const horaFinal = tipoFinal === "presencial" ? (hora || null) : null;
+  if (tipoFinal === "presencial" && (!cidadeFinal || !horaFinal)) throw new Error("Compromisso presencial exige cidade e hora realmente combinadas.");
 
-  const { data: origem, error: origemErr } = agendaOrigemId ? await db.from("agenda").select("id,status").eq("id", agendaOrigemId).maybeSingle() : { data: null, error: null };
+  const { data: origem, error: origemErr } = origemId ? await db.from("agenda").select("id,status").eq("id", origemId).maybeSingle() : { data: null, error: null };
   if (origemErr) throw origemErr;
 
   let sucessoraId;
   if (origem && origem.status === "planejado") {
     // Nunca aconteceu (só foi remarcada antes da data chegar) — atualiza a própria linha, não cria outra.
     const { error: upErr } = await db.from("agenda").update({
-      data, hora: tipo === "presencial" ? (hora || "09:00") : null, tipo: tipo || "remoto",
-      cidade: tipo === "presencial" ? (cidade || null) : null, status: "planejado",
-    }).eq("id", agendaOrigemId);
+      data, hora: horaFinal, tipo: tipoFinal, cidade: cidadeFinal, status: "planejado",
+      ...(tituloNovo ? { titulo: tituloNovo } : {}),
+    }).eq("id", origemId);
     if (upErr) throw upErr;
-    sucessoraId = agendaOrigemId;
+    sucessoraId = origemId;
   } else {
     // Foi tentativa real (origem já "feito", ou não existe mais) — nasce um compromisso novo.
-    const { data: novo, error: novoErr } = await db.from("agenda").insert({
-      servico_id: servicoId || null, titulo: tituloNovo || meta.titulo_original || "Compromisso remarcado",
-      data, hora: tipo === "presencial" ? (hora || "09:00") : null, tipo: tipo || "remoto",
-      cidade: tipo === "presencial" ? (cidade || null) : null, status: "planejado",
-    }).select("id").single();
-    if (novoErr) throw novoErr;
+    const novoId = await uuidDeterministicoEvento("remarcacao:" + pendenciaId, "agenda-sucessora");
+    const { data: novo } = await inserirComIdDeterministico(db, "agenda", novoId, {
+      servico_id: alvoServicoId, titulo: tituloNovo || meta.titulo_original || "Compromisso remarcado",
+      data, hora: horaFinal, tipo: tipoFinal, cidade: cidadeFinal, status: "planejado",
+    }, ["servico_id", "data", "tipo"]);
     sucessoraId = novo.id;
-    if (agendaOrigemId) { await db.from("historico").insert({ o_que: "Remarcado", por: "diego", detalhe: "Compromisso de " + (meta.data_original || "?") + " virou novo compromisso em " + data + " (agenda #" + sucessoraId + ")" }); }
+    if (origemId) {
+      const historicoId = await uuidDeterministicoEvento("remarcacao:" + pendenciaId, "historico");
+      await inserirComIdDeterministico(db, "historico", historicoId, { o_que: "Remarcado", por: "diego", detalhe: "Compromisso de " + (meta.data_original || "?") + " virou novo compromisso em " + data + " (agenda #" + sucessoraId + ")" }, ["o_que", "detalhe"]);
+    }
   }
 
   // Grava a sucessora ANTES de resolver — se cair aqui, o compromisso já existe; só falta marcar a
   // pendência como tratada, e uma nova tentativa de resolução vai achar agenda_sucessora_id preenchido
   // (linha seguinte já devolve jaResolvida:true) em vez de duplicar.
-  const conversaNova = pend.conversa.map((m) => m === pend.conversa[pend.conversa.length - 1] && m?.meta?.tipo_operacional === "remarcacao"
+  const indiceMeta = [...(pend.conversa || [])].map((m) => m?.meta?.tipo_operacional).lastIndexOf("remarcacao");
+  const conversaNova = (pend.conversa || []).map((m, index) => index === indiceMeta
     ? { ...m, meta: { ...m.meta, agenda_sucessora_id: sucessoraId } } : m);
   const { error: metaErr } = await db.from("caixa_entrada").update({ conversa: conversaNova }).eq("id", pendenciaId);
   if (metaErr) throw metaErr;
@@ -489,15 +579,18 @@ async function resolverPendenciaComSucessor(db, { pendenciaId, agendaOrigemId, s
 // pago). É a única exceção a "toda pendência precisa de compromisso novo": cliente desistiu, serviço
 // encerrou, não existe mais o que remarcar.
 async function resolverPendenciaTerminal(db, { pendenciaId, servicoId }) {
-  const { data: pend, error: leituraErr } = await db.from("caixa_entrada").select("id,conversa").eq("id", pendenciaId).single();
+  const { data: pend, error: leituraErr } = await db.from("caixa_entrada").select("id,conversa,processado").eq("id", pendenciaId).single();
   if (leituraErr) throw leituraErr;
   const meta = ultimaMetaRemarcacao(pend);
   if (!meta) throw new Error("Item não é uma pendência de remarcação em aberto.");
   if (meta.agenda_sucessora_id) return { ok: true, jaResolvida: true };
-  if (!servicoId) throw new Error("Pendência sem serviço vinculado não pode encerrar como terminal.");
-  const { data: svc, error: svcErr } = await db.from("servicos").select("status").eq("id", servicoId).maybeSingle();
+  const alvoServicoId = meta.servico_id || servicoId || null;
+  if (servicoId && meta.servico_id && servicoId !== meta.servico_id) throw new Error("O serviço informado não pertence a esta pendência.");
+  if (!alvoServicoId) throw new Error("Pendência sem serviço vinculado não pode encerrar como terminal.");
+  const { data: svc, error: svcErr } = await db.from("servicos").select("status").eq("id", alvoServicoId).maybeSingle();
   if (svcErr) throw svcErr;
   if (!svc || !["entregue", "perdido", "pago"].includes(svc.status)) throw new Error("Serviço não está em estado terminal (entregue/perdido/pago) — não pode encerrar sem sucessor.");
+  if (pend.processado) return { ok: true, jaResolvida: true };
   const { error: resErr } = await db.from("caixa_entrada").update({ status: "resolvido", processado: true, processado_em: new Date().toISOString() }).eq("id", pendenciaId);
   if (resErr) throw resErr;
   return { ok: true, jaResolvida: false };
@@ -509,6 +602,556 @@ function recusaSeForPendenciaAberta(item) {
   const meta = ultimaMetaRemarcacao(item);
   if (meta && !meta.agenda_sucessora_id) throw new Error("Isso é uma pendência de remarcação aberta — não pode ser excluída. Resolva com uma data nova ou encerre o serviço.");
 }
+
+// ===== PORTA ÚNICA DA OPERAÇÃO BAHIA ==============================================================
+// O chat/Claude não deve repetir uma cadeia de UPDATEs por conta própria. Cada fato entra aqui com um id
+// estável. A própria chave primária UUID das tabelas vira a trava contra duplo clique, nova aba e reprocessar
+// o mesmo documento — sem DDL. Se uma etapa falhar, o checkpoint fica aberto em caixa_entrada e o fato não
+// desaparece da operação.
+const TIPO_EVENTO_OPERACAO = "evento_operacao_bahia";
+function jsonCanonico(value) {
+  if (Array.isArray(value)) return value.map(jsonCanonico);
+  if (value && typeof value === "object") return Object.keys(value).sort().reduce((out, key) => {
+    if (value[key] !== undefined) out[key] = jsonCanonico(value[key]);
+    return out;
+  }, {});
+  return value;
+}
+function metaEventoOperacao(item) {
+  const msgs = (item?.conversa || []).filter((m) => m?.meta?.tipo_operacional === TIPO_EVENTO_OPERACAO);
+  return msgs.length ? msgs[msgs.length - 1].meta : null;
+}
+async function uuidDeterministicoEvento(eventoId, papel) {
+  const hex = await sha256("tapecaria-bahia-operacao-v1|" + String(eventoId) + "|" + String(papel));
+  const chars = hex.slice(0, 32).split("");
+  chars[12] = "5";
+  chars[16] = (8 + (parseInt(chars[16], 16) % 4)).toString(16);
+  const h = chars.join("");
+  return [h.slice(0, 8), h.slice(8, 12), h.slice(12, 16), h.slice(16, 20), h.slice(20, 32)].join("-");
+}
+function mesmoValorBanco(a, b) {
+  if ((a === null || a === undefined || a === "") && (b === null || b === undefined || b === "")) return true;
+  if (typeof a === "number" || typeof b === "number") return Number(a) === Number(b);
+  return String(a) === String(b);
+}
+async function inserirComIdDeterministico(db, tabela, id, payload, chavesConferencia) {
+  const tentativa = await db.from(tabela).insert({ id, ...payload }).select("*").single();
+  if (!tentativa.error) return { data: tentativa.data, jaExistia: false };
+  if (tentativa.error.code !== "23505") throw tentativa.error;
+  const existente = await db.from(tabela).select("*").eq("id", id).single();
+  if (existente.error) throw existente.error;
+  const divergente = (chavesConferencia || []).find((key) => !mesmoValorBanco(existente.data?.[key], payload[key]));
+  if (divergente) throw new Error("O mesmo evento já existe com conteúdo diferente em " + tabela + "." + divergente + ". Crie uma correção com outro eventoId.");
+  return { data: existente.data, jaExistia: true };
+}
+async function lerRegistro(db, tabela, id, campos = "*") {
+  if (!id) return null;
+  const { data, error } = await db.from(tabela).select(campos).eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+function trocarMetaEvento(conversa, patch) {
+  const msgs = conversa || [];
+  const indice = [...msgs].map((m) => m?.meta?.tipo_operacional).lastIndexOf(TIPO_EVENTO_OPERACAO);
+  if (indice < 0) throw new Error("Checkpoint sem metadado operacional.");
+  return msgs.map((m, i) => i === indice ? { ...m, meta: { ...m.meta, ...patch, resultado: { ...(m.meta.resultado || {}), ...(patch.resultado || {}) } } } : m);
+}
+async function iniciarEventoOperacao(db, evento) {
+  const eventoId = String(evento?.eventoId || "").trim();
+  const tipoEvento = String(evento?.tipo || "").trim();
+  if (!eventoId || !tipoEvento) throw new Error("A operação exige tipo e eventoId estável.");
+  if (eventoId.length > 180) throw new Error("eventoId longo demais.");
+  const fingerprint = await sha256(tipoEvento + "|" + JSON.stringify(jsonCanonico(evento.dados || {})));
+  const id = await uuidDeterministicoEvento(eventoId, "checkpoint");
+  const agora = new Date().toISOString();
+  const meta = {
+    tipo_operacional: TIPO_EVENTO_OPERACAO, versao: 1, evento_id: eventoId, tipo_evento: tipoEvento,
+    fingerprint, fonte_documento_id: evento.fonteDocumentoId || null, lote_id: evento.loteId || null,
+    item_ref: evento.itemRef || null, texto_original: evento.textoOriginal || null,
+    estado: "aplicando", etapa: "inicio", resultado: {},
+  };
+  const inserido = await inserirComIdDeterministico(db, "caixa_entrada", id, {
+    texto: "Aplicando operação: " + tipoEvento + " · " + eventoId,
+    status: "novo", processado: false,
+    conversa: [{ de: "ia", tipo: "sistema", texto: "Checkpoint criado antes de alterar a operação.", em: agora, meta }],
+  }, []);
+  const atual = inserido.data;
+  const metaAtual = metaEventoOperacao(atual);
+  if (!metaAtual || metaAtual.evento_id !== eventoId || metaAtual.tipo_evento !== tipoEvento) throw new Error("Colisão de checkpoint operacional.");
+  if (metaAtual.fingerprint !== fingerprint) throw new Error("O mesmo eventoId foi reutilizado com dados diferentes. Registre uma correção com novo id.");
+  if (atual.processado && metaAtual.estado === "concluido") return { id, jaConcluido: true, resultado: metaAtual.resultado || {} };
+  if (inserido.jaExistia) {
+    const conversa = trocarMetaEvento(atual.conversa, { estado: "aplicando", etapa: metaAtual.etapa || "retomada", ultimo_erro: null });
+    const { error } = await db.from("caixa_entrada").update({ status: "novo", processado: false, conversa }).eq("id", id);
+    if (error) throw error;
+  }
+  return { id, jaConcluido: false, resultado: metaAtual.resultado || {} };
+}
+async function marcarEtapaEvento(db, checkpointId, etapa, resultado) {
+  const item = await lerRegistro(db, "caixa_entrada", checkpointId);
+  if (!item) throw new Error("Checkpoint da operação não foi encontrado.");
+  const conversa = trocarMetaEvento(item.conversa, { estado: "aplicando", etapa, ultimo_erro: null, resultado: resultado || {} });
+  const { error } = await db.from("caixa_entrada").update({ conversa, status: "novo", processado: false }).eq("id", checkpointId);
+  if (error) throw error;
+}
+async function concluirEventoOperacao(db, checkpointId, resultado) {
+  const item = await lerRegistro(db, "caixa_entrada", checkpointId);
+  if (!item) throw new Error("Checkpoint da operação não foi encontrado.");
+  const meta = metaEventoOperacao(item);
+  const conversa = trocarMetaEvento(item.conversa, { estado: "concluido", etapa: "verificado", concluido_em: new Date().toISOString(), ultimo_erro: null, resultado: resultado || {} });
+  const { error } = await db.from("caixa_entrada").update({
+    texto: "Operação concluída: " + (meta?.tipo_evento || "evento") + " · " + (meta?.evento_id || checkpointId),
+    conversa, status: "resolvido", processado: true, processado_em: new Date().toISOString(),
+  }).eq("id", checkpointId);
+  if (error) throw error;
+}
+async function falharEventoOperacao(db, checkpointId, error) {
+  try {
+    const item = await lerRegistro(db, "caixa_entrada", checkpointId);
+    if (!item) return;
+    const meta = metaEventoOperacao(item);
+    const mensagem = error?.message || String(error);
+    const conversa = trocarMetaEvento(item.conversa, { estado: "falhou", ultimo_erro: mensagem, falhou_em: new Date().toISOString() });
+    await db.from("caixa_entrada").update({
+      texto: "RETOMAR " + (meta?.tipo_evento || "operação") + " · " + (meta?.evento_id || checkpointId) + " · " + mensagem,
+      conversa, status: "novo", processado: false,
+    }).eq("id", checkpointId);
+  } catch (_) { /* o erro original continua sendo o mais importante */ }
+}
+function validarValorPositivo(value, nome = "valor") {
+  const n = Number(String(value ?? "").replace(",", "."));
+  if (!(n > 0)) throw new Error(nome + " precisa ser maior que zero.");
+  return n;
+}
+async function registrarFinanceiroDaOperacao(db, eventoId, dados, papel = "financeiro") {
+  const existente = dados.financeiroId ? await lerRegistro(db, "financeiro", dados.financeiroId) : null;
+  if (dados.financeiroId && !existente) throw new Error("Lançamento financeiro informado não existe.");
+  const categoria = String(dados.categoria || existente?.categoria || "Outro");
+  let tipo = dados.tipo || existente?.tipo || "saida";
+  let escopo = dados.escopo || existente?.escopo || "empresa";
+  let status = dados.status || existente?.status || "pago";
+  if (!["entrada", "saida"].includes(tipo)) throw new Error("Tipo financeiro inválido.");
+  if (!["empresa", "pessoal"].includes(escopo)) throw new Error("Escopo financeiro inválido.");
+  if (!["pago", "a_pagar", "a_receber"].includes(status)) throw new Error("Status financeiro inválido.");
+  if (categoria === "Vale") { tipo = "saida"; escopo = "empresa"; status = "pago"; }
+  if (categoria === CATEGORIA_MATERIAL) {
+    tipo = "saida"; escopo = "empresa";
+    if (!(dados.fornecedorId || existente?.fornecedor_id)) throw new Error("Material exige fornecedorId.");
+  }
+  const valor = validarValorPositivo(dados.valor ?? existente?.valor);
+  const data = dados.data || existente?.data || hojeISO();
+  const tem = (key) => Object.prototype.hasOwnProperty.call(dados, key);
+  const payload = {
+    tipo, escopo, categoria, valor, status, data,
+    descricao: String(dados.descricao || existente?.descricao || categoria).trim(),
+    servico_id: tem("servicoId") ? (dados.servicoId || null) : (existente?.servico_id || null),
+    fornecedor_id: tem("fornecedorId") ? (dados.fornecedorId || null) : (existente?.fornecedor_id || null),
+    agenda_id: tem("agendaId") ? (dados.agendaId || null) : (existente?.agenda_id || null),
+  };
+  if (dados.financeiroId) {
+    if (existente.servico_id && payload.servico_id && existente.servico_id !== payload.servico_id) throw new Error("O lançamento pertence a outro serviço.");
+    const { data: atualizado, error } = await db.from("financeiro").update(payload).eq("id", dados.financeiroId).select("*").single();
+    if (error) throw error;
+    return { registro: atualizado, jaExistia: true };
+  }
+  const id = await uuidDeterministicoEvento(eventoId, papel);
+  const inserido = await inserirComIdDeterministico(db, "financeiro", id, payload, ["tipo", "escopo", "categoria", "valor", "status", "data", "servico_id", "fornecedor_id", "agenda_id"]);
+  return { registro: inserido.data, jaExistia: inserido.jaExistia };
+}
+async function registrarHistoricoDaOperacao(db, eventoId, papel, payload) {
+  const id = await uuidDeterministicoEvento(eventoId, "historico:" + papel);
+  const inserido = await inserirComIdDeterministico(db, "historico", id, payload, ["o_que", "detalhe"]);
+  return inserido.data;
+}
+async function concluirAgendaDaOperacao(db, agendaId, dataReal, servicoId) {
+  if (!agendaId) return null;
+  const agenda = await lerRegistro(db, "agenda", agendaId);
+  if (!agenda) throw new Error("Compromisso informado não existe.");
+  if (servicoId && agenda.servico_id && agenda.servico_id !== servicoId) throw new Error("O compromisso pertence a outro serviço.");
+  if (agenda.status === "feito") return agenda;
+  const hoje = hojeISO();
+  const ocorreuEm = !dataReal || dataReal > hoje ? hoje : dataReal;
+  const { data, error } = await db.from("agenda").update({ status: "feito", data: ocorreuEm }).eq("id", agendaId).select("*").single();
+  if (error) throw error;
+  return data;
+}
+async function aplicarFinanceiroOperacional(db, eventoId, dados) {
+  const { registro, jaExistia } = await registrarFinanceiroDaOperacao(db, eventoId, dados);
+  return { financeiroId: registro.id, jaExistia, status: registro.status };
+}
+async function aplicarEntradaServicoOperacional(db, eventoId, dados) {
+  if (!dados.servicoId) throw new Error("Entrada de serviço exige servicoId.");
+  const servico = await lerRegistro(db, "servicos", dados.servicoId);
+  if (!servico) throw new Error("Serviço não encontrado.");
+  const valorEntrada = validarValorPositivo(dados.valor, "valor da entrada");
+  const totalServico = Number(dados.valorServico || servico.valor_orcamento || 0);
+  if (["lead", "orcamento"].includes(servico.status) && dados.precisaMaterial !== false && !dados.fornecedorId) {
+    throw new Error("A entrada fecha o trabalho, mas falta fornecedor para planejar o material. Pergunte antes de aplicar.");
+  }
+  const entrada = await registrarFinanceiroDaOperacao(db, eventoId, {
+    tipo: "entrada", escopo: "empresa", categoria: dados.categoria || "Serviço", status: dados.status || "pago",
+    valor: valorEntrada, data: dados.data || hojeISO(), descricao: dados.descricao || "Entrada — " + servico.titulo,
+    servicoId: servico.id,
+  }, "financeiro:entrada-servico");
+  let saldoId = null;
+  if (totalServico > valorEntrada && dados.criarSaldo !== false) {
+    const saldo = await registrarFinanceiroDaOperacao(db, eventoId, {
+      tipo: "entrada", escopo: "empresa", categoria: dados.categoria || "Serviço", status: "a_receber",
+      valor: Number((totalServico - valorEntrada).toFixed(2)), data: dados.dataSaldo || dados.prazo || servico.prazo,
+      descricao: dados.descricaoSaldo || "Saldo a receber — " + servico.titulo, servicoId: servico.id,
+    }, "financeiro:saldo-servico");
+    saldoId = saldo.registro.id;
+  }
+  let statusServico = servico.status;
+  let material = null;
+  if (["lead", "orcamento"].includes(servico.status)) {
+    const fechado = await aplicarServicoFechadoOperacional(db, eventoId, {
+      servicoId: servico.id, prazo: dados.prazo || servico.prazo, valorServico: totalServico || servico.valor_orcamento,
+      precisaMaterial: dados.precisaMaterial !== false, fornecedorId: dados.fornecedorId || null,
+      dataEntrega: dados.dataEntrega, por: dados.por || "claude",
+    });
+    statusServico = fechado.statusServico; material = fechado.material;
+  }
+  await registrarHistoricoDaOperacao(db, eventoId, "entrada-servico", {
+    o_que: "Entrada financeira do serviço", por: dados.por || "claude",
+    detalhe: "Serviço #" + servico.id + " · entrada #" + entrada.registro.id + (saldoId ? " · saldo #" + saldoId : ""),
+  });
+  return { servicoId: servico.id, statusServico, financeiroId: entrada.registro.id, saldoFinanceiroId: saldoId, material };
+}
+async function aplicarProLaboreOperacional(db, eventoId, dados) {
+  const valor = validarValorPositivo(dados.valor);
+  const data = dados.data || hojeISO();
+  const descricao = String(dados.descricao || "Retirada de pró-labore").trim();
+  const empresa = await registrarFinanceiroDaOperacao(db, eventoId, { tipo: "saida", escopo: "empresa", categoria: "Retirada de pró-labore", valor, status: "pago", data, descricao }, "financeiro:empresa");
+  const pessoal = await registrarFinanceiroDaOperacao(db, eventoId, { tipo: "entrada", escopo: "pessoal", categoria: "Pró-labore", valor, status: "pago", data, descricao: "Pró-labore recebido — " + descricao }, "financeiro:pessoal");
+  const dizimo = await registrarFinanceiroDaOperacao(db, eventoId, { tipo: "saida", escopo: "pessoal", categoria: "Dízimo", valor: Number((valor * 0.1).toFixed(2)), status: "pago", data, descricao: "Dízimo do pró-labore — " + descricao }, "financeiro:dizimo");
+  return { financeiroIds: [empresa.registro.id, pessoal.registro.id, dizimo.registro.id] };
+}
+async function aplicarValeEntregueOperacional(db, eventoId, dados) {
+  const descricao = /^Vale\s*-/i.test(dados.descricao || "") ? dados.descricao : "Vale - " + String(dados.profissional || dados.descricao || "profissional");
+  const { registro } = await registrarFinanceiroDaOperacao(db, eventoId, { ...dados, tipo: "saida", escopo: "empresa", categoria: "Vale", status: "pago", descricao }, "financeiro:vale");
+  return { financeiroId: registro.id, status: registro.status };
+}
+async function aplicarValeAbatidoOperacional(db, eventoId, dados) {
+  if (!dados.financeiroId) throw new Error("Vale abatido exige financeiroId.");
+  const vale = await lerRegistro(db, "financeiro", dados.financeiroId);
+  if (!vale || vale.categoria !== "Vale") throw new Error("O lançamento informado não é um Vale.");
+  if (vale.status !== "pago") throw new Error("Vale precisa estar pago desde o dia da entrega antes de ser abatido.");
+  if ((vale.descricao || "").startsWith(VALE_ABATIDO_TAG)) return { financeiroId: vale.id, jaAbatido: true };
+  const { error } = await db.from("financeiro").update({ descricao: VALE_ABATIDO_TAG + (vale.descricao || "Vale") }).eq("id", vale.id);
+  if (error) throw error;
+  await registrarHistoricoDaOperacao(db, eventoId, "vale-abatido", { o_que: "Vale abatido", por: "claude", detalhe: "Vale financeiro #" + vale.id + " marcado sem nova movimentação de caixa." });
+  return { financeiroId: vale.id, jaAbatido: false };
+}
+async function criarPerguntaDeterministica(db, eventoId, papel, texto, metaExtra) {
+  const id = await uuidDeterministicoEvento(eventoId, "pergunta:" + papel);
+  const inserido = await inserirComIdDeterministico(db, "caixa_entrada", id, {
+    texto, status: "aguardando_voce", processado: false,
+    conversa: [{ de: "ia", tipo: "pergunta", texto, em: new Date().toISOString(), meta: { tipo_operacional: "pergunta_operacao", evento_id: eventoId, ...metaExtra } }],
+  }, []);
+  return inserido.data;
+}
+async function aplicarMaterialPlanejadoOperacional(db, eventoId, dados) {
+  if (!dados.fornecedorId) throw new Error("Planejar material exige fornecedorId.");
+  const fornecedor = await lerRegistro(db, "fornecedores", dados.fornecedorId);
+  if (!fornecedor) throw new Error("Fornecedor não encontrado.");
+  const servico = dados.servicoId ? await lerRegistro(db, "servicos", dados.servicoId) : null;
+  if (dados.servicoId && !servico) throw new Error("Serviço não encontrado.");
+  if (servico && !["agendado", "producao"].includes(servico.status)) throw new Error("Material só pode ser planejado para serviço fechado ou em produção.");
+  if (dados.financeiroId) {
+    const financeiroExistente = await lerRegistro(db, "financeiro", dados.financeiroId);
+    if (!financeiroExistente || financeiroExistente.categoria !== CATEGORIA_MATERIAL) throw new Error("financeiroId não aponta para uma compra de Material.");
+    if (financeiroExistente.status === "pago") throw new Error("Compra já paga não pode voltar para a lista a pagar.");
+    if (financeiroExistente.fornecedor_id && financeiroExistente.fornecedor_id !== dados.fornecedorId) throw new Error("A compra pertence a outro fornecedor.");
+    if (financeiroExistente.servico_id && dados.servicoId && financeiroExistente.servico_id !== dados.servicoId) throw new Error("A compra pertence a outro serviço.");
+  }
+  const plano = planoDeCompra(fornecedor);
+  if (!plano) throw new Error("Não foi possível calcular o plano de compra.");
+  if (plano.tipo === "presencial" && !fornecedor.cidade) throw new Error("Fornecedor presencial sem cidade. Pergunte ao Diego; não transforme a ida em tarefa remota.");
+  let agendaId = await uuidDeterministicoEvento(eventoId, "agenda:material");
+  const agendaPayload = {
+    titulo: plano.rotulo, data: dados.dataCompra || plano.data, hora: plano.tipo === "presencial" ? (dados.hora || plano.hora) : null,
+    tipo: plano.tipo, cidade: plano.tipo === "presencial" ? fornecedor.cidade : null,
+    local: plano.tipo === "presencial" ? fornecedor.cidade : null, status: "planejado", servico_id: dados.servicoId || null,
+  };
+  let agenda;
+  if (dados.servicoId) {
+    const buscaAgenda = await db.from("agenda").select("*").eq("servico_id", dados.servicoId).eq("status", "planejado");
+    if (buscaAgenda.error) throw buscaAgenda.error;
+    const nomeChave = (fornecedor.nome || "").toLowerCase();
+    const existente = (buscaAgenda.data || []).find((a) => {
+      const titulo = (a.titulo || "").toLowerCase();
+      return titulo.includes(nomeChave) && /material|pedido|buscar/.test(titulo);
+    });
+    if (existente) {
+      agendaId = existente.id;
+      const { data: atualizada, error } = await db.from("agenda").update(agendaPayload).eq("id", agendaId).select("*").single();
+      if (error) throw error;
+      agenda = { data: atualizada, jaExistia: true };
+    }
+  }
+  if (!agenda) agenda = await inserirComIdDeterministico(db, "agenda", agendaId, agendaPayload, ["titulo", "data", "tipo", "cidade", "servico_id"]);
+  let financeiroId = dados.financeiroId || null;
+  if (Number(String(dados.valor ?? "").replace(",", ".")) > 0 || dados.financeiroId) {
+    const fin = await registrarFinanceiroDaOperacao(db, eventoId, {
+      financeiroId: dados.financeiroId, tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MATERIAL,
+      status: "a_pagar", valor: dados.valor, data: dados.dataNecessidade || agendaPayload.data,
+      descricao: dados.descricao || "Material — " + fornecedor.nome, fornecedorId: fornecedor.id,
+      servicoId: dados.servicoId || null, agendaId,
+    }, "financeiro:material-planejado");
+    financeiroId = fin.registro.id;
+  }
+  if (servico) {
+    const entregaMaterial = dados.dataEntrega || plano.entrega || agendaPayload.data;
+    const { error } = await db.from("servicos").update({
+      status: "agendado",
+      loja_material: fornecedor.nome, data_entrega_material: entregaMaterial,
+      proxima_acao: plano.rotulo, atualizado_em: new Date().toISOString(),
+    }).eq("id", servico.id);
+    if (error) throw error;
+  }
+  await registrarHistoricoDaOperacao(db, eventoId, "material-planejado", {
+    o_que: "Material planejado", por: dados.por || "claude",
+    detalhe: "Fornecedor #" + fornecedor.id + " · agenda #" + agendaId + (dados.servicoId ? " · serviço #" + dados.servicoId : ""),
+  });
+  return { agendaId, financeiroId, tipoCompromisso: plano.tipo, dataCompra: agendaPayload.data, dataEntrega: dados.dataEntrega || plano.entrega || null, jaExistia: agenda.jaExistia };
+}
+async function aplicarMaterialEmTransitoOperacional(db, eventoId, dados) {
+  const existente = dados.financeiroId ? await lerRegistro(db, "financeiro", dados.financeiroId) : null;
+  if (dados.financeiroId && (!existente || existente.categoria !== CATEGORIA_MATERIAL)) throw new Error("financeiroId não aponta para uma compra de Material.");
+  const fornecedorId = dados.fornecedorId || existente?.fornecedor_id || null;
+  const servicoId = dados.servicoId || existente?.servico_id || null;
+  const agendaId = dados.agendaId || existente?.agenda_id || null;
+  if (!fornecedorId) throw new Error("Material em trânsito exige fornecedorId.");
+  if (existente?.fornecedor_id && dados.fornecedorId && existente.fornecedor_id !== dados.fornecedorId) throw new Error("A compra pertence a outro fornecedor.");
+  if (existente?.servico_id && dados.servicoId && existente.servico_id !== dados.servicoId) throw new Error("A compra pertence a outro serviço.");
+  const fornecedor = await lerRegistro(db, "fornecedores", fornecedorId);
+  if (!fornecedor) throw new Error("Fornecedor não encontrado.");
+  const servico = servicoId ? await lerRegistro(db, "servicos", servicoId) : null;
+  if (servicoId && !servico) throw new Error("Serviço não encontrado.");
+  if (servico && !["agendado", "producao"].includes(servico.status)) throw new Error("Material em trânsito não pode mover serviço em " + servico.status + ".");
+  if (dados.fecharAgenda && agendaId) {
+    const agenda = await lerRegistro(db, "agenda", agendaId);
+    if (!agenda) throw new Error("Compromisso de compra não encontrado.");
+    if (servicoId && agenda.servico_id && agenda.servico_id !== servicoId) throw new Error("A agenda informada pertence a outro serviço.");
+  }
+  const plano = planoDeCompra(fornecedor);
+  const dataEntrega = dados.dataEntrega || plano?.entrega || null;
+  const pagamentoConfirmado = dados.pagamentoConfirmado === true;
+  const statusFinanceiro = pagamentoConfirmado || existente?.status === "pago" ? "pago" : "a_pagar";
+  const descricaoBase = descricaoFinanceiraVisivel(dados.descricao || existente?.descricao || "Pedido de material — " + fornecedor.nome);
+  const fin = await registrarFinanceiroDaOperacao(db, eventoId, {
+    financeiroId: existente?.id, tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MATERIAL, status: statusFinanceiro,
+    valor: dados.valor ?? existente?.valor, data: existente?.status === "pago" ? existente.data : (dados.data || hojeISO()),
+    descricao: MATERIAL_EM_TRANSITO_TAG + descricaoBase, fornecedorId, servicoId, agendaId,
+  }, "financeiro:material-transito");
+  let agendaConcluidaId = null;
+  if (dados.fecharAgenda && agendaId) {
+    const outros = await db.from("financeiro").select("id,status,descricao").eq("agenda_id", agendaId).eq("categoria", CATEGORIA_MATERIAL);
+    if (outros.error) throw outros.error;
+    const faltaPedir = (outros.data || []).some((f) => f.id !== fin.registro.id && !materialEstaEmTransito(f) && !materialEstaEmMaos(f));
+    if (!faltaPedir) {
+      await concluirAgendaDaOperacao(db, agendaId, dados.data || hojeISO(), servicoId);
+      agendaConcluidaId = agendaId;
+    }
+  }
+  if (servicoId) {
+    const { error } = await db.from("servicos").update({
+      status: "agendado",
+      loja_material: fornecedor.nome, data_entrega_material: dataEntrega,
+      proxima_acao: dataEntrega ? "Aguardar material previsto para " + compactDate(dataEntrega) : "Aguardar chegada do material",
+      atualizado_em: new Date().toISOString(),
+    }).eq("id", servicoId);
+    if (error) throw error;
+  }
+  await registrarHistoricoDaOperacao(db, eventoId, "material-transito", { o_que: "Material em trânsito", por: dados.por || "claude", detalhe: "Financeiro #" + fin.registro.id + (dataEntrega ? " · previsão " + dataEntrega : "") });
+  return { financeiroId: fin.registro.id, statusFinanceiro, agendaId: agendaConcluidaId, servicoId, statusServico: servicoId ? "agendado" : null, dataEntrega };
+}
+async function aplicarMaterialEmMaosOperacional(db, eventoId, dados) {
+  let existente = dados.financeiroId ? await lerRegistro(db, "financeiro", dados.financeiroId) : null;
+  if (dados.financeiroId && (!existente || existente.categoria !== CATEGORIA_MATERIAL)) throw new Error("financeiroId não aponta para uma compra de Material.");
+  const servicoId = dados.servicoId || existente?.servico_id || null;
+  const fornecedorId = dados.fornecedorId || existente?.fornecedor_id || null;
+  if (!fornecedorId) throw new Error("Material em mãos exige fornecedorId.");
+  if (existente?.servico_id && dados.servicoId && existente.servico_id !== dados.servicoId) throw new Error("A compra pertence a outro serviço.");
+  if (existente?.fornecedor_id && dados.fornecedorId && existente.fornecedor_id !== dados.fornecedorId) throw new Error("A compra pertence a outro fornecedor.");
+  const fornecedor = await lerRegistro(db, "fornecedores", fornecedorId);
+  if (!fornecedor) throw new Error("Fornecedor não encontrado.");
+  const servico = servicoId ? await lerRegistro(db, "servicos", servicoId) : null;
+  if (servicoId && !servico) throw new Error("Serviço não encontrado.");
+  if (servico && !["agendado", "producao"].includes(servico.status)) throw new Error("Material em mãos não pode mover serviço em " + servico.status + ".");
+  const agendaId = dados.agendaId || existente?.agenda_id || null;
+  if (dados.fecharAgenda && agendaId) {
+    const agenda = await lerRegistro(db, "agenda", agendaId);
+    if (!agenda) throw new Error("Compromisso de compra não encontrado.");
+    if (servicoId && agenda.servico_id && agenda.servico_id !== servicoId) throw new Error("A agenda informada pertence a outro serviço.");
+  }
+  let materiaisDoServico = [];
+  if (servicoId) {
+    const consulta = await db.from("financeiro").select("id,status,descricao").eq("servico_id", servicoId).eq("categoria", CATEGORIA_MATERIAL);
+    if (consulta.error) throw consulta.error;
+    materiaisDoServico = consulta.data || [];
+  }
+  let materiaisDaAgenda = [];
+  if (dados.fecharAgenda && agendaId) {
+    const consulta = await db.from("financeiro").select("id,status,descricao").eq("agenda_id", agendaId).eq("categoria", CATEGORIA_MATERIAL);
+    if (consulta.error) throw consulta.error;
+    materiaisDaAgenda = consulta.data || [];
+  }
+  const valorInformado = Number(String(dados.valor ?? existente?.valor ?? "").replace(",", "."));
+  let financeiroId = existente?.id || null;
+  let perguntaId = null;
+  if (valorInformado > 0 && !dados.semValor) {
+    if (!existente && dados.pagamentoConfirmado === undefined) throw new Error("Informe pagamentoConfirmado para não inventar movimentação de caixa.");
+    const descricaoBase = descricaoFinanceiraVisivel(dados.descricao || existente?.descricao || "Material — " + fornecedor.nome);
+    const statusFinanceiro = dados.pagamentoConfirmado === true ? "pago" : (existente?.status || "a_pagar");
+    const dataFinanceira = existente?.status === "pago" ? existente.data : (dados.data || hojeISO());
+    const fin = await registrarFinanceiroDaOperacao(db, eventoId, {
+      financeiroId: existente?.id, tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MATERIAL,
+      status: statusFinanceiro, valor: valorInformado, data: dataFinanceira, descricao: MATERIAL_EM_MAOS_TAG + descricaoBase,
+      fornecedorId, servicoId, agendaId: dados.agendaId || existente?.agenda_id || null,
+    }, "financeiro:material-em-maos");
+    existente = fin.registro; financeiroId = fin.registro.id;
+  } else {
+    // O fato físico não pode esperar o preço: produção anda, mas a lacuna financeira fica como pergunta
+    // própria e visível. Se já havia linha de compra, marca que ela chegou sem fingir valor ou caixa.
+    if (existente && !(existente.descricao || "").startsWith(MATERIAL_EM_MAOS_TAG)) {
+      const { error } = await db.from("financeiro").update({ descricao: MATERIAL_EM_MAOS_TAG + descricaoFinanceiraVisivel(existente.descricao || "Material") }).eq("id", existente.id);
+      if (error) throw error;
+    }
+    const pergunta = await criarPerguntaDeterministica(db, eventoId, "valor-material", "Qual foi o valor do material comprado na " + fornecedor.nome + (servicoId ? " para o serviço #" + servicoId : "") + "?", { servico_id: servicoId, fornecedor_id: fornecedorId, financeiro_id: financeiroId });
+    perguntaId = pergunta.id;
+  }
+  const pendentesRestantes = materiaisDoServico.filter((f) => f.id !== financeiroId && !materialEstaEmMaos(f));
+  const pendentesNaAgenda = materiaisDaAgenda.filter((f) => f.id !== financeiroId && !materialEstaEmMaos(f));
+  if (servicoId) {
+    const podeProduzir = pendentesRestantes.length === 0;
+    const { data: atualizado, error } = await db.from("servicos").update({
+      status: podeProduzir ? "producao" : "agendado",
+      loja_material: fornecedor.nome, data_entrega_material: dados.data || hojeISO(),
+      proxima_acao: podeProduzir ? (dados.proximaAcao || "Produzir e acompanhar o prazo") : "Buscar materiais restantes",
+      atualizado_em: new Date().toISOString(),
+    }).eq("id", servicoId).select("status").single();
+    if (error) throw error;
+    if (dados.fecharAgenda && agendaId && pendentesNaAgenda.length === 0) await concluirAgendaDaOperacao(db, agendaId, dados.data || hojeISO(), servicoId);
+    await registrarHistoricoDaOperacao(db, eventoId, "material-em-maos", { o_que: "Material em mãos", por: dados.por || "claude", detalhe: "Serviço #" + servicoId + " · financeiro #" + (financeiroId || "valor pendente") + " · status " + atualizado.status });
+    return { financeiroId, perguntaId, agendaId: pendentesNaAgenda.length ? null : agendaId, servicoId, statusServico: atualizado.status, materiaisPendentes: pendentesRestantes.length, materiaisPendentesNaAgenda: pendentesNaAgenda.length };
+  }
+  if (dados.fecharAgenda && agendaId && pendentesNaAgenda.length === 0) await concluirAgendaDaOperacao(db, agendaId, dados.data || hojeISO(), null);
+  return { financeiroId, perguntaId, agendaId: dados.fecharAgenda && !pendentesNaAgenda.length ? agendaId : null, servicoId: null, statusServico: null, materiaisPendentes: 0, materiaisPendentesNaAgenda: pendentesNaAgenda.length };
+}
+async function aplicarCompromissoConcluidoOperacional(db, eventoId, dados) {
+  if (!dados.agendaId) throw new Error("Conclusão exige agendaId.");
+  const agenda = await lerRegistro(db, "agenda", dados.agendaId);
+  if (!agenda) throw new Error("Compromisso não encontrado.");
+  const servicoId = dados.servicoId || agenda.servico_id || null;
+  const agendaFeita = await concluirAgendaDaOperacao(db, agenda.id, dados.data || hojeISO(), servicoId);
+  if (servicoId) {
+    const { error } = await db.from("servicos").update({ proxima_acao: dados.proximaAcao ?? null, atualizado_em: new Date().toISOString() }).eq("id", servicoId);
+    if (error) throw error;
+  }
+  const historico = await registrarHistoricoDaOperacao(db, eventoId, "compromisso-concluido", {
+    o_que: "\"" + agenda.titulo + "\" concluído", por: dados.por || "diego",
+    detalhe: "Agenda #" + agenda.id + (servicoId ? " · serviço #" + servicoId : ""),
+  });
+  return { agendaId: agendaFeita.id, servicoId, proximaAcao: dados.proximaAcao ?? null, historicoId: historico.id };
+}
+async function aplicarEntregaConcluidaOperacional(db, eventoId, dados) {
+  if (!dados.agendaId) throw new Error("Entrega concluída exige agendaId.");
+  const agenda = await lerRegistro(db, "agenda", dados.agendaId);
+  if (!agenda) throw new Error("Compromisso de entrega não encontrado.");
+  const servicoId = dados.servicoId || agenda.servico_id || null;
+  if (!servicoId) throw new Error("Entrega precisa estar vinculada a um serviço.");
+  if (agenda.servico_id && dados.servicoId && agenda.servico_id !== dados.servicoId) throw new Error("A agenda pertence a outro serviço.");
+  const servico = await lerRegistro(db, "servicos", servicoId);
+  if (!servico) throw new Error("Serviço não encontrado.");
+  if (!["agendado", "producao", "entregue"].includes(servico.status)) throw new Error("Serviço em " + servico.status + " não pode ser entregue.");
+  const valor = validarValorPositivo(dados.valor || servico.valor_orcamento, "valor do serviço");
+  const dataReal = dados.data || hojeISO();
+  const { data: atualizado, error } = await db.from("servicos").update({
+    status: "entregue", valor_orcamento: valor, proxima_acao: null, atualizado_em: new Date().toISOString(),
+  }).eq("id", servicoId).select("*").single();
+  if (error) throw error;
+  const agendaFeita = await concluirAgendaDaOperacao(db, agenda.id, dataReal, servicoId);
+  const historico = await registrarHistoricoDaOperacao(db, eventoId, "entrega", {
+    o_que: "Serviço entregue", por: dados.por || "claude",
+    detalhe: "Serviço #" + servicoId + " · agenda #" + agenda.id + " · valor " + valor,
+  });
+  const { data: caixas, error: cxErr } = await db.from("caixa_entrada").select("id,conversa,processado").eq("processado", false);
+  if (cxErr) throw cxErr;
+  const remarcacoes = (caixas || []).filter((item) => ultimaMetaRemarcacao(item)?.servico_id === servicoId);
+  for (const pendencia of remarcacoes) await resolverPendenciaTerminal(db, { pendenciaId: pendencia.id, servicoId });
+  let financeiroId = null;
+  if (dados.recebimento) {
+    const recebimento = typeof dados.recebimento === "object" ? dados.recebimento : {};
+    const fin = await registrarFinanceiroDaOperacao(db, eventoId, {
+      tipo: "entrada", escopo: "empresa", categoria: recebimento.categoria || "Serviço",
+      status: recebimento.status || "pago", valor: recebimento.valor || valor, data: recebimento.data || dataReal,
+      descricao: recebimento.descricao || "Recebimento — " + (servico.titulo || "serviço"),
+      servicoId, agendaId: agenda.id,
+    }, "financeiro:recebimento-entrega");
+    financeiroId = fin.registro.id;
+  }
+  return { servicoId, statusServico: atualizado.status, valor, agendaId: agendaFeita.id, historicoId: historico.id, financeiroId, remarcacoesEncerradas: remarcacoes.length };
+}
+async function aplicarServicoFechadoOperacional(db, eventoId, dados) {
+  if (!dados.servicoId) throw new Error("Serviço fechado exige servicoId.");
+  const servico = await lerRegistro(db, "servicos", dados.servicoId);
+  if (!servico) throw new Error("Serviço não encontrado.");
+  if (!["lead", "orcamento", "agendado"].includes(servico.status)) throw new Error("Serviço em " + servico.status + " não pode ser fechado de novo.");
+  const prazo = dados.prazo || servico.prazo;
+  if (!prazo) throw new Error("Serviço ativo exige prazo.");
+  if (dados.precisaMaterial !== false && !dados.fornecedorId) throw new Error("Trabalho fechado precisa do fornecedor para planejar o material. Se ainda não souber, pergunte na Caixa.");
+  const valorServico = dados.valorServico ?? dados.valor;
+  const valor = valorServico ? validarValorPositivo(valorServico, "valor do orçamento") : servico.valor_orcamento;
+  const { data: atualizado, error } = await db.from("servicos").update({
+    status: "agendado", prazo, valor_orcamento: valor || null,
+    proxima_acao: dados.fornecedorId ? "Planejar compra do material" : (dados.proximaAcao || "Definir próxima ação"),
+    atualizado_em: new Date().toISOString(),
+  }).eq("id", servico.id).select("*").single();
+  if (error) throw error;
+  let material = null;
+  if (dados.fornecedorId) material = await aplicarMaterialPlanejadoOperacional(db, eventoId, {
+    servicoId: servico.id, fornecedorId: dados.fornecedorId, valor: dados.valorMaterial,
+    descricao: dados.descricaoMaterial, dataNecessidade: dados.dataNecessidade, dataEntrega: dados.dataEntrega,
+    por: dados.por || "claude",
+  });
+  await registrarHistoricoDaOperacao(db, eventoId, "servico-fechado", { o_que: "Serviço fechado", por: dados.por || "claude", detalhe: "Serviço #" + servico.id + (material?.agendaId ? " · compra agenda #" + material.agendaId : "") });
+  return { servicoId: servico.id, statusServico: atualizado.status, material };
+}
+async function processarEventoOperacaoBahia(db, evento) {
+  if (!db) throw new Error("Conexão do app indisponível.");
+  const checkpoint = await iniciarEventoOperacao(db, evento);
+  if (checkpoint.jaConcluido) return { ok: true, jaConcluido: true, eventoId: evento.eventoId, resultado: checkpoint.resultado };
+  try {
+    await marcarEtapaEvento(db, checkpoint.id, "aplicando", checkpoint.resultado);
+    let resultado;
+    const dados = evento.dados || {};
+    switch (evento.tipo) {
+      case "financeiro": resultado = await aplicarFinanceiroOperacional(db, evento.eventoId, dados); break;
+      case "entrada_servico": resultado = await aplicarEntradaServicoOperacional(db, evento.eventoId, dados); break;
+      case "pro_labore": resultado = await aplicarProLaboreOperacional(db, evento.eventoId, dados); break;
+      case "vale_entregue": resultado = await aplicarValeEntregueOperacional(db, evento.eventoId, dados); break;
+      case "vale_abatido": resultado = await aplicarValeAbatidoOperacional(db, evento.eventoId, dados); break;
+      case "servico_fechado": resultado = await aplicarServicoFechadoOperacional(db, evento.eventoId, dados); break;
+      case "material_planejado": resultado = await aplicarMaterialPlanejadoOperacional(db, evento.eventoId, dados); break;
+      case "material_em_transito": resultado = await aplicarMaterialEmTransitoOperacional(db, evento.eventoId, dados); break;
+      case "material_em_maos": resultado = await aplicarMaterialEmMaosOperacional(db, evento.eventoId, dados); break;
+      case "compromisso_concluido": resultado = await aplicarCompromissoConcluidoOperacional(db, evento.eventoId, dados); break;
+      case "entrega_concluida": resultado = await aplicarEntregaConcluidaOperacional(db, evento.eventoId, dados); break;
+      case "remarcacao_com_data": resultado = await resolverPendenciaComSucessor(db, dados); break;
+      case "remarcacao_terminal": resultado = await resolverPendenciaTerminal(db, dados); break;
+      default: throw new Error("Tipo de operação não suportado: " + evento.tipo);
+    }
+    await marcarEtapaEvento(db, checkpoint.id, "verificando", resultado);
+    await concluirEventoOperacao(db, checkpoint.id, resultado);
+    return { ok: true, jaConcluido: false, eventoId: evento.eventoId, resultado };
+  } catch (error) {
+    await falharEventoOperacao(db, checkpoint.id, error);
+    throw error;
+  }
+}
+
 const DIAS_SEMANA_MAP = { domingo: 0, segunda: 1, terca: 2, quarta: 3, quinta: 4, sexta: 5, sabado: 6 };
 function proximaEntregaFornecedor(diasEntrega) {
   if (!diasEntrega) return null;
@@ -671,6 +1314,24 @@ function Home() {
 
   useEffect(() => { if (demo || session) loadAll(); }, [demo, session, loadAll]);
   useEffect(() => { window.localStorage.setItem("tb-novo-modo", mode); }, [mode]);
+  // Claude usa a MESMA conexão autenticada que o app já mantém. Isso evita criar clientes supabase-js em
+  // sequência no console (a causa do congelamento observado) e, principalmente, impede que ele replique
+  // manualmente uma cadeia de gravações. A API não expõe token, sessão nem o cliente bruto.
+  useEffect(() => {
+    if (!db || !session || demo) return;
+    const api = Object.freeze({
+      versao: 1,
+      tipos: Object.freeze(["financeiro", "entrada_servico", "pro_labore", "vale_entregue", "vale_abatido", "servico_fechado", "material_planejado", "material_em_transito", "material_em_maos", "compromisso_concluido", "entrega_concluida", "remarcacao_com_data", "remarcacao_terminal"]),
+      processar: async (evento) => {
+        const resultado = await processarEventoOperacaoBahia(db, evento);
+        await loadAll();
+        return resultado;
+      },
+      instrucoes: () => ({ chat: PROTOCOLO_CHAT_OPERACAO, claude: PROTOCOLO_CLAUDE_OPERACAO }),
+    });
+    window.TB_OPERACOES = api;
+    return () => { if (window.TB_OPERACOES === api) delete window.TB_OPERACOES; };
+  }, [db, session, demo, loadAll]);
 
   useEffect(() => {
     if (demo) { setPinState("ok"); return; }
@@ -734,7 +1395,9 @@ function Home() {
     } catch (error) { notify("Erro no backup: " + error.message, "error"); }
   }, [db, notify]);
 
-  const activeServices = useMemo(() => services.filter((service) => !["pago", "perdido"].includes(service.status)), [services]);
+  // Trabalho ativo e cobrança são visões diferentes. Entregue continua disponível ao Financeiro, mas não
+  // pode reaparecer em Leads, "sem próxima ação", capacidade ou fila do profissional.
+  const activeServices = useMemo(() => services.filter((service) => STATUS_VIVOS.includes(service.status)), [services]);
   // COLEÇÃO CENTRAL — todo consumidor de "compromissos que existem de verdade" usa ISTO, nunca o estado
   // bruto `appointments` diretamente. Correção de 25/07/2026: antes só o Painel escondia o card de um
   // compromisso com pendência de remarcação aberta; Agenda, rota, Compras e o seletor de horário do
@@ -814,6 +1477,7 @@ function Home() {
   async function finishCustomer(item) {
     if (!form.name.trim() || !form.service.trim() || !form.nextAction.trim() || !form.due) { notify("Nome, serviço, próxima ação e data são obrigatórios.", "error"); return; }
     if (form.addAgenda && form.agendaType === "presencial" && !form.city.trim()) { notify("Compromisso presencial precisa de cidade.", "error"); return; }
+    if (form.serviceStatus === "agendado" && form.precisaMaterial && !form.fornecedorId) { notify("Trabalho fechado precisa do fornecedor para o app planejar a compra. Se ainda não sabe, mande a pergunta ao Diego.", "error"); return; }
     const telefone = corrigirTelefone(form.phone);
     if (telefone === null) { notify("Telefone incompleto — celular precisa de DDD + 8 ou 9 dígitos.", "error"); return; }
     if (demo) { await resolveInbox(item, "Ficha e lead criados na demonstração"); notify("Triagem concluída na demonstração.", "ok"); return; }
@@ -831,6 +1495,20 @@ function Home() {
         const { data, error } = await db.from("servicos").insert({ cliente_id: customer.id, titulo: form.service.trim(), status: form.serviceStatus, prioridade: form.priority, proxima_acao: form.nextAction.trim(), prazo: form.due, valor_orcamento: Number(form.value.replace(",", ".")) || null, responsavel: form.responsavel.trim() || null }).select("*").single();
         if (error) throw error; service = data;
       }
+      // "Agendado" é trabalho fechado. O fechamento chama a mesma operação usada pelo documento do Drive:
+      // ela calcula a compra pelo fornecedor e não deixa Serviço e Agenda divergirem.
+      if (form.serviceStatus === "agendado") {
+        const fechado = await processarEventoOperacaoBahia(db, {
+          tipo: "servico_fechado", eventoId: "caixa-" + item.id + "-servico-fechado",
+          textoOriginal: parsedSelected.text,
+          dados: {
+            servicoId: service.id, prazo: form.due, valorServico: Number(form.value.replace(",", ".")) || null,
+            proximaAcao: form.nextAction.trim(), precisaMaterial: form.precisaMaterial,
+            fornecedorId: form.precisaMaterial ? form.fornecedorId : null, por: mode,
+          },
+        });
+        service = { ...service, status: fechado.resultado.statusServico };
+      }
       if (form.addAgenda) {
         const occupied = agendaVisivel.filter((entry) => entry.data === form.due && entry.tipo === "presencial").map((entry) => entry.hora?.slice(0, 5));
         const fallback = horariosParaTipo(form.due, form.agendaType, occupied)[0] || "18:00";
@@ -843,7 +1521,8 @@ function Home() {
         const { data: photo } = await db.from("fotos").select("id").eq("cliente_id", customer.id).eq("url", parsedSelected.imageUrl).limit(1);
         if (!photo?.length) await db.from("fotos").insert({ cliente_id: customer.id, url: parsedSelected.imageUrl, tipo: "outro" });
       }
-      await db.from("historico").insert({ o_que: `Triagem concluída: ${form.service.trim()}`, por: mode, detalhe: `Fonte caixa_entrada#${item.id} · cliente#${customer.id} · serviço#${service.id}` });
+      const { error: hErr } = await db.from("historico").insert({ o_que: `Triagem concluída: ${form.service.trim()}`, por: mode, detalhe: `Fonte caixa_entrada#${item.id} · cliente#${customer.id} · serviço#${service.id}` });
+      if (hErr) throw hErr;
       await resolveInbox(item, `cliente #${customer.id} · serviço #${service.id}`);
       await loadAll(); notify("Ficha e serviço conferidos e salvos.", "ok");
     } catch (error) { notify(`Nada foi encerrado: ${error.message}`, "error"); }
@@ -867,16 +1546,19 @@ function Home() {
   }
 
   async function finishFinance(item) {
-    if (mode === "claude") { notify("Financeiro exige Diego.", "error"); return; }
     const value = Number(form.value.replace(",", "."));
     if (!form.service.trim() || !form.due || !(value > 0)) { notify("Descrição, valor e data são obrigatórios.", "error"); return; }
     if (demo) { await resolveInbox(item, "Lançamento criado na demonstração"); notify("Lançamento registrado.", "ok"); return; }
     setBusy(true);
     try {
-      const payload = { tipo: form.financeType, escopo: form.financeScope, categoria: "Outro", valor: value, descricao: form.service.trim(), status: form.financeStatus, data: form.due };
-      const { data: same } = await db.from("financeiro").select("id").eq("tipo", payload.tipo).eq("valor", payload.valor).eq("data", payload.data).eq("descricao", payload.descricao).limit(1);
-      let id = same?.[0]?.id;
-      if (!id) { const { data, error } = await db.from("financeiro").insert(payload).select("id").single(); if (error) throw error; id = data.id; }
+      const operacao = await processarEventoOperacaoBahia(db, {
+        tipo: "financeiro", eventoId: "caixa-" + item.id + "-financeiro",
+        textoOriginal: parsedSelected.text, dados: {
+          tipo: form.financeType, escopo: form.financeScope, categoria: "Outro", valor: value,
+          descricao: form.service.trim(), status: form.financeStatus, data: form.due,
+        },
+      });
+      const id = operacao.resultado.financeiroId;
       await resolveInbox(item, `financeiro #${id}`); await loadAll(); notify("Lançamento salvo sem duplicar.", "ok");
     } catch (error) { notify(`Nada foi encerrado: ${error.message}`, "error"); }
     finally { setBusy(false); }
@@ -937,7 +1619,12 @@ function Home() {
 
   async function copyContext() {
     const items = [...(working ? [working] : []), ...claudeQueue].slice(0, 8);
-    const lines = ["TAPEÇARIA BAHIA — CONTEXTO ENXUTO", "Regra: uma entrada por vez; pesquisar antes de criar; nunca excluir/enviar/pagar no modo Claude.", ""];
+    const lines = [
+      "TAPEÇARIA BAHIA — CONTEXTO ENXUTO",
+      "Regra: uma entrada por vez; pesquisar antes de criar; nunca excluir.",
+      "Financeiro, material, entrega e remarcação: usar somente window.TB_OPERACOES.processar. Nunca criar outro cliente Supabase nem repetir a cadeia em tabelas separadas.",
+      "",
+    ];
     items.forEach((item, index) => { const parsed = parseInbox(item.texto); const last = [...(item.conversa || [])].reverse().find((message) => message.tipo !== "sistema"); lines.push(`${index + 1}. [${item.status || "novo"}] #${item.id}: ${parsed.text.slice(0, 360) || "[print]"}`); if (last) lines.push(`Última mensagem (${last.de}): ${last.texto.slice(0, 180)}`); });
     await navigator.clipboard.writeText(lines.join("\n")); notify("Contexto enxuto copiado.", "ok");
   }
@@ -948,8 +1635,13 @@ function Home() {
   // Atualização otimista: some da tela na hora; o loadAll depois só reconcilia com o banco.
   const aplicarResolucao = useCallback((patch) => {
     if (!patch) return;
-    if (patch.servicoId) setServices((prev) => prev.map((s) => s.id === patch.servicoId ? { ...s, proxima_acao: patch.proximaAcao ?? null } : s));
-    if (patch.agendaId) setAppointments((prev) => prev.filter((a) => a.id !== patch.agendaId));
+    if (patch.servicoId) setServices((prev) => prev.map((s) => s.id === patch.servicoId ? {
+      ...s,
+      proxima_acao: patch.proximaAcao !== undefined ? patch.proximaAcao : s.proxima_acao,
+      status: patch.statusServico || s.status,
+      valor_orcamento: patch.valorServico || s.valor_orcamento,
+    } : s));
+    if (patch.agendaId && patch.removerAgenda !== false) setAppointments((prev) => prev.filter((a) => a.id !== patch.agendaId));
   }, []);
 
   if (booting) return <div className="loading-screen"><div className="brand-seal">TB</div><p>Preparando a central…</p></div>;
@@ -977,7 +1669,7 @@ function Home() {
     <aside className="side-nav">
       <div className="side-brand"><div className="brand-seal small">TB</div><div><strong>Tapeçaria Bahia</strong><span>Central operacional</span></div></div>
       <nav>{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setSelectedId(null); }}><i>{item.icon}</i><span>{item.label}</span>{item.count !== undefined && <b>{item.count}</b>}</button>)}</nav>
-      <div className="operator-card"><span>Operador atual</span><strong>{mode === "claude" ? "Claude" : "Diego"}</strong><small>{mode === "claude" ? "Ações críticas bloqueadas" : "Controle e aprovações"}</small><button onClick={() => setMode(mode === "claude" ? "diego" : "claude")}>Trocar para {mode === "claude" ? "Diego" : "Claude"}</button></div>
+      <div className="operator-card"><span>Operador atual</span><strong>{mode === "claude" ? "Claude" : "Diego"}</strong><small>{mode === "claude" ? "Operações tipadas liberadas · exclusões bloqueadas" : "Controle e aprovações"}</small><button onClick={() => setMode(mode === "claude" ? "diego" : "claude")}>Trocar para {mode === "claude" ? "Diego" : "Claude"}</button></div>
     </aside>
     <main className="workspace">
       <header className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{tab === "caixa" ? "Caixa de entrada" : nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
@@ -993,7 +1685,7 @@ function Home() {
         </section>
         <section className="triage-column">
           {!selected && <div className="triage-welcome"><div className="big-orb">◎</div><p className="kicker">UMA TAREFA POR VEZ</p><h2>{working ? "Retome a triagem em andamento" : claudeQueue.length ? "Abra o próximo item da fila" : "Nada pede ação agora"}</h2><p>O conteúdo original, as buscas e o formulário ficam juntos para evitar releitura e cliques errados.</p>{working ? <button className="primary" onClick={() => setSelectedId(working.id)}>Retomar</button> : claudeQueue[0] && <button className="primary" onClick={() => claim(claudeQueue[0])}>Pegar próximo item</button>}</div>}
-          {selected && <TriagePanel item={selected} parsed={parsedSelected} mode={mode} form={form} updateForm={updateForm} customers={customers} duplicateCustomers={duplicateCustomers} services={services} appointments={agendaVisivel} finances={finances} busy={busy} reply={reply} setReply={setReply} onClaim={() => claim(selected)} onRelease={() => release(selected)} onAnswer={() => answer(selected)} onCustomer={() => finishCustomer(selected)} onAgenda={() => finishAgenda(selected)} onFinance={() => finishFinance(selected)} onAsk={() => askDiego(selected)} onEdit={(texto) => editInboxNote(selected, texto)} onDelete={() => deleteInboxItem(selected)} />}
+          {selected && <TriagePanel item={selected} parsed={parsedSelected} mode={mode} form={form} updateForm={updateForm} customers={customers} duplicateCustomers={duplicateCustomers} services={services} appointments={agendaVisivel} finances={finances} fornecedores={fornecedores} busy={busy} reply={reply} setReply={setReply} onClaim={() => claim(selected)} onRelease={() => release(selected)} onAnswer={() => answer(selected)} onCustomer={() => finishCustomer(selected)} onAgenda={() => finishAgenda(selected)} onFinance={() => finishFinance(selected)} onAsk={() => askDiego(selected)} onEdit={(texto) => editInboxNote(selected, texto)} onDelete={() => deleteInboxItem(selected)} />}
         </section>
       </div>}
 
@@ -1065,12 +1757,17 @@ function GuiaModal({ db, demo, notify, onClose }) {
     setSavingSec("");
     if (error) notify("Erro: " + error.message, "error"); else notify("Guia atualizado.", "ok");
   };
+  const copiarProtocolos = async () => {
+    await navigator.clipboard.writeText(PROTOCOLO_CHAT_OPERACAO + "\n\n---\n\n" + PROTOCOLO_CLAUDE_OPERACAO);
+    notify("Instruções do chat e do Claude copiadas.", "ok");
+  };
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="modal-card">
-      <div className="modal-head"><div><p className="kicker">CARTILHA DA IA</p><h2>Guia da IA</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
-      <p className="modal-intro">A cartilha que qualquer IA lê antes de operar. Edite para mudar como a IA se comporta.</p>
+      <div className="modal-head"><div><p className="kicker">CARTILHA DA IA</p><h2>Guia da IA</h2></div><div className="ficha-actions"><button className="ghost" onClick={copiarProtocolos}>Copiar instruções pro chat</button><button className="ghost" onClick={onClose}>Fechar</button></div></div>
+      <p className="modal-intro">As regras críticas são travas do app. Este guia explica ao chat como estruturar os fatos e ao Claude como chamar a porta única sem duplicar.</p>
       {rows === null ? <div className="empty-state"><b>Carregando…</b></div> : <>
         <div className="guia-block readonly"><h3>Regras automáticas vigentes</h3><pre>{REGRAS_SISTEMA_ATUAIS}</pre></div>
+        <div className="guia-block readonly"><h3>Protocolo do chat e do Claude</h3><pre>{PROTOCOLO_CHAT_OPERACAO + "\n\n" + PROTOCOLO_CLAUDE_OPERACAO}</pre></div>
         {["empresa", "como_agir", "regras"].map((sec) => <div className="guia-block" key={sec}><h3>{SECAO_LABEL[sec]}</h3><textarea value={drafts[sec]} onChange={(e) => setDrafts((d) => ({ ...d, [sec]: e.target.value }))} /><button className="primary" onClick={() => save(sec)} disabled={savingSec === sec}>{savingSec === sec ? "Salvando…" : "Salvar"}</button></div>)}
       </>}
     </div>
@@ -1083,14 +1780,14 @@ function QueueItem({ item, selected, onOpen }) {
 }
 
 function TriagePanel(props) {
-  const { item, parsed, mode, form, updateForm, customers, duplicateCustomers, services, appointments, busy, reply, setReply } = props;
+  const { item, parsed, mode, form, updateForm, customers, duplicateCustomers, services, appointments, fornecedores, busy, reply, setReply } = props;
   const status = item.status || "novo";
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(parsed.text);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [profissionalAberto, setProfissionalAberto] = useState(null);
   useEffect(() => { setEditText(parsed.text); setEditing(false); setConfirmDelete(false); }, [item.id]);
-  const relatedServices = form.customerId ? services.filter((entry) => entry.cliente_id === form.customerId && !["pago", "perdido"].includes(entry.status)) : [];
+  const relatedServices = form.customerId ? services.filter((entry) => entry.cliente_id === form.customerId && STATUS_VIVOS.includes(entry.status)) : [];
   const cityConflicts = form.due && form.agendaType === "presencial" ? appointments.filter((entry) => entry.data === form.due && entry.tipo === "presencial" && entry.cidade && form.city && entry.cidade.toLowerCase() !== form.city.toLowerCase()) : [];
   const porProfissional = useMemo(() => {
     const map = {};
@@ -1112,7 +1809,7 @@ function TriagePanel(props) {
     {status === "aguardando_voce" && <div className="answer-box"><label>Sua resposta para o Claude<textarea value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Responda aqui; a entrada voltará automaticamente para a fila do Claude." /></label><button className="primary" onClick={props.onAnswer} disabled={!reply.trim()}>Enviar resposta</button></div>}
     {["novo", "respondido"].includes(status) && <div className="claim-box"><h3>Esta entrada ainda não está travada.</h3><p>Assuma antes de alterar dados. Se outra sessão já pegou, esta operação será recusada.</p><button className="primary" onClick={props.onClaim} disabled={busy}>Iniciar triagem segura</button></div>}
     {status === "em_processamento" && <>
-      <div className="classify"><p className="kicker">1 · CLASSIFICAR RESULTADO</p>{[['cliente','Cliente e serviço'],['agenda','Compromisso avulso'],['financeiro','Financeiro avulso']].map(([id, label]) => <button key={id} className={form.kind === id ? "active" : ""} onClick={() => updateForm("kind", id)} disabled={id === "financeiro" && mode === "claude"}>{label}{id === "financeiro" && mode === "claude" ? " · Diego" : ""}</button>)}</div>
+      <div className="classify"><p className="kicker">1 · CLASSIFICAR RESULTADO</p>{[['cliente','Cliente e serviço'],['agenda','Compromisso avulso'],['financeiro','Financeiro avulso']].map(([id, label]) => <button key={id} className={form.kind === id ? "active" : ""} onClick={() => updateForm("kind", id)}>{label}</button>)}</div>
       {form.kind === "cliente" && <div className="form-grid">
         <p className="form-title">2 · Cliente e serviço</p>
         <label>Cliente existente<select value={form.customerId} onChange={(event) => { const customer = customers.find((entry) => entry.id === event.target.value); updateForm("customerId", event.target.value); if (customer) { updateForm("name", customer.nome); updateForm("phone", customer.telefone || ""); updateForm("city", customer.cidade || ""); updateForm("address", customer.endereco || ""); } }}><option value="">Criar ou localizar pelos dados</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.nome}{customer.telefone ? ` · ${customer.telefone}` : ""}</option>)}</select></label>
@@ -1123,6 +1820,10 @@ function TriagePanel(props) {
         {!!relatedServices.length && <div className="duplicate-warning"><b>Serviços abertos deste cliente</b>{relatedServices.map((service) => <span key={service.id}>{service.titulo} · {statusLabel[service.status]}</span>)}</div>}
         <div className="row three"><label>Status<select value={form.serviceStatus} onChange={(event) => updateForm("serviceStatus", event.target.value)}><option value="lead">Novo lead</option><option value="orcamento">Orçamento</option><option value="agendado">Agendado</option></select></label><label>Prioridade<select value={form.priority} onChange={(event) => updateForm("priority", event.target.value)}><option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option></select></label><label>Orçamento R$<input value={form.value} inputMode="decimal" onChange={(event) => updateForm("value", event.target.value)} /></label></div>
         <label>Responsável (profissional)<input value={form.responsavel} onChange={(event) => updateForm("responsavel", event.target.value)} placeholder="Nome de quem vai fazer" /></label>
+        {form.serviceStatus === "agendado" && <div className="sub-form">
+          <label className="check"><input type="checkbox" checked={form.precisaMaterial} onChange={(event) => updateForm("precisaMaterial", event.target.checked)} />Este trabalho precisa comprar material</label>
+          {form.precisaMaterial && <label>Fornecedor do material*<select value={form.fornecedorId} onChange={(event) => updateForm("fornecedorId", event.target.value)}><option value="">Escolha para o app planejar a compra…</option>{(fornecedores || []).map((f) => <option key={f.id} value={f.id}>{f.nome}{f.dias_entrega ? " · entrega" : " · buscar"}</option>)}</select></label>}
+        </div>}
         {Object.keys(porProfissional).length > 0 && <div className="capacidade-profissionais">
           <p className="kicker">Capacidade dos profissionais</p>
           {Object.entries(porProfissional).sort((a, b) => b[1].length - a[1].length).map(([nome, lista]) => { const aberto = profissionalAberto === nome; return <div className={`capacidade-item ${form.responsavel.trim() === nome ? "active" : ""}`} key={nome}>
@@ -1136,11 +1837,11 @@ function TriagePanel(props) {
         <label>Data da próxima ação*<input type="date" value={form.due} onChange={(event) => updateForm("due", event.target.value)} /></label>
         <label className="check"><input type="checkbox" checked={form.addAgenda} onChange={(event) => updateForm("addAgenda", event.target.checked)} />Também criar/atualizar compromisso na Agenda</label>
         {form.addAgenda && <div className="sub-form"><div className="row"><label>Tipo<select value={form.agendaType} onChange={(event) => updateForm("agendaType", event.target.value)}><option value="remoto">Remoto</option><option value="presencial">Presencial</option></select></label><label>Hora (opcional)<input type="time" value={form.time} onChange={(event) => updateForm("time", event.target.value)} /></label></div>{cityConflicts.length > 0 && <div className="danger-box">Conflito de cidade nesse dia: {cityConflicts.map((entry) => `${entry.hora} ${entry.cidade}`).join(" · ")}. Diego precisa revisar.</div>}</div>}
-        <ReviewBox lines={[`Cliente: ${form.customerId ? "reutilizar ficha" : "procurar/criar"} ${form.name || "—"}`, `Serviço: ${form.service || "—"} · ${statusLabel[form.serviceStatus]}`, `Próxima ação: ${form.nextAction || "—"} · ${form.due || "sem data"}`, form.addAgenda ? `Agenda: ${form.agendaType} ${form.time || "horário automático"}` : "Agenda: não criar"]} />
+        <ReviewBox lines={[`Cliente: ${form.customerId ? "reutilizar ficha" : "procurar/criar"} ${form.name || "—"}`, `Serviço: ${form.service || "—"} · ${statusLabel[form.serviceStatus]}`, `Próxima ação: ${form.nextAction || "—"} · ${form.due || "sem data"}`, form.serviceStatus === "agendado" && form.precisaMaterial ? `Material: planejar com ${(fornecedores || []).find((f) => f.id === form.fornecedorId)?.nome || "fornecedor não escolhido"}` : "Material: sem planejamento automático", form.addAgenda ? `Agenda: ${form.agendaType} ${form.time || "horário automático"}` : "Agenda: não criar"]} />
         <button className="primary wide" onClick={props.onCustomer} disabled={busy}>Confirmar triagem</button>
       </div>}
       {form.kind === "agenda" && <div className="form-grid"><p className="form-title">2 · Compromisso avulso</p><label>Compromisso*<input value={form.service} onChange={(event) => updateForm("service", event.target.value)} /></label><div className="row"><label>Data*<input type="date" value={form.due} onChange={(event) => updateForm("due", event.target.value)} /></label><label>Hora<input type="time" value={form.time} onChange={(event) => updateForm("time", event.target.value)} /></label></div><div className="row"><label>Tipo<select value={form.agendaType} onChange={(event) => updateForm("agendaType", event.target.value)}><option value="remoto">Remoto</option><option value="presencial">Presencial</option></select></label><label>Cidade presencial<input value={form.city} onChange={(event) => updateForm("city", event.target.value)} disabled={form.agendaType === "remoto"} /></label></div><ReviewBox lines={[form.service || "Sem título", `${form.due || "sem data"} · ${form.time || "primeiro horário livre"}`, `${form.agendaType}${form.city ? ` · ${form.city}` : ""}`]} /><button className="primary wide" onClick={props.onAgenda} disabled={busy}>Confirmar compromisso</button></div>}
-      {form.kind === "financeiro" && mode === "diego" && <div className="form-grid"><p className="form-title">2 · Financeiro avulso</p><label>Descrição*<input value={form.service} onChange={(event) => updateForm("service", event.target.value)} /></label><div className="row three"><label>Valor R$*<input value={form.value} onChange={(event) => updateForm("value", event.target.value)} /></label><label>Tipo<select value={form.financeType} onChange={(event) => updateForm("financeType", event.target.value)}><option value="saida">Saída</option><option value="entrada">Entrada</option></select></label><label>Status<select value={form.financeStatus} onChange={(event) => updateForm("financeStatus", event.target.value)}><option value="a_pagar">A pagar</option><option value="a_receber">A receber</option><option value="pago">Pago</option></select></label></div><label>Aba<select value={form.financeScope} onChange={(event) => updateForm("financeScope", event.target.value)}><option value="empresa">Empresa</option><option value="pessoal">Pessoal</option></select></label><label>Data*<input type="date" value={form.due} onChange={(event) => updateForm("due", event.target.value)} /></label><ReviewBox lines={[form.service || "Sem descrição", `${form.financeType} · ${form.financeStatus}`, `${money(form.value)} · ${form.due || "sem data"}`]} /><button className="primary wide" onClick={props.onFinance} disabled={busy}>Confirmar lançamento</button></div>}
+      {form.kind === "financeiro" && <div className="form-grid"><p className="form-title">2 · Financeiro avulso</p><label>Descrição*<input value={form.service} onChange={(event) => updateForm("service", event.target.value)} /></label><div className="row three"><label>Valor R$*<input value={form.value} onChange={(event) => updateForm("value", event.target.value)} /></label><label>Tipo<select value={form.financeType} onChange={(event) => updateForm("financeType", event.target.value)}><option value="saida">Saída</option><option value="entrada">Entrada</option></select></label><label>Status<select value={form.financeStatus} onChange={(event) => updateForm("financeStatus", event.target.value)}><option value="a_pagar">A pagar</option><option value="a_receber">A receber</option><option value="pago">Pago</option></select></label></div><label>Aba<select value={form.financeScope} onChange={(event) => updateForm("financeScope", event.target.value)}><option value="empresa">Empresa</option><option value="pessoal">Pessoal</option></select></label><label>Data*<input type="date" value={form.due} onChange={(event) => updateForm("due", event.target.value)} /></label><p className="ficha-note">Use isto só para fato realmente avulso. Material, Vale, Pró-labore e recebimento de serviço têm operação própria.</p><ReviewBox lines={[form.service || "Sem descrição", `${form.financeType} · ${form.financeStatus}`, `${money(form.value)} · ${form.due || "sem data"}`]} /><button className="primary wide" onClick={props.onFinance} disabled={busy}>Confirmar lançamento</button></div>}
       <div className="ask-panel"><p className="kicker">OU · PEDIR INFORMAÇÃO</p><p>Antes de perguntar, confirme que a resposta não está no próprio sistema.</p><div className="audit-checks"><label><input type="checkbox" checked={form.checkedCustomers} onChange={(event) => updateForm("checkedCustomers", event.target.checked)} />Clientes e serviços</label><label><input type="checkbox" checked={form.checkedAgenda} onChange={(event) => updateForm("checkedAgenda", event.target.checked)} />Agenda</label><label><input type="checkbox" checked={form.checkedFinance} onChange={(event) => updateForm("checkedFinance", event.target.checked)} />Financeiro</label></div><textarea value={form.question} onChange={(event) => updateForm("question", event.target.value)} placeholder="Qual dado crítico falta para decidir?" /><button className="secondary" onClick={props.onAsk} disabled={busy}>Perguntar ao Diego e pausar</button></div>
     </>}
   </div>;
@@ -1374,18 +2075,19 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       // FALTANDO MATERIAL: é um ESTADO DERIVADO, não um status no banco. Pedido do Diego (25/07): entre
       // "fechado" e "produção" existe um degrau — o material ainda não está na mão do profissional, e isso
       // tem que acender um alerta que só apaga quando o material chega. Derivar em vez de criar status novo
-      // evita dessincronizar: se a compra está lançada como paga, o alerta apaga sozinho.
-      // Falta material quando o serviço fechado tem compra de material ainda "a pagar" (lista de compras),
-      // ou tem loja registrada na ficha e nenhuma compra paga vinculada a ele.
-      const matPendente = (finances || []).filter((f) => ehCompraMaterial(f) && f.status === "a_pagar" && f.servico_id);
-      const idsPendentes = new Set(matPendente.map((f) => f.servico_id));
-      const comMatPago = new Set((finances || []).filter((f) => ehCompraMaterial(f) && f.status === "pago" && f.servico_id).map((f) => f.servico_id));
-      const faltando = services.filter((s) => ["agendado", "producao"].includes(s.status)
-        && (idsPendentes.has(s.id) || (s.loja_material && !comMatPago.has(s.id))));
+      // evita dessincronizar: só o evento explícito MATERIAL_EM_MAOS apaga o alerta. Pagar um pedido remoto
+      // não basta, porque o tecido ainda pode estar no caminhão.
+      const materiaisVinculados = (finances || []).filter((f) => ehCompraMaterial(f) && f.servico_id);
+      const fisicamentePendentes = materiaisVinculados.filter((f) => !materialEstaEmMaos(f));
+      const idsPendentes = new Set(fisicamentePendentes.map((f) => f.servico_id));
+      const comMatEmMaos = new Set((finances || []).filter((f) => ehCompraMaterial(f) && materialEstaEmMaos(f) && f.servico_id).map((f) => f.servico_id));
+      const faltando = services.filter((s) => (s.status === "agendado"
+        && (idsPendentes.has(s.id) || (s.loja_material && !comMatEmMaos.has(s.id))))
+        || (s.status === "producao" && idsPendentes.has(s.id)));
       if (!faltando.length) return null;
       return <section className="warning-card"><b>{faltando.length} serviço(s) esperando material</b>
         {faltando.slice(0, 6).map((s) => <span key={s.id}>{s.clientes?.nome || "Cliente"} · {s.titulo}{s.loja_material ? " · " + s.loja_material : ""}{s.prazo ? " · prazo " + compactDate(s.prazo) : ""}</span>)}
-        <span>O profissional não começa sem o material. Este aviso apaga sozinho quando a compra for lançada como paga.</span>
+        <span>O profissional não começa sem o material. Este aviso só apaga quando o fato "material em mãos" for confirmado; pedido pago em trânsito não apaga.</span>
       </section>;
     })()}
     {(() => {
@@ -1513,9 +2215,11 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
   const [busy, setBusy] = useState(false);
   const [valorCompra, setValorCompra] = useState("");
   const [fornecedorId, setFornecedorId] = useState((materiais || [])[0]?.fornecedor_id || "");
+  const [pagamentoConfirmado, setPagamentoConfirmado] = useState(false);
   const [valorEntrega, setValorEntrega] = useState(svc?.valor_orcamento ? String(svc.valor_orcamento) : "");
   const ehCompra = ehCompromissoDeCompra(appt, materiais);
   const ehEntrega = ehCompromissoDeEntrega(appt, svc);
+  const ehPedidoRemoto = ehCompra && appt.tipo === "remoto";
   const openParcial = () => { setPendente(sugerirPendente(appt.titulo)); setStep("parcial"); };
   // Compra pergunta o valor; entrega pergunta se o serviço acabou. O resto conclui direto como sempre.
   const concluirTotal = () => ehCompra ? setStep("compra") : ehEntrega ? setStep("entrega") : doTotal();
@@ -1524,12 +2228,25 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
   const doEntrega = async () => {
     const valor = Number(String(valorEntrega).replace(",", "."));
     if (!valor || valor <= 0) { notify("Qual foi o valor do serviço? Sem isso não dá pra marcar como entregue.", "error"); return; }
-    if (demo) { notify("Entregue (demo).", "ok"); doTotal(); return; }
+    if (!svc?.id) { notify("Esta entrega não está ligada a um serviço.", "error"); return; }
+    if (demo) { notify("Entregue (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: svc.id, statusServico: "entregue", valorServico: valor, proximaAcao: null }); return; }
     setBusy(true);
     try {
-      const { error } = await db.from("servicos").update({ status: "entregue", valor_orcamento: valor, proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", svc.id); if (error) throw error;
-      setBusy(false); doTotal();
-    } catch (e) { notify("Erro ao fechar o serviço: " + e.message, "error"); setBusy(false); }
+      const operacao = await processarEventoOperacaoBahia(db, {
+        tipo: "entrega_concluida", eventoId: "app-entrega-agenda-" + appt.id,
+        dados: { agendaId: appt.id, servicoId: svc.id, valor, data: hojeISO(), por: "diego" },
+      });
+      if (files.length) {
+        try {
+          const uploaded = await uploadFiles();
+          const nota = `Entrega concluída: "${appt.titulo}". Print(s) para conferir a ficha.${svc.id ? " (serviço #" + svc.id + ")" : ""}`;
+          const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
+        } catch (upErr) { notify("Entrega fechada, mas os prints não anexaram: " + upErr.message, "error"); }
+      }
+      notify("Entregue. Serviço, agenda e histórico foram atualizados juntos.", "ok");
+      onDone({ agendaId: appt.id, servicoId: svc.id, statusServico: "entregue", valorServico: valor, proximaAcao: null, resultado: operacao.resultado });
+    } catch (e) { notify("A entrega ficou visível para retomada: " + e.message, "error"); }
+    finally { setBusy(false); }
   };
   const uploadFiles = async () => {
     const uploaded = [];
@@ -1545,21 +2262,19 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
     if (demo) { notify("Concluído (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: null }); return; }
     setBusy(true);
     try {
-      // RESOLVEU ANTES DA HORA: ele adianta compromisso o tempo todo (liga hoje o que estava marcado pro dia 25).
-      // A data tem que virar o dia em que ACONTECEU, senão fica registro de algo "feito" numa data futura — foi
-      // assim que 14 clientes sumiram da tela. A trava trg_agenda_feito_no_futuro no banco recusa o contrário.
-      const { error } = await db.from("agenda").update({ status: "feito", data: appt.data > hojeISO() ? hojeISO() : appt.data }).eq("id", appt.id); if (error) throw error;
-      if (appt.servico_id) {
-        const { error: sErr } = await db.from("servicos").update({ proxima_acao: null, atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id); if (sErr) throw sErr;
-        await db.from("historico").insert({ o_que: `"${appt.titulo}" concluído`, por: "diego" });
-      }
+      await processarEventoOperacaoBahia(db, {
+        tipo: "compromisso_concluido", eventoId: "app-conclusao-agenda-" + appt.id,
+        dados: { agendaId: appt.id, servicoId: appt.servico_id || null, data: hojeISO(), proximaAcao: null, por: "diego" },
+      });
       if (files.length) {
-        const uploaded = await uploadFiles();
-        const nota = `Concluído: "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}. Print(s) anexado(s) pro Claude ver e atualizar a ficha/foto.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}`;
-        const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
+        try {
+          const uploaded = await uploadFiles();
+          const nota = `Concluído: "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}. Print(s) anexado(s) pro Claude ver e atualizar a ficha/foto.${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""}`;
+          const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
+        } catch (upErr) { notify("Compromisso concluído, mas os prints não anexaram: " + upErr.message, "error"); }
       }
       notify("Concluído.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: null });
-    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
+    } catch (e) { notify("A conclusão ficou visível para retomada: " + e.message, "error"); } finally { setBusy(false); }
   };
   // Lança o gasto e SÓ DEPOIS conclui: se a gravação do dinheiro falhar, o compromisso continua aberto,
   // porque compromisso fechado sem o gasto lançado é exatamente o que a gente está tentando evitar.
@@ -1567,42 +2282,52 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
     const valor = Number(String(valorCompra).replace(",", "."));
     if (!valor || valor <= 0) { notify("Quanto ficou a compra?", "error"); return; }
     if (!fornecedorId) { notify("De qual fornecedor? (Regra Nº 8: material sempre com fornecedor)", "error"); return; }
-    if (demo) { notify("Compra lançada (demo).", "ok"); doTotal(); return; }
+    if (demo) { notify("Compra lançada (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, statusServico: "producao", proximaAcao: "Produzir e acompanhar o prazo" }); return; }
     setBusy(true);
     try {
-      // GASTO EM DOBRO — corrigido em 25/07/2026. Antes, com DOIS OU MAIS materiais pendentes neste
-      // compromisso, o código caía no `else` e INSERIA uma saída nova, deixando as antigas na lista: o Diego
-      // pagava uma vez e o app registrava duas. Agora sempre quita um pendente (o primeiro da lista) e só
-      // insere quando realmente não existe nenhum. Os outros continuam pendentes pra ele fechar um por um.
       const pendentes = (materiais || []);
-      if (pendentes.length >= 1) {
-        const { error } = await db.from("financeiro").update({ status: "pago", valor, fornecedor_id: fornecedorId, data: hojeISO() }).eq("id", pendentes[0].id); if (error) throw error;
-        if (pendentes.length > 1) notify(`Lançado. Ainda faltam ${pendentes.length - 1} material(is) deste compromisso.`, "ok");
-      } else {
-        const { error } = await db.from("financeiro").insert({
-          tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MATERIAL, valor, status: "pago", data: hojeISO(),
-          descricao: appt.titulo, fornecedor_id: fornecedorId, servico_id: appt.servico_id || null, agenda_id: appt.id,
-        }); if (error) throw error;
-      }
-      // Material na mão => o serviço anda. Se ESTA gravação falhar, o Diego precisa saber: antes o erro era
-      // engolido e a tela dizia "comprado" com o serviço parado em agendado.
-      if (appt.servico_id && svc && svc.status === "agendado") {
-        const { error: sErr } = await db.from("servicos").update({ status: "producao", atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
-        if (sErr) notify("Compra lançada, mas o serviço NÃO entrou em produção: " + sErr.message, "error");
-      }
-      setBusy(false); doTotal();
-    } catch (e) { notify("Erro ao lançar a compra: " + e.message, "error"); setBusy(false); }
+      const alvo = pendentes[0] || null;
+      const servicoAlvo = alvo?.servico_id || appt.servico_id || null;
+      const faseEvento = ehPedidoRemoto ? "transito" : "em-maos";
+      const eventoId = alvo?.id ? "app-material-" + faseEvento + "-financeiro-" + alvo.id : "app-material-" + faseEvento + "-agenda-" + appt.id;
+      const operacao = await processarEventoOperacaoBahia(db, {
+        tipo: ehPedidoRemoto ? "material_em_transito" : "material_em_maos", eventoId,
+        dados: {
+          financeiroId: alvo?.id || null, servicoId: servicoAlvo, fornecedorId, valor,
+          data: hojeISO(), descricao: alvo?.descricao || appt.titulo, agendaId: appt.id,
+          fecharAgenda: true, pagamentoConfirmado: ehPedidoRemoto ? pagamentoConfirmado : true, por: "diego",
+        },
+      });
+      const r = operacao.resultado;
+      notify(ehPedidoRemoto
+        ? (pagamentoConfirmado ? "Pedido registrado e pago. O serviço aguarda o material chegar." : "Pedido registrado sem mexer no caixa. O serviço aguarda o material chegar.")
+        : (r.materiaisPendentes ? `Material registrado. Ainda faltam ${r.materiaisPendentes} item(ns); o serviço ainda não iniciou produção.` : "Material em mãos. O serviço entrou em produção."), "ok");
+      onDone({ agendaId: appt.id, removerAgenda: r.agendaId === appt.id, servicoId: r.servicoId, statusServico: r.statusServico, proximaAcao: ehPedidoRemoto ? "Aguardar chegada do material" : (r.materiaisPendentes ? "Buscar materiais restantes" : "Produzir e acompanhar o prazo") });
+    } catch (e) { notify("A compra ficou visível para retomada: " + e.message, "error"); }
+    finally { setBusy(false); }
   };
   // Saída sem atrito: comprou mas não tem o valor agora. Não trava o dia dele, mas também não deixa sumir —
   // cai na caixa pro Claude cobrar depois. Ver [[feedback-travas-inteligentes-no-app]].
   const doCompraDepois = async () => {
-    if (demo) { doTotal(); return; }
+    if (!fornecedorId) { notify("De qual fornecedor? Preciso disso mesmo quando o valor vem depois.", "error"); return; }
+    if (demo) { onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, statusServico: "producao", proximaAcao: "Produzir e acompanhar o prazo" }); return; }
     setBusy(true);
     try {
-      const nota = `Compra sem valor lançado: "${appt.titulo}"${appt.cidade ? " · " + appt.cidade : ""}. Ele comprou mas não informou quanto — perguntar o valor e lançar na aba Compras (Regra Nº 8).${appt.servico_id ? " (serviço #" + appt.servico_id + ")" : ""} (agenda #${appt.id})`;
-      const { error } = await db.from("caixa_entrada").insert({ texto: nota, status: "novo", conversa: [], processado: false }); if (error) throw error;
-      setBusy(false); doTotal();
-    } catch (e) { notify("Erro: " + e.message, "error"); setBusy(false); }
+      const alvo = (materiais || [])[0] || null;
+      if (ehPedidoRemoto) throw new Error("Pedido remoto sem valor fica aberto: informe o valor ou registre uma pendência explicando o que falta.");
+      const operacao = await processarEventoOperacaoBahia(db, {
+        tipo: "material_em_maos", eventoId: alvo?.id ? "app-material-em-maos-financeiro-" + alvo.id : "app-material-sem-valor-agenda-" + appt.id,
+        dados: {
+          financeiroId: alvo?.id || null, servicoId: alvo?.servico_id || appt.servico_id || null,
+          fornecedorId, agendaId: appt.id, data: hojeISO(), descricao: alvo?.descricao || appt.titulo,
+          semValor: true, fecharAgenda: true, pagamentoConfirmado: false, por: "diego",
+        },
+      });
+      const r = operacao.resultado;
+      notify(r.materiaisPendentes ? `Material registrado, mas ainda faltam ${r.materiaisPendentes} item(ns). O valor ficou como pergunta visível.` : "Material em mãos. A produção andou e o valor ficou como pergunta visível.", "ok");
+      onDone({ agendaId: appt.id, removerAgenda: r.agendaId === appt.id, servicoId: r.servicoId, statusServico: r.statusServico, proximaAcao: r.materiaisPendentes ? "Buscar materiais restantes" : "Produzir e acompanhar o prazo" });
+    } catch (e) { notify("A compra ficou visível para retomada: " + e.message, "error"); }
+    finally { setBusy(false); }
   };
   const doParcial = async () => {
     if (!pendente.trim()) { notify("Explique o que ficou pendente.", "error"); return; }
@@ -1654,17 +2379,19 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
         {files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}
         {filePicker}
         <button className="primary wide" onClick={concluirTotal} disabled={busy}>✔ Concluído total — acabou</button>
+        {!ehCompra && !ehEntrega && svc && ["agendado", "producao"].includes(svc.status) && <button className="ghost wide" onClick={() => setStep("entrega")} disabled={busy}>Foi a entrega final — fechar o serviço</button>}
         <button className="secondary wide" onClick={openParcial} disabled={busy}>🟡 Parcial — falta algo, o Claude reagenda</button>
       </div> : step === "compra" ? <div className="form-grid">
-        <p className="modal-intro">Isso é uma compra de material. Quanto ficou? Lanço agora pra não sumir da aba Compras.</p>
+        <p className="modal-intro">{ehPedidoRemoto ? "Isso é um pedido remoto. Registrar o pedido não significa que o material chegou." : "Isso é uma busca presencial de material. Quanto ficou? Só entra em produção quando o material estiver com você."}</p>
         <label>Valor da compra*<input inputMode="decimal" value={valorCompra} onChange={(e) => setValorCompra(e.target.value)} placeholder="Ex: 85,00" /></label>
+        {ehPedidoRemoto && <label className="check"><input type="checkbox" checked={pagamentoConfirmado} onChange={(e) => setPagamentoConfirmado(e.target.checked)} />O dinheiro já saiu agora</label>}
         <label>Fornecedor*<select value={fornecedorId} onChange={(e) => setFornecedorId(e.target.value)}>
           <option value="">Selecione…</option>
           {(fornecedores || []).map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
         </select></label>
         {appt.servico_id && <p className="ficha-note">Vai entrar vinculado ao serviço deste compromisso — é o que faz a margem real aparecer.</p>}
-        <div className="ficha-actions"><button className="primary" onClick={doCompra} disabled={busy}>Lançar e concluir</button><button className="ghost" onClick={doTotal} disabled={busy}>Não comprei nada</button></div>
-        <button className="ghost wide" onClick={doCompraDepois} disabled={busy}>Comprei, mas o valor eu passo depois</button>
+        <div className="ficha-actions"><button className="primary" onClick={doCompra} disabled={busy}>{ehPedidoRemoto ? "Registrar pedido e concluir" : "Material comigo — concluir"}</button><button className="ghost" onClick={() => { setPendente("Material não foi comprado; precisa remarcar a compra"); setStep("parcial"); }} disabled={busy}>Não comprei nada</button></div>
+        {!ehPedidoRemoto && <button className="ghost wide" onClick={doCompraDepois} disabled={busy}>Material comigo, mas o valor eu passo depois</button>}
       </div> : step === "entrega" ? <div className="form-grid">
         <p className="modal-intro">Entregou mesmo? Então o serviço de {svc?.clientes?.nome || "esse cliente"} fecha aqui e sai da sua lista.</p>
         <label>Valor do serviço*<input inputMode="decimal" value={valorEntrega} onChange={(e) => setValorEntrega(e.target.value)} placeholder="Ex: 450,00" /></label>
@@ -1807,7 +2534,7 @@ function FinanceView({ finances, services, onVerAPagar }) {
     {resumo.aPagar.length > 0 && <p className="ficha-note">{money(resumo.totalAPagar)} em {resumo.aPagar.length} conta(s) ainda por pagar
       {resumo.vencidas.length ? ` · ${resumo.vencidas.length} já vencida(s)` : ""}
       {onVerAPagar && <> · <button type="button" className="ficha-link" onClick={onVerAPagar}>ver em A pagar</button></>}</p>}
-    <section className="metric-grid finance-metrics"><Metric label="Entradas" value={money(paidIn)} detail="Confirmadas" tone="green" /><Metric label="Saídas" value={money(paidOut)} detail="Confirmadas" tone="red" /><Metric label="Saldo" value={money(paidIn - paidOut)} detail="Visão operacional" tone="orange" /></section><section className="content-card"><div className="card-head"><div><p className="kicker">SOMENTE LEITURA NO MODO CLAUDE</p><h3>Lançamentos realizados</h3></div></div>{visiveis.map((item) => <div className="finance-row" key={item.id}><div><strong>{item.descricao || item.categoria || "Lançamento"}</strong><span>{compactDate(item.data)} · {item.status || "pago"}</span></div><b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b></div>)}{!visiveis.length && <div className="empty-state"><b>Nada por aqui ainda.</b></div>}</section></div>;
+    <section className="metric-grid finance-metrics"><Metric label="Entradas" value={money(paidIn)} detail="Confirmadas" tone="green" /><Metric label="Saídas" value={money(paidOut)} detail="Confirmadas" tone="red" /><Metric label="Saldo" value={money(paidIn - paidOut)} detail="Visão operacional" tone="orange" /></section><section className="content-card"><div className="card-head"><div><p className="kicker">DIEGO E CLAUDE · MESMA OPERAÇÃO TIPADA</p><h3>Lançamentos realizados</h3></div></div>{visiveis.map((item) => <div className="finance-row" key={item.id}><div><strong>{descricaoFinanceiraVisivel(item.descricao) || item.categoria || "Lançamento"}</strong><span>{compactDate(item.data)} · {item.status || "pago"}</span></div><b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b></div>)}{!visiveis.length && <div className="empty-state"><b>Nada por aqui ainda.</b></div>}</section></div>;
 }
 
 function nomeFornecedorVale(descricao) {
@@ -1833,17 +2560,15 @@ function ValesView({ finances, db, demo, mode, notify, onChanged }) {
   pendentes.forEach((v) => { const nome = nomeFornecedorVale(v.descricao); (porFornecedor[nome] ||= []).push(v); });
   const totalPendente = pendentes.reduce((sum, v) => sum + Number(v.valor), 0);
   const marcarAbatido = async (item) => {
-    // Abater vale é mexer em dinheiro: vira saída paga no caixa. É do Diego, como as outras ações
-    // financeiras — faltava esta checagem aqui (a aba Compras já tinha). Auditoria de 25/07/2026.
-    if (mode === "claude") { notify("Financeiro exige Diego.", "error"); return; }
+    // Abater é só registrar o desconto administrativo. A operação tipada trava status=pago e nunca cria
+    // uma segunda saída no caixa.
+    if (mode === "claude") { notify("No modo Claude, abata pela operação tipada vale_abatido.", "error"); return; }
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusyId(item.id);
     try {
-      // Só marca o texto. NÃO mexe no status: o dinheiro já saiu no dia do vale, e mudar pra "pago" aqui
-      // faria a mesma saída pesar duas vezes no caixa.
-      const { error } = await db.from("financeiro").update({ descricao: VALE_ABATIDO_TAG + item.descricao }).eq("id", item.id); if (error) throw error;
+      await processarEventoOperacaoBahia(db, { tipo: "vale_abatido", eventoId: "app-vale-abatido-" + item.id, dados: { financeiroId: item.id } });
       notify("Vale abatido — descontado do que você paga ao profissional. O caixa não muda: esse dinheiro já saiu no dia do vale.", "ok"); await onChanged();
-    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusyId(null); }
+    } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusyId(null); }
   };
   return <div className="page-grid">
     <section className="metric-grid finance-metrics"><Metric label="Vales pendentes" value={money(totalPendente)} detail={`${pendentes.length} lançamento(s)`} tone="red" /><Metric label="Fornecedores com vale" value={String(Object.keys(porFornecedor).length)} detail="Aguardando abater" tone="orange" /><Metric label="Já abatidos" value={String(abatidos.length)} detail="Histórico" tone="green" /></section>
@@ -1862,7 +2587,12 @@ function ValesView({ finances, db, demo, mode, notify, onChanged }) {
 // com fornecedor_id e, quando o material foi pra um trabalho específico, servico_id. Assim o saldo da empresa nunca
 // desencontra e a aba Compras é só uma VISTA - mesmo padrão de Vales e Pró-labore. Ver REGRA Nº 8 no Guia da IA.
 const CATEGORIA_MATERIAL = "Material";
-function ehCompraMaterial(item) { return item.tipo === "saida" && (item.categoria === CATEGORIA_MATERIAL || !!item.fornecedor_id); }
+const MATERIAL_EM_MAOS_TAG = "[EM MÃOS] ";
+const MATERIAL_EM_TRANSITO_TAG = "[EM TRÂNSITO] ";
+function ehCompraMaterial(item) { return item.tipo === "saida" && item.categoria === CATEGORIA_MATERIAL; }
+function materialEstaEmMaos(item) { return (item?.descricao || "").startsWith(MATERIAL_EM_MAOS_TAG); }
+function materialEstaEmTransito(item) { return (item?.descricao || "").startsWith(MATERIAL_EM_TRANSITO_TAG); }
+function descricaoFinanceiraVisivel(descricao) { return String(descricao || "").replace(MATERIAL_EM_MAOS_TAG, "").replace(MATERIAL_EM_TRANSITO_TAG, ""); }
 // Compra antiga entrou sem fornecedor e fica pedindo atenção. "Conferido" é só a marca de que o Diego já olhou
 // e está certo - nunca apaga o lançamento (Regra Nº 7), só tira do que precisa de revisão.
 const COMPRA_CONFERIDA_TAG = "[CONFERIDO] ";
@@ -1896,28 +2626,39 @@ function materiaisDoCompromisso(finances, agendaId) { return (finances || []).fi
 const RE_COMPRA = /\b(comprar|compra|pedir|pedido|buscar|retirar|levar)\b/i;
 const RE_INSUMO = /\b(material|materiais|tecido|espuma|percinta|madeira|cord[ãa]o|cola|linha|pvc|p[ée]s?\b|elastico|el[áa]stico|courino|courvim|couro|suede|veludo|chenille|linho|zíper|ziper|grampo|verniz)\b/i;
 function ehCompromissoDeCompra(appt, materiais) {
-  if ((materiais || []).length) return true;
   const t = appt?.titulo || "";
-  return RE_COMPRA.test(t) && RE_INSUMO.test(t);
+  // Material "pendurado" numa entrega/visita é tarefa lateral da viagem, não transforma o compromisso
+  // principal numa compra. Só agenda dedicada de pedir/buscar material abre o fluxo de material.
+  if (RE_COMPRA.test(t) && RE_INSUMO.test(t)) return true;
+  return (materiais || []).length > 0 && /\b(pedir|pedido|comprar|buscar)\b/i.test(t) && !/\b(entreg|visita|retirada do cliente)\b/i.test(t);
 }
 // ENTREGA CONCLUÍDA TEM QUE FECHAR O SERVIÇO. Antes, concluir um compromisso de entrega fechava so o
 // compromisso: o serviço continuava 'agendado', então voltava pra lista de trabalho ativo e o cliente não
 // saía do Painel (Diego em 25/07: "ja foi entregue, nao deixe acontecer mais esse erro de nao sumir
 // de lá"). Agora o app pergunta na hora e move o serviço pra Entregue — que é o que faz ele sumir.
-const STATUS_VIVOS = ["lead", "orcamento", "agendado", "producao"];
 function ehCompromissoDeEntrega(appt, svc) {
-  if (!svc || !STATUS_VIVOS.includes(svc.status)) return false;
-  return /\bentreg/i.test(appt?.titulo || "");
+  if (!svc || !["agendado", "producao"].includes(svc.status)) return false;
+  const titulo = appt?.titulo || "";
+  return /\b(entreg\w*|devolv\w*)\b/i.test(titulo)
+    || (/\blevar\b/i.test(titulo) && /\b(pront\w*|sof[áa]|cadeir\w*|poltron\w*|cabeceir\w*|m[oó]vel|pe[çc]a)\b/i.test(titulo));
 }
 function planoDeCompra(fornecedor) {
   if (!fornecedor) return null;
-  const entrega = proximaEntregaFornecedor(fornecedor.dias_entrega);
-  if (entrega) {
-    const d = new Date(entrega + "T12:00:00"); d.setDate(d.getDate() - 1);
-    const pedirEm = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return { tipo: "remoto", data: pedirEm < hojeISO() ? hojeISO() : pedirEm, hora: null, entrega, rotulo: `Fazer o pedido na ${fornecedor.nome} (entrega ${compactDate(entrega)})` };
+  const dias = String(fornecedor.dias_entrega || "").split(",").map((d) => DIAS_SEMANA_MAP[d.trim()]).filter((n) => n !== undefined);
+  if (dias.length) {
+    const hoje = hojeISO();
+    for (let i = 1; i <= 21; i++) {
+      const entregaDate = new Date(hoje + "T12:00:00"); entregaDate.setDate(entregaDate.getDate() + i);
+      if (!dias.includes(entregaDate.getDay())) continue;
+      const pedidoDate = new Date(entregaDate); pedidoDate.setDate(pedidoDate.getDate() - 1);
+      while (pedidoDate.getDay() === 0) pedidoDate.setDate(pedidoDate.getDate() - 1);
+      const entrega = isoData(entregaDate), pedirEm = isoData(pedidoDate);
+      if (pedirEm < hoje) continue; // perdeu o corte desta entrega; usa a próxima, não inventa pedido atrasado
+      return { tipo: "remoto", data: pedirEm, hora: null, entrega, rotulo: `Fazer o pedido de material na ${fornecedor.nome} (entrega ${compactDate(entrega)})` };
+    }
   }
-  return { tipo: "presencial", data: hojeISO(), hora: "08:00", entrega: null, rotulo: `Buscar material na ${fornecedor.nome}` };
+  // Viagem automática nunca nasce hoje às 08h depois que o horário passou nem no domingo.
+  return { tipo: "presencial", data: proximoDiaUtil(hojeISO()), hora: "08:00", entrega: null, rotulo: `Buscar material na ${fornecedor.nome}` };
 }
 function compraPrecisaRevisao(item) { return !item.fornecedor_id && !(item.descricao || "").startsWith(COMPRA_CONFERIDA_TAG); }
 function mesISO(data) { return (data || "").slice(0, 7); }
@@ -1932,20 +2673,22 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
   const [aba, setAba] = useState("mes");
   const [formOpen, setFormOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const vazio = { fornecedorId: "", servicoId: "", valor: "", descricao: "", data: hojeISO(), jaComprei: true };
-  const [draft, setDraft] = useState(vazio);
+  const novoDraft = () => ({ fornecedorId: "", servicoId: "", valor: "", descricao: "", data: hojeISO(), jaComprei: true, eventoId: novoIdLocal() });
+  const [draft, setDraft] = useState(() => novoDraft());
   const [confirmando, setConfirmando] = useState(null); // { id, servicoId } - item da lista sendo marcado como comprado
   const [vinculando, setVinculando] = useState(null); // id do item escolhendo em qual viagem já marcada aproveitar
   const [cidadeDraft, setCidadeDraft] = useState(null); // { id, valor } - cidade do fornecedor perguntada na hora de agendar
 
   const todas = finances.filter(ehCompraMaterial);
   // "a comprar" é lista de compras (ainda não saiu dinheiro, status a_pagar); só o que já foi comprado conta como gasto.
-  const aComprar = todas.filter((c) => c.status === "a_pagar");
+  const emTransito = todas.filter(materialEstaEmTransito);
+  const emMaosAPagar = todas.filter((c) => materialEstaEmMaos(c) && c.status === "a_pagar");
+  const aComprar = todas.filter((c) => c.status === "a_pagar" && !materialEstaEmMaos(c) && !materialEstaEmTransito(c));
   const compras = todas.filter((c) => c.status !== "a_pagar");
   const nomeFornecedor = (id) => fornecedores.find((f) => f.id === id)?.nome || "Sem fornecedor";
   const servicoDe = (id) => services.find((s) => s.id === id);
   const total = compras.reduce((soma, c) => soma + Number(c.valor), 0);
-  const totalAComprar = aComprar.reduce((soma, c) => soma + Number(c.valor), 0);
+  const totalAComprar = todas.filter((c) => c.status === "a_pagar").reduce((soma, c) => soma + Number(c.valor), 0);
   const mesAtual = mesISO(hojeISO());
   const totalMes = compras.filter((c) => mesISO(c.data) === mesAtual).reduce((soma, c) => soma + Number(c.valor), 0);
 
@@ -1965,76 +2708,72 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
   const tituloGrupo = (chave) => aba === "mes" ? mesLabel(chave) : aba === "fornecedor" ? chave : labelServico(chave);
 
   const salvar = async () => {
-    if (mode === "claude") { notify("Financeiro exige Diego.", "error"); return; }
+    if (mode === "claude") { notify("No modo Claude, registre pela operação tipada de material.", "error"); return; }
     if (!draft.fornecedorId) { notify("Escolha o fornecedor.", "error"); return; }
     const valor = Number(String(draft.valor).replace(",", "."));
     if (!valor || valor <= 0) { notify("Informe um valor válido.", "error"); return; }
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusy(true);
     try {
-      const payload = {
-        tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MATERIAL, status: draft.jaComprei ? "pago" : "a_pagar",
-        valor, data: draft.data || hojeISO(),
-        descricao: draft.descricao.trim() || `Material — ${nomeFornecedor(draft.fornecedorId)}`,
-        fornecedor_id: draft.fornecedorId, servico_id: draft.servicoId || null,
-      };
-      const { data: criado, error } = await db.from("financeiro").insert(payload).select("id").single(); if (error) throw error;
-      // MATERIAL A COMPRAR JÁ NASCE COM DIA MARCADO. Regra do Diego (25/07): "compra de material você tem que
-      // agendar o compromisso automaticamente, se não der eu reagendo, mas não pode sumir da visão". Antes o
-      // item entrava na lista de compras sem compromisso e só aparecia num aviso genérico do Painel — some da
-      // rotina. O dia sai do plano do fornecedor: quem entrega vira pedido remoto na véspera, quem não entrega
-      // vira viagem presencial com cidade e hora (Regra Nº 4). Ele reagenda pelo botão normal se não der.
-      let quando = null;
-      if (!draft.jaComprei) {
-        const forn = (fornecedores || []).find((f) => f.id === draft.fornecedorId);
-        const plano = forn ? planoDeCompra(forn) : null;
-        const novo = plano
-          ? { titulo: plano.rotulo, tipo: plano.tipo, data: plano.data, hora: plano.tipo === "presencial" ? (plano.hora || "08:00") : null, cidade: plano.tipo === "presencial" ? (forn?.cidade || null) : null }
-          : { titulo: `Comprar material - ${nomeFornecedor(draft.fornecedorId)}`, tipo: "remoto", data: proximoDiaUtil(hojeISO()), hora: null, cidade: null };
-        if (novo.tipo === "presencial" && !novo.cidade) { novo.tipo = "remoto"; novo.hora = null; }
-        const { data: ag, error: agErr } = await db.from("agenda").insert({ ...novo, status: "planejado", servico_id: draft.servicoId || null }).select("id").single();
-        if (agErr) notify("Item salvo, mas não deu pra marcar o dia da compra: " + agErr.message, "error");
-        else { quando = novo.data; await db.from("financeiro").update({ agenda_id: ag.id }).eq("id", criado.id); }
-      }
-      notify(draft.jaComprei ? "Compra registrada." : `Na lista de compras${quando ? ", com dia marcado pra " + compactDate(quando) : ""}.`, "ok"); setDraft(vazio); setFormOpen(false); await onChanged();
-    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
+      const descricao = draft.descricao.trim() || `Material — ${nomeFornecedor(draft.fornecedorId)}`;
+      const operacao = draft.jaComprei
+        ? await processarEventoOperacaoBahia(db, {
+            tipo: "material_em_maos", eventoId: "app-nova-compra-" + draft.eventoId,
+            dados: { fornecedorId: draft.fornecedorId, servicoId: draft.servicoId || null, valor, data: draft.data || hojeISO(), descricao, pagamentoConfirmado: true, por: "diego" },
+          })
+        : await processarEventoOperacaoBahia(db, {
+            tipo: "material_planejado", eventoId: "app-nova-compra-" + draft.eventoId,
+            dados: { fornecedorId: draft.fornecedorId, servicoId: draft.servicoId || null, valor, dataNecessidade: draft.data, descricao, por: "diego" },
+          });
+      const r = operacao.resultado;
+      notify(draft.jaComprei
+        ? (r.statusServico === "producao" ? "Material em mãos. Serviço em produção." : "Compra de estoque registrada.")
+        : `Na lista de compras, com ação marcada para ${compactDate(r.dataCompra)}.`, "ok");
+      setDraft(novoDraft()); setFormOpen(false); await onChanged();
+    } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusy(false); }
   };
 
   // Marcar como já comprado: vira gasto de verdade (status pago, data de hoje) e é a ÚLTIMA chance de dizer
   // pra qual serviço foi o material — muitas vezes na hora de anotar ele ainda não sabia.
   const marcarComprado = async (item) => {
-    if (mode === "claude") { notify("Financeiro exige Diego.", "error"); return; }
+    if (mode === "claude") { notify("No modo Claude, confirme pela operação tipada material_em_maos.", "error"); return; }
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusy(true);
     try {
-      const patch = { status: "pago", data: hojeISO() };
-      if (confirmando && confirmando.id === item.id && confirmando.servicoId) patch.servico_id = confirmando.servicoId;
-      const { error } = await db.from("financeiro").update(patch).eq("id", item.id); if (error) throw error;
-      // COMPREI O MATERIAL -> O SERVIÇO ANDA. Pedido do Diego (25/07): "quando falar que comprei o material,
-      // mudar status". O material era o que segurava a produção; comprado, o serviço sai de "agendado"
-      // (fechado, esperando) e entra em "producao". Só mexe em quem estava agendado — quem já está em
-      // produção fica como está, e lead/orçamento não sobe de fase por causa de compra.
-      const alvo = patch.servico_id || item.servico_id;
-      let virou = false;
-      if (alvo) {
-        const svc = (services || []).find((s) => s.id === alvo);
-        if (svc && svc.status === "agendado") {
-          const { error: sErr } = await db.from("servicos").update({ status: "producao", atualizado_em: new Date().toISOString() }).eq("id", alvo);
-          // Falha aqui não pode passar batido: a compra fica paga e o serviço parado em agendado, com a
-          // tela dizendo "comprado". Melhor avisar do que fingir que deu certo.
-          if (sErr) notify("Compra registrada, mas o serviço NÃO entrou em produção: " + sErr.message, "error");
-          else virou = true;
-        }
-      }
-      notify(virou ? "Comprado. O serviço entrou em produção." : "Marcado como comprado.", "ok"); setConfirmando(null); await onChanged();
-    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
+      const servicoId = (confirmando && confirmando.id === item.id && confirmando.servicoId) || item.servico_id || null;
+      const agendaLigada = (appointments || []).find((a) => a.id === item.agenda_id);
+      const agendaDedicada = !!agendaLigada && ehCompromissoDeCompra(agendaLigada, [item]);
+      const operacao = await processarEventoOperacaoBahia(db, {
+        tipo: "material_em_maos", eventoId: "app-material-em-maos-financeiro-" + item.id,
+        dados: {
+          financeiroId: item.id, fornecedorId: item.fornecedor_id, servicoId, valor: item.valor,
+          data: hojeISO(), descricao: item.descricao, agendaId: item.agenda_id || null,
+          fecharAgenda: agendaDedicada, pagamentoConfirmado: item.status === "pago" || !materialEstaEmTransito(item), por: "diego",
+        },
+      });
+      const r = operacao.resultado;
+      notify(r.materiaisPendentes ? `Material confirmado. Ainda faltam ${r.materiaisPendentes} item(ns).` : (r.statusServico === "producao" ? "Material em mãos. O serviço entrou em produção." : "Material de estoque registrado."), "ok");
+      setConfirmando(null); await onChanged();
+    } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusy(false); }
+  };
+  const marcarMaterialPago = async (item) => {
+    if (mode === "claude") { notify("No modo Claude, atualize pela operação tipada financeiro.", "error"); return; }
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusy(true);
+    try {
+      await processarEventoOperacaoBahia(db, {
+        tipo: "financeiro", eventoId: "app-material-pago-" + item.id,
+        dados: { financeiroId: item.id, status: "pago", data: hojeISO() },
+      });
+      notify("Pagamento do material registrado no caixa.", "ok"); await onChanged();
+    } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusy(false); }
   };
 
   // Material vira compromisso de dois jeitos, porque tem dia que ele faz a viagem só pra isso e tem dia que
   // aproveita uma ida que já estava marcada. Nos dois casos a compra guarda o agenda_id, então o compromisso
   // mostra o selo do material e a trava de rota passa a enxergar essa parada.
   const agendarCompra = async (item) => {
-    if (mode === "claude") { notify("Agenda de material é do Diego.", "error"); return; }
+    if (mode === "claude") { notify("No modo Claude, planeje pela operação tipada material_planejado.", "error"); return; }
     const forn = fornecedores.find((f) => f.id === item.fornecedor_id);
     if (!forn) { notify("Escolha o fornecedor antes de agendar.", "error"); return; }
     const plano = planoDeCompra(forn);
@@ -2049,20 +2788,22 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusy(true);
     try {
-      if (cidadeInformada && !forn.cidade) { await db.from("fornecedores").update({ cidade: cidadeInformada }).eq("id", forn.id); forn.cidade = cidadeInformada; }
-      const { data, error } = await db.from("agenda").insert({
-        titulo: plano.rotulo, data: plano.data, hora: plano.hora, tipo: plano.tipo,
-        cidade: plano.tipo === "presencial" ? forn.cidade : null, local: plano.tipo === "presencial" ? forn.cidade : null,
-        // servico_id faltava aqui: o compromisso nascia solto do serviço, então não aparecia na ficha do
-        // cliente nem contava como material daquele trabalho. Os outros caminhos de compra já amarravam.
-        servico_id: item.servico_id || null,
-        status: "planejado",
-      }).select("id").single();
-      if (error) throw error;
-      const { error: e2 } = await db.from("financeiro").update({ agenda_id: data.id }).eq("id", item.id); if (e2) throw e2;
-      notify(plano.tipo === "remoto" ? `Pedido agendado para ${compactDate(plano.data)}.` : `Ida agendada para ${compactDate(plano.data)}.`, "ok");
+      if (cidadeInformada && !forn.cidade) {
+        const { error: cidadeErr } = await db.from("fornecedores").update({ cidade: cidadeInformada }).eq("id", forn.id);
+        if (cidadeErr) throw cidadeErr;
+        forn.cidade = cidadeInformada;
+      }
+      const operacao = await processarEventoOperacaoBahia(db, {
+        tipo: "material_planejado", eventoId: "app-planejar-financeiro-" + item.id,
+        dados: {
+          financeiroId: item.id, fornecedorId: item.fornecedor_id, servicoId: item.servico_id || null,
+          valor: item.valor, dataNecessidade: item.data, descricao: item.descricao, por: "diego",
+        },
+      });
+      const r = operacao.resultado;
+      notify(r.tipoCompromisso === "remoto" ? `Pedido agendado para ${compactDate(r.dataCompra)}.` : `Ida agendada para ${compactDate(r.dataCompra)}.`, "ok");
       setCidadeDraft(null); await onChanged();
-    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
+    } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusy(false); }
   };
   const pendurarNaViagem = async (item, agendaId) => {
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
@@ -2077,7 +2818,7 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
   // Compra sem fornecedor (lançada antes desta aba existir): o Diego atribui o fornecedor ou marca conferida.
   const revisar = compras.filter(compraPrecisaRevisao);
   const resolverRevisao = async (item, fornecedorId) => {
-    if (mode === "claude") { notify("Financeiro exige Diego.", "error"); return; }
+    if (mode === "claude") { notify("No modo Claude, reconcilie pela operação tipada correspondente.", "error"); return; }
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusy(true);
     try {
@@ -2087,7 +2828,7 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
   };
 
-  const servicosVinculaveis = services.filter((s) => !["perdido"].includes(s.status));
+  const servicosVinculaveis = services.filter((s) => ["agendado", "producao"].includes(s.status));
   const seletorServico = (valor, onPick) => <select value={valor} onChange={(e) => onPick(e.target.value)}>
     <option value="">Estoque geral — sem serviço</option>
     {servicosVinculaveis.map((s) => <option key={s.id} value={s.id}>{(s.clientes?.nome || "Cliente") + " — " + s.titulo}</option>)}
@@ -2104,18 +2845,32 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
       <div className="card-head"><div><p className="kicker">PRECISA DE REVISÃO</p><h3>{revisar.length} compra(s) sem fornecedor</h3></div></div>
       <p className="ficha-note">Lançamentos antigos, de antes desta aba existir. Diga de qual fornecedor foi — ou marque como conferida se já está certo. Nada é apagado.</p>
       {revisar.map((c) => <div className="finance-row" key={c.id}>
-        <div><strong>{c.descricao || "Material"}</strong><span>{compactDate(c.data)} · {money(c.valor)}</span>
+        <div><strong>{descricaoFinanceiraVisivel(c.descricao) || "Material"}</strong><span>{compactDate(c.data)} · {money(c.valor)}</span>
           <div className="fornecedor-chips">{fornecedores.map((f) => <button type="button" key={f.id} disabled={busy || mode === "claude"} onClick={() => resolverRevisao(c, f.id)}>{f.nome}</button>)}</div>
         </div>
         <div className="agenda-acoes"><button className="ghost" disabled={busy || mode === "claude"} onClick={() => resolverRevisao(c, null)}>✓ Conferida</button></div>
       </div>)}
     </section>}
 
+    {emTransito.length > 0 && <section className="content-card">
+      <div className="card-head"><div><p className="kicker">MATERIAL EM TRÂNSITO</p><h3>Aguardando chegar</h3></div></div>
+      <p className="ficha-note">Pedido feito não é material em mãos. O serviço continua agendado até a chegada ser confirmada.</p>
+      {emTransito.map((c) => <div className="finance-row" key={c.id}>
+        <div><strong>{descricaoFinanceiraVisivel(c.descricao) || "Material"}</strong><span>{nomeFornecedor(c.fornecedor_id)}{c.servico_id ? ` · ${labelServico(c.servico_id)}` : " · estoque"} · {c.status === "pago" ? "pago" : "pagamento pendente"}</span></div>
+        <div className="agenda-acoes"><b className={c.status === "pago" ? "saida" : ""}>{money(c.valor)}</b><button className="ghost" disabled={busy || mode === "claude"} onClick={() => marcarComprado(c)}>Chegou — material comigo</button></div>
+      </div>)}
+    </section>}
+
+    {emMaosAPagar.length > 0 && <section className="content-card">
+      <div className="card-head"><div><p className="kicker">MATERIAL RECEBIDO · PAGAMENTO PENDENTE</p><h3>Não deixar o caixa esquecer</h3></div></div>
+      {emMaosAPagar.map((c) => <div className="finance-row" key={c.id}><div><strong>{descricaoFinanceiraVisivel(c.descricao) || "Material"}</strong><span>{nomeFornecedor(c.fornecedor_id)} · material já está em mãos</span></div><div className="agenda-acoes"><b>{money(c.valor)}</b><button className="ghost" disabled={busy || mode === "claude"} onClick={() => marcarMaterialPago(c)}>Marcar pagamento</button></div></div>)}
+    </section>}
+
     {aComprar.length > 0 && <section className="content-card">
       <div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>Ainda não comprado</h3></div></div>
-      <p className="ficha-note">Enquanto está aqui não conta como gasto nem no Financeiro. Ao marcar como comprado vira saída da Empresa com a data de hoje.</p>
+      <p className="ficha-note">Enquanto está aqui não conta como gasto nem no Financeiro. Só confirme quando o material estiver realmente com você; pedido pago em trânsito não inicia produção.</p>
       {aComprar.map((c) => <div className="finance-row" key={c.id}>
-        <div><strong>{c.descricao || "Material"}</strong><span>{nomeFornecedor(c.fornecedor_id)}{c.servico_id ? ` · ${labelServico(c.servico_id)}` : " · sem serviço vinculado"}</span>
+        <div><strong>{descricaoFinanceiraVisivel(c.descricao) || "Material"}</strong><span>{nomeFornecedor(c.fornecedor_id)}{c.servico_id ? ` · ${labelServico(c.servico_id)}` : " · sem serviço vinculado"}</span>
           {(() => {
             const appt = (appointments || []).find((a) => a.id === c.agenda_id);
             if (appt) return <span>📅 {appt.titulo} · {compactDate(appt.data)}{appt.hora ? " " + appt.hora.slice(0, 5) : ""} <button type="button" className="ficha-link" onClick={() => pendurarNaViagem(c, null)}>desvincular</button></span>;
@@ -2139,7 +2894,7 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
           </>}
           {confirmando && confirmando.id === c.id
             ? <><button className="primary" disabled={busy} onClick={() => marcarComprado(c)}>Confirmar compra</button><button className="ghost" onClick={() => setConfirmando(null)}>Cancelar</button></>
-            : <button className="ghost" disabled={mode === "claude"} onClick={() => setConfirmando({ id: c.id, servicoId: c.servico_id || "" })}>✓ Já comprei</button>}
+            : <button className="ghost" disabled={mode === "claude"} onClick={() => setConfirmando({ id: c.id, servicoId: c.servico_id || "" })}>✓ Material está comigo</button>}
         </div>
       </div>)}
     </section>}
@@ -2148,7 +2903,7 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
       <div className="card-head"><div><p className="kicker">COMPRAS DE MATERIAL</p><h3>Registrar nova compra</h3></div>
         <button className="ghost" onClick={() => setFormOpen(!formOpen)} disabled={mode === "claude"}>{formOpen ? "Cancelar" : mode === "claude" ? "Só o Diego lança" : "+ Nova compra"}</button></div>
       {formOpen && mode === "diego" && <div className="form-grid">
-        <div className="classify">{[[true, "Já comprei"], [false, "Ainda vou comprar"]].map(([v, label]) => <button key={label} className={draft.jaComprei === v ? "active" : ""} onClick={() => setDraft({ ...draft, jaComprei: v })}>{label}</button>)}</div>
+        <div className="classify">{[[true, "Material está comigo"], [false, "Ainda vou comprar"]].map(([v, label]) => <button key={label} className={draft.jaComprei === v ? "active" : ""} onClick={() => setDraft({ ...draft, jaComprei: v })}>{label}</button>)}</div>
         <label>Fornecedor*
           <div className="fornecedor-chips">{fornecedores.map((f) => <button type="button" key={f.id} className={draft.fornecedorId === f.id ? "active" : ""} onClick={() => setDraft({ ...draft, fornecedorId: f.id })}>{f.nome}</button>)}</div>
         </label>
@@ -2178,7 +2933,7 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
           <div className="vale-fornecedor-head"><strong>{tituloGrupo(chave)}</strong><b>{money(subtotal)}</b></div>
           {servico && orcamento > 0 && <div className="finance-row"><div><strong>Margem real</strong><span>Orçamento {money(orcamento)} − material {money(subtotal)}</span></div><b className={orcamento - subtotal >= 0 ? "entrada" : "saida"}>{money(orcamento - subtotal)}</b></div>}
           {itens.map((c) => <div className="finance-row" key={c.id}>
-            <div><strong>{c.descricao || "Material"}</strong><span>{compactDate(c.data)}{aba !== "fornecedor" ? ` · ${nomeFornecedor(c.fornecedor_id)}` : ""}{aba !== "servico" && c.servico_id ? ` · ${labelServico(c.servico_id)}` : ""}</span></div>
+            <div><strong>{descricaoFinanceiraVisivel(c.descricao) || "Material"}</strong><span>{compactDate(c.data)}{aba !== "fornecedor" ? ` · ${nomeFornecedor(c.fornecedor_id)}` : ""}{aba !== "servico" && c.servico_id ? ` · ${labelServico(c.servico_id)}` : ""}</span></div>
             <b className="saida">− {money(c.valor)}</b>
           </div>)}
         </div>;
@@ -2201,8 +2956,8 @@ function somaDiaMes(dataISO, meses) {
 function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
   const [formOpen, setFormOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const vazio = { descricao: "", valor: "", parcelas: "1", primeiroVenc: somaDiaMes(hojeISO(), 1), escopo: "empresa", categoria: "Conta fixa" };
-  const [draft, setDraft] = useState(vazio);
+  const novoDraft = () => ({ descricao: "", valor: "", parcelas: "1", primeiroVenc: somaDiaMes(hojeISO(), 1), escopo: "empresa", categoria: "Conta fixa", eventoId: novoIdLocal() });
+  const [draft, setDraft] = useState(() => novoDraft());
   const [verTudo, setVerTudo] = useState(false);
   const [escopoAba, setEscopoAba] = useState("todos"); // Diego: dinheiro pessoal (aluguel) separado do da empresa (cartão)
 
@@ -2224,17 +2979,20 @@ function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
   const meses = Object.keys(porMes).sort();
 
   const pagar = async (item) => {
-    if (mode === "claude") { notify("Financeiro exige Diego.", "error"); return; }
+    if (mode === "claude") { notify("No modo Claude, pague pela operação tipada financeiro com o id existente.", "error"); return; }
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusy(true);
     try {
-      const { error } = await db.from("financeiro").update({ status: "pago", data: hojeISO() }).eq("id", item.id); if (error) throw error;
+      await processarEventoOperacaoBahia(db, {
+        tipo: "financeiro", eventoId: "app-conta-paga-" + item.id,
+        dados: { financeiroId: item.id, status: "pago", data: hojeISO() },
+      });
       notify("Pago — agora entra no caixa.", "ok"); await onChanged();
-    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
+    } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusy(false); }
   };
 
   const salvar = async () => {
-    if (mode === "claude") { notify("Financeiro exige Diego.", "error"); return; }
+    if (mode === "claude") { notify("No modo Claude, registre pela operação tipada financeiro.", "error"); return; }
     const total = Number(String(draft.valor).replace(",", "."));
     const n = Math.max(1, parseInt(draft.parcelas, 10) || 1);
     if (!draft.descricao.trim()) { notify("Descreva a conta.", "error"); return; }
@@ -2248,11 +3006,12 @@ function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
         tipo: "saida", escopo: draft.escopo, categoria: draft.categoria, status: "a_pagar",
         valor: valorParcela, data: somaDiaMes(draft.primeiroVenc, i),
         descricao: n > 1 ? `${draft.descricao.trim()} (${i + 1}/${n})` : draft.descricao.trim(),
-        fornecedor_id: null, servico_id: null,
       }));
-      const { error } = await db.from("financeiro").insert(linhas); if (error) throw error;
-      notify(n > 1 ? `${n} parcelas agendadas.` : "Conta agendada.", "ok"); setDraft(vazio); setFormOpen(false); await onChanged();
-    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusy(false); }
+      for (let i = 0; i < linhas.length; i++) {
+        await processarEventoOperacaoBahia(db, { tipo: "financeiro", eventoId: "app-conta-" + draft.eventoId + "-parcela-" + (i + 1), dados: linhas[i] });
+      }
+      notify(n > 1 ? `${n} parcelas agendadas sem duplicar.` : "Conta agendada.", "ok"); setDraft(novoDraft()); setFormOpen(false); await onChanged();
+    } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusy(false); }
   };
 
   const EF_ABAS = [{ id: "todos", label: "Todos" }, { id: "empresa", label: "Empresa" }, { id: "pessoal", label: "Pessoal" }];
@@ -2321,7 +3080,7 @@ function FornecedoresView({ fornecedores }) {
 }
 function CustomersView({ customers, services, search, setSearch, onOpenFicha }) {
   const visible = customers.filter((customer) => `${customer.nome} ${customer.telefone} ${customer.cidade}`.toLowerCase().includes(search.toLowerCase()));
-  return <section className="content-card full"><div className="card-head"><div><p className="kicker">BASE ÚNICA</p><h3>{visible.length} clientes</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome, telefone ou cidade" /></div><div className="customer-list">{visible.map((customer) => <article className="clickable" key={customer.id} onClick={() => onOpenFicha(customer.id)}><div className="customer-avatar">{customer.nome.slice(0, 2).toUpperCase()}</div><div><strong>{customer.nome}</strong><span>{customer.telefone || "Sem telefone"} · {customer.cidade || "Sem cidade"}</span></div><b>{services.filter((service) => service.cliente_id === customer.id && !["pago", "perdido"].includes(service.status)).length} ativo(s)</b></article>)}</div></section>;
+  return <section className="content-card full"><div className="card-head"><div><p className="kicker">BASE ÚNICA</p><h3>{visible.length} clientes</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome, telefone ou cidade" /></div><div className="customer-list">{visible.map((customer) => <article className="clickable" key={customer.id} onClick={() => onOpenFicha(customer.id)}><div className="customer-avatar">{customer.nome.slice(0, 2).toUpperCase()}</div><div><strong>{customer.nome}</strong><span>{customer.telefone || "Sem telefone"} · {customer.cidade || "Sem cidade"}</span></div><b>{services.filter((service) => service.cliente_id === customer.id && STATUS_VIVOS.includes(service.status)).length} ativo(s)</b></article>)}</div></section>;
 }
 
 function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChanged }) {
@@ -2405,28 +3164,17 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
     if (demo) { notify("Na demonstração a ficha não é salva.", "info"); setEditandoMaterial(null); return; }
     const loja = materialDraft.loja.trim();
     const data = materialDraft.data;
-    const { error } = await db.from("servicos").update({ loja_material: loja || null, data_entrega_material: data || null }).eq("id", servicoId);
-    if (error) { notify("Erro: " + error.message, "error"); return; }
-    // O DIEGO NÃO ESCOLHE DATA. Antes isso só criava a ação se ele preenchesse loja E data — informar só a
-    // loja não gerava nada, e o material ficava sem dia marcado (ja aconteceu com uma compra de tecido).
-    // Agora basta a loja: se ele não deu data, o app usa o plano do fornecedor (planoDeCompra), que sabe se
-    // aquele fornecedor ENTREGA — nesse caso é pedido remoto na véspera — ou se é viagem, e aí sai presencial
-    // com cidade e hora, respeitando a Regra Nº 4. Sem fornecedor cadastrado, cai no próximo dia útil.
-    if (loja) {
-      const forn = (fornecedores || []).find((f) => (f.nome || "").trim().toLowerCase() === loja.toLowerCase());
-      const plano = forn ? planoDeCompra(forn) : null;
-      const novo = data
-        ? { titulo: `Comprar material - ${loja}`, tipo: plano?.tipo || "remoto", cidade: plano?.tipo === "presencial" ? (forn?.cidade || null) : null, data, hora: plano?.tipo === "presencial" ? (plano.hora || "08:00") : null }
-        : plano
-          ? { titulo: plano.rotulo, tipo: plano.tipo, cidade: plano.tipo === "presencial" ? (forn?.cidade || null) : null, data: plano.data, hora: plano.tipo === "presencial" ? (plano.hora || "08:00") : null }
-          : { titulo: `Comprar material - ${loja}`, tipo: "remoto", cidade: null, data: proximoDiaUtil(hojeISO()), hora: null };
-      // Presencial sem cidade quebra a Regra Nº 4 e a trava do banco: sem cidade do fornecedor, vira remoto.
-      if (novo.tipo === "presencial" && !novo.cidade) { novo.tipo = "remoto"; novo.hora = null; }
-      const { error: agErr } = await db.from("agenda").insert({ ...novo, status: "planejado", servico_id: servicoId });
-      if (agErr) { notify("Material salvo, mas erro ao criar a ação: " + agErr.message, "error"); setEditandoMaterial(null); await load(); return; }
-      notify(`Material salvo. Compra marcada para ${compactDate(novo.data)}.`, "ok");
-    }
-    notify("Material atualizado.", "ok"); setEditandoMaterial(null); await load(); onChanged?.();
+    if (!loja) { notify("Escolha o fornecedor do material.", "error"); return; }
+    const forn = (fornecedores || []).find((f) => (f.nome || "").trim().toLowerCase() === loja.toLowerCase());
+    if (!forn) { notify("Esse fornecedor ainda não está cadastrado. Cadastre cidade e dias de entrega antes de planejar.", "error"); return; }
+    try {
+      const operacao = await processarEventoOperacaoBahia(db, {
+        tipo: "material_planejado", eventoId: "app-ficha-material-" + servicoId + "-" + forn.id + "-" + (data || "automatico"),
+        dados: { servicoId, fornecedorId: forn.id, dataEntrega: data || undefined, por: "diego" },
+      });
+      notify(`Material planejado. Ação marcada para ${compactDate(operacao.resultado.dataCompra)}.`, "ok");
+      setEditandoMaterial(null); await load(); onChanged?.();
+    } catch (e) { notify("O planejamento ficou visível para retomada: " + e.message, "error"); }
   };
 
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -2451,9 +3199,9 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
           {editandoResp === s.id
             ? <div className="responsavel-edit-row"><input value={respDraft} onChange={(e) => setRespDraft(e.target.value)} placeholder="Nome do profissional" autoFocus /><button className="ghost" onClick={() => salvarResponsavel(s.id)}>Salvar</button><button className="ghost" onClick={() => setEditandoResp(null)}>✕</button></div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEditandoResp(s.id); setRespDraft(s.responsavel || ""); }}>{s.responsavel ? `👤 ${s.responsavel}` : "+ Atribuir profissional"}</button>}
-          {s.status === "producao" && (editandoMaterial === s.id
+          {["agendado", "producao"].includes(s.status) && (editandoMaterial === s.id
             ? <div className="material-edit-block">
-                <div className="responsavel-edit-row"><input value={materialDraft.loja} onChange={(e) => setMaterialDraft((m) => ({ ...m, loja: e.target.value }))} placeholder="Loja do material" /><input type="date" value={materialDraft.data} onChange={(e) => setMaterialDraft((m) => ({ ...m, data: e.target.value }))} /><button className="ghost" onClick={() => salvarMaterial(s.id)}>Salvar</button><button className="ghost" onClick={() => setEditandoMaterial(null)}>✕</button></div>
+                <div className="responsavel-edit-row"><input value={materialDraft.loja} onChange={(e) => setMaterialDraft((m) => ({ ...m, loja: e.target.value }))} placeholder="Loja do material" /><input type="date" title="Previsão de chegada, se já foi informada" value={materialDraft.data} onChange={(e) => setMaterialDraft((m) => ({ ...m, data: e.target.value }))} /><button className="ghost" onClick={() => salvarMaterial(s.id)}>Salvar</button><button className="ghost" onClick={() => setEditandoMaterial(null)}>✕</button></div>
                 {!!(fornecedores || []).length && <div className="fornecedor-chips">{fornecedores.map((f) => <button type="button" key={f.id} className={materialDraft.loja.trim() === f.nome ? "active" : ""} onClick={() => setMaterialDraft({ loja: f.nome, data: proximaEntregaFornecedor(f.dias_entrega) || materialDraft.data })}>{f.nome}</button>)}</div>}
               </div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEditandoMaterial(s.id); setMaterialDraft({ loja: s.loja_material || "", data: s.data_entrega_material || "" }); }}>{s.loja_material ? `🧵 ${s.loja_material}${s.data_entrega_material ? " · entrega " + compactDate(s.data_entrega_material) : ""}` : "+ Registrar loja/entrega do material"}</button>)}
