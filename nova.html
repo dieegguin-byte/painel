@@ -1057,12 +1057,13 @@ async function aplicarCompromissoConcluidoOperacional(db, eventoId, dados) {
   return { agendaId: agendaFeita.id, servicoId, proximaAcao: dados.proximaAcao ?? null, historicoId: historico.id };
 }
 async function aplicarEntregaConcluidaOperacional(db, eventoId, dados) {
-  if (!dados.agendaId) throw new Error("Entrega concluída exige agendaId.");
-  const agenda = await lerRegistro(db, "agenda", dados.agendaId);
-  if (!agenda) throw new Error("Compromisso de entrega não encontrado.");
-  const servicoId = dados.servicoId || agenda.servico_id || null;
+  // agendaId é opcional: a ficha do cliente também fecha entrega direto no serviço, sem compromisso
+  // (caso do compromisso já ter sido concluído separado — antes o serviço ficava preso em produção).
+  const agenda = dados.agendaId ? await lerRegistro(db, "agenda", dados.agendaId) : null;
+  if (dados.agendaId && !agenda) throw new Error("Compromisso de entrega não encontrado.");
+  const servicoId = dados.servicoId || agenda?.servico_id || null;
   if (!servicoId) throw new Error("Entrega precisa estar vinculada a um serviço.");
-  if (agenda.servico_id && dados.servicoId && agenda.servico_id !== dados.servicoId) throw new Error("A agenda pertence a outro serviço.");
+  if (agenda?.servico_id && dados.servicoId && agenda.servico_id !== dados.servicoId) throw new Error("A agenda pertence a outro serviço.");
   const servico = await lerRegistro(db, "servicos", servicoId);
   if (!servico) throw new Error("Serviço não encontrado.");
   if (!["agendado", "producao", "entregue"].includes(servico.status)) throw new Error("Serviço em " + servico.status + " não pode ser entregue.");
@@ -1072,10 +1073,10 @@ async function aplicarEntregaConcluidaOperacional(db, eventoId, dados) {
     status: "entregue", valor_orcamento: valor, proxima_acao: null, atualizado_em: new Date().toISOString(),
   }).eq("id", servicoId).select("*").single();
   if (error) throw error;
-  const agendaFeita = await concluirAgendaDaOperacao(db, agenda.id, dataReal, servicoId);
+  const agendaFeita = agenda ? await concluirAgendaDaOperacao(db, agenda.id, dataReal, servicoId) : null;
   const historico = await registrarHistoricoDaOperacao(db, eventoId, "entrega", {
     o_que: "Serviço entregue", por: dados.por || "claude",
-    detalhe: "Serviço #" + servicoId + " · agenda #" + agenda.id + " · valor " + valor,
+    detalhe: "Serviço #" + servicoId + (agenda ? " · agenda #" + agenda.id : "") + " · valor " + valor,
   });
   const { data: caixas, error: cxErr } = await db.from("caixa_entrada").select("id,conversa,processado").eq("processado", false);
   if (cxErr) throw cxErr;
@@ -1088,11 +1089,11 @@ async function aplicarEntregaConcluidaOperacional(db, eventoId, dados) {
       tipo: "entrada", escopo: "empresa", categoria: recebimento.categoria || "Serviço",
       status: recebimento.status || "pago", valor: recebimento.valor || valor, data: recebimento.data || dataReal,
       descricao: recebimento.descricao || "Recebimento — " + (servico.titulo || "serviço"),
-      servicoId, agendaId: agenda.id,
+      servicoId, agendaId: agenda?.id || null,
     }, "financeiro:recebimento-entrega");
     financeiroId = fin.registro.id;
   }
-  return { servicoId, statusServico: atualizado.status, valor, agendaId: agendaFeita.id, historicoId: historico.id, financeiroId, remarcacoesEncerradas: remarcacoes.length };
+  return { servicoId, statusServico: atualizado.status, valor, agendaId: agendaFeita?.id || null, historicoId: historico.id, financeiroId, remarcacoesEncerradas: remarcacoes.length };
 }
 async function aplicarServicoFechadoOperacional(db, eventoId, dados) {
   if (!dados.servicoId) throw new Error("Serviço fechado exige servicoId.");
@@ -3097,6 +3098,8 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
   const [respDraft, setRespDraft] = useState("");
   const [editandoMaterial, setEditandoMaterial] = useState(null);
   const [materialDraft, setMaterialDraft] = useState({ loja: "", data: "" });
+  const [entregando, setEntregando] = useState(null);
+  const [valorEntregaDraft, setValorEntregaDraft] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -3177,6 +3180,23 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
     } catch (e) { notify("O planejamento ficou visível para retomada: " + e.message, "error"); }
   };
 
+  // Pedido do Diego (26/07): compromisso concluído sem escolher "Entreguei" deixava o serviço preso em
+  // produção sem jeito de fechar pela ficha. Este botão fecha a entrega direto no serviço, sem precisar
+  // de compromisso — usa a mesma operação tipada, só que sem agendaId.
+  const confirmarEntrega = async (servicoId) => {
+    if (demo) { notify("Na demonstração a ficha não é salva.", "info"); setEntregando(null); return; }
+    const valor = Number(String(valorEntregaDraft).replace(",", "."));
+    if (!valor || valor <= 0) { notify("Qual foi o valor do serviço? Sem isso não dá pra marcar como entregue.", "error"); return; }
+    try {
+      await processarEventoOperacaoBahia(db, {
+        tipo: "entrega_concluida", eventoId: "app-ficha-entrega-" + servicoId,
+        dados: { servicoId, valor, data: hojeISO(), por: "diego" },
+      });
+      notify("Entregue. Serviço fechado.", "ok");
+      setEntregando(null); await load(); onChanged?.();
+    } catch (e) { notify("A entrega ficou visível para retomada: " + e.message, "error"); }
+  };
+
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="modal-card">
       <div className="modal-head"><div><p className="kicker">FICHA DO CLIENTE</p><h2>{cliente?.nome || "Cliente"}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
@@ -3205,6 +3225,11 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
                 {!!(fornecedores || []).length && <div className="fornecedor-chips">{fornecedores.map((f) => <button type="button" key={f.id} className={materialDraft.loja.trim() === f.nome ? "active" : ""} onClick={() => setMaterialDraft({ loja: f.nome, data: proximaEntregaFornecedor(f.dias_entrega) || materialDraft.data })}>{f.nome}</button>)}</div>}
               </div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEditandoMaterial(s.id); setMaterialDraft({ loja: s.loja_material || "", data: s.data_entrega_material || "" }); }}>{s.loja_material ? `🧵 ${s.loja_material}${s.data_entrega_material ? " · entrega " + compactDate(s.data_entrega_material) : ""}` : "+ Registrar loja/entrega do material"}</button>)}
+          {["agendado", "producao"].includes(s.status) && (entregando === s.id
+            ? <div className="material-edit-block">
+                <div className="responsavel-edit-row"><input value={valorEntregaDraft} onChange={(e) => setValorEntregaDraft(e.target.value)} placeholder="Valor R$" autoFocus /><button className="ghost" onClick={() => confirmarEntrega(s.id)}>Confirmar entrega</button><button className="ghost" onClick={() => setEntregando(null)}>✕</button></div>
+              </div>
+            : <button type="button" className="responsavel-badge" onClick={() => { setEntregando(s.id); setValorEntregaDraft(s.valor_orcamento ? String(s.valor_orcamento) : ""); }}>✅ Marcar como entregue</button>)}
         </div><div className="ficha-servico-meta">{s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <span>—</span>}{s.prazo && <time>{compactDate(s.prazo)}</time>}{(sugestao || tel) && <div className="ficha-servico-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">WhatsApp</a>}</div>}</div></div>; })}</div>}
         <p className="ficha-note">Mudança de status e financeiro continuam no app atual por enquanto.</p>
 
