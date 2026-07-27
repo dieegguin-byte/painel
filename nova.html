@@ -1690,7 +1690,7 @@ function Home() {
         </section>
       </div>}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onOpenFicha={setFichaId} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} finances={finances} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} services={services} onVerAPagar={() => setTab("futuro")} />}
@@ -1982,8 +1982,25 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
 
 const SEM_PROFISSIONAL = "Sem profissional atribuído";
 // PAINEL: capacidade por profissional - clica no nome pra ver os servicos dele (mesmo padrao da Agenda: colapsado, expande no clique)
-function CapacidadeCard({ services }) {
+function CapacidadeCard({ services, db, demo, notify, onChanged }) {
   const [aberto, setAberto] = useState(null);
+  const [entregando, setEntregando] = useState(null);
+  const [valorDraft, setValorDraft] = useState("");
+  // Pedido do Diego (26/07): "melhor ter um botão na produção pra eu marcar como concluído" — direto no
+  // card de capacidade, sem precisar abrir a ficha. Mesma operação tipada da ficha, só o gatilho é outro.
+  const confirmarEntrega = async (servicoId) => {
+    if (demo) { notify("Na demonstração não salva.", "info"); setEntregando(null); return; }
+    const valor = Number(String(valorDraft).replace(",", "."));
+    if (!valor || valor <= 0) { notify("Qual foi o valor do serviço? Sem isso não dá pra marcar como entregue.", "error"); return; }
+    try {
+      await processarEventoOperacaoBahia(db, {
+        tipo: "entrega_concluida", eventoId: "app-capacidade-entrega-" + servicoId,
+        dados: { servicoId, valor, data: hojeISO(), por: "diego" },
+      });
+      notify("Entregue. Serviço fechado.", "ok");
+      setEntregando(null); await onChanged?.();
+    } catch (e) { notify("A entrega ficou visível para retomada: " + e.message, "error"); }
+  };
   const porProfissional = useMemo(() => {
     const map = {};
     // Capacidade é só trabalho FECHADO que ocupa alguém: agendado e produção. Lead e orçamento são funil
@@ -2004,13 +2021,18 @@ function CapacidadeCard({ services }) {
       {/* PRODUÇÃO NA FRENTE, AGENDADO NO FINAL DA FILA. Regra do Diego (25/07): "agendado tem que ir para o
           final da fila". Produção é peça na bancada com prazo correndo; agendado é trabalho fechado que ainda
           não começou. Dentro de cada grupo, prazo mais apertado primeiro. */}
-      {isAberto && <div className="capacidade-item-corpo">{[...lista].sort((a, b) => (a.status === "agendado") - (b.status === "agendado") || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999"))).map((s) => <div className="capacidade-servico" key={s.id}><strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{statusLabel[s.status] || s.status}{s.prazo ? " · " + compactDate(s.prazo) : ""}</em></div>)}</div>}
+      {isAberto && <div className="capacidade-item-corpo">{[...lista].sort((a, b) => (a.status === "agendado") - (b.status === "agendado") || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999"))).map((s) => <div className="capacidade-servico" key={s.id}>
+        <strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{statusLabel[s.status] || s.status}{s.prazo ? " · " + compactDate(s.prazo) : ""}</em>
+        {entregando === s.id
+          ? <div className="responsavel-edit-row"><input value={valorDraft} onChange={(e) => setValorDraft(e.target.value)} placeholder="Valor R$" autoFocus /><button className="ghost" onClick={() => confirmarEntrega(s.id)}>Confirmar entrega</button><button className="ghost" onClick={() => setEntregando(null)}>✕</button></div>
+          : <button type="button" className="ghost" onClick={(e) => { e.stopPropagation(); setEntregando(s.id); setValorDraft(s.valor_orcamento ? String(s.valor_orcamento) : ""); }}>✅ Marcar como entregue</button>}
+      </div>)}</div>}
     </div>; })}</div>
   </section>;
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, db, demo, notify, onRotinaChanged, onOpenQueue, onConcluir, onReschedule, onSemProximaAcao, onOpenFicha }) {
+function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, db, demo, notify, onRotinaChanged, onServicoChanged, onOpenQueue, onConcluir, onReschedule, onSemProximaAcao, onOpenFicha }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
   // `appointments` já chega filtrado pela coleção central (compromissosOperacionais, calculada uma vez na
@@ -2021,7 +2043,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   const irParaVencendo = () => { if (dueAll.length === 0) return; setFiltroTipo("todos"); document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   return <div className="page-grid"><section className="hero-summary"><div><p className="kicker">VISÃO OPERACIONAL</p><h2>Clareza antes de velocidade.</h2><p>O site separa a vez do Claude, a sua vez e as decisões que exigem aprovação.</p></div><button className="primary" onClick={onOpenQueue}>Abrir fila de entrada</button></section><section className="metric-grid"><Metric label="Para Claude" value={inbox.filter((entry) => ["novo", "respondido"].includes(entry.status || "novo")).length} detail="Novos e respondidos" tone="orange" /><Metric label="Aguardando você" value={inbox.filter((entry) => entry.status === "aguardando_voce").length} detail="Perguntas no app" tone="red" /><Metric label="Agenda vencendo" value={dueAll.length} detail="Hoje ou atrasada" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
-    <CapacidadeCard services={services} />
+    <CapacidadeCard services={services} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     {(() => {
       // "PRECISA REMARCAR" — Fase 1 do desenho de 25/07/2026. Nenhuma data aqui é combinada; é só visibilidade
       // enquanto ninguém decidiu a próxima. Vem logo no topo porque é exatamente o tipo de coisa que não pode
