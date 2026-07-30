@@ -1736,7 +1736,7 @@ function Home() {
       {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} finances={finances} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
-      {tab === "financeiro" && <FinanceView finances={finances} services={services} onVerAPagar={() => setTab("futuro")} />}
+      {tab === "financeiro" && <FinanceView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "vales" && <ValesView finances={finances} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
@@ -2688,8 +2688,12 @@ function AgendaPicker({ appointments, appt, onClose, onPicked }) {
 }
 
 const FINANCE_ABAS = [{ id: "todos", label: "Todos" }, { id: "empresa", label: "Empresa" }, { id: "pro_labore", label: "Pró-labore" }, { id: "pessoal", label: "Pessoal" }];
-function FinanceView({ finances, services, onVerAPagar }) {
+function FinanceView({ finances, services, db, demo, mode, notify, onChanged, onVerAPagar }) {
   const [aba, setAba] = useState("todos");
+  // FOCO = qual card do topo está selecionado. Diego (29/07): "entradas saídas e saldo ali dá pra fazer
+  // outro card como a receber, e todos clicáveis levando a eles". O número parado não servia pra nada —
+  // agora cada card é a porta pra lista dele, sem precisar de aba nova no menu.
+  const [foco, setFoco] = useState("todos");
   // O Financeiro mostra o que JÁ ACONTECEU. Conta futura (a_pagar) fica de fora da lista porque ela ordena por
   // data: um parcelamento de 12 meses ia empilhar 2027 em cima do que aconteceu hoje e esconder o dia. O que
   // está por vencer aparece resumido na faixa do topo, que leva pra aba "A pagar".
@@ -2708,23 +2712,24 @@ function FinanceView({ finances, services, onVerAPagar }) {
   const hoje = hojeISO();
   const resumo = resumoContas(finances, services, hoje);
   const paidIn = visiveis.filter((item) => item.tipo === "entrada" && (!item.status || item.status === "pago")).reduce((sum, item) => sum + Number(item.valor), 0); const paidOut = visiveis.filter((item) => item.tipo === "saida" && (!item.status || item.status === "pago")).reduce((sum, item) => sum + Number(item.valor), 0);
+  const totalAReceber = resumo.aReceber.reduce((s, f) => s + Number(f.valor), 0);
+  // A lista de baixo obedece o card selecionado. Só o "A receber" troca o componente inteiro (tem botão de
+  // dar baixa); entrada/saída são o mesmo formato de linha, só filtrado.
+  const noFoco = foco === "entrada" ? visiveis.filter((i) => i.tipo === "entrada") : foco === "saida" ? visiveis.filter((i) => i.tipo === "saida") : visiveis;
   return <div className="page-grid"><div className="funil-filtros">{FINANCE_ABAS.map((a) => <button key={a.id} className={aba === a.id ? "active" : ""} onClick={() => setAba(a.id)}>{a.label}</button>)}</div>
     {resumo.aPagar.length > 0 && <p className="ficha-note">{money(resumo.totalAPagar)} em {resumo.aPagar.length} conta(s) ainda por pagar
       {resumo.vencidas.length ? ` · ${resumo.vencidas.length} já vencida(s)` : ""}
       {onVerAPagar && <> · <button type="button" className="ficha-link" onClick={onVerAPagar}>ver em A pagar</button></>}</p>}
-    {/* A RECEBER, EXPLÍCITO: nome de quem deve e quando, pra ele não ter que adivinhar se já entrou.
-        Fica FORA da lista de realizados de propósito — é dinheiro combinado, não dinheiro no caixa. */}
-    {resumo.aReceber.length > 0 && <section className="warning-card">
-      <b>{money(resumo.aReceber.reduce((s, f) => s + Number(f.valor), 0))} a receber — ainda NÃO entrou no caixa</b>
-      {[...resumo.aReceber].sort((a, b) => (a.data || "").localeCompare(b.data || "")).map((f) => {
-        const svc = (services || []).find((s) => s.id === f.servico_id);
-        const quem = svc?.clientes?.nome || descricaoFinanceiraVisivel(f.descricao) || "Serviço";
-        const atrasado = (f.data || "") < hoje;
-        return <span key={f.id}>{quem} · {money(f.valor)} · {atrasado ? `venceu ${compactDate(f.data)} — cobrar` : `previsto ${compactDate(f.data)}`}</span>;
-      })}
-      <span>Some daqui e entra no saldo quando o dinheiro chegar de verdade.</span>
-    </section>}
-    <section className="metric-grid finance-metrics"><Metric label="Entradas" value={money(paidIn)} detail="Confirmadas" tone="green" /><Metric label="Saídas" value={money(paidOut)} detail="Confirmadas" tone="red" /><Metric label="Saldo" value={money(paidIn - paidOut)} detail="Visão operacional" tone="orange" /></section><section className="content-card"><div className="card-head"><div><p className="kicker">DIEGO E CLAUDE · MESMA OPERAÇÃO TIPADA</p><h3>Lançamentos realizados</h3></div></div>{visiveis.map((item) => <div className="finance-row" key={item.id}><div><strong>{descricaoFinanceiraVisivel(item.descricao) || item.categoria || "Lançamento"}</strong><span>{compactDate(item.data)} · {item.status || "pago"}</span></div><b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b></div>)}{!visiveis.length && <div className="empty-state"><b>Nada por aqui ainda.</b></div>}</section></div>;
+    {/* 4 CARDS CLICÁVEIS. O de "A receber" é amarelo de propósito: é o único que NÃO é dinheiro no caixa. */}
+    <section className="metric-grid finance-metrics">
+      <Metric label="Entradas" value={money(paidIn)} detail={foco === "entrada" ? "▾ mostrando só estas" : "Confirmadas · toque para ver"} tone="green" onClick={() => setFoco(foco === "entrada" ? "todos" : "entrada")} />
+      <Metric label="Saídas" value={money(paidOut)} detail={foco === "saida" ? "▾ mostrando só estas" : "Confirmadas · toque para ver"} tone="red" onClick={() => setFoco(foco === "saida" ? "todos" : "saida")} />
+      <Metric label="Saldo" value={money(paidIn - paidOut)} detail={foco === "todos" ? "▾ tudo que já aconteceu" : "Toque para ver tudo"} tone="orange" onClick={() => setFoco("todos")} />
+      <Metric label="A receber" value={money(totalAReceber)} detail={foco === "receber" ? "▾ ainda fora do caixa" : `${resumo.aReceber.length} saldo(s) · toque para ver`} tone="yellow" onClick={() => setFoco(foco === "receber" ? "todos" : "receber")} />
+    </section>
+    {foco === "receber"
+      ? <AReceberBloco finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={onChanged} />
+      : <section className="content-card"><div className="card-head"><div><p className="kicker">DIEGO E CLAUDE · MESMA OPERAÇÃO TIPADA</p><h3>{foco === "entrada" ? "Entradas confirmadas" : foco === "saida" ? "Saídas confirmadas" : "Lançamentos realizados"}</h3></div></div>{noFoco.map((item) => <div className="finance-row" key={item.id}><div><strong>{descricaoFinanceiraVisivel(item.descricao) || item.categoria || "Lançamento"}</strong><span>{compactDate(item.data)} · {item.status || "pago"}</span></div><b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b></div>)}{!noFoco.length && <div className="empty-state"><b>Nada por aqui ainda.</b></div>}</section>}</div>;
 }
 
 function nomeFornecedorVale(descricao) {
@@ -3141,6 +3146,44 @@ function somaDiaMes(dataISO, meses) {
   const base = new Date(a, m - 1 + meses, 1);
   const ultimo = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
   return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(Math.min(d, ultimo)).padStart(2, "0")}`;
+}
+
+// A RECEBER TEM LUGAR PRÓPRIO, MAS NÃO ABA PRÓPRIA (29/07/2026). Diego pediu "outro card que leve a eles,
+// tire de lá onde está" — e ao perguntar se precisava de aba nova, a resposta foi não: seria a 11ª aba do
+// menu pra duas linhas de conteúdo. Os cards do topo do Financeiro é que são a navegação: clicar em
+// "A receber" troca a lista de baixo por este bloco. Antes esse dinheiro vivia misturado nos lançamentos
+// realizados com "+ R$ 1.000" verde igual a entrada paga — dava pra achar que já tinha entrado (Oziane).
+// O botão "Recebi" é o momento em que vira caixa, pela mesma operação tipada da conta paga.
+function ehEntradaFutura(f) { return f.tipo === "entrada" && f.status === "a_receber"; }
+function AReceberBloco({ finances, services, db, demo, mode, notify, onChanged }) {
+  const [busy, setBusy] = useState(null);
+  const hoje = hojeISO();
+  const contas = finances.filter(ehEntradaFutura).slice().sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  const nomeDe = (f) => {
+    const svc = (services || []).find((s) => s.id === f.servico_id);
+    return svc?.clientes?.nome || descricaoFinanceiraVisivel(f.descricao) || f.categoria || "Serviço";
+  };
+  const receber = async (item) => {
+    if (mode === "claude") { notify("No modo Claude, receba pela operação tipada financeiro com o id existente.", "error"); return; }
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusy(item.id);
+    try {
+      await processarEventoOperacaoBahia(db, {
+        tipo: "financeiro", eventoId: "app-saldo-recebido-" + item.id,
+        dados: { financeiroId: item.id, status: "pago", data: hojeISO() },
+      });
+      notify(`Recebido — ${money(item.valor)} entrou no caixa.`, "ok"); await onChanged();
+    } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusy(null); }
+  };
+  return <section className="content-card"><div className="card-head"><div><p className="kicker">DINHEIRO COMBINADO, AINDA FORA DO CAIXA</p><h3>Saldos a receber</h3></div></div>
+    {!contas.length && <div className="empty-state"><b>Nenhum saldo a receber.</b><span>Todo serviço fechado já está pago.</span></div>}
+    {contas.map((item) => { const atrasado = (item.data || "") < hoje; return <div className="finance-row" key={item.id}>
+      <div><strong>{nomeDe(item)}</strong><span>{atrasado ? `venceu ${compactDate(item.data)} — cobrar` : `previsto ${compactDate(item.data)}`}{item.servico_id ? "" : " · sem serviço vinculado"}</span></div>
+      <b className="entrada">+ {money(item.valor)}</b>
+      <button className="ghost" disabled={busy === item.id} onClick={() => receber(item)}>Recebi</button>
+    </div>; })}
+    {!!contas.length && <p className="ficha-note">Nada aqui entra no saldo do Financeiro. Só entra quando você tocar em “Recebi”.</p>}
+  </section>;
 }
 
 function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
