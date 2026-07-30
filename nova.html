@@ -1126,17 +1126,55 @@ async function aplicarEntregaConcluidaOperacional(db, eventoId, dados) {
   const remarcacoes = (caixas || []).filter((item) => ultimaMetaRemarcacao(item)?.servico_id === servicoId);
   for (const pendencia of remarcacoes) await resolverPendenciaTerminal(db, { pendenciaId: pendencia.id, servicoId });
   let financeiroId = null;
+  const quitados = [];
   if (dados.recebimento) {
     const recebimento = typeof dados.recebimento === "object" ? dados.recebimento : {};
-    const fin = await registrarFinanceiroDaOperacao(db, eventoId, {
-      tipo: "entrada", escopo: "empresa", categoria: recebimento.categoria || "Serviço",
-      status: recebimento.status || "pago", valor: recebimento.valor || valor, data: recebimento.data || dataReal,
-      descricao: recebimento.descricao || "Recebimento — " + (servico.titulo || "serviço"),
-      servicoId, agendaId: agenda?.id || null,
-    }, "financeiro:recebimento-entrega");
-    financeiroId = fin.registro.id;
+    const valorRecebido = validarValorPositivo(recebimento.valor || valor, "valor recebido");
+    const dataRecebimento = recebimento.data || dataReal;
+    // O saldo a receber já existe desde a entrada do serviço (ver aplicarEntradaServicoOperacional). Criar
+    // uma entrada nova sem quitá-lo fazia o MESMO dinheiro contar duas vezes: a linha paga nova mais o
+    // a_receber que continuava aberto (caso da Oziane: R$1.000 recebidos viravam R$2.000 aparentes). Aqui
+    // o recebido abate o que já está lançado, na ordem de vencimento, e só o que sobrar vira linha nova.
+    const { data: abertos, error: abertosErr } = await db.from("financeiro")
+      .select("id,valor,data,descricao").eq("servico_id", servicoId).eq("tipo", "entrada")
+      .eq("status", "a_receber").order("data", { ascending: true });
+    if (abertosErr) throw abertosErr;
+    let restante = valorRecebido;
+    for (const linha of abertos || []) {
+      if (restante <= 0) break;
+      const valorLinha = parseMoedaBR(linha.valor) || 0;
+      if (restante >= valorLinha) {
+        await registrarFinanceiroDaOperacao(db, eventoId, { financeiroId: linha.id, status: "pago", data: dataRecebimento });
+        quitados.push(linha.id);
+        restante = Number((restante - valorLinha).toFixed(2));
+      } else {
+        // Recebeu menos que o saldo: a linha aberta fica só com o que ainda falta e o que entrou de verdade
+        // vira uma linha paga própria — o caixa mostra o dinheiro real e o resto continua cobrável.
+        const { error: parcialErr } = await db.from("financeiro")
+          .update({ valor: Number((valorLinha - restante).toFixed(2)) }).eq("id", linha.id);
+        if (parcialErr) throw parcialErr;
+        const parcial = await registrarFinanceiroDaOperacao(db, eventoId, {
+          tipo: "entrada", escopo: "empresa", categoria: recebimento.categoria || "Serviço", status: "pago",
+          valor: restante, data: dataRecebimento,
+          descricao: recebimento.descricao || "Recebimento parcial — " + (servico.titulo || "serviço"),
+          servicoId, agendaId: agenda?.id || null,
+        }, "financeiro:recebimento-parcial");
+        financeiroId = parcial.registro.id;
+        restante = 0;
+      }
+    }
+    if (restante > 0) {
+      const fin = await registrarFinanceiroDaOperacao(db, eventoId, {
+        tipo: "entrada", escopo: "empresa", categoria: recebimento.categoria || "Serviço",
+        status: recebimento.status || "pago", valor: restante, data: dataRecebimento,
+        descricao: recebimento.descricao || "Recebimento — " + (servico.titulo || "serviço"),
+        servicoId, agendaId: agenda?.id || null,
+      }, "financeiro:recebimento-entrega");
+      financeiroId = fin.registro.id;
+    }
+    if (!financeiroId && quitados.length) financeiroId = quitados[0];
   }
-  return { servicoId, statusServico: atualizado.status, valor, agendaId: agendaFeita?.id || null, historicoId: historico.id, financeiroId, remarcacoesEncerradas: remarcacoes.length };
+  return { servicoId, statusServico: atualizado.status, valor, agendaId: agendaFeita?.id || null, historicoId: historico.id, financeiroId, quitados, remarcacoesEncerradas: remarcacoes.length };
 }
 async function aplicarServicoFechadoOperacional(db, eventoId, dados) {
   if (!dados.servicoId) throw new Error("Serviço fechado exige servicoId.");
@@ -2119,19 +2157,28 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   // raiz) — compromisso com pendência de remarcação aberta nunca chega até aqui. Só resta separar por data.
   // ROTA × COBRANÇA (28/07/2026): a agenda só mostra o que tem hora/deslocamento. Cobrança sai daqui e vai
   // pro bloco próprio, senão o dia parece ter 16 compromissos quando a estrada tem 3. Ver ehCobranca().
-  const rotaAll = appointments.filter((entry) => !ehCobranca(entry));
-  const cobrancasAll = appointments.filter((entry) => ehCobranca(entry));
-  const dueAll = rotaAll.filter((entry) => entry.data <= today); const futurosAll = rotaAll.filter((entry) => entry.data > today); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
   const svcDe = (a) => services.find((s) => s.id === a.servico_id);
+  // REFINAMENTO 29/07 (Diego: "esperando cliente / sua vez não é cobrança"): só sai da agenda o que espera o
+  // CLIENTE. Remoto sem hora que depende do Diego (entregar a cabeceira, cobrar o profissional, revisar) é
+  // trabalho dele esperando dia — volta pra agenda com Concluir/Reagendar, sem botão de WhatsApp e fora do
+  // ciclo de 3 dias, que não faz sentido nenhum pra tarefa própria. Antes os dois viravam CobrancaCard.
+  const cobrancasAll = appointments.filter((entry) => ehCobranca(entry) && esperandoCliente(entry, svcDe(entry)));
+  const idsCobranca = new Set(cobrancasAll.map((entry) => entry.id));
+  const rotaAll = appointments.filter((entry) => !idsCobranca.has(entry.id));
+  const dueAll = rotaAll.filter((entry) => entry.data <= today); const futurosAll = rotaAll.filter((entry) => entry.data > today); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
   // Atualização otimista pra a linha sumir NA HORA: sem isto ela só sairia depois do loadAll (5 queries) e
   // parecia que o clique não pegou — mesmo bug já corrigido nos compromissos em 15/07.
   // Guarda a DATA resolvida, não `true`: o ciclo recicla a mesma linha da agenda mudando a data, então
   // marcar o id pra sempre esconderia a próxima volta da cobrança numa aba deixada aberta.
   const [resolvidas, setResolvidas] = useState({});
   const [busyCobranca, setBusyCobranca] = useState(null);
-  const cobrancasVencidas = cobrancasAll.filter((a) => a.data <= today && resolvidas[a.id] !== a.data);
-  const cobrarCliente = cobrancasVencidas.filter((a) => esperandoCliente(a, svcDe(a)));
-  const suaVez = cobrancasVencidas.filter((a) => !esperandoCliente(a, svcDe(a)));
+  const cobrarCliente = cobrancasAll.filter((a) => a.data <= today && resolvidas[a.id] !== a.data);
+  // A LISTA FICA FECHADA (Diego, 29/07: "está poluindo o painel"). Cobrar 12 clientes no WhatsApp não é
+  // decisão, é tarefa em lote — o Painel mostra o tamanho e o valor em jogo, e a lista abre num toque, aqui
+  // mesmo. Sem aba nova: o dia do telefone continua sendo uma coisa só, não uma navegação.
+  const [listaCobrancas, setListaCobrancas] = useState(false);
+  const valorEmJogo = cobrarCliente.reduce((soma, a) => soma + Number(svcDe(a)?.valor_orcamento || 0), 0);
+  const qtdNoTeto = cobrarCliente.filter((a) => cobrancaNoTeto(svcDe(a))).length;
   // COBREI: conta a tentativa e empurra o ciclo. O link do WhatsApp abre normalmente; isto roda em paralelo.
   const onCobrou = async (a, svc) => {
     const proxima = somarDias(today, COBRANCA_INTERVALO_DIAS);
@@ -2262,12 +2309,12 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Compromissos de hoje e atrasados</h3></div></div><AvisoRota compromissos={due.filter((a) => a.data === today)} />{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</section>}
     {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
     {cobrarCliente.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">COBRANÇAS · ESPERANDO O CLIENTE</p><h3>{cobrarCliente.length} pra cobrar hoje</h3></div></div>
-      <p className="ficha-note">Não é rota — resolve no celular. Cada cobrança volta sozinha em {COBRANCA_INTERVALO_DIAS} dias; na {COBRANCA_TETO_TENTATIVAS}ª sem resposta o app propõe encerrar.</p>
-      {[...cobrarCliente].sort((x, y) => (x.data || "").localeCompare(y.data || "")).map((a) => { const svc = svcDe(a); return <CobrancaCard key={a.id} a={a} svc={svc} today={today} tentativas={cobrancaTentativas(svc)} noTeto={cobrancaNoTeto(svc)} onCobrou={onCobrou} onEncerrar={onEncerrar} busy={busyCobranca === a.id} />; })}
-    </section>}
-    {suaVez.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">SUA VEZ · NÃO É COBRANÇA</p><h3>{suaVez.length} coisa(s) que dependem de você</h3></div></div>
-      <p className="ficha-note">Isto não é esperar cliente — é trabalho seu que ficou sem dia. Precisa de data, não de ciclo.</p>
-      {[...suaVez].sort((x, y) => (x.data || "").localeCompare(y.data || "")).map((a) => { const svc = svcDe(a); return <CobrancaCard key={a.id} a={a} svc={svc} today={today} tentativas={cobrancaTentativas(svc)} noTeto={false} onCobrou={onCobrou} onEncerrar={onEncerrar} busy={busyCobranca === a.id} />; })}
+      <p className="ficha-note">{valorEmJogo > 0 ? `${money(valorEmJogo)} em jogo · ` : ""}não é rota, resolve no celular. Cada uma volta sozinha em {COBRANCA_INTERVALO_DIAS} dias; na {COBRANCA_TETO_TENTATIVAS}ª sem resposta o app propõe encerrar.</p>
+      {qtdNoTeto > 0 && <p className="ficha-note"><b>{qtdNoTeto} já no limite de {COBRANCA_TETO_TENTATIVAS} tentativas</b> — essas precisam de decisão sua: insistir ou encerrar.</p>}
+      <button className="ghost" style={{ width: "100%" }} onClick={() => setListaCobrancas((v) => !v)}>{listaCobrancas ? "Fechar lista" : `Abrir a lista de ${cobrarCliente.length}`}</button>
+      {listaCobrancas && <div style={{ marginTop: 12 }}>
+        {[...cobrarCliente].sort((x, y) => (cobrancaNoTeto(svcDe(y)) ? 1 : 0) - (cobrancaNoTeto(svcDe(x)) ? 1 : 0) || (x.data || "").localeCompare(y.data || "")).map((a) => { const svc = svcDe(a); return <CobrancaCard key={a.id} a={a} svc={svc} today={today} tentativas={cobrancaTentativas(svc)} noTeto={cobrancaNoTeto(svc)} onCobrou={onCobrou} onEncerrar={onEncerrar} busy={busyCobranca === a.id} />; })}
+      </div>}
     </section>}
     {futuros.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Próximos compromissos</h3></div></div>{[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</section>}
     {filtroTipo !== "todos" && due.length === 0 && futuros.length === 0 && (dueAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
@@ -3159,6 +3206,12 @@ function AReceberBloco({ finances, services, db, demo, mode, notify, onChanged }
   const [busy, setBusy] = useState(null);
   const hoje = hojeISO();
   const contas = finances.filter(ehEntradaFutura).slice().sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+  // Diego, 29/07: "tem mais para receber que não está lá". O card só mostrava quem tem linha a_receber
+  // gravada — serviço entregue com valor cheio e nenhuma entrada lançada é dinheiro a receber igual, e ficava
+  // invisível justo no lugar onde ele vai olhar pra saber quanto tem pra entrar. Entra aqui, mas separado:
+  // não é linha de financeiro, é saldo que ninguém lançou ainda — por isso não tem "Recebi" direto.
+  const { prontosSemCobranca } = resumoContas(finances, services, hoje);
+  const semLancar = (prontosSemCobranca || []).slice().sort((a, b) => (a.prazo || "").localeCompare(b.prazo || ""));
   const nomeDe = (f) => {
     const svc = (services || []).find((s) => s.id === f.servico_id);
     return svc?.clientes?.nome || descricaoFinanceiraVisivel(f.descricao) || f.categoria || "Serviço";
@@ -3176,13 +3229,22 @@ function AReceberBloco({ finances, services, db, demo, mode, notify, onChanged }
     } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusy(null); }
   };
   return <section className="content-card"><div className="card-head"><div><p className="kicker">DINHEIRO COMBINADO, AINDA FORA DO CAIXA</p><h3>Saldos a receber</h3></div></div>
-    {!contas.length && <div className="empty-state"><b>Nenhum saldo a receber.</b><span>Todo serviço fechado já está pago.</span></div>}
+    {!contas.length && !semLancar.length && <div className="empty-state"><b>Nenhum saldo a receber.</b><span>Todo serviço fechado já está pago.</span></div>}
     {contas.map((item) => { const atrasado = (item.data || "") < hoje; return <div className="finance-row" key={item.id}>
       <div><strong>{nomeDe(item)}</strong><span>{atrasado ? `venceu ${compactDate(item.data)} — cobrar` : `previsto ${compactDate(item.data)}`}{item.servico_id ? "" : " · sem serviço vinculado"}</span></div>
       <b className="entrada">+ {money(item.valor)}</b>
       <button className="ghost" disabled={busy === item.id} onClick={() => receber(item)}>Recebi</button>
     </div>; })}
     {!!contas.length && <p className="ficha-note">Nada aqui entra no saldo do Financeiro. Só entra quando você tocar em “Recebi”.</p>}
+    {!!semLancar.length && <div style={{ marginTop: contas.length ? 18 : 0, paddingTop: 14, borderTop: "1px dashed var(--line)" }}>
+      <p className="kicker">AINDA SEM LANÇAMENTO NENHUM — {money(semLancar.reduce((s, x) => s + Number(x.valor_orcamento || 0), 0))}</p>
+      {semLancar.map((s) => <div className="finance-row" key={s.id}>
+        <div><strong>{s.clientes?.nome || s.titulo}</strong><span>{s.status === "entregue" ? "entregue" : "em produção"}{s.prazo ? ` · prazo ${compactDate(s.prazo)}` : ""} · valor combinado, nenhuma entrada no financeiro</span></div>
+        <b className="entrada">+ {money(s.valor_orcamento)}</b>
+        <span className="status-pill">falta lançar</span>
+      </div>)}
+      <p className="ficha-note">Esses não têm linha no financeiro ainda, então não dá pra tocar em “Recebi”: primeiro lança a entrada do serviço (ou o saldo), depois recebe.</p>
+    </div>}
   </section>;
 }
 
