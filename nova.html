@@ -389,10 +389,13 @@ const JANELAS_SEMANA = { 0: [], 1: [["08:00", "11:00"], ["13:00", "18:00"]], 2: 
 // Tarefa remota (ligar, mandar mensagem) não disputa horário: janela ampla, todo dia, nunca bloqueia horário ocupado.
 const JANELA_REMOTO = ["07:00", "22:00"];
 // Tempo típico de estrada entre as praças do Diego, em minutos (par de cidadeChave em ordem alfabética). Estimativa pro ALERTA, não pra bloquear.
-const TEMPO_ESTRADA_MIN = { "brasilia|luziania": 75, "luziania|valparaiso": 25, "cidade ocidental|luziania": 30, "luziania|novo gama": 35, "jardim inga|luziania": 15, "aguas lindas de goias|luziania": 105, "aguas claras|luziania": 60, "aguas claras|brasilia": 25, "brasilia|valparaiso": 45, "brasilia|novo gama": 50, "brasilia|cidade ocidental": 50, "aguas lindas de goias|brasilia": 50, "novo gama|valparaiso": 15, "cidade ocidental|valparaiso": 15, "cidade ocidental|novo gama": 20, "luziania|riacho fundo": 50, "riacho fundo|valparaiso": 30, "aguas claras|riacho fundo": 20, "brasilia|riacho fundo": 25, "novo gama|riacho fundo": 30, "cidade ocidental|riacho fundo": 45, "aguas lindas de goias|riacho fundo": 60, "aguas claras|valparaiso": 40, "aguas claras|novo gama": 45, "aguas claras|cidade ocidental": 55, "aguas claras|aguas lindas de goias": 60 };
+const TEMPO_ESTRADA_MIN = { "brasilia|luziania": 75, "luziania|valparaiso": 25, "cidade ocidental|luziania": 30, "luziania|novo gama": 35, "jardim inga|luziania": 15, "aguas lindas de goias|luziania": 105, "aguas claras|luziania": 60, "aguas claras|brasilia": 25, "brasilia|valparaiso": 45, "brasilia|novo gama": 50, "brasilia|cidade ocidental": 50, "aguas lindas de goias|brasilia": 50, "novo gama|valparaiso": 15, "cidade ocidental|valparaiso": 15, "cidade ocidental|novo gama": 20, "luziania|riacho fundo": 50, "riacho fundo|valparaiso": 30, "aguas claras|riacho fundo": 20, "brasilia|riacho fundo": 25, "novo gama|riacho fundo": 30, "cidade ocidental|riacho fundo": 45, "aguas lindas de goias|riacho fundo": 60, "aguas claras|valparaiso": 40, "aguas claras|novo gama": 45, "aguas claras|cidade ocidental": 55, "aguas claras|aguas lindas de goias": 60, "luziania|taguatinga": 60, "aguas claras|taguatinga": 10, "brasilia|taguatinga": 25, "taguatinga|valparaiso": 45, "novo gama|taguatinga": 45, "cidade ocidental|taguatinga": 55, "riacho fundo|taguatinga": 20, "aguas lindas de goias|taguatinga": 40, "jardim inga|taguatinga": 55 };
 // Riacho Fundo e os pares com Águas Claras entraram em 23/07/2026 porque o par que não existe aqui cai num
 // default cego de 60min - era o que fazia a rota Luziânia > Valparaíso > Riacho Fundo > Águas Claras não bater.
 // Esses tempos são ESTIMATIVA pelo corredor da BR-040; corrigir com o tempo real quando o Diego apontar.
+// Taguatinga entrou em 30/07/2026: cinco fornecedores de tecido/couro (Afibracom, Helo Couros, Broadway,
+// Fernanda Couros, Ativa Tecidos) são de lá, e sem os pares a viagem de compra caía no default de 60min.
+// Os tempos de Taguatinga também são estimativa — Diego, corrija quando notar que não bate.
 const DURACAO_SERVICO_MIN = 60;
 const CIDADE_BASE = "luziania";
 function hojeISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
@@ -1261,7 +1264,16 @@ function proximaEntregaFornecedor(diasEntrega) {
 function gerarSlots(ini, fim) { const slots = []; let [h, m] = ini.split(":").map(Number); const [hf, mf] = fim.split(":").map(Number); while (h < hf || (h === hf && m < mf)) { slots.push(String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0")); m += 60; if (m >= 60) { m -= 60; h += 1; } } return slots; }
 function horariosParaTipo(dataISO, tipo, ocupados) { if (tipo === "remoto") return gerarSlots(JANELA_REMOTO[0], JANELA_REMOTO[1]); const dia = new Date(dataISO + "T00:00:00").getDay(); const occ = new Set((ocupados || []).filter(Boolean).map((h) => h.slice(0, 5))); const livres = []; for (const [ini, fim] of (JANELAS_SEMANA[dia] || [])) gerarSlots(ini, fim).forEach((h) => { if (!occ.has(h)) livres.push(h); }); return livres; }
 function minutosDoHorario(h) { const [hh, mm] = String(h || "").split(":").map(Number); return (hh || 0) * 60 + (mm || 0); }
-function cidadeChave(c) { return String(c || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split("(")[0].split("-")[0].trim(); }
+// O MESMO LUGAR ESCRITO DE DUAS FORMAS VIRAVA DUAS CIDADES. O fornecedor Seu Andrade está cadastrado como
+// "Jardim do Ingá" (é o nome certo do lugar) e a tabela de estrada usa "jardim inga" — sem casar, o par não
+// era encontrado e o app assumia o default cego de 60 min onde são 15. Erro silencioso: a trava de rota
+// simplesmente calculava errado, sem avisar ninguém. Em vez de forçar o cadastro a escrever torto, o app
+// aceita as duas formas. Diego, 30/07: "andrade jardim do inga".
+const CIDADE_SINONIMOS = { "jardim do inga": "jardim inga", "inga": "jardim inga", "aguas lindas": "aguas lindas de goias", "valparaiso de goias": "valparaiso", "sao sebastiao": "sao sebastiao" };
+function cidadeChave(c) {
+  const base = String(c || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split("(")[0].split("-")[0].trim();
+  return CIDADE_SINONIMOS[base] || base;
+}
 function tempoEstradaMin(c1, c2) { const a = cidadeChave(c1), b = cidadeChave(c2); if (!a || !b || a === b) return 0; return TEMPO_ESTRADA_MIN[[a, b].sort().join("|")] ?? 60; }
 function horarioApertado(h, outros, cidadeNova) { return (outros || []).some((a) => Math.abs(minutosDoHorario(h) - minutosDoHorario(a.hora)) < tempoEstradaMin(cidadeNova, a.cidade) + DURACAO_SERVICO_MIN); }
 // TRAVA DE ROTA. As praças do Diego ficam num corredor saindo de Luziânia (Valparaíso > Riacho Fundo > Águas
