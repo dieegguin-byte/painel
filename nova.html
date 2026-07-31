@@ -783,6 +783,19 @@ async function registrarFinanceiroDaOperacao(db, eventoId, dados, papel = "finan
     tipo = "saida"; escopo = "empresa";
     if (!(dados.fornecedorId || existente?.fornecedor_id)) throw new Error("Material exige fornecedorId.");
   }
+  // DINHEIRO DE SERVIÇO SEM DONO NÃO ENTRA (Diego, 30/07: "dê um jeito para não acontecer novamente").
+  // O que aconteceu: a entrada da Ana Cristina (R$1.107) e a da Madalena (R$1.250) foram lançadas sem
+  // servico_id. O dinheiro estava no caixa, certo — mas o serviço parecia não ter recebido nada, o saldo a
+  // receber nunca foi criado, e as duas sumiram da cobrança. Foi preciso o Diego lembrar de cabeça pra achar.
+  // Mesma trava do Material com fornecedor: entrada de Serviço tem que dizer DE QUEM é. Só vale pra
+  // categoria "Serviço" — saldo inicial, empréstimo, pró-labore e reembolso continuam livres, porque esses
+  // legitimamente não pertencem a um serviço.
+  // Só na CRIAÇÃO (sem financeiroId). Alterar uma linha que já existe continua livre, senão o botão "Recebi"
+  // deixaria de funcionar justamente nos saldos antigos que estão sem serviço — travar o conserto do legado
+  // seria o oposto do que se quer.
+  if (!dados.financeiroId && ehCategoriaServico(categoria) && tipo === "entrada" && !dados.servicoId) {
+    throw new Error("Entrada de Serviço exige servicoId — sem isso o dinheiro entra no caixa mas o serviço fica parecendo não pago, e o saldo a receber some da cobrança.");
+  }
   const valor = validarValorPositivo(dados.valor ?? existente?.valor);
   const data = dados.data || existente?.data || hojeISO();
   const tem = (key) => Object.prototype.hasOwnProperty.call(dados, key);
@@ -2847,6 +2860,9 @@ function ValesView({ finances, db, demo, mode, notify, onChanged }) {
 // com fornecedor_id e, quando o material foi pra um trabalho específico, servico_id. Assim o saldo da empresa nunca
 // desencontra e a aba Compras é só uma VISTA - mesmo padrão de Vales e Pró-labore. Ver REGRA Nº 8 no Guia da IA.
 const CATEGORIA_MATERIAL = "Material";
+// Dinheiro que ENTRA por um trabalho. Comparado sem acento porque o banco tem as duas grafias ("Serviço" e
+// "Servico") vindas de lançamentos de épocas diferentes — a trava não pode depender do cedilha.
+const ehCategoriaServico = (cat) => String(cat || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase() === "servico";
 const MATERIAL_EM_MAOS_TAG = "[EM MÃOS] ";
 const MATERIAL_EM_TRANSITO_TAG = "[EM TRÂNSITO] ";
 function ehCompraMaterial(item) { return item.tipo === "saida" && item.categoria === CATEGORIA_MATERIAL; }
@@ -3230,6 +3246,11 @@ function AReceberBloco({ finances, services, db, demo, mode, notify, onChanged }
   // não é linha de financeiro, é saldo que ninguém lançou ainda — por isso não tem "Recebi" direto.
   const { prontosSemCobranca } = resumoContas(finances, services, hoje);
   const semLancar = (prontosSemCobranca || []).slice().sort((a, b) => (a.prazo || "").localeCompare(b.prazo || ""));
+  // DINHEIRO ÓRFÃO: entrada de serviço que ninguém amarrou a um serviço. A trava nova (ver
+  // registrarFinanceiroDaOperacao) impede que apareçam novos, mas os antigos já estavam no banco e é
+  // justamente por serem invisíveis que a entrada da Ana Cristina e a da Madalena ficaram 13 dias sem virar
+  // saldo a receber. Aparecem aqui porque é o lugar onde a conta não fecha.
+  const orfaos = (finances || []).filter((f) => f.tipo === "entrada" && f.status === "pago" && !f.servico_id && ehCategoriaServico(f.categoria));
   const nomeDe = (f) => {
     const svc = (services || []).find((s) => s.id === f.servico_id);
     return svc?.clientes?.nome || descricaoFinanceiraVisivel(f.descricao) || f.categoria || "Serviço";
@@ -3262,6 +3283,14 @@ function AReceberBloco({ finances, services, db, demo, mode, notify, onChanged }
         <span className="status-pill">falta lançar</span>
       </div>)}
       <p className="ficha-note">Esses não têm linha no financeiro ainda, então não dá pra tocar em “Recebi”: primeiro lança a entrada do serviço (ou o saldo), depois recebe.</p>
+    </div>}
+    {!!orfaos.length && <div style={{ marginTop: 18, paddingTop: 14, borderTop: "1px dashed var(--line)" }}>
+      <p className="kicker">⚠ ENTRADA SEM SERVIÇO — {money(orfaos.reduce((s, f) => s + Number(f.valor || 0), 0))}</p>
+      {orfaos.map((f) => <div className="finance-row" key={f.id}>
+        <div><strong>{descricaoFinanceiraVisivel(f.descricao) || f.categoria}</strong><span>recebido {compactDate(f.data)} · está no caixa, mas não sabe de qual serviço</span></div>
+        <b className="entrada">+ {money(f.valor)}</b>
+      </div>)}
+      <p className="ficha-note">Esse dinheiro entrou, mas o serviço dele parece não ter recebido nada — por isso o saldo a receber não foi criado. Peça pro Claude amarrar cada um ao serviço certo.</p>
     </div>}
   </section>;
 }
