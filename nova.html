@@ -60,7 +60,14 @@
 .material-itens{display:block;font-size:12px;color:var(--muted);margin:4px 0 6px}
 button.sutil{opacity:.55;font-size:12px}
 .compra-lojas{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
-.compra-loja-chip{font-size:11px;padding:4px 9px;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap}
+.compra-loja-chip{font-size:11px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap;background:transparent;cursor:pointer}
+.compra-loja-chip:hover{color:var(--text);border-color:var(--accent)}
+.compra-loja-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.compra-loja-painel{margin:0 0 14px;padding:12px;border:1px solid var(--accent);border-radius:10px;background:var(--surface2)}
+.compra-loja-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.compra-loja-head strong{font-size:15px}
+.compra-loja-acoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.compra-loja-acoes button{flex:1 1 auto;font-size:13px}
 .compra-item-nome{font-weight:400;cursor:text}
 .compra-item.feito .compra-item-nome{text-decoration:line-through}
 .compra-item-input{width:100%;background:var(--surface);border:1px solid var(--accent);border-radius:5px;color:var(--text);font-size:15px;padding:3px 7px}
@@ -3419,6 +3426,14 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   const [lojaDraft, setLojaDraft] = useState("");
   const [editandoItem, setEditandoItem] = useState(null);
   const [itemDraft, setItemDraft] = useState("");
+  // VISÃO POR LOJA. Diego, 04/08: "os fornecedores lá ser clicáveis, quando clicar ele me levar a lista
+  // daquele fornecedor... e outra opção de copiar, sem check mas organizada, para eu mandar para o WhatsApp
+  // do fornecedor o pedido certinho, e um botão marcar todos caso eu mande o pedido".
+  // São dois modos de comprar, e cada um pede uma tela: na loja ele confere item a item com o dedo; no
+  // WhatsApp ele manda o pedido inteiro de uma vez e marca tudo junto. A lista por cliente continua sendo a
+  // visão principal, porque é ela que amarra o material ao serviço.
+  const [lojaAberta, setLojaAberta] = useState(null);
+  const [copiado, setCopiado] = useState(false);
   // ARQUIVADO = o cliente já saiu da lista. Diego, 04/08: "quando comprar tudo tem que sumir o cliente da aba
   // compras, com um botão confirmar e ele sumir". Sumir sozinho ao marcar o último item seria pior: ele
   // perderia a conferência final e o card evaporaria embaixo do dedo. O botão é o momento de dizer "conferi,
@@ -3485,6 +3500,36 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
     if (!texto) return; // vazio não apaga: pra remover existe o ✕, que é explícito
     gravar(servico, (servico.materiais_necessarios || []).map((m, i) => i === idx ? { ...m, item: texto } : m));
   };
+  // Itens pendentes de uma loja, de TODOS os clientes — é assim que a compra acontece de verdade.
+  const lojaDoItem = (m, s) => ((m.loja || s.loja_material || "").trim() || "Loja a definir");
+  const itensDaLoja = (loja) => ativos.flatMap((s) => visiveisDe(s)
+    .map((m, vi) => ({ m, s, idx: (s.materiais_necessarios || []).indexOf(m) }))
+    .filter((x) => !x.m.comprado && lojaDoItem(x.m, x.s) === loja));
+  // Pedido pra colar no WhatsApp do fornecedor. Sem checkbox, sem nome de cliente solto: o fornecedor precisa
+  // saber O QUE separar, não pra quem é. O cliente entra só como referência curta, pra ele conferir depois.
+  const textoDoPedido = (loja) => {
+    const itens = itensDaLoja(loja);
+    const linhas = itens.map((x) => `• ${x.m.item} (${(x.s.clientes?.nome || "").split(" ")[0]})`);
+    return `Olá! Preciso separar o seguinte material:\n\n${linhas.join("\n")}\n\nObrigado!`;
+  };
+  const copiarPedido = async (loja) => {
+    try {
+      await navigator.clipboard.writeText(textoDoPedido(loja));
+      setCopiado(true); setTimeout(() => setCopiado(false), 2500);
+      notify("Pedido copiado — cole no WhatsApp do fornecedor.", "ok");
+    } catch (e) { notify("Não consegui copiar. Segure no texto pra copiar à mão.", "error"); }
+  };
+  // Marcar tudo de uma loja: um serviço por vez, porque cada um é uma linha no banco.
+  const marcarTodosDaLoja = async (loja) => {
+    const itens = itensDaLoja(loja);
+    const porServico = {};
+    itens.forEach((x) => { (porServico[x.s.id] ||= { s: x.s, idxs: [] }).idxs.push(x.idx); });
+    for (const { s, idxs } of Object.values(porServico)) {
+      const lista = (s.materiais_necessarios || []).map((m, i) => idxs.includes(i) ? { ...m, comprado: true, lojaSugerida: false } : m);
+      await gravar(s, lista);
+    }
+    notify(`${itens.length} item(ns) da ${loja} marcados como resolvidos.`, "ok");
+  };
   const remover = (servico, idx) => gravar(servico, (servico.materiais_necessarios || []).filter((_, i) => i !== idx));
   // Confirmar não apaga: arquiva. O que foi comprado continua registrado na ficha do serviço.
   const confirmar = (servico) => gravar(servico, (servico.materiais_necessarios || []).map((m) => m.arquivado ? m : { ...m, comprado: true, arquivado: true }));
@@ -3499,8 +3544,25 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
         continua por cliente (é assim que ele confere o serviço), mas esta faixa diz onde ir e o que rende
         cada parada. Sem ela, planejar a viagem exigiria ler a lista inteira e montar isso de cabeça. */}
     {!!Object.keys(porLoja).length && <div className="compra-lojas">
-      {Object.entries(porLoja).sort((a, b) => b[1] - a[1]).map(([loja, qtd]) => <span key={loja} className="compra-loja-chip">{loja} · {qtd}</span>)}
+      {Object.entries(porLoja).sort((a, b) => b[1] - a[1]).map(([loja, qtd]) => <button type="button" key={loja} className={`compra-loja-chip${lojaAberta === loja ? " active" : ""}`} onClick={() => setLojaAberta(lojaAberta === loja ? null : loja)}>{loja} · {qtd}</button>)}
     </div>}
+    {lojaAberta && (() => { const itens = itensDaLoja(lojaAberta); return <div className="compra-loja-painel">
+      <div className="compra-loja-head">
+        <strong>{lojaAberta}</strong>
+        <button type="button" className="ghost" onClick={() => setLojaAberta(null)}>✕ fechar</button>
+      </div>
+      {!itens.length ? <p className="ficha-note">Nada pendente nesta loja.</p> : <>
+        {itens.map((x, n) => <label className="compra-item" key={n}>
+          <input type="checkbox" checked={false} disabled={busy === x.s.id || mode === "claude"} onChange={() => alternar(x.s, x.idx)} />
+          <span>{x.m.item}<em className="compra-item-loja">{x.s.clientes?.nome || "cliente"}{x.s.prazo ? " · entrega " + compactDate(x.s.prazo) : ""}</em></span>
+        </label>)}
+        <div className="compra-loja-acoes">
+          <button type="button" className="primary" onClick={() => copiarPedido(lojaAberta)}>{copiado ? "✓ copiado" : "📋 Copiar pedido pro WhatsApp"}</button>
+          <button type="button" className="ghost" disabled={!!busy} onClick={() => marcarTodosDaLoja(lojaAberta)}>Marcar todos ({itens.length})</button>
+        </div>
+        <p className="ficha-note">Na loja, vá marcando um a um. Se mandar o pedido pelo WhatsApp, copie e use “Marcar todos” — some daqui e da lista de cada cliente.</p>
+      </>}
+    </div>; })()}
     {ordenados.map((s) => {
       // Guarda o índice REAL junto do item: a tela mostra só os não arquivados, mas alternar/remover precisam
       // apontar pra posição verdadeira no array salvo.
