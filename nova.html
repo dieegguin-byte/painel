@@ -69,8 +69,10 @@ button.sutil{opacity:.55;font-size:12px}
 .compra-item.feito span{text-decoration:line-through;color:var(--muted)}
 .compra-remover{background:none;border:0;color:var(--muted);font-size:14px;padding:4px 6px;cursor:pointer;opacity:.5}
 .compra-remover:hover{opacity:1}
-.compra-add{padding-top:8px;border-top:1px solid var(--line)}
-.compra-add input{width:100%;background:transparent;border:0;color:var(--text);font-size:14px;padding:6px 4px}
+.compra-add{display:flex;gap:8px;align-items:center;padding-top:8px;border-top:1px solid var(--line)}
+.compra-add input{flex:1;min-width:0;background:transparent;border:0;color:var(--text);font-size:14px;padding:6px 4px}
+.compra-add button{flex:0 0 auto;font-size:12px;padding:6px 10px}
+.compra-cliente .primary.wide{margin-top:10px}
 .compras-historico{margin-top:6px}
 .compras-historico summary{cursor:pointer;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px;color:var(--muted)}
 .compras-historico[open] summary{margin-bottom:10px}
@@ -3375,10 +3377,16 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
 function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   const [busy, setBusy] = useState(null);
   const [novoItem, setNovoItem] = useState({});
-  const ativos = (services || []).filter((s) => ["agendado", "producao"].includes(s.status) && (s.materiais_necessarios || []).length);
+  // ARQUIVADO = o cliente já saiu da lista. Diego, 04/08: "quando comprar tudo tem que sumir o cliente da aba
+  // compras, com um botão confirmar e ele sumir". Sumir sozinho ao marcar o último item seria pior: ele
+  // perderia a conferência final e o card evaporaria embaixo do dedo. O botão é o momento de dizer "conferi,
+  // pode tirar". Os itens não são apagados (Regra Nº 7) — ficam marcados, só saem da vista.
+  // Se o tapeceiro pedir algo depois, o item novo entra sem arquivo e o cliente reaparece na lista sozinho.
+  const visiveisDe = (s) => (s.materiais_necessarios || []).filter((m) => !m.arquivado);
+  const ativos = (services || []).filter((s) => ["agendado", "producao"].includes(s.status) && visiveisDe(s).length);
   const ordenados = [...ativos].sort((a, b) => String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
-  const totalItens = ativos.reduce((n, s) => n + (s.materiais_necessarios || []).length, 0);
-  const faltam = ativos.reduce((n, s) => n + (s.materiais_necessarios || []).filter((m) => !m.comprado).length, 0);
+  const totalItens = ativos.reduce((n, s) => n + visiveisDe(s).length, 0);
+  const faltam = ativos.reduce((n, s) => n + visiveisDe(s).filter((m) => !m.comprado).length, 0);
   const gravar = async (servico, novaLista) => {
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusy(servico.id);
@@ -3399,31 +3407,41 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
     gravar(servico, [...(servico.materiais_necessarios || []), { item: texto, comprado: false }]);
   };
   const remover = (servico, idx) => gravar(servico, (servico.materiais_necessarios || []).filter((_, i) => i !== idx));
+  // Confirmar não apaga: arquiva. O que foi comprado continua registrado na ficha do serviço.
+  const confirmar = (servico) => gravar(servico, (servico.materiais_necessarios || []).map((m) => m.arquivado ? m : { ...m, comprado: true, arquivado: true }));
   if (!ordenados.length) return <section className="content-card"><div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>Nada pra comprar</h3></div></div>
     <div className="empty-state"><b>Nenhum serviço ativo tem material anotado.</b><span>Peça pro Claude anotar o que falta em cada cliente, ou adicione na ficha do serviço.</span></div></section>;
   return <section className="content-card">
     <div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>{faltam} item(ns) pra comprar</h3></div>
       {totalItens > faltam && <span className="status-pill">{totalItens - faltam} já comprado(s)</span>}</div>
     {ordenados.map((s) => {
-      const itens = s.materiais_necessarios || [];
-      const pendentes = itens.filter((m) => !m.comprado).length;
-      return <div className={`compra-cliente${pendentes ? "" : " tudo-comprado"}`} key={s.id}>
+      // Guarda o índice REAL junto do item: a tela mostra só os não arquivados, mas alternar/remover precisam
+      // apontar pra posição verdadeira no array salvo.
+      const itens = (s.materiais_necessarios || []).map((m, i) => ({ m, i })).filter((x) => !x.m.arquivado);
+      const pendentes = itens.filter((x) => !x.m.comprado).length;
+      const tudoComprado = !pendentes && itens.length > 0;
+      return <div className={`compra-cliente${tudoComprado ? " tudo-comprado" : ""}`} key={s.id}>
         <div className="compra-cliente-head">
           <strong>{s.clientes?.nome || "Cliente"}</strong>
           <span>{pendentes ? `faltam ${pendentes}` : "tudo comprado ✓"}{s.prazo ? ` · entrega ${compactDate(s.prazo)}` : ""}{s.loja_material ? ` · ${s.loja_material}` : ""}</span>
         </div>
-        {itens.map((m, i) => <label className={`compra-item${m.comprado ? " feito" : ""}`} key={i}>
+        {itens.map(({ m, i }) => <label className={`compra-item${m.comprado ? " feito" : ""}`} key={i}>
           <input type="checkbox" checked={!!m.comprado} disabled={busy === s.id || mode === "claude"} onChange={() => alternar(s, i)} />
           <span>{m.item}</span>
           <button type="button" className="compra-remover" title="Tirar da lista" disabled={busy === s.id} onClick={(e) => { e.preventDefault(); remover(s, i); }}>✕</button>
         </label>)}
+        {/* O tapeceiro pede material a mais no meio do serviço — tem que dar pra somar na hora, sem sair da tela. */}
         <div className="compra-add">
           <input value={novoItem[s.id] || ""} onChange={(e) => setNovoItem((n) => ({ ...n, [s.id]: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === "Enter") adicionar(s); }} placeholder="+ item" disabled={busy === s.id} />
+            onKeyDown={(e) => { if (e.key === "Enter") adicionar(s); }} placeholder="O que mais falta?" disabled={busy === s.id} />
+          <button type="button" className="ghost" disabled={busy === s.id || !(novoItem[s.id] || "").trim()} onClick={() => adicionar(s)}>+ Adicionar</button>
         </div>
+        {tudoComprado && <button type="button" className="primary wide" disabled={busy === s.id} onClick={() => confirmar(s)}>
+          {busy === s.id ? "..." : `✓ Confirmar — comprei tudo do ${(s.clientes?.nome || "cliente").split(" ")[0]}`}
+        </button>}
       </div>;
     })}
-    <p className="ficha-note">Marcar o item é só a sua lista — o gasto continua entrando pela compra normal, com fornecedor e valor.</p>
+    <p className="ficha-note">Marcar o item é só a sua lista — o gasto continua entrando pela compra normal, com fornecedor e valor. Ao confirmar, o cliente sai daqui; se o tapeceiro pedir mais alguma coisa, é só adicionar que ele volta.</p>
   </section>;
 }
 
