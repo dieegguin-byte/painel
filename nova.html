@@ -61,7 +61,12 @@
 button.sutil{opacity:.55;font-size:12px}
 .compra-lojas{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
 .compra-loja-chip{font-size:11px;padding:4px 9px;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap}
-.compra-item-loja{display:block;font-size:11px;color:var(--muted);font-style:normal;margin-top:1px}
+.compra-item-nome{font-weight:400;cursor:text}
+.compra-item.feito .compra-item-nome{text-decoration:line-through}
+.compra-item-input{width:100%;background:var(--surface);border:1px solid var(--accent);border-radius:5px;color:var(--text);font-size:15px;padding:3px 7px}
+.compra-item-loja{display:block;font-size:11px;color:var(--muted);font-style:normal;margin-top:1px;cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
+.compra-item-loja.palpite{opacity:.6;font-style:italic}
+.compra-loja-input{display:block;margin-top:2px;font-size:11px;background:var(--surface);border:1px solid var(--line);border-radius:5px;color:var(--text);padding:2px 6px;max-width:180px}
 .compra-cliente{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface2)}
 .compra-cliente.tudo-comprado{opacity:.55}
 .compra-cliente-head{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
@@ -70,7 +75,7 @@ button.sutil{opacity:.55;font-size:12px}
 .compra-item{display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid var(--line);cursor:pointer;font-size:15px}
 .compra-item input[type=checkbox]{width:22px;height:22px;flex:0 0 22px;accent-color:var(--accent);cursor:pointer}
 .compra-item span{flex:1}
-.compra-item.feito span{text-decoration:line-through;color:var(--muted)}
+.compra-item.feito span{color:var(--muted)}
 .compra-remover{background:none;border:0;color:var(--muted);font-size:14px;padding:4px 6px;cursor:pointer;opacity:.5}
 .compra-remover:hover{opacity:1}
 .compra-add{display:flex;gap:8px;align-items:center;padding-top:8px;border-top:1px solid var(--line)}
@@ -3385,9 +3390,33 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
 // serve nesse momento é papel de supermercado — o que falta, de quem é, e um quadradinho pra marcar.
 // Os itens moram em servicos.materiais_necessarios (jsonb: [{item, comprado}]) porque a informação já nascia
 // junto com o serviço — o que muda é ela virar lista marcável em vez de texto solto na descrição.
+// O APP APRENDE ONDE CADA MATERIAL É COMPRADO. Diego, 04/08: "quando lançar o cliente eu vou ter que dizer em
+// qual loja vou comprar? ainda também não temos os materiais totalmente registrados em cada um". Não deve
+// precisar: suede ele compra no Ozair, tecido na Ellis — isso se repete serviço após serviço. Em vez de
+// pedir a loja toda vez, o app olha onde um material com nome parecido JÁ foi comprado e preenche sozinho.
+// A sugestão aparece marcada com "?" e nunca se disfarça de fato confirmado: palpite exibido como certeza é
+// pior que campo vazio, porque manda ele pra loja errada com confiança. Ao marcar comprado, vira confirmada.
+function lojaAprendida(nomeItem, services) {
+  const norm = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const palavras = norm(nomeItem).split(/[^a-z0-9]+/).filter((p) => p.length > 3);
+  if (!palavras.length) return null;
+  const placar = {};
+  (services || []).forEach((s) => (s.materiais_necessarios || []).forEach((m) => {
+    const loja = (m.loja || "").trim();
+    if (!loja || m.lojaSugerida) return; // só aprende de loja confirmada, senão o palpite se auto-alimenta
+    const alvo = norm(m.item);
+    if (palavras.some((p) => alvo.includes(p))) placar[loja] = (placar[loja] || 0) + 1;
+  }));
+  const melhor = Object.entries(placar).sort((a, b) => b[1] - a[1])[0];
+  return melhor ? melhor[0] : null;
+}
 function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   const [busy, setBusy] = useState(null);
   const [novoItem, setNovoItem] = useState({});
+  const [editandoLoja, setEditandoLoja] = useState(null);
+  const [lojaDraft, setLojaDraft] = useState("");
+  const [editandoItem, setEditandoItem] = useState(null);
+  const [itemDraft, setItemDraft] = useState("");
   // ARQUIVADO = o cliente já saiu da lista. Diego, 04/08: "quando comprar tudo tem que sumir o cliente da aba
   // compras, com um botão confirmar e ele sumir". Sumir sozinho ao marcar o último item seria pior: ele
   // perderia a conferência final e o card evaporaria embaixo do dedo. O botão é o momento de dizer "conferi,
@@ -3423,15 +3452,36 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
       await onChanged?.();
     } catch (e) { notify("Não salvou: " + e.message, "error"); } finally { setBusy(null); }
   };
+  // Comprar CONFIRMA a loja: ele foi lá e pegou, então aquele palpite virou fato e pode ensinar os próximos.
   const alternar = (servico, idx) => {
-    const lista = (servico.materiais_necessarios || []).map((m, i) => i === idx ? { ...m, comprado: !m.comprado } : m);
+    const lista = (servico.materiais_necessarios || []).map((m, i) => {
+      if (i !== idx) return m;
+      const comprado = !m.comprado;
+      return comprado && m.loja ? { ...m, comprado, lojaSugerida: false } : { ...m, comprado };
+    });
     gravar(servico, lista);
   };
   const adicionar = (servico) => {
     const texto = (novoItem[servico.id] || "").trim();
     if (!texto) return;
     setNovoItem((n) => ({ ...n, [servico.id]: "" }));
-    gravar(servico, [...(servico.materiais_necessarios || []), { item: texto, comprado: false }]);
+    const palpite = lojaAprendida(texto, services);
+    const novo = palpite ? { item: texto, comprado: false, loja: palpite, lojaSugerida: true } : { item: texto, comprado: false };
+    gravar(servico, [...(servico.materiais_necessarios || []), novo]);
+  };
+  const salvarLoja = (servico, idx) => {
+    const nome = lojaDraft.trim();
+    setEditandoLoja(null);
+    gravar(servico, (servico.materiais_necessarios || []).map((m, i) => i === idx ? { ...m, loja: nome, lojaSugerida: false } : m));
+  };
+  // Corrigir o texto do item. Diego, 04/08: "eu quero poder corrigir os itens anotados em compras". O nome
+  // sai da ficha ou de mim lendo a ficha — vai ter abreviação, medida errada, tecido trocado. Sem editar,
+  // o conserto seria apagar e digitar de novo, perdendo a loja já confirmada e o histórico do item.
+  const salvarItem = (servico, idx) => {
+    const texto = itemDraft.trim();
+    setEditandoItem(null);
+    if (!texto) return; // vazio não apaga: pra remover existe o ✕, que é explícito
+    gravar(servico, (servico.materiais_necessarios || []).map((m, i) => i === idx ? { ...m, item: texto } : m));
   };
   const remover = (servico, idx) => gravar(servico, (servico.materiais_necessarios || []).filter((_, i) => i !== idx));
   // Confirmar não apaga: arquiva. O que foi comprado continua registrado na ficha do serviço.
@@ -3462,7 +3512,21 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
         </div>
         {itens.map(({ m, i }) => <label className={`compra-item${m.comprado ? " feito" : ""}`} key={i}>
           <input type="checkbox" checked={!!m.comprado} disabled={busy === s.id || mode === "claude"} onChange={() => alternar(s, i)} />
-          <span>{m.item}{(m.loja || "").trim() ? <em className="compra-item-loja">{m.loja}</em> : null}</span>
+          <span>
+            {editandoItem === `${s.id}:${i}`
+              ? <input className="compra-item-input" value={itemDraft} autoFocus
+                  onClick={(e) => e.preventDefault()} onChange={(e) => setItemDraft(e.target.value)}
+                  onBlur={() => salvarItem(s, i)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); salvarItem(s, i); } if (e.key === "Escape") setEditandoItem(null); }} />
+              : <b className="compra-item-nome" onClick={(e) => { e.preventDefault(); setItemDraft(m.item || ""); setEditandoItem(`${s.id}:${i}`); }}>{m.item}</b>}
+            {editandoLoja === `${s.id}:${i}`
+              ? <input className="compra-loja-input" value={lojaDraft} autoFocus list="lojas-conhecidas"
+                  onClick={(e) => e.preventDefault()} onChange={(e) => setLojaDraft(e.target.value)}
+                  onBlur={() => salvarLoja(s, i)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); salvarLoja(s, i); } }} placeholder="Onde comprar?" />
+              : <em className={`compra-item-loja${m.lojaSugerida ? " palpite" : ""}`}
+                  onClick={(e) => { e.preventDefault(); setLojaDraft(m.loja || ""); setEditandoLoja(`${s.id}:${i}`); }}>
+                  {(m.loja || "").trim() ? m.loja + (m.lojaSugerida ? " ?" : "") : "+ onde comprar"}
+                </em>}
+          </span>
           <button type="button" className="compra-remover" title="Tirar da lista" disabled={busy === s.id} onClick={(e) => { e.preventDefault(); remover(s, i); }}>✕</button>
         </label>)}
         {/* O tapeceiro pede material a mais no meio do serviço — tem que dar pra somar na hora, sem sair da tela. */}
@@ -3476,7 +3540,8 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
         </button>}
       </div>;
     })}
-    <p className="ficha-note">Marcar o item é só a sua lista — o gasto continua entrando pela compra normal, com fornecedor e valor. Ao confirmar, o cliente sai daqui; se o tapeceiro pedir mais alguma coisa, é só adicionar que ele volta.</p>
+    <datalist id="lojas-conhecidas">{[...new Set((services || []).flatMap((s) => (s.materiais_necessarios || []).map((m) => m.loja)).filter(Boolean))].map((l) => <option key={l} value={l} />)}</datalist>
+    <p className="ficha-note">Toque na loja pra trocar. “{"Ozair ?"}” é palpite meu, pelo lugar onde material parecido já foi comprado — marcar como comprado confirma. Marcar o item é só a sua lista: o gasto continua entrando pela compra normal, com fornecedor e valor. Ao confirmar, o cliente sai daqui; se o tapeceiro pedir mais alguma coisa, é só adicionar que ele volta.</p>
   </section>;
 }
 
