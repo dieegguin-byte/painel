@@ -56,6 +56,7 @@
 .records-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.record-card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--yellow);border-radius:14px;padding:14px}.record-card.priority-alta{border-left-color:var(--red)}.record-card.priority-baixa{border-left-color:var(--green)}.record-top{display:flex;justify-content:space-between;align-items:center}.record-top time{font-size:9px;color:var(--dim)}.record-card h4{font-size:13px;margin:13px 0 3px}.record-card>p{font-size:10px;color:var(--muted);margin:0}.next-action{background:#0f0d0c;border-radius:9px;padding:9px;margin:13px 0;font-size:10px}.next-action small{display:block;color:var(--orange2);font-size:7px;margin-bottom:3px}.record-card footer{display:flex;justify-content:space-between;align-items:center;font-size:10px}.record-card footer a{color:#98c9a6;text-decoration:none}.rotina-lista{display:flex;flex-direction:column;gap:8px}.rotina-item{display:flex;justify-content:space-between;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:12px;padding:12px 14px}.rotina-item.cor-alta{border-left-color:var(--red)}.rotina-item.cor-media{border-left-color:var(--yellow)}.rotina-esq{display:flex;flex-direction:column;gap:3px;min-width:0}.rotina-esq strong{font-size:14px}.rotina-esq span{font-size:11px;color:var(--dim)}.rotina-dir{display:flex;align-items:center;gap:10px;flex:none}.rotina-dir em{font-style:normal;font-size:12px;font-weight:700;color:var(--yellow);white-space:nowrap}.rotina-dir em.atrasada{color:#e88477}
 .cobranca-item{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--green);border-radius:12px;padding:12px 14px;margin-bottom:8px}.cobranca-item.cor-alta{border-left-color:var(--red)}.cobranca-item.cor-media{border-left-color:var(--yellow)}.cobranca-item.cor-baixa{border-left-color:var(--green)}.cobranca-esq{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 260px}.cobranca-esq strong{font-size:14px}.cobranca-esq span{font-size:11px;color:var(--muted)}.cobranca-esq em{font-style:normal;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.3px}.cobranca-esq em.cobranca-teto{color:#e88477;text-transform:none;letter-spacing:0;font-size:11px;font-weight:600}.cobranca-dir{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap}
 .entrega-form{display:flex;flex-direction:column;gap:8px;background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:12px;margin-top:8px}.entrega-form label{display:flex;flex-direction:column;gap:4px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}.entrega-form input{background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:9px 10px;font-size:14px;font-family:inherit}.entrega-hint{font-size:11px;color:#91c49f}
+.ficha-servico-desc{margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.45;white-space:pre-wrap}
 .material-itens{display:block;font-size:12px;color:var(--muted);margin:4px 0 6px}
 button.sutil{opacity:.55;font-size:12px}
 .compra-cliente{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface2)}
@@ -2339,7 +2340,14 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       if (svc) {
         // `prazo` acompanha a data da cobrança pra Leads/varredura não mostrarem prazo vencido de um item
         // que na verdade está no ciclo. O QUANDO tem uma fonte só: agenda.data. Não guardo data duplicada.
-        const { error } = await db.from("servicos").update({ tentativas: nTent, prazo: proxima, atualizado_em: new Date().toISOString() }).eq("id", svc.id);
+        // MAS SÓ ENQUANTO O PRAZO FOR "VALIDADE DO LEAD" (auditoria 04/08). Em lead/orçamento o prazo é
+        // interno — quando revisar. De agendado em diante ele é OUTRA COISA: a data de entrega combinada com
+        // o cliente, que a lista de compras ordena e o atraso mede. Empurrar esse prazo a cada cobrança
+        // apagaria a promessa feita ao cliente pra caber um lembrete interno — o serviço nunca pareceria
+        // atrasado porque a régua andava junto.
+        const patch = { tentativas: nTent, atualizado_em: new Date().toISOString() };
+        if (["lead", "orcamento"].includes(svc.status)) patch.prazo = proxima;
+        const { error } = await db.from("servicos").update(patch).eq("id", svc.id);
         if (error) throw error;
       }
       const { error: aErr } = await db.from("agenda").update({ data: proxima }).eq("id", a.id);
@@ -3802,6 +3810,13 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
 
         <h3 className="ficha-section">Histórico de serviços</h3>
         {!servicos.length ? <div className="empty-state"><b>Nenhum serviço registrado.</b></div> : <div className="ficha-servicos">{servicos.map((s) => { const sugestao = s.sugestao_resposta || ""; const tel = cliente.telefone ? normalizePhone(cliente.telefone) : ""; return <div className={`ficha-servico priority-${s.prioridade || "media"}`} key={s.id}><div className="ficha-servico-main"><strong>{s.titulo}</strong><span>{statusLabel[s.status] || s.status}{s.proxima_acao ? " · " + s.proxima_acao : ""}</span>
+          {/* A DESCRIÇÃO ERA UM BURACO NEGRO. Auditoria de 04/08: `servicos.descricao` era gravada em 13
+              serviços e não aparecia em NENHUMA tela — só o financeiro renderiza descrição. Era ali que o
+              detalhe do que foi combinado (espuma, catraca, tecido) ia parar quando eu processava a ficha,
+              e o Diego dizia com razão "está na ficha dele". Estava — num campo que ninguém mostrava.
+              Campo que só recebe e nunca devolve não é registro, é perda de informação com passo extra. */}
+          {!!(s.descricao || "").trim() && <p className="ficha-servico-desc">{s.descricao}</p>}
+          {!!(s.materiais_necessarios || []).length && <p className="ficha-servico-desc">🧵 {(s.materiais_necessarios || []).map((m) => (m.comprado ? "✓ " : "☐ ") + m.item).join(" · ")}</p>}
           {editandoResp === s.id
             ? <div className="responsavel-edit-row"><input value={respDraft} onChange={(e) => setRespDraft(e.target.value)} placeholder="Nome do profissional" autoFocus /><button className="ghost" onClick={() => salvarResponsavel(s.id)}>Salvar</button><button className="ghost" onClick={() => setEditandoResp(null)}>✕</button></div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEditandoResp(s.id); setRespDraft(s.responsavel || ""); }}>{s.responsavel ? `👤 ${s.responsavel}` : "+ Atribuir profissional"}</button>}
