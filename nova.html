@@ -3505,11 +3505,15 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   const itensDaLoja = (loja) => ativos.flatMap((s) => visiveisDe(s)
     .map((m, vi) => ({ m, s, idx: (s.materiais_necessarios || []).indexOf(m) }))
     .filter((x) => !x.m.comprado && lojaDoItem(x.m, x.s) === loja));
-  // Pedido pra colar no WhatsApp do fornecedor. Sem checkbox, sem nome de cliente solto: o fornecedor precisa
-  // saber O QUE separar, não pra quem é. O cliente entra só como referência curta, pra ele conferir depois.
+  // Pedido pra colar no WhatsApp do fornecedor. SÓ O MATERIAL. Diego, 04/08: "sobre o nome da cliente ir ao
+  // copiar para o WhatsApp, não precisa o fornecedor saber disso" — e está certo: nome de cliente é dado da
+  // Tapeçaria, não do fornecedor. Mandar junto vaza a carteira dele sem necessidade nenhuma.
+  // Itens iguais viram uma linha com quantidade: é assim que a loja separa, e evita o fornecedor achar que
+  // recebeu o pedido duplicado.
   const textoDoPedido = (loja) => {
-    const itens = itensDaLoja(loja);
-    const linhas = itens.map((x) => `• ${x.m.item} (${(x.s.clientes?.nome || "").split(" ")[0]})`);
+    const contagem = {};
+    itensDaLoja(loja).forEach((x) => { const nome = (x.m.item || "").trim(); contagem[nome] = (contagem[nome] || 0) + 1; });
+    const linhas = Object.entries(contagem).map(([item, qtd]) => `• ${qtd > 1 ? qtd + "x " : ""}${item}`);
     return `Olá! Preciso separar o seguinte material:\n\n${linhas.join("\n")}\n\nObrigado!`;
   };
   const copiarPedido = async (loja) => {
