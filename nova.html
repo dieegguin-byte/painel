@@ -59,6 +59,9 @@
 .ficha-servico-desc{margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.45;white-space:pre-wrap}
 .material-itens{display:block;font-size:12px;color:var(--muted);margin:4px 0 6px}
 button.sutil{opacity:.55;font-size:12px}
+.compra-lojas{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
+.compra-loja-chip{font-size:11px;padding:4px 9px;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap}
+.compra-item-loja{display:block;font-size:11px;color:var(--muted);font-style:normal;margin-top:1px}
 .compra-cliente{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface2)}
 .compra-cliente.tudo-comprado{opacity:.55}
 .compra-cliente-head{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
@@ -3395,6 +3398,9 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   const ordenados = [...ativos].sort((a, b) => String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
   const totalItens = ativos.reduce((n, s) => n + visiveisDe(s).length, 0);
   const faltam = ativos.reduce((n, s) => n + visiveisDe(s).filter((m) => !m.comprado).length, 0);
+  // Quantos itens pendentes rendem cada loja — o que decide se a viagem vale a pena.
+  const porLoja = {};
+  ativos.forEach((s) => visiveisDe(s).filter((m) => !m.comprado).forEach((m) => { const L = (m.loja || s.loja_material || "").trim() || "Loja a definir"; porLoja[L] = (porLoja[L] || 0) + 1; }));
   // MARCAR AQUI TEM QUE VALER NO RESTO DO APP. Diego, 04/08: "quando confirmo na aba compras, ela já confirma
   // automaticamente em Capacidade, ou tenho que marcar lá também?". O alerta "Esperando material" já sumia
   // sozinho (lê esta mesma lista), mas a PRÓXIMA AÇÃO do serviço continuava escrita "Comprar o material" no
@@ -3435,6 +3441,14 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   return <section className="content-card">
     <div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>{faltam} item(ns) pra comprar</h3></div>
       {totalItens > faltam && <span className="status-pill">{totalItens - faltam} já comprado(s)</span>}</div>
+    {/* QUEM COMPRA PENSA POR LOJA, NÃO POR CLIENTE. Diego, 04/08, sobre o Leandro: "suede amassado grafite e
+        espuma D33 no Ozair" e "espuma do encosto é na Ellis Tecidos" — o material de UM cliente vem de lojas
+        diferentes, e numa ida à Ellis ele quer pegar o que é da Ellis de todo mundo de uma vez. A lista
+        continua por cliente (é assim que ele confere o serviço), mas esta faixa diz onde ir e o que rende
+        cada parada. Sem ela, planejar a viagem exigiria ler a lista inteira e montar isso de cabeça. */}
+    {!!Object.keys(porLoja).length && <div className="compra-lojas">
+      {Object.entries(porLoja).sort((a, b) => b[1] - a[1]).map(([loja, qtd]) => <span key={loja} className="compra-loja-chip">{loja} · {qtd}</span>)}
+    </div>}
     {ordenados.map((s) => {
       // Guarda o índice REAL junto do item: a tela mostra só os não arquivados, mas alternar/remover precisam
       // apontar pra posição verdadeira no array salvo.
@@ -3448,7 +3462,7 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
         </div>
         {itens.map(({ m, i }) => <label className={`compra-item${m.comprado ? " feito" : ""}`} key={i}>
           <input type="checkbox" checked={!!m.comprado} disabled={busy === s.id || mode === "claude"} onChange={() => alternar(s, i)} />
-          <span>{m.item}</span>
+          <span>{m.item}{(m.loja || "").trim() ? <em className="compra-item-loja">{m.loja}</em> : null}</span>
           <button type="button" className="compra-remover" title="Tirar da lista" disabled={busy === s.id} onClick={(e) => { e.preventDefault(); remover(s, i); }}>✕</button>
         </label>)}
         {/* O tapeceiro pede material a mais no meio do serviço — tem que dar pra somar na hora, sem sair da tela. */}
