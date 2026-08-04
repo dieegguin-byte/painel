@@ -2029,7 +2029,7 @@ function TriagePanel(props) {
             <button type="button" className="capacidade-item-head" onClick={() => { updateForm("responsavel", nome); setProfissionalAberto(aberto ? null : nome); }}>
               <span>{nome}</span><b>{lista.length} ativo{lista.length > 1 ? "s" : ""}</b><i>{aberto ? "▲" : "▼"}</i>
             </button>
-            {aberto && <div className="capacidade-item-corpo">{lista.map((s) => <div className="capacidade-servico" key={s.id}><strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{statusLabel[s.status] || s.status}{s.prazo ? " · " + compactDate(s.prazo) : ""}</em></div>)}</div>}
+            {aberto && <div className="capacidade-item-corpo">{lista.map((s) => <div className="capacidade-servico" key={s.id}><strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{statusLabel[s.status] || s.status}{s.prazo ? " · " + prazoComRotulo(s) : ""}</em></div>)}</div>}
           </div>; })}
         </div>}
         <label>Próxima ação*<input value={form.nextAction} onChange={(event) => updateForm("nextAction", event.target.value)} /></label>
@@ -2306,7 +2306,7 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
           final da fila". Produção é peça na bancada com prazo correndo; agendado é trabalho fechado que ainda
           não começou. Dentro de cada grupo, prazo mais apertado primeiro. */}
       {isAberto && <div className="capacidade-item-corpo">{[...lista].sort((a, b) => (a.status === "agendado") - (b.status === "agendado") || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999"))).map((s) => <div className="capacidade-servico" key={s.id}>
-        <strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{statusLabel[s.status] || s.status}{s.prazo ? " · " + compactDate(s.prazo) : ""}</em>
+        <strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{statusLabel[s.status] || s.status}{s.prazo ? " · " + prazoComRotulo(s) : ""}</em>
         {esperandoMaterial(s) && <div className="material-pendente">
           <em>⏳ Esperando material{s.loja_material ? " · " + s.loja_material : ""} — o profissional não começa sem ele.</em>
           {/* Dizer O QUE falta economiza uma ida à aba Compras só pra lembrar. */}
@@ -2494,7 +2494,7 @@ function LeadsView({ services, search, setSearch, onOpenFicha, initialFiltro, on
         <span className="status-pill">{statusLabel[service.status] || service.status}</span>
         {service.responsavel && <span className="responsavel-badge">👤 {service.responsavel}</span>}
         <b>{service.valor_orcamento ? money(service.valor_orcamento) : "—"}</b>
-        <time>{compactDate(service.prazo)}</time>
+        <time title={prazoComRotulo(service)}>{prazoComRotulo(service) || "—"}</time>
       </div>
     </article>)}
     {!visible.length && <div className="empty-state"><b>Nenhum serviço nesse filtro.</b></div>}</div></section>;
@@ -3116,6 +3116,20 @@ function planoDeCompra(fornecedor) {
   return { tipo: "presencial", data: proximoDiaUtil(hojeISO()), hora: "08:00", entrega: null, rotulo: `Buscar material na ${fornecedor.nome}` };
 }
 function compraPrecisaRevisao(item) { return !item.fornecedor_id && !(item.descricao || "").startsWith(COMPRA_CONFERIDA_TAG); }
+// O MESMO CAMPO GUARDA TRÊS COISAS DIFERENTES. Diego, 04/08, sobre o Leandro: "ele era agendado, deu entrada
+// e agendei para buscar só quando fosse executar o serviço" — o 02/08 era a data de BUSCAR, não uma entrega
+// atrasada. Mas a tela mostrava só "02/08" ao lado de um serviço vencido, e ele apareceu como atraso de
+// cliente quando não era nada disso.
+// `servicos.prazo` significa: quando retomar (lead/orçamento), quando buscar (agendado), quando entregar
+// (produção). São compromissos de natureza distinta — um é lembrete interno, o outro é promessa ao cliente.
+// Mostrar a data sem dizer do que ela é obriga ele a lembrar de cabeça em que fase cada serviço está.
+function rotuloPrazo(status) {
+  if (status === "producao") return "entregar até";
+  if (status === "agendado") return "buscar em";
+  if (status === "entregue" || status === "pago") return "entregue em";
+  return "retomar em";
+}
+function prazoComRotulo(s) { return s?.prazo ? `${rotuloPrazo(s.status)} ${compactDate(s.prazo)}` : ""; }
 function mesISO(data) { return (data || "").slice(0, 7); }
 function mesLabel(chave) {
   if (!chave) return "Sem data";
@@ -3590,7 +3604,7 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
       return <div className={`compra-cliente${tudoComprado ? " tudo-comprado" : ""}`} key={s.id}>
         <div className="compra-cliente-head">
           <strong>{s.clientes?.nome || "Cliente"}</strong>
-          <span>{pendentes ? `faltam ${pendentes}` : "tudo comprado ✓"}{s.prazo ? ` · entrega ${compactDate(s.prazo)}` : ""}{s.loja_material ? ` · ${s.loja_material}` : ""}</span>
+          <span>{pendentes ? `faltam ${pendentes}` : "tudo comprado ✓"}{s.prazo ? ` · ${prazoComRotulo(s)}` : ""}{s.loja_material ? ` · ${s.loja_material}` : ""}</span>
         </div>
         {itens.map(({ m, i }) => <label className={`compra-item${m.comprado ? " feito" : ""}`} key={i}>
           <input type="checkbox" checked={!!m.comprado} disabled={busy === s.id || mode === "claude"} onChange={() => alternar(s, i)} />
@@ -3687,7 +3701,7 @@ function AReceberBloco({ finances, services, db, demo, mode, notify, onChanged }
     {!!semLancar.length && <div style={{ marginTop: contas.length ? 18 : 0, paddingTop: 14, borderTop: "1px dashed var(--line)" }}>
       <p className="kicker">AINDA SEM LANÇAMENTO NENHUM — {money(semLancar.reduce((s, x) => s + Number(x.valor_orcamento || 0), 0))}</p>
       {semLancar.map((s) => <div className="finance-row" key={s.id}>
-        <div><strong>{s.clientes?.nome || s.titulo}</strong><span>{s.status === "entregue" ? "entregue" : "em produção"}{s.prazo ? ` · prazo ${compactDate(s.prazo)}` : ""} · valor combinado, nenhuma entrada no financeiro</span></div>
+        <div><strong>{s.clientes?.nome || s.titulo}</strong><span>{s.status === "entregue" ? "entregue" : "em produção"}{s.prazo ? ` · ${prazoComRotulo(s)}` : ""} · valor combinado, nenhuma entrada no financeiro</span></div>
         <b className="entrada">+ {money(s.valor_orcamento)}</b>
         <span className="status-pill">falta lançar</span>
       </div>)}
@@ -4048,7 +4062,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
                 <div className="ficha-actions"><button className="primary" onClick={() => confirmarEntrega(s.id)}>Confirmar entrega</button><button className="ghost" onClick={() => setEntregando(null)}>Cancelar</button></div>
               </div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEntregando(s.id); setValorEntregaDraft(s.valor_orcamento ? String(s.valor_orcamento) : ""); setRecebidoFichaDraft(""); }}>✅ Marcar como entregue</button>)}
-        </div><div className="ficha-servico-meta">{s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <span>—</span>}{s.prazo && <time>{compactDate(s.prazo)}</time>}{(sugestao || tel) && <div className="ficha-servico-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">WhatsApp</a>}</div>}</div></div>; })}</div>}
+        </div><div className="ficha-servico-meta">{s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <span>—</span>}{s.prazo && <time>{prazoComRotulo(s)}</time>}{(sugestao || tel) && <div className="ficha-servico-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">WhatsApp</a>}</div>}</div></div>; })}</div>}
         <p className="ficha-note">Mudança de status e financeiro continuam no app atual por enquanto.</p>
 
         <h3 className="ficha-section">Fotos</h3>
