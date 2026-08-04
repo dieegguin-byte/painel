@@ -1112,15 +1112,50 @@ async function aplicarCompromissoConcluidoOperacional(db, eventoId, dados) {
   if (!agenda) throw new Error("Compromisso não encontrado.");
   const servicoId = dados.servicoId || agenda.servico_id || null;
   const agendaFeita = await concluirAgendaDaOperacao(db, agenda.id, dados.data || hojeISO(), servicoId);
+  let statusServico = null;
+  let proximaAcaoFinal = dados.proximaAcao ?? null;
   if (servicoId) {
-    const { error } = await db.from("servicos").update({ proxima_acao: dados.proximaAcao ?? null, atualizado_em: new Date().toISOString() }).eq("id", servicoId);
+    // BUSCOU O MÓVEL = A PRODUÇÃO COMEÇOU. Diego, 04/08: "marquei o serviço do Leandro que estava para buscar
+    // e não mudou status para produção automaticamente e não deu opção de material em mãos ou entregue como
+    // nos outros" — mesma coisa na Solange e na Oziane ("não falou que está esperando material como a Carla").
+    // O que acontecia: concluir compromisso só fechava a agenda e limpava a próxima ação. O serviço ficava
+    // preso em "agendado" pra sempre, e como o fluxo de material/entrega só aparece pra quem está em produção,
+    // o app emudecia justo depois do passo que faz o trabalho começar. Quem chegava em produção era só quem
+    // passava pela COMPRA de material (era por isso que a Carla avisava e os outros não).
+    // Regra: compromisso PRESENCIAL concluído num serviço "agendado" significa que o móvel veio pra oficina.
+    // Entrega fica de fora (tem fluxo próprio, aplicarEntregaConcluidaOperacional) e remoto também — ligar
+    // pro cliente não move nada. A próxima ação segue a mesma lógica do material: se ainda falta material
+    // comprado, ele continua esperando; se não falta, é produzir.
+    const servico = await lerRegistro(db, "servicos", servicoId);
+    const ehEntrega = /\b(entrega|entregar|entregue)\b/i.test(agenda.titulo || "");
+    const comecouProducao = servico && servico.status === "agendado" && agenda.tipo === "presencial" && !ehEntrega;
+    let proximaAcao = dados.proximaAcao ?? null;
+    let novoStatus = null;
+    if (comecouProducao) {
+      // A ORDEM DO TRABALHO REAL: buscou → compra o material → produz → entrega. Diego, 04/08: "ao concluir o
+      // compromisso deveria mudar o status, pedir para comprar material e depois marcar como entregue, tudo
+      // automático". Antes o app pulava do nada direto pra "marcar como entregue", que é o último passo —
+      // oferecia o fim antes do meio. São três situações diferentes e cada uma pede outra coisa:
+      // nenhum material lançado = ele ainda precisa comprar; material comprado mas não em mãos = está a
+      // caminho, é esperar; tudo em mãos = produzir. Só no terceiro caso faz sentido caminhar pra entrega.
+      const { data: materiais } = await db.from("financeiro").select("id,descricao,status").eq("servico_id", servicoId).eq("categoria", CATEGORIA_MATERIAL);
+      const lista = materiais || [];
+      const faltando = lista.filter((f) => !materialEstaEmMaos(f));
+      novoStatus = "producao";
+      proximaAcao = dados.proximaAcao ?? (!lista.length ? "Comprar o material" : faltando.length ? "Aguardar chegada do material" : "Produzir e acompanhar o prazo");
+    }
+    const patch = { proxima_acao: proximaAcao, atualizado_em: new Date().toISOString() };
+    if (novoStatus) patch.status = novoStatus;
+    const { error } = await db.from("servicos").update(patch).eq("id", servicoId);
     if (error) throw error;
+    statusServico = novoStatus || servico?.status || null;
+    proximaAcaoFinal = proximaAcao;
   }
   const historico = await registrarHistoricoDaOperacao(db, eventoId, "compromisso-concluido", {
     o_que: "\"" + agenda.titulo + "\" concluído", por: dados.por || "diego",
-    detalhe: "Agenda #" + agenda.id + (servicoId ? " · serviço #" + servicoId : ""),
+    detalhe: "Agenda #" + agenda.id + (servicoId ? " · serviço #" + servicoId : "") + (statusServico === "producao" ? " · entrou em produção" : ""),
   });
-  return { agendaId: agendaFeita.id, servicoId, proximaAcao: dados.proximaAcao ?? null, historicoId: historico.id };
+  return { agendaId: agendaFeita.id, servicoId, statusServico, proximaAcao: proximaAcaoFinal, historicoId: historico.id };
 }
 async function aplicarEntregaConcluidaOperacional(db, eventoId, dados) {
   // agendaId é opcional: a ficha do cliente também fecha entrega direto no serviço, sem compromisso
@@ -2152,6 +2187,12 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
     if (materiaisPendentesDe(s.id).length) return true;
     return s.status === "agendado" && !!s.loja_material && !temMatEmMaos(s.id);
   };
+  // BUSCOU O MÓVEL E NÃO COMPROU NADA AINDA. Diego, 04/08: "ao concluir o compromisso deveria mudar o status,
+  // pedir para comprar material e depois marcar como entregue, tudo automático" — o que aparecia era só
+  // "Marcar como entregue", o ÚLTIMO passo oferecido antes do meio. Este caso não cai em esperandoMaterial:
+  // lá tem compra lançada ou loja no cadastro, aqui não tem nada — e é exatamente por não ter nada que o app
+  // precisa falar. Sem isto, um serviço em produção sem material fica mudo até alguém lembrar sozinho.
+  const precisaComprarMaterial = (s) => s.status === "producao" && !materiaisPendentesDe(s.id).length && !temMatEmMaos(s.id) && !s.loja_material;
   // "JÁ COMPREI" = o fato MATERIAL_EM_MÃOS, o único que apaga o alerta. Usa a compra já lançada quando ela
   // existe (aí nem pergunta fornecedor); se só havia a loja no cadastro do serviço, resolve o fornecedor pelo
   // nome e entra com semValor, que libera a produção sem travar esperando o valor exato.
@@ -2217,6 +2258,10 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
         {esperandoMaterial(s) && <div className="material-pendente">
           <em>⏳ Esperando material{s.loja_material ? " · " + s.loja_material : ""} — o profissional não começa sem ele.</em>
           <button type="button" className="ghost" disabled={busyMaterial === s.id} onClick={(e) => { e.stopPropagation(); marcarMaterialEmMaos(s); }}>{busyMaterial === s.id ? "..." : "📦 Já comprei, está em mãos"}</button>
+        </div>}
+        {precisaComprarMaterial(s) && <div className="material-pendente">
+          <em>🛒 Voltou pra oficina e ainda não tem material comprado — o profissional não começa sem ele.</em>
+          <span className="ficha-note">Lance a compra na aba Compras (com o fornecedor), que o serviço anda sozinho pra produção.</span>
         </div>}
         {entregando === s.id
           ? <div className="entrega-form">
