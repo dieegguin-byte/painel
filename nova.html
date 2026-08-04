@@ -56,6 +56,8 @@
 .records-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.record-card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--yellow);border-radius:14px;padding:14px}.record-card.priority-alta{border-left-color:var(--red)}.record-card.priority-baixa{border-left-color:var(--green)}.record-top{display:flex;justify-content:space-between;align-items:center}.record-top time{font-size:9px;color:var(--dim)}.record-card h4{font-size:13px;margin:13px 0 3px}.record-card>p{font-size:10px;color:var(--muted);margin:0}.next-action{background:#0f0d0c;border-radius:9px;padding:9px;margin:13px 0;font-size:10px}.next-action small{display:block;color:var(--orange2);font-size:7px;margin-bottom:3px}.record-card footer{display:flex;justify-content:space-between;align-items:center;font-size:10px}.record-card footer a{color:#98c9a6;text-decoration:none}.rotina-lista{display:flex;flex-direction:column;gap:8px}.rotina-item{display:flex;justify-content:space-between;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:12px;padding:12px 14px}.rotina-item.cor-alta{border-left-color:var(--red)}.rotina-item.cor-media{border-left-color:var(--yellow)}.rotina-esq{display:flex;flex-direction:column;gap:3px;min-width:0}.rotina-esq strong{font-size:14px}.rotina-esq span{font-size:11px;color:var(--dim)}.rotina-dir{display:flex;align-items:center;gap:10px;flex:none}.rotina-dir em{font-style:normal;font-size:12px;font-weight:700;color:var(--yellow);white-space:nowrap}.rotina-dir em.atrasada{color:#e88477}
 .cobranca-item{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--green);border-radius:12px;padding:12px 14px;margin-bottom:8px}.cobranca-item.cor-alta{border-left-color:var(--red)}.cobranca-item.cor-media{border-left-color:var(--yellow)}.cobranca-item.cor-baixa{border-left-color:var(--green)}.cobranca-esq{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 260px}.cobranca-esq strong{font-size:14px}.cobranca-esq span{font-size:11px;color:var(--muted)}.cobranca-esq em{font-style:normal;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.3px}.cobranca-esq em.cobranca-teto{color:#e88477;text-transform:none;letter-spacing:0;font-size:11px;font-weight:600}.cobranca-dir{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap}
 .entrega-form{display:flex;flex-direction:column;gap:8px;background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:12px;margin-top:8px}.entrega-form label{display:flex;flex-direction:column;gap:4px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}.entrega-form input{background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:9px 10px;font-size:14px;font-family:inherit}.entrega-hint{font-size:11px;color:#91c49f}
+.material-itens{display:block;font-size:12px;color:var(--muted);margin:4px 0 6px}
+button.sutil{opacity:.55;font-size:12px}
 .compra-cliente{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface2)}
 .compra-cliente.tudo-comprado{opacity:.55}
 .compra-cliente-head{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
@@ -2198,17 +2200,19 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
   // aviso solto que só informava, sem deixar resolver. O estado continua DERIVADO (nada de status novo).
   const materiaisPendentesDe = (servicoId) => (finances || []).filter((f) => ehCompraMaterial(f) && f.servico_id === servicoId && !materialEstaEmMaos(f));
   const temMatEmMaos = (servicoId) => (finances || []).some((f) => ehCompraMaterial(f) && f.servico_id === servicoId && materialEstaEmMaos(f));
+  // FALTA MATERIAL É FATO ANOTADO, NÃO DEDUÇÃO POR AUSÊNCIA. Diego, 04/08: "os serviços que estão faltando
+  // material não estão como o da Carla, e os que estão para entregar ainda estão marcando errado como voltou
+  // para oficina". O erro anterior foi meu: eu tratava "não tem compra lançada" como "falta comprar", então a
+  // Ana Cristina e a Madalena — prontas, só esperando entrega — apareciam pedindo material que ninguém devia.
+  // Ausência de dado não é informação. Agora a fonte é a lista de compras (materiais_necessarios): tem item
+  // não marcado, está esperando material; não tem, está pronto pra andar.
+  const materiaisAnotadosPendentes = (s) => (s.materiais_necessarios || []).filter((m) => !m.comprado).length;
   const esperandoMaterial = (s) => {
     if (!["agendado", "producao"].includes(s.status)) return false;
+    if (materiaisAnotadosPendentes(s)) return true;
     if (materiaisPendentesDe(s.id).length) return true;
     return s.status === "agendado" && !!s.loja_material && !temMatEmMaos(s.id);
   };
-  // BUSCOU O MÓVEL E NÃO COMPROU NADA AINDA. Diego, 04/08: "ao concluir o compromisso deveria mudar o status,
-  // pedir para comprar material e depois marcar como entregue, tudo automático" — o que aparecia era só
-  // "Marcar como entregue", o ÚLTIMO passo oferecido antes do meio. Este caso não cai em esperandoMaterial:
-  // lá tem compra lançada ou loja no cadastro, aqui não tem nada — e é exatamente por não ter nada que o app
-  // precisa falar. Sem isto, um serviço em produção sem material fica mudo até alguém lembrar sozinho.
-  const precisaComprarMaterial = (s) => s.status === "producao" && !materiaisPendentesDe(s.id).length && !temMatEmMaos(s.id) && !s.loja_material;
   // "JÁ COMPREI" = o fato MATERIAL_EM_MÃOS, o único que apaga o alerta. Usa a compra já lançada quando ela
   // existe (aí nem pergunta fornecedor); se só havia a loja no cadastro do serviço, resolve o fornecedor pelo
   // nome e entra com semValor, que libera a produção sem travar esperando o valor exato.
@@ -2273,11 +2277,9 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
         <strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{statusLabel[s.status] || s.status}{s.prazo ? " · " + compactDate(s.prazo) : ""}</em>
         {esperandoMaterial(s) && <div className="material-pendente">
           <em>⏳ Esperando material{s.loja_material ? " · " + s.loja_material : ""} — o profissional não começa sem ele.</em>
+          {/* Dizer O QUE falta economiza uma ida à aba Compras só pra lembrar. */}
+          {!!materiaisAnotadosPendentes(s) && <span className="material-itens">{(s.materiais_necessarios || []).filter((m) => !m.comprado).map((m) => m.item).join(" · ")}</span>}
           <button type="button" className="ghost" disabled={busyMaterial === s.id} onClick={(e) => { e.stopPropagation(); marcarMaterialEmMaos(s); }}>{busyMaterial === s.id ? "..." : "📦 Já comprei, está em mãos"}</button>
-        </div>}
-        {precisaComprarMaterial(s) && <div className="material-pendente">
-          <em>🛒 Voltou pra oficina e ainda não tem material comprado — o profissional não começa sem ele.</em>
-          <span className="ficha-note">Lance a compra na aba Compras (com o fornecedor), que o serviço anda sozinho pra produção.</span>
         </div>}
         {entregando === s.id
           ? <div className="entrega-form">
@@ -2289,7 +2291,7 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
               <span className="entrega-hint">{parseMoedaBR(recebidoDraft) > 0 ? `Entra ${money(parseMoedaBR(recebidoDraft))} no caixa da empresa, hoje.` : "Sem recebimento — nada entra no caixa."}</span>
               <div className="ficha-actions"><button className="primary" onClick={() => confirmarEntrega(s.id)}>Confirmar entrega</button><button className="ghost" onClick={() => setEntregando(null)}>Cancelar</button></div>
             </div>
-          : <button type="button" className="ghost" onClick={(e) => { e.stopPropagation(); setEntregando(s.id); setValorDraft(s.valor_orcamento ? String(s.valor_orcamento) : ""); setRecebidoDraft(""); }}>✅ Marcar como entregue</button>}
+          : <button type="button" className={esperandoMaterial(s) ? "ghost sutil" : "ghost"} onClick={(e) => { e.stopPropagation(); setEntregando(s.id); setValorDraft(s.valor_orcamento ? String(s.valor_orcamento) : ""); setRecebidoDraft(""); }}>{esperandoMaterial(s) ? "Entregar mesmo assim" : "✅ Marcar como entregue"}</button>}
       </div>)}</div>}
     </div>; })}</div>
   </section>;
