@@ -59,6 +59,20 @@
 .ficha-servico-desc{margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.45;white-space:pre-wrap}
 .material-itens{display:block;font-size:12px;color:var(--muted);margin:4px 0 6px}
 button.sutil{opacity:.55;font-size:12px}
+.plano-caixa{border-left:3px solid var(--accent)}
+.plano-caixa.apertado{border-left-color:#e05c5c}
+.plano-linha{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.plano-linha span{color:var(--muted);font-size:13px}
+.plano-linha.total{border-bottom:0;border-top:2px solid var(--line);margin-top:2px;padding-top:10px;font-size:16px}
+.plano-linha.total span{color:var(--text);font-weight:600;font-size:14px}
+.plano-sugestoes{margin-top:16px;padding-top:12px;border-top:1px dashed var(--line)}
+.plano-sugestao{display:flex;gap:10px;padding:9px 11px;margin:7px 0;border-radius:8px;background:var(--surface2);border-left:3px solid var(--line)}
+.plano-sugestao.verde{border-left-color:#4ea86f}
+.plano-sugestao.amarelo{border-left-color:#e0a458}
+.plano-sugestao.cinza{border-left-color:var(--muted)}
+.plano-sugestao strong{display:block;font-size:14px}
+.plano-sugestao span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.plano-sugestao em{display:block;font-size:11px;color:var(--muted);font-style:normal;margin-top:4px;opacity:.85}
 .compra-lojas{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
 .compra-loja-chip{font-size:11px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap;background:transparent;cursor:pointer}
 .compra-loja-chip:hover{color:var(--text);border-color:var(--accent)}
@@ -1879,7 +1893,7 @@ function Home() {
       {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} finances={finances} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
-      {tab === "futuro" && <FuturoView finances={finances} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
+      {tab === "futuro" && <FuturoView finances={finances} services={activeServices} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "vales" && <ValesView finances={finances} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
@@ -3690,7 +3704,59 @@ function AReceberBloco({ finances, services, db, demo, mode, notify, onChanged }
   </section>;
 }
 
-function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
+// PLANO DE CAIXA. Diego, 04/08: "queria algo inteligente assim para contas a pagar, que cruzasse... que ela
+// visse algo que está para vencer, visse que o caixa está apertado, desse sugestão de qual serviço entregar
+// ou lead parado... porque está quase inútil".
+// Ele está certo: a lista sozinha diz O QUE vence, e ele já sabe. A pergunta que ele faz de verdade quando
+// abre essa aba é "vou dar conta?" — e, se não, "o que eu faço hoje". Isso exige cruzar quatro coisas que já
+// estão no banco e nunca se olharam: o caixa de hoje, o que vence, o que está pra entrar, e o trabalho que
+// pode virar dinheiro rápido.
+// A REGRA DAS SUGESTÕES é distância até o dinheiro, não tamanho do valor. Um serviço pronto só esperando
+// entrega vira caixa hoje; um lead de R$5.000 pode não virar nunca. Ordenar por valor mandaria ele atrás do
+// mais difícil justamente no dia em que o caixa aperta.
+function PlanoDeCaixa({ finances, services, escopo }) {
+  const hoje = hojeISO();
+  const noEscopo = (f) => escopo === "todos" || (f.escopo || "empresa") === escopo;
+  // Caixa = o que já entrou menos o que já saiu. Só "pago" conta: promessa não paga conta de luz.
+  const caixa = finances.filter((f) => noEscopo(f) && (f.status === "pago" || !f.status))
+    .reduce((s, f) => s + (f.tipo === "entrada" ? Number(f.valor) : -Number(f.valor)), 0);
+  const limite = somarDias(hoje, 15); // 15 dias: o horizonte em que ele ainda consegue agir
+  const dentro = (d) => (d || "") <= limite;
+  const vencendo = finances.filter((f) => noEscopo(f) && ehSaidaFutura(f) && dentro(f.data));
+  const totalVence = vencendo.reduce((s, f) => s + Number(f.valor), 0);
+  const receber = finances.filter((f) => noEscopo(f) && f.tipo === "entrada" && f.status === "a_receber" && dentro(f.data));
+  const totalReceber = receber.reduce((s, f) => s + Number(f.valor), 0);
+  const projetado = caixa + totalReceber - totalVence;
+  const atrasadas = vencendo.filter((f) => (f.data || "") < hoje);
+  // Dinheiro parado em trabalho, por ordem de quão perto está de virar caixa.
+  const prontos = (services || []).filter((s) => s.status === "producao" && Number(s.valor_orcamento) > 0
+    && !(s.materiais_necessarios || []).some((m) => !m.comprado));
+  const receberVencido = receber.filter((f) => (f.data || "") < hoje);
+  const emProducao = (services || []).filter((s) => s.status === "producao" && Number(s.valor_orcamento) > 0 && !prontos.includes(s));
+  const valorDe = (lista) => lista.reduce((s, x) => s + Number(x.valor_orcamento || x.valor || 0), 0);
+  if (!vencendo.length && !receber.length) return null;
+  const apertado = projetado < 0;
+  const sugestoes = [];
+  if (prontos.length) sugestoes.push({ tom: "verde", titulo: `${prontos.length} serviço(s) pronto(s) pra entregar`, valor: valorDe(prontos), nomes: prontos.map((s) => s.clientes?.nome || "cliente"), como: "Material resolvido — entregar já vira dinheiro no caixa." });
+  if (receberVencido.length) sugestoes.push({ tom: "amarelo", titulo: `${receberVencido.length} saldo(s) a receber já vencido(s)`, valor: valorDe(receberVencido), nomes: receberVencido.map((f) => descricaoFinanceiraVisivel(f.descricao).slice(0, 28)), como: "Cliente já recebeu ou combinou pagar — é só cobrar." });
+  if (emProducao.length) sugestoes.push({ tom: "cinza", titulo: `${emProducao.length} em produção`, valor: valorDe(emProducao), nomes: emProducao.map((s) => s.clientes?.nome || "cliente"), como: "Ainda depende de material ou do profissional." });
+  return <section className={`content-card plano-caixa${apertado ? " apertado" : ""}`}>
+    <div className="card-head"><div><p className="kicker">PRÓXIMOS 15 DIAS</p>
+      <h3>{apertado ? `Falta ${money(Math.abs(projetado))} pra fechar o mês` : `Sobra ${money(projetado)} depois de pagar tudo`}</h3></div></div>
+    <div className="plano-linha"><span>Caixa hoje</span><b className={caixa >= 0 ? "entrada" : "saida"}>{money(caixa)}</b></div>
+    <div className="plano-linha"><span>A receber até lá {receberVencido.length ? `· ${receberVencido.length} já vencido(s)` : ""}</span><b className="entrada">+ {money(totalReceber)}</b></div>
+    <div className="plano-linha"><span>Vence até lá {atrasadas.length ? `· ${atrasadas.length} atrasada(s)` : ""}</span><b className="saida">− {money(totalVence)}</b></div>
+    <div className="plano-linha total"><span>{apertado ? "Descoberto" : "Sobra"}</span><b className={apertado ? "saida" : "entrada"}>{money(projetado)}</b></div>
+    {!!sugestoes.length && <div className="plano-sugestoes">
+      <p className="kicker">{apertado ? "DE ONDE TIRAR — DO MAIS RÁPIDO PRO MAIS DEMORADO" : "DINHEIRO PARADO EM TRABALHO"}</p>
+      {sugestoes.map((s, i) => <div className={`plano-sugestao ${s.tom}`} key={i}>
+        <div><strong>{s.titulo} · {money(s.valor)}</strong><span>{s.nomes.slice(0, 4).join(" · ")}{s.nomes.length > 4 ? ` +${s.nomes.length - 4}` : ""}</span><em>{s.como}</em></div>
+      </div>)}
+      {apertado && prontos.length > 0 && <p className="ficha-note">Entregando {prontos.length === 1 ? "esse serviço" : `os ${prontos.length} prontos`} você já cobre {valorDe(prontos) >= Math.abs(projetado) ? "todo o descoberto" : `${money(valorDe(prontos))} do descoberto`}.</p>}
+    </div>}
+  </section>;
+}
+function FuturoView({ finances, services, db, demo, mode, notify, onChanged }) {
   const [formOpen, setFormOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const novoDraft = () => ({ descricao: "", valor: "", parcelas: "1", primeiroVenc: somaDiaMes(hojeISO(), 1), escopo: "empresa", categoria: "Conta fixa", eventoId: novoIdLocal() });
@@ -3754,6 +3820,7 @@ function FuturoView({ finances, db, demo, mode, notify, onChanged }) {
   const EF_ABAS = [{ id: "todos", label: "Todos" }, { id: "empresa", label: "Empresa" }, { id: "pessoal", label: "Pessoal" }];
   return <div className="page-grid">
     <div className="funil-filtros">{EF_ABAS.map((a) => <button key={a.id} className={escopoAba === a.id ? "active" : ""} onClick={() => setEscopoAba(a.id)}>{a.label}</button>)}</div>
+    <PlanoDeCaixa finances={finances} services={services} escopo={escopoAba} />
     <section className="metric-grid finance-metrics">
       <Metric label="Vence neste mês" value={money(doMes.reduce((s, c) => s + Number(c.valor), 0))} detail={`${doMes.length} conta(s)`} tone="orange" />
       <Metric label="Atrasadas" value={money(atrasadas.reduce((s, c) => s + Number(c.valor), 0))} detail={atrasadas.length ? `${atrasadas.length} vencida(s)` : "Nada vencido"} tone="red" />
