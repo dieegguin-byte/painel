@@ -3387,11 +3387,24 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   const ordenados = [...ativos].sort((a, b) => String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
   const totalItens = ativos.reduce((n, s) => n + visiveisDe(s).length, 0);
   const faltam = ativos.reduce((n, s) => n + visiveisDe(s).filter((m) => !m.comprado).length, 0);
+  // MARCAR AQUI TEM QUE VALER NO RESTO DO APP. Diego, 04/08: "quando confirmo na aba compras, ela já confirma
+  // automaticamente em Capacidade, ou tenho que marcar lá também?". O alerta "Esperando material" já sumia
+  // sozinho (lê esta mesma lista), mas a PRÓXIMA AÇÃO do serviço continuava escrita "Comprar o material" no
+  // Painel e na ficha — ele compraria tudo e o app seguiria mandando comprar. Meia-ligação é pior que
+  // nenhuma: obriga ele a lembrar de atualizar em dois lugares, que é justamente o trabalho que o app deveria
+  // tirar. Marcar aqui é o único lugar onde ele toca.
   const gravar = async (servico, novaLista) => {
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusy(servico.id);
     try {
-      const { error } = await db.from("servicos").update({ materiais_necessarios: novaLista, atualizado_em: new Date().toISOString() }).eq("id", servico.id);
+      const patch = { materiais_necessarios: novaLista, atualizado_em: new Date().toISOString() };
+      const pendentes = novaLista.filter((m) => !m.comprado).length;
+      const acaoAtual = (servico.proxima_acao || "").toLowerCase();
+      // Voltou a faltar material: isso passa na frente de qualquer outra ação. Zerou: só troca se a ação que
+      // estava lá era sobre material — pra não apagar uma instrução específica que o Diego tenha escrito.
+      if (pendentes) patch.proxima_acao = "Comprar o material";
+      else if (!acaoAtual || /material/.test(acaoAtual)) patch.proxima_acao = "Produzir e acompanhar o prazo";
+      const { error } = await db.from("servicos").update(patch).eq("id", servico.id);
       if (error) throw error;
       await onChanged?.();
     } catch (e) { notify("Não salvou: " + e.message, "error"); } finally { setBusy(null); }
