@@ -56,6 +56,22 @@
 .records-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.record-card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--yellow);border-radius:14px;padding:14px}.record-card.priority-alta{border-left-color:var(--red)}.record-card.priority-baixa{border-left-color:var(--green)}.record-top{display:flex;justify-content:space-between;align-items:center}.record-top time{font-size:9px;color:var(--dim)}.record-card h4{font-size:13px;margin:13px 0 3px}.record-card>p{font-size:10px;color:var(--muted);margin:0}.next-action{background:#0f0d0c;border-radius:9px;padding:9px;margin:13px 0;font-size:10px}.next-action small{display:block;color:var(--orange2);font-size:7px;margin-bottom:3px}.record-card footer{display:flex;justify-content:space-between;align-items:center;font-size:10px}.record-card footer a{color:#98c9a6;text-decoration:none}.rotina-lista{display:flex;flex-direction:column;gap:8px}.rotina-item{display:flex;justify-content:space-between;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:12px;padding:12px 14px}.rotina-item.cor-alta{border-left-color:var(--red)}.rotina-item.cor-media{border-left-color:var(--yellow)}.rotina-esq{display:flex;flex-direction:column;gap:3px;min-width:0}.rotina-esq strong{font-size:14px}.rotina-esq span{font-size:11px;color:var(--dim)}.rotina-dir{display:flex;align-items:center;gap:10px;flex:none}.rotina-dir em{font-style:normal;font-size:12px;font-weight:700;color:var(--yellow);white-space:nowrap}.rotina-dir em.atrasada{color:#e88477}
 .cobranca-item{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--green);border-radius:12px;padding:12px 14px;margin-bottom:8px}.cobranca-item.cor-alta{border-left-color:var(--red)}.cobranca-item.cor-media{border-left-color:var(--yellow)}.cobranca-item.cor-baixa{border-left-color:var(--green)}.cobranca-esq{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 260px}.cobranca-esq strong{font-size:14px}.cobranca-esq span{font-size:11px;color:var(--muted)}.cobranca-esq em{font-style:normal;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.3px}.cobranca-esq em.cobranca-teto{color:#e88477;text-transform:none;letter-spacing:0;font-size:11px;font-weight:600}.cobranca-dir{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap}
 .entrega-form{display:flex;flex-direction:column;gap:8px;background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:12px;margin-top:8px}.entrega-form label{display:flex;flex-direction:column;gap:4px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}.entrega-form input{background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:9px 10px;font-size:14px;font-family:inherit}.entrega-hint{font-size:11px;color:#91c49f}
+.compra-cliente{margin:12px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface2)}
+.compra-cliente.tudo-comprado{opacity:.55}
+.compra-cliente-head{display:flex;flex-direction:column;gap:2px;margin-bottom:8px}
+.compra-cliente-head strong{font-size:15px}
+.compra-cliente-head span{font-size:12px;color:var(--muted)}
+.compra-item{display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid var(--line);cursor:pointer;font-size:15px}
+.compra-item input[type=checkbox]{width:22px;height:22px;flex:0 0 22px;accent-color:var(--accent);cursor:pointer}
+.compra-item span{flex:1}
+.compra-item.feito span{text-decoration:line-through;color:var(--muted)}
+.compra-remover{background:none;border:0;color:var(--muted);font-size:14px;padding:4px 6px;cursor:pointer;opacity:.5}
+.compra-remover:hover{opacity:1}
+.compra-add{padding-top:8px;border-top:1px solid var(--line)}
+.compra-add input{width:100%;background:transparent;border:0;color:var(--text);font-size:14px;padding:6px 4px}
+.compras-historico{margin-top:6px}
+.compras-historico summary{cursor:pointer;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:13px;color:var(--muted)}
+.compras-historico[open] summary{margin-bottom:10px}
 .mes-nav{display:flex;align-items:center;gap:8px;margin:10px 0}
 .mes-nav strong{flex:1;text-align:center;font-size:13px}
 .mes-nav strong::first-letter{text-transform:uppercase}
@@ -3231,6 +3247,13 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
   </select>;
 
   return <div className="page-grid">
+    <ListaDeCompras services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={onChanged} />
+
+    {/* O RESTO DA ABA É CONTABILIDADE, e por isso vem depois da lista. Diego, 04/08: "essa aba compras não
+        está sendo nada funcional... parece financeiro quando era para ser mais uma lista". Os números
+        continuam existindo pra quando ele quiser conferir gasto, mas quem abre a aba está indo comprar. */}
+    <details className="compras-historico">
+      <summary>Gastos com material — números e histórico</summary>
     <section className="metric-grid finance-metrics">
       <Metric label="Material neste mês" value={money(totalMes)} detail={mesLabel(mesAtual)} tone="red" />
       <Metric label="A comprar" value={money(totalAComprar)} detail={`${aComprar.length} item(ns) na lista`} tone="orange" />
@@ -3335,7 +3358,71 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
         </div>;
       })}
     </section>
+    </details>
   </div>;
+}
+
+// LISTA DE COMPRAS. Diego, 04/08: "olha o tanto de coisa para comprar, era para ter uma lista de compras na
+// aba Compras... já sabe o que é de cada cliente, não tem uma lista fácil de visualização para eu chegar e
+// comprar... ficou muito complicado quando era para ter algo mais simples, parece financeiro quando era para
+// ser mais uma lista, com check de cada item".
+// Ele está certo e a razão é simples: quem abre essa aba está indo à loja, não fazendo contabilidade. O que
+// serve nesse momento é papel de supermercado — o que falta, de quem é, e um quadradinho pra marcar.
+// Os itens moram em servicos.materiais_necessarios (jsonb: [{item, comprado}]) porque a informação já nascia
+// junto com o serviço — o que muda é ela virar lista marcável em vez de texto solto na descrição.
+function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
+  const [busy, setBusy] = useState(null);
+  const [novoItem, setNovoItem] = useState({});
+  const ativos = (services || []).filter((s) => ["agendado", "producao"].includes(s.status) && (s.materiais_necessarios || []).length);
+  const ordenados = [...ativos].sort((a, b) => String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
+  const totalItens = ativos.reduce((n, s) => n + (s.materiais_necessarios || []).length, 0);
+  const faltam = ativos.reduce((n, s) => n + (s.materiais_necessarios || []).filter((m) => !m.comprado).length, 0);
+  const gravar = async (servico, novaLista) => {
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusy(servico.id);
+    try {
+      const { error } = await db.from("servicos").update({ materiais_necessarios: novaLista, atualizado_em: new Date().toISOString() }).eq("id", servico.id);
+      if (error) throw error;
+      await onChanged?.();
+    } catch (e) { notify("Não salvou: " + e.message, "error"); } finally { setBusy(null); }
+  };
+  const alternar = (servico, idx) => {
+    const lista = (servico.materiais_necessarios || []).map((m, i) => i === idx ? { ...m, comprado: !m.comprado } : m);
+    gravar(servico, lista);
+  };
+  const adicionar = (servico) => {
+    const texto = (novoItem[servico.id] || "").trim();
+    if (!texto) return;
+    setNovoItem((n) => ({ ...n, [servico.id]: "" }));
+    gravar(servico, [...(servico.materiais_necessarios || []), { item: texto, comprado: false }]);
+  };
+  const remover = (servico, idx) => gravar(servico, (servico.materiais_necessarios || []).filter((_, i) => i !== idx));
+  if (!ordenados.length) return <section className="content-card"><div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>Nada pra comprar</h3></div></div>
+    <div className="empty-state"><b>Nenhum serviço ativo tem material anotado.</b><span>Peça pro Claude anotar o que falta em cada cliente, ou adicione na ficha do serviço.</span></div></section>;
+  return <section className="content-card">
+    <div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>{faltam} item(ns) pra comprar</h3></div>
+      {totalItens > faltam && <span className="status-pill">{totalItens - faltam} já comprado(s)</span>}</div>
+    {ordenados.map((s) => {
+      const itens = s.materiais_necessarios || [];
+      const pendentes = itens.filter((m) => !m.comprado).length;
+      return <div className={`compra-cliente${pendentes ? "" : " tudo-comprado"}`} key={s.id}>
+        <div className="compra-cliente-head">
+          <strong>{s.clientes?.nome || "Cliente"}</strong>
+          <span>{pendentes ? `faltam ${pendentes}` : "tudo comprado ✓"}{s.prazo ? ` · entrega ${compactDate(s.prazo)}` : ""}{s.loja_material ? ` · ${s.loja_material}` : ""}</span>
+        </div>
+        {itens.map((m, i) => <label className={`compra-item${m.comprado ? " feito" : ""}`} key={i}>
+          <input type="checkbox" checked={!!m.comprado} disabled={busy === s.id || mode === "claude"} onChange={() => alternar(s, i)} />
+          <span>{m.item}</span>
+          <button type="button" className="compra-remover" title="Tirar da lista" disabled={busy === s.id} onClick={(e) => { e.preventDefault(); remover(s, i); }}>✕</button>
+        </label>)}
+        <div className="compra-add">
+          <input value={novoItem[s.id] || ""} onChange={(e) => setNovoItem((n) => ({ ...n, [s.id]: e.target.value }))}
+            onKeyDown={(e) => { if (e.key === "Enter") adicionar(s); }} placeholder="+ item" disabled={busy === s.id} />
+        </div>
+      </div>;
+    })}
+    <p className="ficha-note">Marcar o item é só a sua lista — o gasto continua entrando pela compra normal, com fornecedor e valor.</p>
+  </section>;
 }
 
 // SAÍDAS FUTURAS: conta que já está comprometida mas ainda não saiu do caixa (parcela de cartão, aluguel).
