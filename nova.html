@@ -2974,9 +2974,6 @@ const VALE_ABATIDO_TAG = "[ABATIDO] ";
 function ValesView({ finances, db, demo, mode, notify, onChanged }) {
   const [busyId, setBusyId] = useState(null);
   const vales = finances.filter((f) => f.categoria === "Vale");
-  // Vale é lembrete de dívida, NÃO gasto: enquanto pendente fica status "a_pagar" e por isso não entra no saldo do
-  // Financeiro (que só soma pago). Ao marcar abatido - o momento em que o Diego realmente paga - vira "pago" e aí sim
-  // pesa no caixa. O prefixo [ABATIDO] na descrição é só a marcação administrativa que move o item pro histórico.
   // O DINHEIRO DO VALE SAI NA HORA (Diego confirmou em 25/07/2026: "todos vales já saem na hora" — Pix ou
   // dinheiro na mão). Então TODO vale nasce como saída PAGA: o caixa sente no dia em que ele entrega.
   // O que fica pendente NÃO é pagamento, é o DESCONTO no que ele vai pagar pro profissional depois.
@@ -3024,7 +3021,12 @@ const MATERIAL_EM_TRANSITO_TAG = "[EM TRÂNSITO] ";
 function ehCompraMaterial(item) { return item.tipo === "saida" && item.categoria === CATEGORIA_MATERIAL; }
 function materialEstaEmMaos(item) { return (item?.descricao || "").startsWith(MATERIAL_EM_MAOS_TAG); }
 function materialEstaEmTransito(item) { return (item?.descricao || "").startsWith(MATERIAL_EM_TRANSITO_TAG); }
-function descricaoFinanceiraVisivel(descricao) { return String(descricao || "").replace(MATERIAL_EM_MAOS_TAG, "").replace(MATERIAL_EM_TRANSITO_TAG, ""); }
+// Tags são controle interno de cada aba (material em mãos, vale abatido) — no Financeiro elas só poluem.
+// Diego, 04/08: "confirmei na aba Vales, lá não era para mexer no financeiro". E não mexeu: o valor e o
+// status do vale continuaram iguais. O que mudou foi o NOME do lançamento, que passou a exibir "[ABATIDO]"
+// na lista do Financeiro — e ver a linha mudar sozinha depois de mexer noutra aba parece, com toda razão,
+// que o caixa foi alterado. Aparência de alteração no dinheiro é tão ruim quanto alteração de verdade.
+function descricaoFinanceiraVisivel(descricao) { return String(descricao || "").replace(MATERIAL_EM_MAOS_TAG, "").replace(MATERIAL_EM_TRANSITO_TAG, "").replace(VALE_ABATIDO_TAG, ""); }
 // Compra antiga entrou sem fornecedor e fica pedindo atenção. "Conferido" é só a marca de que o Diego já olhou
 // e está certo - nunca apaga o lançamento (Regra Nº 7), só tira do que precisa de revisão.
 const COMPRA_CONFERIDA_TAG = "[CONFERIDO] ";
