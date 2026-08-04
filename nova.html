@@ -1852,7 +1852,7 @@ function Home() {
     {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
     {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} />}
     {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
-    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
+    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} services={services} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {addAgendaOpen && <AddAgendaModal appointments={agendaVisivel} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
   </div>;
 }
@@ -2520,7 +2520,7 @@ function AddAgendaModal({ appointments, db, demo, notify, onClose, onDone }) {
   </>;
 }
 
-function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, onClose, onDone }) {
+function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, services, svc, onClose, onDone }) {
   const [step, setStep] = useState("choose");
   const [pendente, setPendente] = useState("");
   const [files, setFiles] = useState([]);
@@ -2529,9 +2529,18 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
   const [fornecedorId, setFornecedorId] = useState((materiais || [])[0]?.fornecedor_id || "");
   const [pagamentoConfirmado, setPagamentoConfirmado] = useState(false);
   const [valorEntrega, setValorEntrega] = useState(svc?.valor_orcamento ? String(svc.valor_orcamento) : "");
+  const [profissional, setProfissional] = useState(svc?.responsavel || "");
   const ehCompra = ehCompromissoDeCompra(appt, materiais);
   const ehEntrega = ehCompromissoDeEntrega(appt, svc);
   const ehPedidoRemoto = ehCompra && appt.tipo === "remoto";
+  // BUSCAR O MÓVEL É SUCESSO, NÃO PENDÊNCIA. Diego, 04/08: "quando eu pegar o serviço, por exemplo da
+  // Andriele, eu vou colocar em concluído parcial que busquei e deixei em tal profissional". Só que "Parcial"
+  // cria pendência de REMARCAÇÃO — o app entendia como algo que deu errado e mandava reagendar, quando na
+  // verdade o trabalho acabou de começar. E era nesse mesmo momento que ele sabia com quem ia deixar a peça,
+  // mas não tinha onde dizer: por isso Gabriela, José Ângelo e Andriele estavam sem profissional.
+  // Este caminho junta as três coisas num toque: conclui a busca, põe o serviço em produção e grava quem
+  // ficou com ela.
+  const ehBuscaDeServico = !ehCompra && !ehEntrega && svc && svc.status === "agendado" && appt.tipo === "presencial";
   const openParcial = () => { setPendente(sugerirPendente(appt.titulo)); setStep("parcial"); };
   // Compra pergunta o valor; entrega pergunta se o serviço acabou. O resto conclui direto como sempre.
   const concluirTotal = () => ehCompra ? setStep("compra") : ehEntrega ? setStep("entrega") : doTotal();
@@ -2587,6 +2596,27 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
       }
       notify("Concluído.", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, proximaAcao: null });
     } catch (e) { notify("A conclusão ficou visível para retomada: " + e.message, "error"); } finally { setBusy(false); }
+  };
+  // "Busquei e deixei com o Fulano": conclui o compromisso (que já leva o serviço pra produção no gateway) e
+  // grava o responsável. O profissional é opcional — se ele ainda não sabe com quem vai deixar, a busca não
+  // pode ficar travada por causa disso; o serviço entra em produção do mesmo jeito e o nome entra depois.
+  const doBuscou = async () => {
+    const nome = profissional.trim();
+    if (demo) { notify("Registrado (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: appt.servico_id || null, statusServico: "producao", proximaAcao: null }); return; }
+    setBusy(true);
+    try {
+      const operacao = await processarEventoOperacaoBahia(db, {
+        tipo: "compromisso_concluido", eventoId: "app-conclusao-agenda-" + appt.id,
+        dados: { agendaId: appt.id, servicoId: appt.servico_id || null, data: hojeISO(), por: "diego" },
+      });
+      const r = operacao.resultado;
+      if (nome && appt.servico_id && nome !== (svc?.responsavel || "")) {
+        const { error } = await db.from("servicos").update({ responsavel: nome, atualizado_em: new Date().toISOString() }).eq("id", appt.servico_id);
+        if (error) throw error;
+      }
+      notify(nome ? `Buscado e com ${nome}. O serviço entrou em produção.` : "Buscado. O serviço entrou em produção.", "ok");
+      onDone({ agendaId: appt.id, servicoId: r.servicoId, statusServico: r.statusServico, proximaAcao: r.proximaAcao });
+    } catch (e) { notify("Ficou visível para retomada: " + e.message, "error"); } finally { setBusy(false); }
   };
   // Lança o gasto e SÓ DEPOIS conclui: se a gravação do dinheiro falhar, o compromisso continua aberto,
   // porque compromisso fechado sem o gasto lançado é exatamente o que a gente está tentando evitar.
@@ -2690,9 +2720,16 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, svc, o
         <p className="modal-intro">Foi concluído totalmente ou ficou pendência?</p>
         {files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}
         {filePicker}
-        <button className="primary wide" onClick={concluirTotal} disabled={busy}>✔ Concluído total — acabou</button>
+        {ehBuscaDeServico && <button className="primary wide" onClick={() => setStep("buscou")} disabled={busy}>📦 Busquei — deixei com o profissional</button>}
+        <button className={ehBuscaDeServico ? "ghost wide" : "primary wide"} onClick={concluirTotal} disabled={busy}>✔ Concluído total — acabou</button>
         {!ehCompra && !ehEntrega && svc && ["agendado", "producao"].includes(svc.status) && <button className="ghost wide" onClick={() => setStep("entrega")} disabled={busy}>Foi a entrega final — fechar o serviço</button>}
         <button className="secondary wide" onClick={openParcial} disabled={busy}>🟡 Parcial — falta algo, o Claude reagenda</button>
+      </div> : step === "buscou" ? <div className="form-grid">
+        <p className="modal-intro">A peça de {svc?.clientes?.nome || "esse cliente"} veio pra oficina. O serviço entra em produção agora — com quem ela ficou?</p>
+        <label>Profissional<input value={profissional} onChange={(e) => setProfissional(e.target.value)} list="profissionais-conhecidos" placeholder="Nome de quem ficou com a peça" autoFocus /></label>
+        <datalist id="profissionais-conhecidos">{[...new Set((services || []).map((s) => s.responsavel).filter(Boolean))].map((n) => <option key={n} value={n} />)}</datalist>
+        <p className="ficha-note">Pode deixar em branco se ainda não definiu — o serviço entra em produção do mesmo jeito e você atribui depois.</p>
+        <div className="ficha-actions"><button className="primary" onClick={doBuscou} disabled={busy}>Confirmar</button><button className="ghost" onClick={() => setStep("choose")} disabled={busy}>Voltar</button></div>
       </div> : step === "compra" ? <div className="form-grid">
         <p className="modal-intro">{ehPedidoRemoto ? "Isso é um pedido remoto. Registrar o pedido não significa que o material chegou." : "Isso é uma busca presencial de material. Quanto ficou? Só entra em produção quando o material estiver com você."}</p>
         <label>Valor da compra*<input inputMode="decimal" value={valorCompra} onChange={(e) => setValorCompra(e.target.value)} placeholder="Ex: 85,00" /></label>
