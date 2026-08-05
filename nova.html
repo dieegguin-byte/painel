@@ -2363,6 +2363,13 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   // decisão, é tarefa em lote — o Painel mostra o tamanho e o valor em jogo, e a lista abre num toque, aqui
   // mesmo. Sem aba nova: o dia do telefone continua sendo uma coisa só, não uma navegação.
   const [listaCobrancas, setListaCobrancas] = useState(false);
+  // NADA ABRE SOZINHO NO PAINEL. Diego, 04/08: "quero tudo recolhível sem abrir sozinho no painel principal
+  // ao iniciar". O Painel é onde ele decide o dia — abrir com três listas estendidas obriga a rolar pra ver o
+  // que existe antes de escolher o que olhar. Fechado, o topo mostra as CONTAGENS de tudo numa tela só, e ele
+  // abre o que interessa. Cada botão diz quantos itens tem dentro, então fechar não esconde informação:
+  // troca a lista inteira por um número, que é o que se lê de relance.
+  const [listaHoje, setListaHoje] = useState(false);
+  const [listaFuturos, setListaFuturos] = useState(false);
   const valorEmJogo = cobrarCliente.reduce((soma, a) => soma + Number(svcDe(a)?.valor_orcamento || 0), 0);
   const qtdNoTeto = cobrarCliente.filter((a) => cobrancaNoTeto(svcDe(a))).length;
   // COBREI: conta a tentativa e empurra o ciclo. O link do WhatsApp abre normalmente; isto roda em paralelo.
@@ -2481,7 +2488,11 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       // continua valendo (agendado = fechado); o que saiu foi o card diário.
       return null;
     })()}
-    {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Compromissos de hoje e atrasados</h3></div></div><AvisoRota compromissos={due.filter((a) => a.data === today)} />{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</section>}
+    {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>{due.length} compromisso(s) de hoje e atrasados</h3></div></div>
+      {/* O aviso de rota fica FORA do recolhível: rota que volta é erro que ele precisa ver sem abrir nada. */}
+      <AvisoRota compromissos={due.filter((a) => a.data === today)} />
+      <button className="ghost" style={{ width: "100%" }} onClick={() => setListaHoje((v) => !v)}>{listaHoje ? "Fechar" : `Abrir os ${due.length}`}</button>
+      {listaHoje && <div style={{ marginTop: 12 }}>{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</div>}</section>}
     {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
     {cobrarCliente.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">COBRANÇAS · ESPERANDO O CLIENTE</p><h3>{cobrarCliente.length} pra cobrar hoje</h3></div></div>
       <p className="ficha-note">{valorEmJogo > 0 ? `${money(valorEmJogo)} em jogo · ` : ""}não é rota, resolve no celular. Cada uma volta sozinha em {COBRANCA_INTERVALO_DIAS} dias; na {COBRANCA_TETO_TENTATIVAS}ª sem resposta o app propõe encerrar.</p>
@@ -2491,7 +2502,9 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
         {[...cobrarCliente].sort((x, y) => (cobrancaNoTeto(svcDe(y)) ? 1 : 0) - (cobrancaNoTeto(svcDe(x)) ? 1 : 0) || (x.data || "").localeCompare(y.data || "")).map((a) => { const svc = svcDe(a); return <CobrancaCard key={a.id} a={a} svc={svc} today={today} tentativas={cobrancaTentativas(svc)} noTeto={cobrancaNoTeto(svc)} onCobrou={onCobrou} onEncerrar={onEncerrar} busy={busyCobranca === a.id} />; })}
       </div>}
     </section>}
-    {futuros.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>Próximos compromissos</h3></div></div>{[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</section>}
+    {futuros.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></div></div>
+      <button className="ghost" style={{ width: "100%" }} onClick={() => setListaFuturos((v) => !v)}>{listaFuturos ? "Fechar" : `Abrir os ${futuros.length}`}</button>
+      {listaFuturos && <div style={{ marginTop: 12 }}>{[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</div>}</section>}
     {filtroTipo !== "todos" && due.length === 0 && futuros.length === 0 && (dueAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
     {/* SAIU o aviso financeiro do rodapé: era o mesmo assunto do card "a pagar" lá em cima, só que sem o
         valor e sem o caixa possível — repetia a preocupação sem ajudar a decidir. Diego, 25/07. */}</div>;
