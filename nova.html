@@ -2389,6 +2389,25 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   // Nunca deleta — Regra Nº 7. Vira `perdido` com o motivo e o número de tentativas registrado.
   const onEncerrar = async (a, svc) => {
     const nTent = cobrancaTentativas(svc);
+    // TRABALHO FEITO NÃO É LEAD FRIO. Diego, 04/08: "não sei por que a Madalena sumiu do profissional Marlom
+    // Junior" — o serviço dela (R$2.500, pronto pra entregar, R$1.250 já pagos e R$1.250 a receber) tinha
+    // virado "perdido" às 17:19 "após 0 tentativas". Um toque no "Chega" apagou da produção, da capacidade do
+    // profissional e do a receber um serviço que só faltava entregar.
+    // "Chega" existe pra lead que não responde — jogar fora um orçamento frio não custa nada. Mas serviço com
+    // dinheiro pago dentro é outra coisa: o cliente pagou, a peça está na oficina, e "perdido" mente sobre os
+    // dois. Aqui o app pergunta antes, dizendo o que está em jogo. É o único lugar do app onde um toque só
+    // destrói valor — e a memória do Diego é clara: avisar é bom, deixar o app criar prejuízo não.
+    const jaPago = (finances || []).filter((f) => f.servico_id === svc?.id && f.tipo === "entrada" && f.status === "pago").reduce((s, f) => s + Number(f.valor), 0);
+    const aReceber = (finances || []).filter((f) => f.servico_id === svc?.id && f.tipo === "entrada" && f.status === "a_receber").reduce((s, f) => s + Number(f.valor), 0);
+    if (svc && (jaPago > 0 || ["producao", "entregue"].includes(svc.status))) {
+      const nome = svc.clientes?.nome || "esse cliente";
+      const linhas = [`${nome} não é um lead parado:`];
+      if (jaPago > 0) linhas.push(`• já pagou ${money(jaPago)}`);
+      if (aReceber > 0) linhas.push(`• tem ${money(aReceber)} a receber`);
+      if (svc.status === "producao") linhas.push("• o serviço está em produção");
+      linhas.push("", "Encerrar marca como PERDIDO: sai da produção, da fila do profissional e do a receber.", "Tem certeza?");
+      if (!window.confirm(linhas.join("\n"))) return;
+    }
     setBusyCobranca(a.id);
     setResolvidas((r) => ({ ...r, [a.id]: a.data }));
     if (demo) { notify("Encerrado (demo).", "ok"); setBusyCobranca(null); return; }
@@ -3492,6 +3511,12 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
       // estava lá era sobre material — pra não apagar uma instrução específica que o Diego tenha escrito.
       if (pendentes) patch.proxima_acao = "Comprar o material";
       else if (!acaoAtual || /material/.test(acaoAtual)) patch.proxima_acao = "Produzir e acompanhar o prazo";
+      // MATERIAL COMPLETO DESTRAVA A PRODUÇÃO. Diego, 04/08: "confirmei a compra da Carla lá em Compras mas
+      // não mudou status automaticamente em Capacidade profissional". A próxima ação mudava, o status não —
+      // e status é o que a Capacidade mostra, então pra ele nada tinha acontecido. Meia-ligação de novo.
+      // É a mesma regra que material_em_maos já aplica há semanas (podeProduzir → "producao"): o que segurava
+      // o serviço em "agendado" era faltar material; acabou de faltar, o profissional pode começar.
+      if (!pendentes && servico.status === "agendado") patch.status = "producao";
       const { error } = await db.from("servicos").update(patch).eq("id", servico.id);
       if (error) throw error;
       await onChanged?.();
