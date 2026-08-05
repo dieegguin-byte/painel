@@ -2193,7 +2193,13 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
   // grupos do semáforo ficam separados em vez de misturados numa lista só ordenada por dias.
   const atrasadas = pendentes.filter((x) => x.st.estado === "vencida");
   const doDia = pendentes.filter((x) => x.st.estado !== "vencida");
-  const aberto = abertoManual === null ? atrasadas.length > 0 : abertoManual;
+  // SEMPRE FECHADO ATÉ ELE TOCAR. Diego, 04/08: "ao abrir o app as rotinas pendentes já abrem, quero que
+  // abra só depois de eu clicar". Antes abria sozinha quando havia rotina ATRASADA — e como quase sempre há
+  // alguma atrasada (lavar o carro, backup), na prática o Painel abria com a lista estendida empurrando
+  // agenda e dinheiro pra baixo. O automatismo que existia pra chamar atenção virou o estado normal, e o que
+  // é sempre urgente deixa de ser urgente. O título já mostra quantas estão atrasadas: isso basta pra
+  // decidir se vale abrir agora.
+  const aberto = abertoManual === true;
   const linha = ({ r, st }) => <article className={`rotina-item ${st.estado === "vencida" ? "cor-alta" : "cor-media"}`} key={r.id}>
     <div className="rotina-esq">
       <strong>{r.titulo}</strong>
