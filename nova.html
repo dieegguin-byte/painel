@@ -3519,7 +3519,7 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   // Painel e na ficha — ele compraria tudo e o app seguiria mandando comprar. Meia-ligação é pior que
   // nenhuma: obriga ele a lembrar de atualizar em dois lugares, que é justamente o trabalho que o app deveria
   // tirar. Marcar aqui é o único lugar onde ele toca.
-  const gravar = async (servico, novaLista) => {
+  const gravar = async (servico, novaLista, extra) => {
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusy(servico.id);
     try {
@@ -3530,12 +3530,13 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
       // estava lá era sobre material — pra não apagar uma instrução específica que o Diego tenha escrito.
       if (pendentes) patch.proxima_acao = "Comprar o material";
       else if (!acaoAtual || /material/.test(acaoAtual)) patch.proxima_acao = "Produzir e acompanhar o prazo";
-      // MATERIAL COMPLETO DESTRAVA A PRODUÇÃO. Diego, 04/08: "confirmei a compra da Carla lá em Compras mas
-      // não mudou status automaticamente em Capacidade profissional". A próxima ação mudava, o status não —
-      // e status é o que a Capacidade mostra, então pra ele nada tinha acontecido. Meia-ligação de novo.
-      // É a mesma regra que material_em_maos já aplica há semanas (podeProduzir → "producao"): o que segurava
-      // o serviço em "agendado" era faltar material; acabou de faltar, o profissional pode começar.
-      if (!pendentes && servico.status === "agendado") patch.status = "producao";
+      // O STATUS SÓ MUDA NO CONFIRMAR, NUNCA NO CHECKBOX. Diego, 04/08: "Solange lá em compras não confirmei
+      // os materiais e já mudou status". Eu tinha ligado a mudança ao último item marcado — mas marcar é
+      // "peguei este item", e confirmar é "acabou, pode tirar da lista". Mexer no status antes do confirmar
+      // muda o serviço embaixo do dedo dele, no meio da conferência, e ainda por cima com um efeito que ele
+      // não pediu. Vale aqui a mesma razão que já fez o cliente não sumir sozinho da lista: o botão é o
+      // momento em que ele diz "é isso". Ver `confirmar`.
+      if (extra) Object.assign(patch, extra);
       const { error } = await db.from("servicos").update(patch).eq("id", servico.id);
       if (error) throw error;
       await onChanged?.();
@@ -3608,7 +3609,14 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   };
   const remover = (servico, idx) => gravar(servico, (servico.materiais_necessarios || []).filter((_, i) => i !== idx));
   // Confirmar não apaga: arquiva. O que foi comprado continua registrado na ficha do serviço.
-  const confirmar = (servico) => gravar(servico, (servico.materiais_necessarios || []).map((m) => m.arquivado ? m : { ...m, comprado: true, arquivado: true }));
+  // E é AQUI que a produção destrava — material completo confirmado é o que tirava o serviço de "agendado".
+  // Mesma regra que material_em_maos já aplica (podeProduzir → "producao"), só que disparada pelo ato
+  // deliberado dele, não por um checkbox no meio da conferência.
+  const confirmar = (servico) => {
+    const lista = (servico.materiais_necessarios || []).map((m) => m.arquivado ? m : { ...m, comprado: true, arquivado: true });
+    const extra = servico.status === "agendado" ? { status: "producao" } : null;
+    gravar(servico, lista, extra);
+  };
   if (!ordenados.length) return <section className="content-card"><div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>Nada pra comprar</h3></div></div>
     <div className="empty-state"><b>Nenhum serviço ativo tem material anotado.</b><span>Peça pro Claude anotar o que falta em cada cliente, ou adicione na ficha do serviço.</span></div></section>;
   return <section className="content-card">
