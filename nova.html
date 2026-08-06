@@ -59,6 +59,13 @@
 .ficha-servico-desc{margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.45;white-space:pre-wrap}
 .material-itens{display:block;font-size:12px;color:var(--muted);margin:4px 0 6px}
 button.sutil{opacity:.55;font-size:12px}
+.cobranca-marcar{display:flex;flex-direction:column;gap:8px;width:100%;padding-top:8px}
+.cobranca-marcar input{background:var(--surface);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:8px 10px;font-size:14px;width:100%}
+.conta-edit{display:block}
+.conta-edit-campos{display:flex;flex-direction:column;gap:8px;width:100%}
+.conta-edit-campos input{background:var(--surface);border:1px solid var(--line);border-radius:6px;color:var(--text);padding:8px 10px;font-size:14px;width:100%}
+.conta-edit-campos .row{display:flex;gap:8px}
+.conta-edit-campos .row input{flex:1;min-width:0}
 .plano-caixa{border-left:3px solid var(--accent)}
 .plano-caixa.apertado{border-left-color:#e05c5c}
 .plano-linha{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
@@ -1885,7 +1892,7 @@ function Home() {
 
       {tab === "caixa" && <div className="inbox-layout">
         <section className="queue-column">
-          <div className="composer"><textarea value={composer} onChange={(event) => setComposer(event.target.value)} placeholder="Cole uma mensagem, descreva o atendimento ou acrescente uma orientação…" />{files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}<div className="composer-actions"><label className="file-button">{files.length ? `${files.length} print(s)` : "Adicionar print(s)"}<input type="file" accept="image/*" multiple onChange={(event) => setFiles((fs) => [...fs, ...Array.from(event.target.files || [])])} /></label><button className="primary" onClick={addInbox} disabled={busy || (!composer.trim() && !files.length)}>Salvar na fila</button></div></div>
+          <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busy} />
           <div className="queue-summary"><div><span>Para Claude</span><b>{claudeQueue.length}</b></div><div><span>Em triagem</span><b>{working ? 1 : 0}</b></div><div><span>Aguardando você</span><b>{waiting.length}</b></div></div>
           {working && <QueueItem item={working} selected={selectedId === working.id} onOpen={() => setSelectedId(working.id)} />}
           {claudeQueue.map((item) => <QueueItem key={item.id} item={item} selected={selectedId === item.id} onOpen={() => setSelectedId(item.id)} />)}
@@ -1898,7 +1905,7 @@ function Home() {
         </section>
       </div>}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onOpenQueue={() => setTab("caixa")} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} finances={finances} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
@@ -2149,7 +2156,16 @@ function CompromissoCard({ a, svc, today, onConcluir, onReschedule, materiais })
 
 // COBRANÇA: linha enxuta, sem hora e sem rota. Vive num bloco próprio do Painel — é o "dia do telefone",
 // separado do "dia da estrada". Dois botões só: cobrei (conta +1, volta em 3 dias) e chega (encerra).
-function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar, busy }) {
+// CLIENTE QUE RESPONDEU SAI DA COBRANÇA NA HORA. Diego, 04/08: "em cobranças esperando cliente tem que ter
+// um botão para mudar o cliente de lá, como a Neide — ela falou comigo, voltou de viagem e marcou para sábado
+// de manhã; lá não tem como eu mover ela, nem te falar que deu certo e você mover agora pra compromisso".
+// Sem isso, a cobrança que JÁ deu certo continuava voltando a cada 3 dias, e ele ficava com um cliente
+// combinado no cartão de "esperando resposta" — o oposto do que aconteceu. E a única saída era me esperar.
+// O botão "Respondeu" pergunta o dia, vira compromisso de verdade e zera o ciclo de tentativas.
+function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar, onRespondeu, busy }) {
+  const [marcando, setMarcando] = useState(false);
+  const [dataDraft, setDataDraft] = useState(somarDias(today, 1));
+  const [horaDraft, setHoraDraft] = useState("09:00");
   const sugestao = svc?.sugestao_resposta || mensagemPadraoCompromisso(a, svc, today);
   const tel = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "";
   const atrasada = a.data < today;
@@ -2162,14 +2178,41 @@ function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar,
       {noTeto && <em className="cobranca-teto">Já foram {COBRANCA_TETO_TENTATIVAS} tentativas sem resposta — o app não insiste mais. Encerrar?</em>}
       {!tel && <em className="cobranca-teto">Sem telefone na ficha — não dá pra cobrar. Pegue o número antes.</em>}
     </div>
-    <div className="cobranca-dir">
-      {tel && <a className="btn-wpp" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer" onClick={() => onCobrou(a, svc)}>Cobrar no WhatsApp</a>}
-      {sugestao && <button className="ghost" title="Copiar mensagem" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}
-      <button className={noTeto ? "primary" : "ghost"} disabled={busy} onClick={() => onEncerrar(a, svc)}>Chega</button>
-    </div>
+    {marcando
+      ? <div className="cobranca-marcar">
+          <div className="row">
+            <input type="date" value={dataDraft} onChange={(e) => setDataDraft(e.target.value)} />
+            <input type="time" value={horaDraft} onChange={(e) => setHoraDraft(e.target.value)} />
+          </div>
+          <div className="ficha-actions">
+            <button className="primary" disabled={busy} onClick={() => { onRespondeu(a, svc, dataDraft, horaDraft); setMarcando(false); }}>Virar compromisso</button>
+            <button className="ghost" onClick={() => setMarcando(false)}>Cancelar</button>
+          </div>
+        </div>
+      : <div className="cobranca-dir">
+          {tel && <a className="btn-wpp" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer" onClick={() => onCobrou(a, svc)}>Cobrar no WhatsApp</a>}
+          {sugestao && <button className="ghost" title="Copiar mensagem" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}
+          <button className="ghost" disabled={busy} onClick={() => setMarcando(true)}>✓ Respondeu</button>
+          <button className={noTeto ? "primary" : "ghost"} disabled={busy} onClick={() => onEncerrar(a, svc)}>Chega</button>
+        </div>}
   </article>;
 }
 
+// A CAIXA FICA ABERTA ONDE ELE JÁ ESTÁ. Diego, 04/08: "aqui no painel a caixa de entrada eu clico em abrir
+// fila para depois digitar; acho melhor deixar já a caixa lá pra eu ir colocando de cara logo o compromisso,
+// e não precisar clicar para depois colocar". Ele lança do celular no meio do serviço, muitas vezes com uma
+// mão só — dois toques antes de escrever é atrito onde não pode ter. O mesmo componente serve o Painel e a
+// aba Caixa: um lugar só pra manter, e o que ele digita cai na mesma fila.
+function ComposerCaixa({ composer, setComposer, files, setFiles, addInbox, busy, placeholder }) {
+  return <div className="composer">
+    <textarea value={composer} onChange={(event) => setComposer(event.target.value)} placeholder={placeholder || "Cole uma mensagem, descreva o atendimento ou acrescente uma orientação…"} />
+    {files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}
+    <div className="composer-actions">
+      <label className="file-button">{files.length ? `${files.length} print(s)` : "Adicionar print(s)"}<input type="file" accept="image/*" multiple onChange={(event) => setFiles((fs) => [...fs, ...Array.from(event.target.files || [])])} /></label>
+      <button className="primary" onClick={addInbox} disabled={busy || (!composer.trim() && !files.length)}>Salvar na fila</button>
+    </div>
+  </div>;
+}
 // Rotinas que vencem hoje ou estão atrasadas aparecem no Painel; "✓ Fiz hoje" reinicia a contagem.
 function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
   const [busyId, setBusyId] = useState(null);
@@ -2346,7 +2389,7 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, db, demo, notify, onRotinaChanged, onServicoChanged, onOpenQueue, onConcluir, onReschedule, onSemProximaAcao, onOpenFicha }) {
+function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, db, demo, notify, onRotinaChanged, onServicoChanged, onOpenQueue, onConcluir, onReschedule, onSemProximaAcao, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
   // `appointments` já chega filtrado pela coleção central (compromissosOperacionais, calculada uma vez na
@@ -2408,6 +2451,26 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       onServicoChanged();
     } catch (e) { setResolvidas((r) => { const c = { ...r }; delete c[a.id]; return c; }); notify("Erro: " + e.message, "error"); }
   };
+  // RESPONDEU: a cobrança deu certo. O que era "remoto sem hora" (= ciclo de 3 dias) vira compromisso com
+  // dia e hora — e sai da fila de cobrança pela própria definição de ehCobranca(), sem precisar de campo novo.
+  // Zera as tentativas: o contador existe pra medir insistência sem resposta, e houve resposta.
+  const onRespondeu = async (a, svc, data, hora) => {
+    setBusyCobranca(a.id);
+    setResolvidas((r) => ({ ...r, [a.id]: a.data }));
+    if (demo) { notify(`Vira compromisso em ${compactDate(data)} (demo).`, "ok"); setBusyCobranca(null); return; }
+    try {
+      const { error: aErr } = await db.from("agenda").update({ data, hora, tipo: "presencial", cidade: svc?.clientes?.cidade || null, local: svc?.clientes?.cidade || null }).eq("id", a.id);
+      if (aErr) throw aErr;
+      if (svc) {
+        const { error } = await db.from("servicos").update({ tentativas: 0, prazo: data, proxima_acao: `Cliente respondeu — combinado para ${compactDate(data)}`, atualizado_em: new Date().toISOString() }).eq("id", svc.id);
+        if (error) throw error;
+      }
+      await db.from("historico").insert({ o_que: `Cobrança respondida: ${svc?.clientes?.nome || a.titulo}`, por: "diego", detalhe: `Cliente respondeu e combinou ${compactDate(data)} ${hora}. Saiu da fila de cobrança e virou compromisso.` });
+      notify(`Virou compromisso em ${compactDate(data)} às ${hora}.`, "ok");
+      onServicoChanged();
+    } catch (e) { setResolvidas((r) => { const c = { ...r }; delete c[a.id]; return c; }); notify("Erro: " + e.message, "error"); }
+    finally { setBusyCobranca(null); }
+  };
   // CHEGA: encerra na hora, a qualquer momento, sem precisar chegar no teto (decisão do Diego, 28/07).
   // Nunca deleta — Regra Nº 7. Vira `perdido` com o motivo e o número de tentativas registrado.
   const onEncerrar = async (a, svc) => {
@@ -2451,7 +2514,10 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   const porTipo = (list) => filtroTipo === "todos" ? list : list.filter((entry) => (entry.tipo || "presencial") === filtroTipo);
   const due = porTipo(dueAll); const futuros = porTipo(futurosAll);
   const irParaVencendo = () => { if (dueAll.length === 0) return; setFiltroTipo("todos"); document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
-  return <div className="page-grid"><section className="hero-summary"><div><p className="kicker">VISÃO OPERACIONAL</p><h2>Clareza antes de velocidade.</h2><p>O site separa a vez do Claude, a sua vez e as decisões que exigem aprovação.</p></div><button className="primary" onClick={onOpenQueue}>Abrir fila de entrada</button></section><section className="metric-grid"><Metric label="Para Claude" value={inbox.filter((entry) => ["novo", "respondido"].includes(entry.status || "novo")).length} detail="Novos e respondidos" tone="orange" /><Metric label="Aguardando você" value={inbox.filter((entry) => entry.status === "aguardando_voce").length} detail="Perguntas no app" tone="red" /><Metric label="Agenda vencendo" value={dueAll.length} detail="Hoje ou atrasada" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
+  return <div className="page-grid"><section className="hero-summary"><div><p className="kicker">VISÃO OPERACIONAL</p><h2>Clareza antes de velocidade.</h2><p>O site separa a vez do Claude, a sua vez e as decisões que exigem aprovação.</p></div><button className="primary" onClick={onOpenQueue}>Abrir fila de entrada</button></section>
+    {addInbox && <section className="content-card"><div className="card-head"><div><p className="kicker">ANOTAR AGORA</p><h3>O que aconteceu?</h3></div></div>
+      <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />
+    </section>}<section className="metric-grid"><Metric label="Para Claude" value={inbox.filter((entry) => ["novo", "respondido"].includes(entry.status || "novo")).length} detail="Novos e respondidos" tone="orange" /><Metric label="Aguardando você" value={inbox.filter((entry) => entry.status === "aguardando_voce").length} detail="Perguntas no app" tone="red" /><Metric label="Agenda vencendo" value={dueAll.length} detail="Hoje ou atrasada" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     {/* SAIU DO PAINEL em 30/07/2026 o card "N cliente(s) esperando remarcação". Diego: "achei desnecessário
@@ -2509,7 +2575,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       {qtdNoTeto > 0 && <p className="ficha-note"><b>{qtdNoTeto} já no limite de {COBRANCA_TETO_TENTATIVAS} tentativas</b> — essas precisam de decisão sua: insistir ou encerrar.</p>}
       <button className="ghost" style={{ width: "100%" }} onClick={() => setListaCobrancas((v) => !v)}>{listaCobrancas ? "Fechar lista" : `Abrir a lista de ${cobrarCliente.length}`}</button>
       {listaCobrancas && <div style={{ marginTop: 12 }}>
-        {[...cobrarCliente].sort((x, y) => (cobrancaNoTeto(svcDe(y)) ? 1 : 0) - (cobrancaNoTeto(svcDe(x)) ? 1 : 0) || (x.data || "").localeCompare(y.data || "")).map((a) => { const svc = svcDe(a); return <CobrancaCard key={a.id} a={a} svc={svc} today={today} tentativas={cobrancaTentativas(svc)} noTeto={cobrancaNoTeto(svc)} onCobrou={onCobrou} onEncerrar={onEncerrar} busy={busyCobranca === a.id} />; })}
+        {[...cobrarCliente].sort((x, y) => (cobrancaNoTeto(svcDe(y)) ? 1 : 0) - (cobrancaNoTeto(svcDe(x)) ? 1 : 0) || (x.data || "").localeCompare(y.data || "")).map((a) => { const svc = svcDe(a); return <CobrancaCard key={a.id} a={a} svc={svc} today={today} tentativas={cobrancaTentativas(svc)} noTeto={cobrancaNoTeto(svc)} onCobrou={onCobrou} onEncerrar={onEncerrar} onRespondeu={onRespondeu} busy={busyCobranca === a.id} />; })}
       </div>}
     </section>}
     {futuros.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></div></div>
@@ -3839,6 +3905,12 @@ function FuturoView({ finances, services, db, demo, mode, notify, onChanged }) {
   const [draft, setDraft] = useState(() => novoDraft());
   const [verTudo, setVerTudo] = useState(false);
   const [escopoAba, setEscopoAba] = useState("todos"); // Diego: dinheiro pessoal (aluguel) separado do da empresa (cartão)
+  // CONTA AGENDADA NÃO É VALOR FIXO. Diego, 04/08: "ali em Contas a pagar, o caso do cartão da minha mãe e
+  // outros lugares, deixa eu editar, porque nesse mês mesmo teve uma variação, aumentou o valor". Cartão,
+  // luz e água mudam todo mês — o app agendava o valor previsto e depois não deixava acertar. Sem edição, a
+  // saída era marcar pago com valor errado (e sujar o caixa) ou apagar e refazer (e perder o histórico).
+  const [editando, setEditando] = useState(null);
+  const [draftEdit, setDraftEdit] = useState({ descricao: "", valor: "", data: "" });
 
   const todasContas = finances.filter(ehSaidaFutura);
   const contas = todasContas.filter((c) => escopoAba === "todos" || (c.escopo || "empresa") === escopoAba).slice().sort((a, b) => (a.data || "").localeCompare(b.data || ""));
@@ -3870,6 +3942,24 @@ function FuturoView({ finances, services, db, demo, mode, notify, onChanged }) {
     } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusy(false); }
   };
 
+  // Edita a conta agendada passando pelo mesmo gateway do resto do dinheiro — nada de UPDATE solto no banco.
+  const salvarEdicao = async (item) => {
+    if (mode === "claude") { notify("No modo Claude, ajuste pela operação tipada financeiro.", "error"); return; }
+    const valor = parseMoedaBR(draftEdit.valor);
+    if (!valor || valor <= 0) { notify("Informe um valor válido.", "error"); return; }
+    if (!draftEdit.data) { notify("Informe a data de vencimento.", "error"); return; }
+    if (demo) { notify("Na demonstração não salva.", "info"); setEditando(null); return; }
+    setBusy(true);
+    try {
+      await processarEventoOperacaoBahia(db, {
+        // eventoId com o valor dentro: corrigir a mesma conta duas vezes no mês (o cartão que muda de novo)
+        // precisa passar, e o checkpoint recusaria o mesmo id com conteúdo diferente.
+        tipo: "financeiro", eventoId: `app-conta-editada-${item.id}-${Math.round(valor * 100)}-${draftEdit.data}`,
+        dados: { financeiroId: item.id, valor, data: draftEdit.data, descricao: draftEdit.descricao.trim() || item.descricao },
+      });
+      notify("Conta atualizada.", "ok"); setEditando(null); await onChanged();
+    } catch (e) { notify("Não salvou: " + e.message, "error"); } finally { setBusy(false); }
+  };
   const salvar = async () => {
     if (mode === "claude") { notify("No modo Claude, registre pela operação tipada financeiro.", "error"); return; }
     const total = parseMoedaBR(draft.valor);
@@ -3929,10 +4019,26 @@ function FuturoView({ finances, services, db, demo, mode, notify, onChanged }) {
       {!!contas.length && !noHorizonte.length && !verTudo && <div className="empty-state"><b>Nada vence nos próximos 60 dias.</b></div>}
       {meses.map((m) => <div key={m} className="vale-fornecedor">
         <div className="vale-fornecedor-head"><strong>{mesLabel(m)}</strong><b>{money(porMes[m].reduce((s, c) => s + Number(c.valor), 0))}</b></div>
-        {porMes[m].map((c) => <div className="finance-row" key={c.id}>
-          <div><strong>{c.descricao || c.categoria}</strong><span>Vence {compactDate(c.data)} · {c.escopo === "pessoal" ? "Pessoal" : "Empresa"} · {c.categoria}{(c.data || "") < hoje ? " · ATRASADA" : ""}</span></div>
-          <div className="agenda-acoes"><b className="saida">{money(c.valor)}</b><button className="ghost" disabled={busy || mode === "claude"} onClick={() => pagar(c)}>Marcar pago</button></div>
-        </div>)}
+        {porMes[m].map((c) => editando === c.id
+          ? <div className="finance-row conta-edit" key={c.id}>
+              <div className="conta-edit-campos">
+                <input value={draftEdit.descricao} onChange={(e) => setDraftEdit((d) => ({ ...d, descricao: e.target.value }))} placeholder="Descrição" />
+                <div className="row">
+                  <input inputMode="decimal" value={draftEdit.valor} onChange={(e) => setDraftEdit((d) => ({ ...d, valor: e.target.value }))} placeholder="Valor" />
+                  <input type="date" value={draftEdit.data} onChange={(e) => setDraftEdit((d) => ({ ...d, data: e.target.value }))} />
+                </div>
+                <div className="ficha-actions">
+                  <button className="primary" disabled={busy} onClick={() => salvarEdicao(c)}>Salvar</button>
+                  <button className="ghost" onClick={() => setEditando(null)}>Cancelar</button>
+                </div>
+              </div>
+            </div>
+          : <div className="finance-row" key={c.id}>
+              <div><strong>{c.descricao || c.categoria}</strong><span>Vence {compactDate(c.data)} · {c.escopo === "pessoal" ? "Pessoal" : "Empresa"} · {c.categoria}{(c.data || "") < hoje ? " · ATRASADA" : ""}</span></div>
+              <div className="agenda-acoes"><b className="saida">{money(c.valor)}</b>
+                <button className="ghost" disabled={busy || mode === "claude"} onClick={() => { setEditando(c.id); setDraftEdit({ descricao: descricaoFinanceiraVisivel(c.descricao) || "", valor: String(c.valor), data: c.data || hoje }); }}>Editar</button>
+                <button className="ghost" disabled={busy || mode === "claude"} onClick={() => pagar(c)}>Marcar pago</button></div>
+            </div>)}
       </div>)}
       {depois.length > 0 && <p className="ficha-note">{verTudo
         ? <>Mostrando tudo, inclusive o que vence depois de {compactDate(horizonte)}. <button type="button" className="ficha-link" onClick={() => setVerTudo(false)}>voltar pros próximos 60 dias</button></>
