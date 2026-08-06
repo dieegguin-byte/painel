@@ -1181,6 +1181,7 @@ async function aplicarCompromissoConcluidoOperacional(db, eventoId, dados) {
     const comecouProducao = servico && servico.status === "agendado" && agenda.tipo === "presencial" && !ehEntrega;
     let proximaAcao = dados.proximaAcao ?? null;
     let novoStatus = null;
+    const patchExtra = {};
     if (comecouProducao) {
       // A ORDEM DO TRABALHO REAL: buscou → compra o material → produz → entrega. Diego, 04/08: "ao concluir o
       // compromisso deveria mudar o status, pedir para comprar material e depois marcar como entregue, tudo
@@ -1193,8 +1194,17 @@ async function aplicarCompromissoConcluidoOperacional(db, eventoId, dados) {
       const faltando = lista.filter((f) => !materialEstaEmMaos(f));
       novoStatus = "producao";
       proximaAcao = dados.proximaAcao ?? (!lista.length ? "Comprar o material" : faltando.length ? "Aguardar chegada do material" : "Produzir e acompanhar o prazo");
+      // BUSCOU E NÃO TEM MATERIAL ANOTADO? ABRE O ESPAÇO NA LISTA DE COMPRAS. Diego, 04/08, sobre a Andriele:
+      // "marquei que busquei e deixei com o profissional, só que lá já entrou em produção, mas deveria estar
+      // pedindo o material e criado um espaço na Lista de compras". Sem isso o serviço entra em produção
+      // silencioso: não aparece esperando material (a lista está vazia) nem na aba Compras, e some da vista
+      // justamente quando o próximo passo é comprar. Um item vazio é honesto — diz que falta anotar, em vez
+      // de fingir que não falta nada. Só cria quando não há NADA anotado; nunca sobrescreve lista existente.
+      if (!(servico.materiais_necessarios || []).length) {
+        patchExtra.materiais_necessarios = [{ item: "(anotar o material deste serviço)", comprado: false }];
+      }
     }
-    const patch = { proxima_acao: proximaAcao, atualizado_em: new Date().toISOString() };
+    const patch = { proxima_acao: proximaAcao, atualizado_em: new Date().toISOString(), ...patchExtra };
     if (novoStatus) patch.status = novoStatus;
     const { error } = await db.from("servicos").update(patch).eq("id", servicoId);
     if (error) throw error;
