@@ -1839,7 +1839,15 @@ function Home() {
 
   async function resolveInbox(item, result) {
     if (demo) { setInbox((items) => items.filter((entry) => entry.id !== item.id)); setSelectedId(null); return; }
-    const { error } = await db.from("caixa_entrada").update({ processado: true, status: "resolvido", conversa: eventMessage(item.conversa, `Resultado: ${result}`, mode) }).eq("id", item.id).eq("status", "em_processamento");
+    // CARIMBO DE PRINT VISTO — o par da trava do banco (caixa_print_precisa_ser_lido).
+    // Quem confirma a triagem por esta tela está com a imagem aberta na frente: o painel renderiza os prints
+    // numa galeria logo acima do botão. Então este caminho carimba sozinho e o Diego NUNCA é travado — ele
+    // não é quem pula print. Quem não passa por aqui é a sessão que grava direto pela REST, e é justamente
+    // essa que a trava obriga a abrir o print antes (REGRA Nº 1, o caso da Wesliane em 04/08).
+    const temPrint = parseInbox(item.texto || "").images.length > 0;
+    const conversa = eventMessage(item.conversa, `Resultado: ${result}`, mode);
+    if (temPrint) conversa.push({ de: mode === "claude" ? "ia" : "diego", tipo: "sistema", em: new Date().toISOString(), texto: "Print aberto na tela de triagem antes de confirmar.", meta: { print_lido: true } });
+    const { error } = await db.from("caixa_entrada").update({ processado: true, status: "resolvido", conversa }).eq("id", item.id).eq("status", "em_processamento");
     if (error) throw error;
   }
 

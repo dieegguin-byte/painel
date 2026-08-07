@@ -130,3 +130,56 @@ create unique index agenda_sem_duplicata
 -- "Agendado/produção precisa de valor" — também não: visita de orçamento entra
 -- como agendado sem valor e está certo (caso da Shirlei).
 -- ============================================================================
+
+
+-- ----------------------------------------------------------------------------
+-- TRAVA 8 — item com print não fecha sem alguém ter aberto o print
+-- Escrita em 07/08/2026, a pedido do Diego.
+--
+-- A HISTÓRIA: a REGRA Nº 1 ("sempre abrir e ler o print antes de decidir") existe
+-- desde 14/07. Em 04/08 o Diego pediu "um pop-up na hora de concluir perguntando
+-- se viu o print" e o que entrou foi um selo na fila + um aviso ao lado do botão.
+-- No MESMO dia 04/08 o print da Wesliane passou batido, expirou, e o serviço dela
+-- (R$1.650, prazo 24/08) está até hoje sem lista de material.
+--
+-- POR QUE O AVISO NÃO PEGOU: selo e aviso vivem na TELA DE TRIAGEM, e as sessões
+-- de IA não usam a tela — gravam direto na REST. O aviso cercava o Diego, que não
+-- é quem pula print. Diego, 07/08: "outras sessões sempre esquecem". Está certo:
+-- regra o modelo ignora, aviso na tela o modelo nem vê. Trigger o modelo não dribla.
+--
+-- COMO PASSAR PELA TRAVA (o jeito certo, não o contorno): abrir a imagem, ler
+-- nome/telefone/cidade/material/medidas, e gravar em `conversa` uma mensagem com
+-- meta {"print_lido": true} junto do que foi lido. É uma linha a mais e é o
+-- registro de que a informação da imagem entrou na decisão.
+--
+-- O DIEGO NUNCA É TRAVADO: quem confirma pela tela de triagem está com o print
+-- aberto na frente (o painel renderiza a galeria acima do botão), e o resolveInbox
+-- do nova.html carimba print_lido sozinho nesse caminho.
+-- ----------------------------------------------------------------------------
+create or replace function trava_caixa_print_precisa_ser_lido() returns trigger as $$
+begin
+  if new.processado = true
+     and coalesce(old.processado, false) = false
+     and new.texto like '%[[TB_INBOX_IMG]]%'
+     and not exists (
+       select 1
+       from jsonb_array_elements(coalesce(new.conversa::jsonb, '[]'::jsonb)) as m
+       where (m -> 'meta' ->> 'print_lido') = 'true'
+     ) then
+    raise exception
+      'Este item tem print e nada registra que ele foi aberto. Abra a imagem, leia o que está nela (nome, telefone, cidade, material, medidas) e grave em conversa uma mensagem com meta {"print_lido": true} antes de processar. REGRA Nº 1 — foi assim que o print da Wesliane passou batido em 04/08 e o serviço dela ficou sem material.';
+  end if;
+  return new;
+end $$ language plpgsql;
+
+drop trigger if exists trg_caixa_print_precisa_ser_lido on caixa_entrada;
+create trigger trg_caixa_print_precisa_ser_lido
+  before insert or update on caixa_entrada
+  for each row execute function trava_caixa_print_precisa_ser_lido();
+
+-- Só pega a gravação que ACABA de virar processado=true (o coalesce do old cuida
+-- disso), então item já fechado no passado continua como está e não trava numa
+-- edição futura qualquer.
+--
+-- PRA DESFAZER, se atrapalhar:
+--   drop trigger if exists trg_caixa_print_precisa_ser_lido on caixa_entrada;
