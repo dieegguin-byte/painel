@@ -2023,6 +2023,53 @@ function Home() {
     barra.scrollTo({ left: ativo.offsetLeft - (barra.clientWidth - ativo.offsetWidth) / 2, behavior: "smooth" });
   }, [tab]);
 
+  // DESLIZAR PRO LADO TROCA DE ABA — ideia do Diego (07/08/2026): "igual na tela principal do Android".
+  // Serve pra VIZINHANÇA, não pra tudo: do Painel até Fornecedores seriam 9 deslizadas, e tela inicial de
+  // Android tem 3 ou 4 páginas, não 10. O salto longo continua sendo tocar na barra — que agora rola sozinha
+  // até a aba aberta. Os dois se completam em vez de competir.
+  // NÃO GUARDA A ORDEM DAS ABAS AQUI. Em vez disso acha o botão ativo na própria barra e clica no vizinho:
+  // assim reaproveita o onClick que já existe (que também limpa o item selecionado) e nunca sai de sincronia
+  // se a ordem das abas mudar um dia.
+  // As guardas, cada uma por um motivo real:
+  // - modal aberto: dentro de uma ficha ou confirmação o gesto é do conteúdo, não navegação;
+  // - campo de texto: arrastar dentro de um input é selecionar texto;
+  // - qualquer coisa que role de lado (a própria barra de abas é uma): o gesto pertence a ela;
+  // - o movimento tem que ser claramente horizontal e passar de 60px, senão rolar a lista com o polegar
+  //   torto trocaria de aba sem querer — que seria pior que o problema que isso resolve.
+  useEffect(() => {
+    let x0 = 0, y0 = 0, valido = false;
+    const roleDeLado = (alvo) => {
+      for (let n = alvo; n && n !== document.body; n = n.parentElement) {
+        const cs = getComputedStyle(n);
+        if (/auto|scroll/.test(cs.overflowX) && n.scrollWidth > n.clientWidth + 2) return true;
+      }
+      return false;
+    };
+    const inicio = (e) => {
+      const t = e.touches[0];
+      valido = e.touches.length === 1
+        && !document.querySelector(".modal-overlay")
+        && !(e.target.closest && e.target.closest("input,textarea,select"))
+        && !roleDeLado(e.target);
+      x0 = t.clientX; y0 = t.clientY;
+    };
+    const fim = (e) => {
+      if (!valido) return;
+      valido = false;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - x0, dy = t.clientY - y0;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      const botoes = [...document.querySelectorAll("nav.mobile-nav button")];
+      const atual = botoes.findIndex((b) => b.classList.contains("active"));
+      if (atual < 0) return;
+      const vizinho = botoes[atual + (dx < 0 ? 1 : -1)];
+      if (vizinho) vizinho.click();
+    };
+    document.addEventListener("touchstart", inicio, { passive: true });
+    document.addEventListener("touchend", fim, { passive: true });
+    return () => { document.removeEventListener("touchstart", inicio); document.removeEventListener("touchend", fim); };
+  }, []);
+
   async function addInbox() {
     if (!composer.trim() && !files.length) return;
     if (demo) { setInbox((items) => [...items, { id: `demo-${Date.now()}`, texto: composer.trim(), status: "novo", conversa: [], criado_em: new Date().toISOString(), processado: false }]); setComposer(""); setFiles([]); notify("Entrada adicionada na demonstração.", "ok"); return; }
