@@ -155,6 +155,11 @@ button.sutil{opacity:.55;font-size:12px}
 .mobile-nav button{font-size:11px;padding:9px 4px}
 .mobile-nav button i{font-size:28px}
 .search,.form-grid input,.form-grid textarea,.form-grid select,.composer textarea{font-size:15px}
+/* A barra de abas continua depois da borda: o desbotado avisa que da pra arrastar. Sem isso os 5 primeiros
+   botoes terminavam exatamente na borda e a barra parecia completa. */
+.mobile-nav{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 18px),transparent)}
+/* Alvo de toque: 36px erra no dedo, ainda mais com a mao ocupada segurando o movel. 44px e o minimo. */
+.header-actions .ghost,.agenda-acoes .ghost,.agenda-acoes .primary,.funil-filtros button{min-height:44px}
 .finance-row>b,.finance-row b{font-size:14px}
 .compromisso-card{grid-template-columns:74px 1fr;gap:10px;padding:12px}
 .compromisso-quando b{font-size:17px}
@@ -2001,6 +2006,18 @@ function Home() {
     return () => { cancelado = true; };
   }, [notify]);
 
+  // A BARRA DE ABAS ROLA ATÉ ONDE VOCÊ ESTÁ. São 10 abas e só 5 cabem num celular de 375px — Compras,
+  // A pagar, Profissionais, Clientes e Fornecedores nascem fora da tela. O pior não era estarem escondidas,
+  // era abrir uma delas e a barra ficar parada: o Diego ficava dentro de uma aba sem enxergar qual estava
+  // marcada. Medido em 07/08: cliquei em Profissionais, a tela trocou e o botão continuou a 507px.
+  // Mexe SÓ no scroll da própria barra — nada de scrollIntoView, que arrastaria a página inteira junto.
+  useEffect(() => {
+    const barra = document.querySelector("nav.mobile-nav");
+    const ativo = barra && barra.querySelector("button.active");
+    if (!barra || !ativo) return;
+    barra.scrollTo({ left: ativo.offsetLeft - (barra.clientWidth - ativo.offsetWidth) / 2, behavior: "smooth" });
+  }, [tab]);
+
   async function addInbox() {
     if (!composer.trim() && !files.length) return;
     if (demo) { setInbox((items) => [...items, { id: `demo-${Date.now()}`, texto: composer.trim(), status: "novo", conversa: [], criado_em: new Date().toISOString(), processado: false }]); setComposer(""); setFiles([]); notify("Entrada adicionada na demonstração.", "ok"); return; }
@@ -2782,7 +2799,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     {/* SAIU o aviso financeiro do rodapé: era o mesmo assunto do card "a pagar" lá em cima, só que sem o
         valor e sem o caixa possível — repetia a preocupação sem ajudar a decidir. Diego, 25/07. */}</div>;
 }
-function Metric({ label, value, detail, tone, onClick }) { return <article className={`metric-card ${tone}${onClick ? " clickable" : ""}`} onClick={onClick || undefined}><span>{label}</span><b>{String(value).padStart(2, "0")}</b><small>{detail}</small></article>; }
+function Metric({ label, value, detail, tone, onClick }) { return <article className={`metric-card ${tone}${onClick ? " clickable" : ""}`} onClick={onClick || undefined}><span>{label}</span><b>{value}</b><small>{detail}</small></article>; }
 
 const FUNIL_FILTROS = [{ id: "todos", label: "Todos" }, { id: "sem_acao", label: "Sem ação" }, { id: "lead", label: "Lead" }, { id: "orcamento", label: "Orçamento" }, { id: "agendado", label: "Agendado" }, { id: "producao", label: "Em produção" }, { id: "entregue", label: "Entregue" }];
 function LeadsView({ services, search, setSearch, onOpenFicha, initialFiltro, onConsumedInitialFiltro }) {
