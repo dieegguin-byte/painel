@@ -2,7 +2,7 @@
   "name": "Atendimento — Tapeçaria Bahia",
   "short_name": "Atendimento TB",
   "description": "Hub de atendimento da Tapeçaria e Estofados Bahia: leads, agenda, financeiro e estoque.",
-  "start_url": "./index.html",
+  "start_url": "./nova.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
@@ -12,5 +12,18 @@
   "icons": [
     { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "./icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
-  ]
+  ],
+  "share_target": {
+    "action": "./compartilhar",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "titulo",
+      "text": "texto",
+      "url": "link",
+      "files": [
+        { "name": "arquivos", "accept": ["image/*"] }
+      ]
+    }
+  }
 }

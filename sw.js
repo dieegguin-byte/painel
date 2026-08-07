@@ -17,7 +17,13 @@
      fingir que esta atualizado. Gravacao offline NAO existe de proposito: fila
      de escrita duplicaria compromisso e as travas do banco recusariam calado.
 */
-const VERSAO = 'tb-atendimento-v10';
+const VERSAO = 'tb-atendimento-v11';
+// COMPARTILHAR DO WHATSAPP. O Android entrega o print/texto num POST multipart pra ./compartilhar,
+// que NAO existe como arquivo - e nem poderia, o GitHub Pages so serve estatico. O service worker e
+// o unico lugar capaz de pegar esse POST. Ele guarda a carga no cache e manda o app abrir; quem le,
+// mostra e limpa e o nova.html. NAO gravamos no Supabase daqui de proposito: o SW nao enxerga o
+// localStorage da pagina, entao nao tem a sessao do Diego - gravar daqui exigiria um segundo login.
+const CARGA_COMPARTILHADA = './__compartilhado__';
 const SHELL = [
   './',
   './index.html',
@@ -54,8 +60,36 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   const req = e.request;
+  const alvo = new URL(req.url);
+
+  // Compartilhamento vindo do WhatsApp (ou de qualquer app) - ver comentario no topo.
+  if (req.method === 'POST' && alvo.origin === location.origin && alvo.pathname.endsWith('/compartilhar')) {
+    e.respondWith((async () => {
+      try {
+        const form = await req.formData();
+        const arquivos = form.getAll('arquivos').filter((f) => f && f.size);
+        const carga = {
+          texto: [form.get('titulo'), form.get('texto'), form.get('link')].filter(Boolean).join('\n').trim(),
+          imagens: [],
+          em: Date.now()
+        };
+        const c = await caches.open(VERSAO);
+        for (let i = 0; i < arquivos.length; i++) {
+          const chave = './__compartilhado_img_' + i + '__';
+          await c.put(chave, new Response(arquivos[i], { headers: { 'Content-Type': arquivos[i].type || 'image/jpeg' } }));
+          carga.imagens.push(new URL(chave, self.location).href);
+        }
+        await c.put(CARGA_COMPARTILHADA, new Response(JSON.stringify(carga), { headers: { 'Content-Type': 'application/json' } }));
+      } catch (err) {
+        // Compartilhamento perdido e ruim; app que nao abre e pior. Segue pro app de qualquer jeito.
+      }
+      return Response.redirect(new URL('./nova.html?compartilhado=1', self.location).href, 303);
+    })());
+    return;
+  }
+
   if (req.method !== 'GET') return;
-  const url = new URL(req.url);
+  const url = alvo;
 
   // CDN: cache-first. Abre offline e ainda economiza dados do celular dele.
   if (url.hostname === 'cdn.jsdelivr.net') {
