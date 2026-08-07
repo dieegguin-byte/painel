@@ -6,6 +6,10 @@
 <meta name="theme-color" content="#0f0d0c">
 <title>Nova Central Operacional — Tapeçaria Bahia</title>
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
+<!-- SEM ISTO NAO EXISTE APP INSTALADO. So o index.html (o antigo) apontava pro manifest, entao instalar a
+     partir daqui gerava um atalho pelado: sem nome, sem icone maskable, sem "Compartilhar pro painel" - e o
+     Share Target nunca ia aparecer no WhatsApp por mais certo que o manifest estivesse. Descoberto em 07/08. -->
+<link rel="manifest" href="./manifest.webmanifest">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
@@ -4598,7 +4602,7 @@ root.render(<Home />);
 // (que é o caso do dia a dia) nunca instalava o cache, e por isso nada funcionava offline. Registrar aqui
 // também: o escopo './' cobre a pasta inteira, então os dois compartilham o mesmo SW.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=10').catch(() => {}));
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=11').catch(() => {}));
 }
 </script>
 </body>
