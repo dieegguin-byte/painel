@@ -2437,7 +2437,7 @@ function CompromissoCard({ a, svc, today, onConcluir, onReschedule, materiais })
 // Sem isso, a cobrança que JÁ deu certo continuava voltando a cada 3 dias, e ele ficava com um cliente
 // combinado no cartão de "esperando resposta" — o oposto do que aconteceu. E a única saída era me esperar.
 // O botão "Respondeu" pergunta o dia, vira compromisso de verdade e zera o ciclo de tentativas.
-function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar, onRespondeu, busy }) {
+function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar, onRespondeu, onInsistirMais, cobradaEm, busy }) {
   const [marcando, setMarcando] = useState(false);
   const [dataDraft, setDataDraft] = useState(somarDias(today, 1));
   const [horaDraft, setHoraDraft] = useState("09:00");
@@ -2449,8 +2449,9 @@ function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar,
       <strong>{svc?.clientes?.nome || "Cliente"}</strong>
       <span>{svc?.proxima_acao || a.titulo}</span>
       {/* O contador é o coração disto: sem ele o Diego não sabia que já tinha tentado 4 vezes (caso Francisco). */}
-      <em>{tentativas + 1}ª tentativa de {COBRANCA_TETO_TENTATIVAS}{atrasada ? ` · desde ${compactDate(a.data)}` : ""}</em>
-      {noTeto && <em className="cobranca-teto">Já foram {COBRANCA_TETO_TENTATIVAS} tentativas sem resposta — o app não insiste mais. Encerrar?</em>}
+      <em>{cobradaEm ? `Cobrado agora · volta em ${compactDate(cobradaEm)}` : `${tentativas + 1}ª tentativa de ${COBRANCA_TETO_TENTATIVAS}${atrasada ? ` · desde ${compactDate(a.data)}` : ""}`}</em>
+      {cobradaEm && <em className="cobranca-teto">Se ele responder agora, marque aqui mesmo — este cartão fica até você sair do Painel.</em>}
+      {noTeto && !cobradaEm && <em className="cobranca-teto">Já foram {COBRANCA_TETO_TENTATIVAS} tentativas sem resposta — o app não insiste mais sozinho. Encerrar ou insistir mais?</em>}
       {!tel && <em className="cobranca-teto">Sem telefone na ficha — não dá pra cobrar. Pegue o número antes.</em>}
     </div>
     {marcando
@@ -2465,10 +2466,11 @@ function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar,
           </div>
         </div>
       : <div className="cobranca-dir">
-          {tel && <a className="btn-wpp" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer" onClick={() => onCobrou(a, svc)}>Cobrar no WhatsApp</a>}
+          {tel && <a className="btn-wpp" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer" onClick={() => onCobrou(a, svc)}>{cobradaEm ? "Cobrar de novo" : "Cobrar no WhatsApp"}</a>}
           {sugestao && <button className="ghost" title="Copiar mensagem" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}
-          <button className="ghost" disabled={busy} onClick={() => setMarcando(true)}>✓ Respondeu</button>
-          <button className={noTeto ? "primary" : "ghost"} disabled={busy} onClick={() => onEncerrar(a, svc)}>Chega</button>
+          <button className={cobradaEm ? "primary" : "ghost"} disabled={busy} onClick={() => setMarcando(true)}>✓ Respondeu</button>
+          {noTeto && <button className="ghost" disabled={busy} onClick={() => onInsistirMais(a, svc)}>Insistir mais</button>}
+          <button className={noTeto && !cobradaEm ? "primary" : "ghost"} disabled={busy} onClick={() => onEncerrar(a, svc)}>Chega</button>
         </div>}
   </article>;
 }
@@ -2685,8 +2687,14 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   // Guarda a DATA resolvida, não `true`: o ciclo recicla a mesma linha da agenda mudando a data, então
   // marcar o id pra sempre esconderia a próxima volta da cobrança numa aba deixada aberta.
   const [resolvidas, setResolvidas] = useState({});
+  // COBRAR NO WHATSAPP NÃO PODE FAZER O CLIENTE SUMIR (Diego, 07/08: "quando eu clico no WhatsApp já some,
+  // não tem como eu dizer para fazer mais tentativas, não tem como eu dizer que respondeu"). O clique some
+  // com a linha porque o ciclo joga a data pra daqui 3 dias — só que é JUSTO NESSE MOMENTO que o cliente
+  // responde, e aí o "✓ Respondeu" já não estava mais na tela. Agora o card fica até ele sair do Painel:
+  // marcado como cobrado hoje, com os botões todos à mão. Na próxima abertura ele já não aparece.
+  const [cobradasAgora, setCobradasAgora] = useState({});
   const [busyCobranca, setBusyCobranca] = useState(null);
-  const cobrarCliente = cobrancasAll.filter((a) => a.data <= today && resolvidas[a.id] !== a.data);
+  const cobrarCliente = cobrancasAll.filter((a) => (a.data <= today || cobradasAgora[a.id]) && resolvidas[a.id] !== a.data);
   // A LISTA FICA FECHADA (Diego, 29/07: "está poluindo o painel"). Cobrar 12 clientes no WhatsApp não é
   // decisão, é tarefa em lote — o Painel mostra o tamanho e o valor em jogo, e a lista abre num toque, aqui
   // mesmo. Sem aba nova: o dia do telefone continua sendo uma coisa só, não uma navegação.
@@ -2704,7 +2712,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   const onCobrou = async (a, svc) => {
     const proxima = somarDias(today, COBRANCA_INTERVALO_DIAS);
     const nTent = cobrancaTentativas(svc) + 1;
-    setResolvidas((r) => ({ ...r, [a.id]: a.data }));
+    setCobradasAgora((c) => ({ ...c, [a.id]: proxima }));
     if (demo) { notify(`Cobrança registrada (demo) — voltaria em ${compactDate(proxima)}.`, "ok"); return; }
     try {
       if (svc) {
@@ -2722,9 +2730,23 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       }
       const { error: aErr } = await db.from("agenda").update({ data: proxima }).eq("id", a.id);
       if (aErr) throw aErr;
-      notify(`${nTent}ª tentativa registrada. Volta em ${compactDate(proxima)}.`, "ok");
+      notify(`${nTent}ª tentativa registrada. Volta em ${compactDate(proxima)} — se ele responder agora, o botão "✓ Respondeu" continua aí.`, "ok");
       onServicoChanged();
-    } catch (e) { setResolvidas((r) => { const c = { ...r }; delete c[a.id]; return c; }); notify("Erro: " + e.message, "error"); }
+    } catch (e) { setCobradasAgora((c) => { const n = { ...c }; delete n[a.id]; return n; }); notify("Erro: " + e.message, "error"); }
+  };
+  // INSISTIR MAIS: o teto existe pra ele não ficar perseguindo quem não responde, mas quem decide é ele —
+  // tem cliente que some um mês e volta comprando. Zerar as tentativas devolve o cliente ao ciclo normal
+  // em vez de deixar só a saída "encerrar", que era a única oferecida ao bater no limite.
+  const onInsistirMais = async (a, svc) => {
+    if (!svc) return;
+    setBusyCobranca(a.id);
+    if (demo) { notify("Mais tentativas liberadas (demo).", "ok"); setBusyCobranca(null); return; }
+    try {
+      const { error } = await db.from("servicos").update({ tentativas: 0, atualizado_em: new Date().toISOString() }).eq("id", svc.id);
+      if (error) throw error;
+      notify(`${svc.clientes?.nome || "Cliente"} volta pro ciclo — mais ${COBRANCA_TETO_TENTATIVAS} tentativas.`, "ok");
+      onServicoChanged();
+    } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusyCobranca(null); }
   };
   // RESPONDEU: a cobrança deu certo. O que era "remoto sem hora" (= ciclo de 3 dias) vira compromisso com
   // dia e hora — e sai da fila de cobrança pela própria definição de ehCobranca(), sem precisar de campo novo.
@@ -2850,7 +2872,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       {qtdNoTeto > 0 && <p className="ficha-note"><b>{qtdNoTeto} já no limite de {COBRANCA_TETO_TENTATIVAS} tentativas</b> — essas precisam de decisão sua: insistir ou encerrar.</p>}
       <button className="ghost" style={{ width: "100%" }} onClick={() => setListaCobrancas((v) => !v)}>{listaCobrancas ? "Fechar lista" : `Abrir a lista de ${cobrarCliente.length}`}</button>
       {listaCobrancas && <div style={{ marginTop: 12 }}>
-        {[...cobrarCliente].sort((x, y) => (cobrancaNoTeto(svcDe(y)) ? 1 : 0) - (cobrancaNoTeto(svcDe(x)) ? 1 : 0) || (x.data || "").localeCompare(y.data || "")).map((a) => { const svc = svcDe(a); return <CobrancaCard key={a.id} a={a} svc={svc} today={today} tentativas={cobrancaTentativas(svc)} noTeto={cobrancaNoTeto(svc)} onCobrou={onCobrou} onEncerrar={onEncerrar} onRespondeu={onRespondeu} busy={busyCobranca === a.id} />; })}
+        {[...cobrarCliente].sort((x, y) => (cobrancaNoTeto(svcDe(y)) ? 1 : 0) - (cobrancaNoTeto(svcDe(x)) ? 1 : 0) || (x.data || "").localeCompare(y.data || "")).map((a) => { const svc = svcDe(a); return <CobrancaCard key={a.id} a={a} svc={svc} today={today} tentativas={cobrancaTentativas(svc)} noTeto={cobrancaNoTeto(svc)} onCobrou={onCobrou} onEncerrar={onEncerrar} onRespondeu={onRespondeu} onInsistirMais={onInsistirMais} cobradaEm={cobradasAgora[a.id]} busy={busyCobranca === a.id} />; })}
       </div>}
     </section>}
     {futuros.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></div></div>
