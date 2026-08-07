@@ -3495,7 +3495,12 @@ const COMPRA_CONFERIDA_TAG = "[CONFERIDO] ";
 // tenho de onde tirar?". Usado no Painel (alerta com 1 dia de antecedência) e no Financeiro (linha de resumo).
 function resumoContas(finances, services, hoje) {
   const amanha = (() => { const d = new Date(hoje + "T12:00:00"); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
-  const aPagar = (finances || []).filter((f) => f.status === "a_pagar" && f.tipo === "saida" && f.categoria !== "Vale");
+  // TRABALHO DE PROFISSIONAL NÃO É CONTA A PAGAR (Diego, 06/08: "não gostei do alerta no painel, aparece que
+  // estou devendo o Marcão — queria algo separado lá mesmo em Profissionais"). Anotar que ele buscou um móvel
+  // é memória pro acerto, não conta com vencimento: não tem data pra correr atrás de dinheiro, e o valor bruto
+  // ainda vai ser abatido dos vales. Sai daqui pelo mesmo motivo que o Vale já saía — os dois vivem na aba
+  // Profissionais, onde um desconta o outro.
+  const aPagar = (finances || []).filter((f) => f.status === "a_pagar" && f.tipo === "saida" && f.categoria !== "Vale" && f.categoria !== CATEGORIA_MAO_DE_OBRA);
   const vencidas = aPagar.filter((f) => (f.data || "") < hoje);
   // 1 dia de antecedência: entra no Painel na véspera, não no dia, pra dar tempo de correr atrás do dinheiro.
   const urgentes = aPagar.filter((f) => (f.data || "") === hoje || (f.data || "") === amanha);
