@@ -900,8 +900,13 @@ async function registrarFinanceiroDaOperacao(db, eventoId, dados, papel = "finan
   // depois acertamos"). Na hora em que o Marcão sai pra buscar um móvel o preço daquela corrida muitas vezes
   // ainda não está combinado — exigir valor ali faria ele não anotar, que é justamente o esquecimento que essa
   // parte existe pra evitar. O valor entra depois, e o acerto não fecha enquanto sobrar item sem valor.
+  // CAMPO VAZIO VIRA ZERO, NÃO NaN. parseMoedaBR("") devolve NaN, e Math.max(0, NaN) continua NaN — que o
+  // JSON manda como null e o banco recusa (valor é NOT NULL). Foi exatamente o que aconteceu na primeira noite
+  // da aba Profissionais: as quatro tentativas do Diego de anotar trabalho sem valor combinado falharam com
+  // 'null value in column "valor"'. O campo vazio é o caminho normal aqui, não a exceção.
+  const valorBruto = dados.permiteValorZero ? parseMoedaBR(dados.valor ?? existente?.valor ?? 0) : null;
   const valor = dados.permiteValorZero
-    ? Math.max(0, parseMoedaBR(dados.valor ?? existente?.valor ?? 0))
+    ? (Number.isFinite(valorBruto) && valorBruto > 0 ? valorBruto : 0)
     : validarValorPositivo(dados.valor ?? existente?.valor);
   const data = dados.data || existente?.data || hojeISO();
   const tem = (key) => Object.prototype.hasOwnProperty.call(dados, key);
