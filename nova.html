@@ -1941,6 +1941,50 @@ function Home() {
     if (error) notify(error.message, "error"); else { setReply(""); await loadAll(); notify("Resposta enviada para a fila do Claude.", "ok"); }
   }
 
+  // CHEGOU DO WHATSAPP (Share Target). O service worker pegou o print/texto que o Diego compartilhou, guardou
+  // no cache e abriu o app com ?compartilhado=1. Aqui a carga vira o que já existe: texto no campo e print(s)
+  // anexados, igualzinho a colar na mão — por isso reaproveita o addInbox em vez de duplicar upload.
+  // NÃO SALVA SOZINHO DE PROPÓSITO. Print que cai na fila sem contexto é print que fica semanas parado (o caso
+  // do sofá que ficou 3 semanas). O compartilhar tira o trabalho de copiar; dizer de quem é continua com ele.
+  useEffect(() => {
+    const endereco = new URL(location.href);
+    if (endereco.searchParams.get("compartilhado") !== "1") return;
+    let cancelado = false;
+    (async () => {
+      try {
+        if (!("caches" in window)) return;
+        // O nome do cache tem a versão do service worker dentro, então procura em vez de chutar —
+        // senão isso quebra calado toda vez que o sw.js subir de versão.
+        let cache = null, carga = null;
+        for (const nome of await caches.keys()) {
+          const c = await caches.open(nome);
+          const achou = await c.match("./__compartilhado__");
+          if (achou) { cache = c; carga = await achou.json(); break; }
+        }
+        if (!carga || cancelado) return;
+        const recebidos = [];
+        for (let i = 0; i < (carga.imagens || []).length; i++) {
+          const img = await cache.match(carga.imagens[i]);
+          if (!img) continue;
+          const blob = await img.blob();
+          recebidos.push(new File([blob], `whatsapp_${carga.em}_${i}.jpg`, { type: blob.type || "image/jpeg" }));
+          await cache.delete(carga.imagens[i]);
+        }
+        await cache.delete("./__compartilhado__");
+        if (cancelado) return;
+        setTab("painel");
+        if (carga.texto) setComposer((atual) => (atual ? atual + "\n" : "") + carga.texto);
+        if (recebidos.length) setFiles((fs) => [...fs, ...recebidos]);
+        notify(recebidos.length ? `Chegou do WhatsApp: ${recebidos.length} print(s). Diga de quem é e salve.` : "Chegou do WhatsApp. Confira e salve.", "ok");
+      } catch (e) {
+        notify("Não consegui ler o que veio do WhatsApp: " + e.message, "error");
+      } finally {
+        history.replaceState(null, "", endereco.pathname);
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [notify]);
+
   async function addInbox() {
     if (!composer.trim() && !files.length) return;
     if (demo) { setInbox((items) => [...items, { id: `demo-${Date.now()}`, texto: composer.trim(), status: "novo", conversa: [], criado_em: new Date().toISOString(), processado: false }]); setComposer(""); setFiles([]); notify("Entrada adicionada na demonstração.", "ok"); return; }
