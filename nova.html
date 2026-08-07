@@ -532,6 +532,17 @@ const CACHE_OFFLINE = "tb-novo-cache-offline";
 // Não é segredo novo: é SHA-256 de 4 dígitos, quebrável em milissegundos por quem já tem o aparelho na mão.
 // O PIN é bloqueio de tela, não autenticação — a autorização de verdade tem que estar no banco (RLS).
 const PIN_HASH_LOCAL = "tb-novo-pin-hash";
+// PIN DESLIGADO — decisão do Diego em 07/08/2026, no dia em que o painel virou app instalado de verdade.
+// Por que incomodava: o "já digitei" ficava no sessionStorage, que o Android limpa quando o app fecha. Ou
+// seja, pedia os 4 dígitos TODA vez que ele abria — e o ganho era pequeno, porque o que o PIN protege é só
+// o caso de alguém pegar o celular DELE já desbloqueado, e o celular dele já tem bloqueio de tela. Era uma
+// segunda tranca em cima de uma tranca, cobrada várias vezes por dia.
+// O QUE CONTINUA PROTEGENDO OS DADOS: o login por e-mail (magic link do Supabase) e o RLS do banco —
+// sem sessão ninguém lê nada, e o link público do app nunca dependeu do PIN pra isso.
+// PRA VOLTAR: trocar para true. Só isso. O hash segue guardado em `config.pin_hash`, a PinScreen e as
+// funções definePin/tryPin continuam inteiras logo abaixo — não viraram código morto por descuido, estão
+// de pé de propósito pra essa volta ser um caractere, sem ele precisar redefinir PIN nenhum.
+const PIN_LIGADO = false;
 function lerCacheOffline() {
   try {
     const bruto = window.localStorage.getItem(CACHE_OFFLINE);
@@ -1682,6 +1693,7 @@ function Home() {
   }, [db, session, demo, loadAll]);
 
   useEffect(() => {
+    if (!PIN_LIGADO) { setPinState("ok"); return; }
     if (demo) { setPinState("ok"); return; }
     if (!db || !session) { setPinState("checking"); return; }
     let cancelled = false;
