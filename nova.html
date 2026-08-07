@@ -3321,8 +3321,18 @@ function FinanceView({ finances, services, db, demo, mode, notify, onChanged, on
 }
 
 function nomeFornecedorVale(descricao) {
-  const semPrefixo = (descricao || "").replace(/^Vale\s*-\s*/i, "");
+  // "Vale - Marcão", "Vale Marcão" e "Vale: Marcão" são a mesma pessoa. O hífen era obrigatório aqui, então
+  // os vales digitados sem ele viravam um profissional chamado "Vale Marcão".
+  const semPrefixo = (descricao || "").replace(/^Vale\s*[-–—:]?\s*/i, "");
   return semPrefixo.split(/[\(,]/)[0].trim() || "Sem nome";
+}
+// UMA PESSOA, UMA CONTA. Achado em 07/08/2026 na primeira tela real da aba Profissionais: o Marcão aparecia
+// TRÊS vezes — "Vale Marcão" (R$70), "Marcao" sem acento (R$131) e "Marcão" (R$288 + o trabalho). Enquanto
+// era só a lista de vales, nome torto era feio; agora que um lado desconta o outro, nome torto dá conta
+// ERRADA — ele acertaria com um "Marcão" e continuaria devendo os outros dois. A chave ignora acento, caixa
+// e pontuação; o nome mostrado é o mais completo que apareceu.
+function chaveProfissional(nome) {
+  return String(nome || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() || "sem nome";
 }
 const VALE_ABATIDO_TAG = "[ABATIDO] ";
 // ABA PROFISSIONAIS (era "Vales" até 06/08/2026)
@@ -3349,10 +3359,17 @@ function ProfissionaisView({ finances, services, db, demo, mode, notify, onChang
   const totalPendente = pendentes.reduce((sum, v) => sum + Number(v.valor), 0);
   const totalTrabalho = trabalhosAbertos.reduce((sum, t) => sum + Number(t.valor || 0), 0);
   const semValor = trabalhosAbertos.filter((t) => !Number(t.valor)).length;
-  // UMA CONTA POR PESSOA: vale e trabalho do mesmo nome caem na mesma linha, senão o acerto continuaria
-  // sendo feito de cabeça. O nome é a chave porque é assim que ele fala ("acertar com o Marcão").
+  // UMA CONTA POR PESSOA: vale e trabalho da mesma pessoa caem na mesma linha, senão o acerto continuaria
+  // sendo feito de cabeça. A chave ignora acento e caixa (ver chaveProfissional) porque os vales antigos têm
+  // o mesmo nome escrito de três jeitos, e é assim que ele fala: "acertar com o Marcão", um só.
   const contas = {};
-  const entrar = (nome) => (contas[nome] ||= { nome, vales: [], trabalhos: [] });
+  const entrar = (nome) => {
+    const chave = chaveProfissional(nome);
+    const conta = (contas[chave] ||= { nome, vales: [], trabalhos: [] });
+    // Fica com o nome mais completo que apareceu — "Marcão" ganha de "Marcao", e não "Vale Marcão".
+    if (nome && nome.length > conta.nome.length) conta.nome = nome;
+    return conta;
+  };
   pendentes.forEach((v) => entrar(nomeFornecedorVale(v.descricao)).vales.push(v));
   trabalhosAbertos.forEach((t) => entrar(nomeProfissionalMaoDeObra(t.descricao)).trabalhos.push(t));
   const listaContas = Object.values(contas).map((c) => {
@@ -3362,7 +3379,7 @@ function ProfissionaisView({ finances, services, db, demo, mode, notify, onChang
   }).sort((a, b) => b.liquido - a.liquido);
   const nomesConhecidos = [...new Set([
     ...(services || []).map((s) => s.responsavel).filter(Boolean),
-    ...Object.keys(contas),
+    ...Object.values(contas).map((c) => c.nome),
   ])];
   const anotarTrabalho = async () => {
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
