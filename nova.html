@@ -372,6 +372,7 @@ const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
 - REGRA Nº 11: a identidade de um cliente é o TELEFONE, nunca o nome. Nome se repete no cadastro real (ja aconteceu de quatro nomes se repetirem no cadastro) — nunca concluir que são duas pessoas diferentes só porque o nome bate, nem que são a mesma só porque o nome é igual. Antes de criar cliente novo, procurar pelo telefone. E telefone com o tamanho certo NÃO quer dizer telefone certo: comparar o número pelo conjunto de dígitos ORDENADO contra os já cadastrados — se bater com alguém, é a mesma pessoa com erro de digitação, não cliente novo. Validação que dá pra resolver sozinho sem perguntar ao Diego: celular brasileiro é 9 + 8 dígitos e o primeiro desses 8 é sempre 6, 7, 8 ou 9 — número em que esse dígito é 2, por exemplo, é inválido de cara, então dá pra saber qual dos dois cadastros duplicados está errado. Já aconteceu de um mesmo cliente entrar duas vezes na mesma cidade com o número digitado fora de ordem: os dois passavam na checagem de 13 dígitos e só o formato denunciava qual era o certo.
 - REGRA Nº 12 (reescrita em 25/07/2026 — desenho debatido pelo Diego com um segundo modelo, revisado por um terceiro review no mesmo dia; docs decisao-design-reagendamento.md): quando um compromisso NÃO ACONTECE (o Diego pede reagendamento ou conclui parcial), o app NUNCA inventa uma data. Cria uma PENDÊNCIA em caixa_entrada — status "novo", com meta.tipo_operacional="remarcacao", meta.agenda_origem_id, meta.servico_id, meta.titulo_original, meta.motivo e meta.revisar_em (data interna, nunca prometida a cliente) — ANTES de qualquer upload ou alteração destrutiva na agenda. Enquanto meta.agenda_sucessora_id estiver vazio a pendência está ABERTA, e o compromisso original (agenda_origem_id) SOME de toda tela — Painel, Agenda, rota, seletores de horário, Compras, ficha — porque todo consumidor lê a coleção central compromissosOperacionais()/agendaVisivel, nunca appointments bruto. NUNCA excluir uma pendência aberta (recusaSeForPendenciaAberta bloqueia isso no app; mesma regra vale pra qualquer sessão mexendo direto no banco). NUNCA criar um segundo compromisso pro mesmo agenda_origem_id enquanto a pendência estiver aberta — antes de gravar, procurar em caixa_entrada por um item não processado com esse agenda_origem_id. Pra resolver com data real, usar a MESMA lógica de resolverPendenciaComSucessor: consultar o status ATUAL da origem — se ainda está "planejado" (nunca foi tentativa que aconteceu), ATUALIZAR a própria linha com a data nova, sem criar outra; se já está "feito" (foi tentado e encerrado), CRIAR um compromisso novo vinculado ao serviço. Nos dois casos gravar agenda_sucessora_id ANTES de marcar a pendência como resolvida (processado=true) — nunca resolver sem sucessor confirmado. A ÚNICA exceção é o serviço ter virado entregue, perdido ou pago (resolverPendenciaTerminal) — cliente desistiu ou serviço encerrou, não existe mais o que remarcar. Se o texto do Diego já traz uma data ("ele quer amanhã 13h"), resolver na hora com aquela data; se depende de resposta do cliente ("aguardar resposta"), deixar aberta e só ajustar revisar_em. O Diego nunca escolhe data pelo app: ele explica o que aconteceu, e só existe compromisso quando alguém de fato decidiu uma data.
 - REGRA Nº 13 (canal certo pra cada coisa — pedido do Diego em 25/07/2026: "deveria usar a função perguntas no app de qualquer dúvida"): DÚVIDA DO CLAUDE vai pra caixa_entrada com status "aguardando_voce" e a pergunta dentro do campo "conversa" no formato [{de:'ia', texto:'...', em:ISO}] — é o único canal que tem campo de resposta e conta na métrica "Aguardando você" do Painel. NUNCA transformar dúvida em card de aviso no Painel nem em compromisso na agenda: card de aviso é pra ESTADO que o app deduz sozinho e o Diego decide olhando (faltando material, agendado sem valor, conta vencendo), e compromisso na agenda é pra TRABALHO que ele vai fazer. Erro real cometido em 25/07: telefone faltando de duas clientes virou card de aviso, e "confirmar o valor de serviço entregue" virou 7 compromissos na agenda — os dois eram pergunta, não aviso nem tarefa. Sintoma de que você errou o canal: se a única saída do Diego é te dar uma informação que só ele tem, é pergunta.
+- REGRA Nº 14 (pedido do Diego em 06/08/2026, sobre o Marcão: "ele vai pegando vale, mas eu tenho que ir anotando que ele busca serviço comigo — isso é trabalho dele, ele busca e entrega, eu tenho que pagar a ele FORA os trabalhos que ele faz, só pra não esquecer quando for abater os vales"): profissional tem DOIS lados e o app tinha só um. O vale (dinheiro adiantado, já saiu do caixa) vive de um lado; o TRABALHO dele — buscar o móvel, entregar o móvel, o serviço no estofado — vive do outro, e é o que estava só na cabeça do Diego. Toda vez que um profissional buscar ou entregar, anotar na aba Profissionais (ou pela operação mao_de_obra_anotada): categoria "Mão de obra", escopo empresa, status "a_pagar", descrição "Mão de obra - Nome · o que foi". Pode ir SEM VALOR quando ainda não foi combinado — anotar sem valor é melhor que não anotar. ANOTAR NÃO MEXE NO CAIXA: o saldo só conta o que está "pago" (Regra Nº 5), e o dinheiro sai uma vez só, no acerto. O acerto (mao_de_obra_acertada) tira do caixa apenas o LÍQUIDO — soma dos trabalhos MENOS os vales pendentes dele — marca os trabalhos com [ACERTADO] e os vales com [ABATIDO]. Se o acerto pagasse o valor cheio dos trabalhos, o dinheiro do vale sairia duas vezes (é o erro de R$465,70 da Regra Nº 9, de cabeça pra baixo). Acerto não fecha com trabalho sem valor: pagar por baixo é o mesmo esquecimento que essa regra existe pra matar.
 - Novo lead, orçamento e agendado não geram lançamento financeiro.
 - O valor informado nesses status é apenas valor de orçamento.
 - Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
@@ -429,11 +430,12 @@ const PROTOCOLO_CLAUDE_OPERACAO = [
   "9. ENTREGA_CONCLUIDA exige valor, fecha Agenda e Servico e so registra recebimento se o relato disser que recebeu.",
   "10. Reagendamento e parcial sem data permanecem na Caixa. Resolver somente com data real ou servico terminal.",
   "11. Vale entregue e saida paga no dia. Vale abatido so recebe a marca de abatimento e nao mexe no caixa.",
+  "11A. Trabalho do profissional (buscar, entregar ou o servico em si) usa mao_de_obra_anotada: nasce a_pagar, pode ir sem valor e NAO mexe no caixa. Quem paga e o acerto: mao_de_obra_acertada tira do caixa so o liquido (trabalhos menos vales) e marca os dois lados. Nunca lancar trabalho de profissional como saida paga solta.",
   "12. Depois da chamada, conferir ok, jaConcluido e resultado. Em erro, nao improvisar: a operacao fica visivel na Caixa para retomada.",
   "13. Ao terminar o lote, gerar um COMPROVANTE_DE_EXECUCAO com evento, resultado e ids. Esse comprovante nunca volta como entrada.",
   "",
   "TIPOS DISPONIVEIS EM window.TB_OPERACOES",
-  "financeiro, entrada_servico, pro_labore, vale_entregue, vale_abatido, servico_fechado, material_planejado, material_em_transito, material_em_maos, compromisso_concluido, entrega_concluida, remarcacao_com_data e remarcacao_terminal.",
+  "financeiro, entrada_servico, pro_labore, vale_entregue, vale_abatido, mao_de_obra_anotada, mao_de_obra_acertada, servico_fechado, material_planejado, material_em_transito, material_em_maos, compromisso_concluido, entrega_concluida, remarcacao_com_data e remarcacao_terminal.",
   "",
   "CAMPOS MINIMOS EM dados",
   "financeiro: tipo, escopo, categoria, valor, status, data e descricao. Para alterar linha existente, financeiroId e somente os campos que mudam.",
@@ -441,6 +443,8 @@ const PROTOCOLO_CLAUDE_OPERACAO = [
   "pro_labore: valor, data e descricao opcional.",
   "vale_entregue: valor, data, profissional ou descricao.",
   "vale_abatido: financeiroId do Vale já pago.",
+  "mao_de_obra_anotada: profissional, oQue (busca, entrega, servico ou outro), valor quando ja combinado, detalhe e servicoId quando for de um trabalho.",
+  "mao_de_obra_acertada: profissional, trabalhoIds, valeIds e data. Todo trabalho precisa de valor antes de fechar.",
   "servico_fechado: servicoId, prazo, valorServico, precisaMaterial e fornecedorId quando aplicavel.",
   "material_planejado: fornecedorId, servicoId quando for de cliente, valor se conhecido, dataNecessidade e descricao.",
   "material_em_transito: fornecedorId, servicoId, valor, data, dataEntrega e financeiroId ou agendaId quando ja existirem.",
@@ -872,7 +876,13 @@ async function registrarFinanceiroDaOperacao(db, eventoId, dados, papel = "finan
   if (!dados.financeiroId && ehCategoriaServico(categoria) && tipo === "entrada" && !dados.servicoId) {
     throw new Error("Entrada de Serviço exige servicoId — sem isso o dinheiro entra no caixa mas o serviço fica parecendo não pago, e o saldo a receber some da cobrança.");
   }
-  const valor = validarValorPositivo(dados.valor ?? existente?.valor);
+  // ANOTAÇÃO DE TRABALHO PODE NASCER SEM VALOR (Diego, 06/08: "ele busca e entrega, eu tenho que ir anotando,
+  // depois acertamos"). Na hora em que o Marcão sai pra buscar um móvel o preço daquela corrida muitas vezes
+  // ainda não está combinado — exigir valor ali faria ele não anotar, que é justamente o esquecimento que essa
+  // parte existe pra evitar. O valor entra depois, e o acerto não fecha enquanto sobrar item sem valor.
+  const valor = dados.permiteValorZero
+    ? Math.max(0, parseMoedaBR(dados.valor ?? existente?.valor ?? 0))
+    : validarValorPositivo(dados.valor ?? existente?.valor);
   const data = dados.data || existente?.data || hojeISO();
   const tem = (key) => Object.prototype.hasOwnProperty.call(dados, key);
   const payload = {
@@ -976,6 +986,89 @@ async function aplicarValeAbatidoOperacional(db, eventoId, dados) {
   if (error) throw error;
   await registrarHistoricoDaOperacao(db, eventoId, "vale-abatido", { o_que: "Vale abatido", por: "claude", detalhe: "Vale financeiro #" + vale.id + " marcado sem nova movimentação de caixa." });
   return { financeiroId: vale.id, jaAbatido: false };
+}
+
+// TRABALHO DO PROFISSIONAL — o outro lado do vale (Diego, 06/08/2026)
+// "O Marcão vai pegando vale, mas eu tenho que ir anotando que ele busca serviço comigo — isso é trabalho
+// dele, ele busca e entrega, eu tenho que pagar a ele FORA os trabalhos que ele faz. Só pra não esquecer
+// quando for abater os vales."
+// Até aqui o app só guardava o que SAIU adiantado (o vale). O que o profissional GANHOU ficava na cabeça do
+// Diego, e na hora do acerto o que não estivesse lembrado simplesmente não era pago. Agora cada busca,
+// entrega ou trabalho vira uma linha do lado dele.
+// POR QUE NÃO MEXE NO CAIXA: anotar não é pagar. A linha nasce status "a_pagar" — e o saldo só conta o que
+// está "pago" (Regra Nº 5). O dinheiro sai uma vez só, no acerto. É a mesma lógica do vale, ao contrário.
+const CATEGORIA_MAO_DE_OBRA = "Mão de obra";
+const MAO_DE_OBRA_ACERTADA_TAG = "[ACERTADO] ";
+const TRABALHOS_PROFISSIONAL = { busca: "Buscou o móvel", entrega: "Entregou o móvel", servico: "Trabalho no estofado", outro: "Outro trabalho" };
+function nomeProfissionalMaoDeObra(descricao) {
+  const semTag = (descricao || "").replace(MAO_DE_OBRA_ACERTADA_TAG, "").replace(/^Mão de obra\s*-\s*/i, "");
+  return semTag.split(/[·(,]/)[0].trim() || "Sem nome";
+}
+function ehTrabalhoAberto(item) {
+  return item.categoria === CATEGORIA_MAO_DE_OBRA && item.status === "a_pagar" && !(item.descricao || "").startsWith(MAO_DE_OBRA_ACERTADA_TAG);
+}
+async function aplicarMaoDeObraAnotadaOperacional(db, eventoId, dados) {
+  const profissional = String(dados.profissional || "").trim();
+  if (!profissional) throw new Error("Anotação de trabalho exige o nome do profissional — é por ele que o acerto é somado.");
+  const oQue = TRABALHOS_PROFISSIONAL[dados.oQue] || String(dados.oQue || "Trabalho").trim();
+  const detalhe = String(dados.detalhe || "").trim();
+  const descricao = "Mão de obra - " + profissional + " · " + oQue + (detalhe ? " (" + detalhe + ")" : "");
+  const { registro } = await registrarFinanceiroDaOperacao(db, eventoId, {
+    ...dados, tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MAO_DE_OBRA, status: "a_pagar",
+    descricao, permiteValorZero: true,
+  }, "financeiro:mao-de-obra");
+  return { financeiroId: registro.id, valor: registro.valor, semValor: !Number(registro.valor) };
+}
+// O ACERTO. Do caixa sai só o LÍQUIDO: o que ele fez menos os vales que já saíram. Se saísse o valor cheio
+// dos trabalhos, o mesmo dinheiro do vale sairia duas vezes — o erro de R$465,70 de julho, ao contrário.
+// Por isso os trabalhos são MARCADOS como acertados (igual o vale abatido) em vez de virarem "pago".
+async function aplicarMaoDeObraAcertadaOperacional(db, eventoId, dados) {
+  const profissional = String(dados.profissional || "").trim();
+  if (!profissional) throw new Error("O acerto é sempre com um profissional.");
+  const trabalhoIds = Array.isArray(dados.trabalhoIds) ? dados.trabalhoIds : [];
+  const valeIds = Array.isArray(dados.valeIds) ? dados.valeIds : [];
+  if (!trabalhoIds.length) throw new Error("Nenhum trabalho anotado para acertar.");
+  const trabalhos = [];
+  for (const id of trabalhoIds) {
+    const item = await lerRegistro(db, "financeiro", id);
+    if (!item || item.categoria !== CATEGORIA_MAO_DE_OBRA) throw new Error("Lançamento " + id + " não é trabalho de profissional.");
+    if ((item.descricao || "").startsWith(MAO_DE_OBRA_ACERTADA_TAG)) continue;
+    if (!Number(item.valor)) throw new Error("Tem trabalho sem valor no acerto (" + (item.descricao || "") + "). Ponha o valor antes de fechar, senão você paga por baixo.");
+    trabalhos.push(item);
+  }
+  const vales = [];
+  for (const id of valeIds) {
+    const vale = await lerRegistro(db, "financeiro", id);
+    if (!vale || vale.categoria !== "Vale") throw new Error("Lançamento " + id + " não é Vale.");
+    if ((vale.descricao || "").startsWith(VALE_ABATIDO_TAG)) continue;
+    vales.push(vale);
+  }
+  const totalTrabalho = trabalhos.reduce((soma, item) => soma + Number(item.valor), 0);
+  const totalVale = vales.reduce((soma, item) => soma + Number(item.valor), 0);
+  const liquido = Number((totalTrabalho - totalVale).toFixed(2));
+  if (liquido < 0) throw new Error("Os vales (" + money(totalVale) + ") passam do que ele fez (" + money(totalTrabalho) + "). Tire algum vale deste acerto — ele fica pendente pro próximo.");
+  let financeiroId = null;
+  if (liquido > 0) {
+    const { registro } = await registrarFinanceiroDaOperacao(db, eventoId, {
+      tipo: "saida", escopo: "empresa", categoria: CATEGORIA_MAO_DE_OBRA, status: "pago",
+      valor: liquido, data: dados.data || hojeISO(),
+      descricao: "Acerto com " + profissional + " — " + trabalhos.length + " trabalho(s)" + (totalVale ? " menos " + money(totalVale) + " de vale" : ""),
+    }, "financeiro:acerto");
+    financeiroId = registro.id;
+  }
+  for (const item of trabalhos) {
+    const { error } = await db.from("financeiro").update({ descricao: MAO_DE_OBRA_ACERTADA_TAG + (item.descricao || CATEGORIA_MAO_DE_OBRA) }).eq("id", item.id);
+    if (error) throw error;
+  }
+  for (const vale of vales) {
+    const { error } = await db.from("financeiro").update({ descricao: VALE_ABATIDO_TAG + (vale.descricao || "Vale") }).eq("id", vale.id);
+    if (error) throw error;
+  }
+  await registrarHistoricoDaOperacao(db, eventoId, "acerto-profissional", {
+    o_que: "Acerto com " + profissional, por: dados.por || "diego",
+    detalhe: money(totalTrabalho) + " de trabalho − " + money(totalVale) + " de vale = " + money(liquido) + " pago do caixa.",
+  });
+  return { financeiroId, totalTrabalho, totalVale, liquido, trabalhos: trabalhos.length, vales: vales.length };
 }
 async function criarPerguntaDeterministica(db, eventoId, papel, texto, metaExtra) {
   const id = await uuidDeterministicoEvento(eventoId, "pergunta:" + papel);
@@ -1351,6 +1444,8 @@ async function processarEventoOperacaoBahia(db, evento) {
       case "pro_labore": resultado = await aplicarProLaboreOperacional(db, evento.eventoId, dados); break;
       case "vale_entregue": resultado = await aplicarValeEntregueOperacional(db, evento.eventoId, dados); break;
       case "vale_abatido": resultado = await aplicarValeAbatidoOperacional(db, evento.eventoId, dados); break;
+      case "mao_de_obra_anotada": resultado = await aplicarMaoDeObraAnotadaOperacional(db, evento.eventoId, dados); break;
+      case "mao_de_obra_acertada": resultado = await aplicarMaoDeObraAcertadaOperacional(db, evento.eventoId, dados); break;
       case "servico_fechado": resultado = await aplicarServicoFechadoOperacional(db, evento.eventoId, dados); break;
       case "material_planejado": resultado = await aplicarMaterialPlanejadoOperacional(db, evento.eventoId, dados); break;
       case "material_em_transito": resultado = await aplicarMaterialEmTransitoOperacional(db, evento.eventoId, dados); break;
@@ -1437,6 +1532,23 @@ function telefoneQuebrado(tel) {
 // faltando que o app conserta sozinho. Só a terceira vira aviso — senão a contagem enche de coisa que não tem
 // conserto e o aviso vira barulho que ele aprende a ignorar.
 function telefoneCorrigivel(tel) { return Boolean(String(tel || "").trim()) && !ehTelefoneFixo(tel) && telefoneQuebrado(tel); }
+// ESTRAGO ANTIGO, INVISÍVEL. Até 06/08 o app enfiava o 9 em todo número de 10 dígitos, então todo fixo salvo
+// pela ficha virou "9 + o fixo". Esses NÃO caem no aviso acima: ficaram com 11 dígitos começando em 9, ou
+// seja, cara de celular válido. Dá pra desconfiar deles porque celular de verdade é 9 seguido de 6-9, e fixo
+// estragado é 9 seguido de 2-5. É suspeita, não certeza — por isso o app mostra e pergunta, nunca desfaz
+// sozinho. Quem sabe se aquele número é da recepção do hospital ou do celular da cliente é o Diego.
+function suspeitaDeFixoEstragado(tel) {
+  const d = String(tel || "").replace(/\D/g, "");
+  const semPais = d.startsWith("55") && d.length > 11 ? d.slice(2) : d;
+  return semPais.length === 11 && semPais[2] === "9" && /^[2-5]/.test(semPais.slice(3));
+}
+function semONoveInventado(tel) {
+  const d = String(tel || "").replace(/\D/g, "");
+  const semPais = d.startsWith("55") && d.length > 11 ? d.slice(2) : d;
+  if (!suspeitaDeFixoEstragado(semPais)) return null;
+  const original = semPais.slice(0, 2) + semPais.slice(3);
+  return `+55 ${original.slice(0, 2)} ${original.slice(2, 6)}-${original.slice(6)}`;
+}
 function sugerirPendente(titulo) { const t = (titulo || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); if (/mensagem|whatsapp|contato|ligar|liguei/.test(t)) return "Aguardar resposta do cliente"; if (/visita|avaliar|orcamento|medir/.test(t)) return "Reagendar visita ou avaliação"; if (/entrega|retirada|buscar|levar/.test(t)) return "Reagendar retirada ou entrega"; if (/pagamento|cobranca|cobrar/.test(t)) return "Cobrar pagamento"; return "Revisar e continuar"; }
 
 function Home() {
@@ -1886,10 +1998,12 @@ function Home() {
   // Vale pendente = ainda não foi descontado do profissional. O dinheiro já saiu (status pago), então o
   // que marca a pendência é a ausência do [ABATIDO], não o status. Ver Regra Nº 9.
   const valesPendentes = finances.filter((f) => f.categoria === "Vale" && !(f.descricao || "").startsWith(VALE_ABATIDO_TAG)).length;
+  // O contador da aba conta as duas pendências do profissional: vale a descontar e trabalho a pagar.
+  const contaProfissionais = valesPendentes + finances.filter(ehTrabalhoAberto).length;
   const contasFuturas = finances.filter(ehSaidaFutura).length;
   const nav = [
     { id: "painel", label: "Painel", icon: "⌂" }, { id: "caixa", label: "Caixa", icon: "◎", count: inbox.length }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
-    { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "compras", label: "Compras", icon: "▣" }, { id: "futuro", label: "A pagar", icon: "◷", count: contasFuturas }, { id: "vales", label: "Vales", icon: "✎", count: valesPendentes },
+    { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "compras", label: "Compras", icon: "▣" }, { id: "futuro", label: "A pagar", icon: "◷", count: contasFuturas }, { id: "vales", label: "Profissionais", icon: "✎", count: contaProfissionais },
     { id: "clientes", label: "Clientes", icon: "○" }, { id: "fornecedores", label: "Fornecedores", icon: "▤" },
   ];
 
@@ -1927,7 +2041,7 @@ function Home() {
       {tab === "financeiro" && <FinanceView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} services={activeServices} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
-      {tab === "vales" && <ValesView finances={finances} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
+      {tab === "vales" && <ProfissionaisView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
     </main>
@@ -3129,9 +3243,19 @@ function nomeFornecedorVale(descricao) {
   return semPrefixo.split(/[\(,]/)[0].trim() || "Sem nome";
 }
 const VALE_ABATIDO_TAG = "[ABATIDO] ";
-function ValesView({ finances, db, demo, mode, notify, onChanged }) {
+// ABA PROFISSIONAIS (era "Vales" até 06/08/2026)
+// O nome mudou porque a aba passou a ter os DOIS lados da conta com cada profissional: o que ele já pegou
+// adiantado (vale) e o que ele fez pra ganhar (buscar, entregar, o serviço). Diego: "eu tenho que ir anotando
+// que ele busca serviço comigo, isso é trabalho dele... só pra não esquecer quando for abater os vales".
+// Vale sozinho só mostrava a dívida DELE com o Diego. Faltava a do Diego com ele — que era a que sumia.
+function ProfissionaisView({ finances, services, db, demo, mode, notify, onChanged }) {
   const [busyId, setBusyId] = useState(null);
+  const [confirmando, setConfirmando] = useState(null);
+  const [valores, setValores] = useState({});
+  const [novo, setNovo] = useState({ profissional: "", oQue: "busca", detalhe: "", valor: "", data: hojeISO() });
   const vales = finances.filter((f) => f.categoria === "Vale");
+  const trabalhos = finances.filter((f) => f.categoria === CATEGORIA_MAO_DE_OBRA && f.status === "a_pagar");
+  const trabalhosAbertos = trabalhos.filter(ehTrabalhoAberto);
   // O DINHEIRO DO VALE SAI NA HORA (Diego confirmou em 25/07/2026: "todos vales já saem na hora" — Pix ou
   // dinheiro na mão). Então TODO vale nasce como saída PAGA: o caixa sente no dia em que ele entrega.
   // O que fica pendente NÃO é pagamento, é o DESCONTO no que ele vai pagar pro profissional depois.
@@ -3140,9 +3264,68 @@ function ValesView({ finances, db, demo, mode, notify, onChanged }) {
   // isso 6 vales de R$465,70 não apareciam no caixa mesmo com o dinheiro já tendo saído.
   const pendentes = vales.filter((v) => !(v.descricao || "").startsWith(VALE_ABATIDO_TAG));
   const abatidos = vales.filter((v) => (v.descricao || "").startsWith(VALE_ABATIDO_TAG));
-  const porFornecedor = {};
-  pendentes.forEach((v) => { const nome = nomeFornecedorVale(v.descricao); (porFornecedor[nome] ||= []).push(v); });
   const totalPendente = pendentes.reduce((sum, v) => sum + Number(v.valor), 0);
+  const totalTrabalho = trabalhosAbertos.reduce((sum, t) => sum + Number(t.valor || 0), 0);
+  const semValor = trabalhosAbertos.filter((t) => !Number(t.valor)).length;
+  // UMA CONTA POR PESSOA: vale e trabalho do mesmo nome caem na mesma linha, senão o acerto continuaria
+  // sendo feito de cabeça. O nome é a chave porque é assim que ele fala ("acertar com o Marcão").
+  const contas = {};
+  const entrar = (nome) => (contas[nome] ||= { nome, vales: [], trabalhos: [] });
+  pendentes.forEach((v) => entrar(nomeFornecedorVale(v.descricao)).vales.push(v));
+  trabalhosAbertos.forEach((t) => entrar(nomeProfissionalMaoDeObra(t.descricao)).trabalhos.push(t));
+  const listaContas = Object.values(contas).map((c) => {
+    const somaTrabalho = c.trabalhos.reduce((s, t) => s + Number(t.valor || 0), 0);
+    const somaVale = c.vales.reduce((s, v) => s + Number(v.valor), 0);
+    return { ...c, somaTrabalho, somaVale, liquido: Number((somaTrabalho - somaVale).toFixed(2)), pendencias: c.trabalhos.filter((t) => !Number(t.valor)).length };
+  }).sort((a, b) => b.liquido - a.liquido);
+  const nomesConhecidos = [...new Set([
+    ...(services || []).map((s) => s.responsavel).filter(Boolean),
+    ...Object.keys(contas),
+  ])];
+  const anotarTrabalho = async () => {
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    const profissional = novo.profissional.trim();
+    if (!profissional) { notify("Diga de quem é o trabalho — é por ele que o acerto soma.", "error"); return; }
+    setBusyId("novo");
+    try {
+      await processarEventoOperacaoBahia(db, {
+        tipo: "mao_de_obra_anotada",
+        eventoId: "app-mao-de-obra-" + Date.now(),
+        dados: { profissional, oQue: novo.oQue, detalhe: novo.detalhe.trim(), valor: novo.valor, data: novo.data, por: "diego" },
+      });
+      notify(novo.valor ? `Anotado pro ${profissional}. Isso não mexeu no caixa — o dinheiro sai no acerto.` : `Anotado pro ${profissional} sem valor. Ponha o valor antes de acertar.`, "ok");
+      setNovo({ profissional, oQue: novo.oQue, detalhe: "", valor: "", data: hojeISO() });
+      await onChanged();
+    } catch (e) { notify("Não anotou: " + e.message, "error"); } finally { setBusyId(null); }
+  };
+  const salvarValor = async (item) => {
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusyId(item.id);
+    try {
+      await processarEventoOperacaoBahia(db, { tipo: "financeiro", eventoId: "app-mao-de-obra-valor-" + item.id + "-" + Date.now(), dados: { financeiroId: item.id, valor: valores[item.id] } });
+      notify("Valor anotado. Continua fora do caixa até o acerto.", "ok");
+      setValores({ ...valores, [item.id]: "" });
+      await onChanged();
+    } catch (e) { notify("Não salvou: " + e.message, "error"); } finally { setBusyId(null); }
+  };
+  const acertar = async (conta) => {
+    if (mode === "claude") { notify("No modo Claude, acerte pela operação tipada mao_de_obra_acertada.", "error"); return; }
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusyId("acerto-" + conta.nome);
+    try {
+      const r = await processarEventoOperacaoBahia(db, {
+        tipo: "mao_de_obra_acertada",
+        // O id carrega o primeiro trabalho do lote: repetir o botão depois de uma falha retoma o MESMO acerto
+        // (não paga duas vezes), mas um segundo acerto com a mesma pessoa no mesmo dia é outro lote e passa.
+        eventoId: "app-acerto-" + conta.nome.replace(/\s+/g, "-").toLowerCase() + "-" + conta.trabalhos[0].id,
+        dados: { profissional: conta.nome, trabalhoIds: conta.trabalhos.map((t) => t.id), valeIds: conta.vales.map((v) => v.id), data: hojeISO(), por: "diego" },
+      });
+      const liquido = r?.resultado?.liquido ?? conta.liquido;
+      notify(`Acerto com ${conta.nome} fechado: ${money(liquido)} saiu do caixa. Os vales dele já estavam pagos e foram descontados.`, "ok");
+      setConfirmando(null);
+      await onChanged();
+    } catch (e) { notify(e.message, "error"); } finally { setBusyId(null); }
+  };
   const marcarAbatido = async (item) => {
     // Abater é só registrar o desconto administrativo. A operação tipada trava status=pago e nunca cria
     // uma segunda saída no caixa.
@@ -3154,16 +3337,72 @@ function ValesView({ finances, db, demo, mode, notify, onChanged }) {
       notify("Vale abatido — descontado do que você paga ao profissional. O caixa não muda: esse dinheiro já saiu no dia do vale.", "ok"); await onChanged();
     } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusyId(null); }
   };
+  const acertados = finances.filter((f) => f.categoria === CATEGORIA_MAO_DE_OBRA && (f.descricao || "").startsWith(MAO_DE_OBRA_ACERTADA_TAG));
   return <div className="page-grid">
-    <section className="metric-grid finance-metrics"><Metric label="Vales pendentes" value={money(totalPendente)} detail={`${pendentes.length} lançamento(s)`} tone="red" /><Metric label="Fornecedores com vale" value={String(Object.keys(porFornecedor).length)} detail="Aguardando abater" tone="orange" /><Metric label="Já abatidos" value={String(abatidos.length)} detail="Histórico" tone="green" /></section>
-    <section className="content-card"><div className="card-head"><div><p className="kicker">CONTROLE DE VALES</p><h3>Pendentes de abater</h3></div></div>
-      {!pendentes.length && <div className="empty-state"><b>Nenhum vale pendente.</b><span>Quando você der um vale a um profissional, ele aparece aqui até marcar como abatido.</span></div>}
-      {Object.entries(porFornecedor).map(([nome, itens]) => { const subtotal = itens.reduce((s, v) => s + Number(v.valor), 0); return <div key={nome} className="vale-fornecedor">
-        <div className="vale-fornecedor-head"><strong>{nome}</strong><b>{money(subtotal)}</b></div>
-        {itens.map((v) => <div className="finance-row" key={v.id}><div><strong>{compactDate(v.data)}</strong><span>{v.descricao}</span></div><div className="agenda-acoes"><b className="saida">− {money(v.valor)}</b><button className="ghost" disabled={busyId === v.id} onClick={() => marcarAbatido(v)}>{busyId === v.id ? "..." : "Marcar abatido"}</button></div></div>)}
-      </div>; })}
+    <section className="metric-grid finance-metrics">
+      <Metric label="Eles têm a receber" value={money(totalTrabalho)} detail={`${trabalhosAbertos.length} trabalho(s)${semValor ? ` · ${semValor} sem valor` : ""}`} tone={semValor ? "orange" : "yellow"} />
+      <Metric label="Vales já adiantados" value={money(totalPendente)} detail={`${pendentes.length} vale(s) a descontar`} tone="red" />
+      <Metric label="Sai do caixa no acerto" value={money(Math.max(0, totalTrabalho - totalPendente))} detail="Trabalho menos vale" tone="green" />
     </section>
-    {abatidos.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">HISTÓRICO</p><h3>Vales já abatidos</h3></div></div>{abatidos.map((v) => <div className="finance-row" key={v.id}><div><strong>{v.descricao.replace(VALE_ABATIDO_TAG, "")}</strong><span>{compactDate(v.data)} · abatido</span></div><b className="saida">− {money(v.valor)}</b></div>)}</section>}
+
+    {/* ANOTAR É O CORAÇÃO DA ABA: se anotar der trabalho, ele não anota, e a busca do Marcão volta a se perder.
+        Por isso o formulário fica em cima, aberto, com o nome guardado entre uma anotação e outra — ele
+        costuma lançar duas ou três seguidas do mesmo profissional. */}
+    <section className="content-card">
+      <div className="card-head"><div><p className="kicker">ANOTE NA HORA</p><h3>O que o profissional fez</h3></div></div>
+      <p className="ficha-note">Buscou, entregou ou fez o serviço — anote aqui, mesmo sem valor combinado. <strong>Isso não mexe no caixa</strong>: só entra no seu saldo no dia do acerto.</p>
+      <div className="form-grid">
+        <label>Profissional*<input value={novo.profissional} onChange={(e) => setNovo({ ...novo, profissional: e.target.value })} list="profissionais-acerto" placeholder="Marcão, Marlom pai…" /></label>
+        <datalist id="profissionais-acerto">{nomesConhecidos.map((n) => <option key={n} value={n} />)}</datalist>
+        <div className="agenda-acoes">
+          {Object.entries(TRABALHOS_PROFISSIONAL).map(([chave, rotulo]) => <button key={chave} className={novo.oQue === chave ? "primary" : "ghost"} onClick={() => setNovo({ ...novo, oQue: chave })}>{rotulo}</button>)}
+        </div>
+        <label>De quem / o quê<input value={novo.detalhe} onChange={(e) => setNovo({ ...novo, detalhe: e.target.value })} placeholder="Poltrona da Andriele, Jardim do Ingá" /></label>
+        <div className="row three">
+          <label>Valor R$ (se já combinou)<input value={novo.valor} onChange={(e) => setNovo({ ...novo, valor: e.target.value })} placeholder="deixe vazio se for acertar depois" /></label>
+          <label>Data<input type="date" value={novo.data} onChange={(e) => setNovo({ ...novo, data: e.target.value })} /></label>
+        </div>
+        <button className="primary wide" disabled={busyId === "novo"} onClick={anotarTrabalho}>{busyId === "novo" ? "Anotando…" : "Anotar trabalho"}</button>
+      </div>
+    </section>
+
+    <section className="content-card"><div className="card-head"><div><p className="kicker">CONTA COM CADA UM</p><h3>Acerto por profissional</h3></div></div>
+      {!listaContas.length && <div className="empty-state"><b>Nada em aberto com ninguém.</b><span>Anote acima quando alguém buscar, entregar ou fizer um trabalho — e os vales que você adiantar aparecem aqui do lado.</span></div>}
+      {listaContas.map((conta) => <div key={conta.nome} className="vale-fornecedor">
+        <div className="vale-fornecedor-head"><strong>{conta.nome}</strong><b className={conta.liquido > 0 ? "saida" : ""}>{conta.liquido > 0 ? money(conta.liquido) + " a pagar" : conta.liquido < 0 ? money(-conta.liquido) + " adiantado demais" : "quites"}</b></div>
+
+        {conta.trabalhos.map((t) => <div className="finance-row" key={t.id}>
+          <div><strong>{compactDate(t.data)}</strong><span>{(t.descricao || "").replace(/^Mão de obra\s*-\s*/i, "")}</span></div>
+          {Number(t.valor)
+            ? <b>+ {money(t.valor)}</b>
+            : <div className="agenda-acoes">
+                <input value={valores[t.id] || ""} onChange={(e) => setValores({ ...valores, [t.id]: e.target.value })} placeholder="R$ combinado" style={{ maxWidth: "8rem" }} />
+                <button className="ghost" disabled={busyId === t.id || !(valores[t.id] || "").trim()} onClick={() => salvarValor(t)}>{busyId === t.id ? "..." : "Pôr valor"}</button>
+              </div>}
+        </div>)}
+
+        {conta.vales.map((v) => <div className="finance-row" key={v.id}>
+          <div><strong>{compactDate(v.data)}</strong><span>{v.descricao}</span></div>
+          <div className="agenda-acoes"><b className="saida">− {money(v.valor)}</b><button className="ghost" disabled={busyId === v.id} onClick={() => marcarAbatido(v)}>{busyId === v.id ? "..." : "Só abater"}</button></div>
+        </div>)}
+
+        {/* O ACERTO PAGA O LÍQUIDO, NUNCA O CHEIO: o vale já saiu do caixa no dia em que ele pegou.
+            Pagar o total dos trabalhos aqui faria o mesmo dinheiro sair duas vezes. */}
+        {conta.pendencias > 0 && <p className="ficha-note">Falta valor em {conta.pendencias} trabalho(s) — o acerto não fecha assim, senão você paga por baixo.</p>}
+        {conta.trabalhos.length > 0 && (confirmando === conta.nome
+          ? <div className="agenda-acoes">
+              <span>{money(conta.somaTrabalho)} de trabalho {conta.somaVale ? `− ${money(conta.somaVale)} de vale ` : ""}= <strong>{money(Math.max(0, conta.liquido))} do caixa agora</strong></span>
+              <button className="primary" disabled={busyId === "acerto-" + conta.nome} onClick={() => acertar(conta)}>{busyId === "acerto-" + conta.nome ? "Fechando…" : "Confirmar acerto"}</button>
+              <button className="ghost" onClick={() => setConfirmando(null)}>Cancelar</button>
+            </div>
+          : <button className="ghost" disabled={conta.pendencias > 0} onClick={() => setConfirmando(conta.nome)}>Acertar com {conta.nome}</button>)}
+      </div>)}
+    </section>
+
+    {(abatidos.length > 0 || acertados.length > 0) && <section className="content-card"><div className="card-head"><div><p className="kicker">HISTÓRICO</p><h3>Já acertado</h3></div></div>
+      {acertados.map((t) => <div className="finance-row" key={t.id}><div><strong>{t.descricao.replace(MAO_DE_OBRA_ACERTADA_TAG, "").replace(/^Mão de obra\s*-\s*/i, "")}</strong><span>{compactDate(t.data)} · pago no acerto</span></div><b>{money(t.valor)}</b></div>)}
+      {abatidos.map((v) => <div className="finance-row" key={v.id}><div><strong>{v.descricao.replace(VALE_ABATIDO_TAG, "")}</strong><span>{compactDate(v.data)} · vale abatido</span></div><b className="saida">− {money(v.valor)}</b></div>)}
+    </section>}
   </div>;
 }
 
@@ -3795,7 +4034,10 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
 // SAÍDAS FUTURAS: conta que já está comprometida mas ainda não saiu do caixa (parcela de cartão, aluguel).
 // Fica com status "a_pagar", então o saldo do Financeiro NÃO se mexe até ser paga de verdade aqui.
 // Vale tem aba própria e material a comprar aparece em Compras — por isso saem desta lista.
-function ehSaidaFutura(item) { return item.tipo === "saida" && item.status === "a_pagar" && item.categoria !== "Vale" && item.categoria !== CATEGORIA_MATERIAL; }
+// Mão de obra anotada também sai: ela vive na aba Profissionais, onde é somada CONTRA os vales dele. Se
+// entrasse aqui, "A pagar" mostraria o valor cheio dos trabalhos ignorando o que já foi adiantado — número
+// maior que a dívida real, justamente na tela que ele usa pra decidir de onde tirar dinheiro.
+function ehSaidaFutura(item) { return item.tipo === "saida" && item.status === "a_pagar" && item.categoria !== "Vale" && item.categoria !== CATEGORIA_MATERIAL && item.categoria !== CATEGORIA_MAO_DE_OBRA; }
 function somaDiaMes(dataISO, meses) {
   const [a, m, d] = dataISO.split("-").map(Number);
   const base = new Date(a, m - 1 + meses, 1);
