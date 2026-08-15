@@ -34,5 +34,12 @@ editor Monaco e quebra a sintaxe.
 | `2026-08-14_p0_seguranca.sql` | _pendente — precisa da sessão do Diego no painel do Supabase_ | — |
 | `2026-08-14_indices_desempenho.sql` | _pendente_ | — |
 
+Revisão de 15/08 (conferência do ChatGPT Work) no arquivo de segurança: a política de
+`fornecedores` deixou de liberar o papel genérico `authenticated` e passou a perguntar
+por uma lista de usuários autorizados (`usuarios_autorizados` + função
+`usuario_autorizado()`); e duplicata de agenda agora **interrompe** a migração em vez de
+só avisar. A mesma política nas outras tabelas (item nº 8 da auditoria) fica pra depois
+de confirmar que o app continua operando com `fornecedores`.
+
 O histórico anterior a esta pasta está em `TRAVAS_BANCO.sql` (travas 1 a 8; as
 travas 1 a 7 estão no banco, a 8 virou a migração de 14/08) e `CICLO_COBRANCA.sql`.

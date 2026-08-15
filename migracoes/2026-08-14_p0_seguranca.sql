@@ -19,23 +19,71 @@
 -- ----------------------------------------------------------------------------
 -- 1. RLS na tabela fornecedores (Advisor: "RLS disabled in public")
 -- Era a única tabela pública sem RLS: qualquer chave anônima lia e escrevia a
--- lista de fornecedores, telefone de contato incluído. A política é a mesma das
--- outras tabelas — quem está autenticado no app faz tudo, anônimo não faz nada.
--- O (select auth.role()) no lugar de auth.role() é a forma recomendada pelo
--- Supabase: assim o Postgres avalia uma vez por consulta, não uma vez por linha.
+-- lista de fornecedores, telefone de contato incluído.
+--
+-- REVISADO EM 15/08 depois da conferência do ChatGPT Work: a primeira versão
+-- liberava para o papel `authenticated`, o que bloqueia anônimo mas autoriza
+-- QUALQUER usuário autenticado do projeto. Como a decisão de quem pode operar não
+-- pode morar num papel genérico, entra uma lista de usuários autorizados e a
+-- política pergunta por ela.
+--
+-- A função é SECURITY DEFINER de propósito: sem isso, consultar a lista de dentro
+-- da política da própria lista vira recursão. Ela só devolve verdadeiro/falso.
+--
+-- ESTA MIGRAÇÃO MEXE SÓ EM fornecedores. Aplicar a mesma política às outras
+-- tabelas (item nº 8 da auditoria) é o passo seguinte, depois de confirmar aqui
+-- que o app continua lendo e gravando normal — trocar tudo de uma vez arrisca
+-- deixar o Diego sem app no meio do expediente.
 -- ----------------------------------------------------------------------------
-alter table public.fornecedores enable row level security;
+create table if not exists public.usuarios_autorizados (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  criado_em timestamptz not null default now()
+);
 
+alter table public.usuarios_autorizados enable row level security;
+drop policy if exists autorizado_le_a_si on public.usuarios_autorizados;
+create policy autorizado_le_a_si on public.usuarios_autorizados
+  for select to authenticated
+  using ((select auth.uid()) = user_id);
+
+-- Quem opera hoje. Se um dia entrar outra pessoa (ou outra conta do Diego), é
+-- uma linha aqui — não é mexer em política.
+insert into public.usuarios_autorizados (user_id, email)
+select id, email from auth.users where lower(email) = 'dieegguin@gmail.com'
+on conflict (user_id) do nothing;
+
+-- TRAVA DE SEGURANÇA DA PRÓPRIA MIGRAÇÃO: se a lista ficar vazia (e-mail
+-- diferente do esperado, por exemplo), a política nova trancaria o app inteiro
+-- pra fora dos fornecedores. Melhor parar aqui e não aplicar nada.
+do $$
+begin
+  if not exists (select 1 from public.usuarios_autorizados) then
+    raise exception 'Nenhum usuário autorizado foi encontrado em auth.users. Confira o e-mail de login antes de aplicar — sem isso a política tranca o app.';
+  end if;
+end $$;
+
+create or replace function public.usuario_autorizado() returns boolean
+language sql stable security definer set search_path = public, pg_temp as $$
+  select exists (select 1 from public.usuarios_autorizados u where u.user_id = auth.uid());
+$$;
+
+alter table public.fornecedores enable row level security;
 drop policy if exists auth_all on public.fornecedores;
-create policy auth_all on public.fornecedores
+drop policy if exists operador_autorizado on public.fornecedores;
+create policy operador_autorizado on public.fornecedores
   for all
   to authenticated
-  using ((select auth.role()) = 'authenticated')
-  with check ((select auth.role()) = 'authenticated');
+  using ((select public.usuario_autorizado()))
+  with check ((select public.usuario_autorizado()));
 
 -- Confere depois de rodar (tem que voltar rowsecurity = true e 1 política):
 --   select relrowsecurity from pg_class where relname = 'fornecedores';
 --   select polname from pg_policy where polrelid = 'public.fornecedores'::regclass;
+-- E, com a sessão do app aberta, abrir a aba Fornecedores: tem que listar os 10
+-- cadastros normalmente. Se vier vazio, desfaça com:
+--   drop policy if exists operador_autorizado on public.fornecedores;
+--   alter table public.fornecedores disable row level security;
 
 
 -- ----------------------------------------------------------------------------
@@ -86,11 +134,12 @@ alter function public.trava_caixa_print_precisa_ser_lido() set search_path = pub
 
 -- ----------------------------------------------------------------------------
 -- 4. Índice único que impede o mesmo compromisso duas vezes
--- Índice único NÃO aceita NOT VALID: se existir duplicata, a criação falha e o
--- resto da migração para. Por isso o bloco confere antes e avisa em vez de
--- quebrar — se aparecer a mensagem, é pra consolidar as duplicatas primeiro
--- (mudar a errada, nunca apagar — Regra Nº 7) e rodar de novo.
--- Na auditoria de 14/08 não havia duplicata ativa.
+-- Índice único NÃO aceita NOT VALID: se existir duplicata, a criação falha.
+-- Havendo duplicata, esta migração FALHA de propósito (corrigido em 15/08, a
+-- pedido da conferência: antes só emitia aviso, e um aviso no meio de um script
+-- longo passa batido — daria pra achar que aplicou tudo quando não aplicou).
+-- Se falhar: consolidar as duplicatas primeiro (mudar a errada, nunca apagar —
+-- Regra Nº 7) e rodar de novo. Na auditoria de 14/08 não havia duplicata ativa.
 -- ----------------------------------------------------------------------------
 do $$
 declare
@@ -105,12 +154,11 @@ begin
   ) d;
 
   if duplicadas > 0 then
-    raise notice 'ÍNDICE NÃO CRIADO: existem % combinações de serviço+título+data duplicadas na agenda. Consolide antes e rode de novo.', duplicadas;
-  else
-    execute 'drop index if exists agenda_sem_duplicata';
-    execute 'create unique index agenda_sem_duplicata on public.agenda (servico_id, titulo, data) where servico_id is not null';
-    raise notice 'Índice agenda_sem_duplicata criado.';
+    raise exception 'ÍNDICE NÃO CRIADO E MIGRAÇÃO INTERROMPIDA: existem % combinações de serviço+título+data duplicadas na agenda. Rode "select servico_id, titulo, data, count(*) from agenda group by 1,2,3 having count(*) > 1", consolide e execute de novo.', duplicadas;
   end if;
+
+  execute 'drop index if exists agenda_sem_duplicata';
+  execute 'create unique index agenda_sem_duplicata on public.agenda (servico_id, titulo, data) where servico_id is not null';
 end $$;
 
 
@@ -120,7 +168,16 @@ end $$;
 select
   (select relrowsecurity from pg_class where relname = 'fornecedores') as fornecedores_com_rls,
   (select count(*) from pg_policy where polrelid = 'public.fornecedores'::regclass) as politicas_fornecedores,
+  (select count(*) from public.usuarios_autorizados) as operadores_autorizados,
   (select count(*) from pg_trigger where tgname = 'trg_caixa_print_precisa_ser_lido') as trava_print,
   (select count(*) from pg_trigger where tgname = 'trg_agenda_feito_no_futuro') as trava_agenda_futuro,
   (select count(*) from pg_indexes where indexname = 'agenda_sem_duplicata') as indice_agenda;
--- Esperado: true, 1, 1, 1, 1
+-- Esperado: true, 1, 1, 1, 1, 1
+
+
+-- ----------------------------------------------------------------------------
+-- 6. CONFERÊNCIA MANUAL, fora do SQL (item nº 8 da auditoria)
+-- No painel do Supabase: Authentication > Providers > Email, conferir que o
+-- cadastro público (Allow new users to sign up) está DESLIGADO. O app já usa
+-- shouldCreateUser:false, mas isso é só a tela — quem chama a API direto ignora.
+-- ----------------------------------------------------------------------------

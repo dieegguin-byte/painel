@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Testes — Central Operacional</title>
+<!--
+  TESTES DA REGRA DE MATERIAL E DE HORÁRIO — criado em 15/08/2026 a pedido da conferência do ChatGPT Work.
+
+  POR QUE ASSIM: este PC não tem node nem python, e o nova.html é um arquivo só que transpila com Babel no
+  navegador. Então o teste roda no mesmo lugar em que o app roda: esta página carrega o código do
+  nova.html, transpila igual, e chama as funções com um BANCO FALSO em memória. Nenhuma linha de cliente
+  real é lida ou escrita — o `db` daqui é um objeto de mentira que devolve o que o teste mandou.
+
+  COMO RODAR: abrir esta página por HTTP (o fetch do nova.html não funciona em file://). Um servidor
+  estático qualquer serve; o jeito usado aqui foi um HttpListener de PowerShell na porta 8765.
+      http://localhost:8765/testes.html
+  Verde = passou, vermelho = quebrou. O número final é o que vale.
+-->
+<style>
+  body{font-family:ui-monospace,Consolas,monospace;background:#14100e;color:#e8dcd2;margin:0;padding:24px;line-height:1.5}
+  h1{font-size:18px;margin:0 0 4px}
+  p.sub{color:#a4938a;margin:0 0 20px;font-size:13px}
+  .grupo{margin:18px 0 6px;color:#e9a178;font-size:13px;text-transform:uppercase;letter-spacing:.08em}
+  .t{padding:5px 0;border-bottom:1px solid #2a211d;font-size:13px}
+  .ok::before{content:"PASSOU  ";color:#7fbf8f;font-weight:700}
+  .falhou::before{content:"FALHOU  ";color:#e8776a;font-weight:700}
+  .falhou{color:#e8776a}
+  .detalhe{display:block;color:#a4938a;padding-left:64px;font-size:12px}
+  #placar{position:sticky;top:0;background:#14100e;padding:12px 0;font-size:15px;border-bottom:1px solid #2a211d}
+</style>
+</head>
+<body>
+<h1>Testes — regra de material e de horário</h1>
+<p class="sub">Banco falso em memória. Nenhum dado real é tocado.</p>
+<div id="placar">carregando o nova.html…</div>
+<div id="saida"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
+<script>
+const saida = document.getElementById("saida");
+const placar = document.getElementById("placar");
+let passou = 0, falhou = 0;
+function grupo(nome) { const d = document.createElement("div"); d.className = "grupo"; d.textContent = nome; saida.appendChild(d); }
+function checar(nome, condicao, detalhe) {
+  const d = document.createElement("div");
+  d.className = "t " + (condicao ? "ok" : "falhou");
+  d.textContent = nome;
+  if (detalhe !== undefined && !condicao) { const s = document.createElement("span"); s.className = "detalhe"; s.textContent = "recebi: " + JSON.stringify(detalhe); d.appendChild(s); }
+  saida.appendChild(d);
+  condicao ? passou++ : falhou++;
+}
+const igual = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// ---------------------------------------------------------------------------
+// BANCO FALSO. Só o que as operações usam: from(tabela).select().eq().eq() /
+// .update().eq().select().single() / .insert(). Guarda as linhas em memória e
+// registra tudo que foi escrito, pra o teste conferir o efeito.
+// ---------------------------------------------------------------------------
+function bancoFalso(tabelas) {
+  const dados = JSON.parse(JSON.stringify(tabelas || {}));
+  const escritas = [];
+  const falhas = {}; // { tabela: "update" } faz aquela escrita falhar, pra testar estado parcial
+  const filtrar = (linhas, filtros) => linhas.filter((l) => filtros.every(([col, val]) => l[col] === val));
+  function consulta(tabela, modo, payload) {
+    const linhas = dados[tabela] || (dados[tabela] = []);
+    const filtros = [];
+    const api = {
+      eq(col, val) { filtros.push([col, val]); return api; },
+      select() { return api; },
+      single() { return api.then((r) => ({ data: (r.data || [])[0] || null, error: r.error })); },
+      maybeSingle() { return api.single(); },
+      then(resolve) {
+        if (falhas[tabela] === modo) return resolve({ data: null, error: { message: "falha simulada em " + tabela + "." + modo } });
+        if (modo === "select") return resolve({ data: filtrar(linhas, filtros), error: null });
+        if (modo === "update") {
+          const alvos = filtrar(linhas, filtros);
+          alvos.forEach((l) => Object.assign(l, payload));
+          escritas.push({ tabela, modo, payload, ids: alvos.map((l) => l.id) });
+          return resolve({ data: alvos, error: null });
+        }
+        if (modo === "insert") {
+          const novos = (Array.isArray(payload) ? payload : [payload]).map((p, n) => ({ id: tabela[0] + "-novo-" + (linhas.length + n + 1), ...p }));
+          linhas.push(...novos);
+          escritas.push({ tabela, modo, payload });
+          return resolve({ data: novos, error: null });
+        }
+        return resolve({ data: null, error: null });
+      },
+    };
+    return api;
+  }
+  return {
+    dados, escritas, falhas,
+    from(tabela) {
+      return {
+        select: () => consulta(tabela, "select"),
+        update: (payload) => consulta(tabela, "update", payload),
+        insert: (payload) => consulta(tabela, "insert", payload),
+        delete: () => consulta(tabela, "delete"),
+      };
+    },
+  };
+}
+
+// Carrega o código do app do mesmo jeito que a página real: pega o <script type="text/plain" id="app-source">
+// do nova.html, transpila com Babel (runtime clássico) e roda. Assim o teste sempre usa o código publicado,
+// nunca uma cópia que envelhece.
+async function carregarApp() {
+  const html = await fetch("nova.html?t=" + Date.now()).then((r) => r.text());
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const fonte = doc.querySelector("#app-source")?.textContent;
+  if (!fonte) throw new Error("não achei o #app-source dentro do nova.html");
+  // React não existe aqui: as funções puras e as operações não precisam dele, mas o arquivo inteiro
+  // referencia React no topo. Basta um objeto de mentira pra o script rodar até o fim.
+  window.React = window.React || { createElement: () => null, useState: () => [null, () => {}], useEffect: () => {}, useMemo: (f) => f(), useCallback: (f) => f, useRef: () => ({ current: null }), Fragment: "fragment" };
+  window.ReactDOM = window.ReactDOM || { createRoot: () => ({ render: () => {} }) };
+  window.supabase = window.supabase || { createClient: () => ({ auth: { getSession: async () => ({ data: { session: null } }), onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }) } }) };
+  const saidaBabel = Babel.transform(fonte, { presets: [["react", { runtime: "classic" }], "typescript"], filename: "app.tsx" }).code;
+  const script = document.createElement("script");
+  script.textContent = saidaBabel;
+  document.body.appendChild(script);
+}
+
+(async () => {
+  try { await carregarApp(); } catch (e) { placar.textContent = "NÃO CONSEGUI CARREGAR O APP: " + e.message; placar.style.color = "#e8776a"; return; }
+
+  // =========================================================================
+  grupo("Material — os três estados (a comprar, a caminho, em mãos)");
+  // =========================================================================
+  const servicoCom = (materiais, extra) => ({ id: "svc-1", status: "agendado", titulo: "Reforma de sofá", materiais_necessarios: materiais, ...extra });
+  const semFinanceiro = () => bancoFalso({ financeiro: [], servicos: [], historico: [] });
+
+  let est = await materialPendenteDoServico(semFinanceiro(), servicoCom([{ item: "Espuma D33", comprado: false }]));
+  checar("item nunca comprado = pendente e entra em 'a comprar'", est.pendente && est.aComprar.length === 1 && est.emTransitoAnotado.length === 0, est);
+
+  est = await materialPendenteDoServico(semFinanceiro(), servicoCom([{ item: "Espuma D33", comprado: false, pedido: true }]));
+  checar("pedido enviado = em trânsito, continua pendente, sai de 'a comprar'", est.pendente && est.emTransitoAnotado.length === 1 && est.aComprar.length === 0, est);
+  checar("próxima ação de item a caminho é esperar, não comprar", proximaAcaoPorMaterial(est) === "Aguardar chegada do material", proximaAcaoPorMaterial(est));
+
+  est = await materialPendenteDoServico(semFinanceiro(), servicoCom([{ item: "Espuma D33", comprado: true }]));
+  checar("item em mãos = liberado", !est.pendente && proximaAcaoPorMaterial(est) === "Produzir e acompanhar o prazo", est);
+
+  est = await materialPendenteDoServico(semFinanceiro(), servicoCom([{ item: "Velho", comprado: false, arquivado: true }]));
+  checar("item arquivado não segura produção", !est.pendente, est);
+
+  est = await materialPendenteDoServico(semFinanceiro(), servicoCom([]));
+  checar("serviço sem material anotado não é tratado como pendente", !est.pendente && !est.temFonte, est);
+
+  const comCompraEmTransito = bancoFalso({ financeiro: [{ id: "f1", servico_id: "svc-1", tipo: "saida", categoria: "Material", descricao: "Tecido", status: "a_pagar" }] });
+  est = await materialPendenteDoServico(comCompraEmTransito, servicoCom([{ item: "Espuma", comprado: true }]));
+  checar("lista toda em mãos, mas compra do financeiro sem [EM MÃOS] = pendente", est.pendente && est.faltaChegar.length === 1, est);
+
+  const comCompraEmMaos = bancoFalso({ financeiro: [{ id: "f1", servico_id: "svc-1", tipo: "saida", categoria: "Material", descricao: "[EM MÃOS] Tecido", status: "pago" }] });
+  est = await materialPendenteDoServico(comCompraEmMaos, servicoCom([{ item: "Espuma", comprado: true }]));
+  checar("as duas fontes resolvidas = produção liberada", !est.pendente, est);
+
+  const misturado = bancoFalso({ financeiro: [{ id: "f1", servico_id: "svc-1", tipo: "saida", categoria: "Material", descricao: "Tecido", status: "a_pagar" }] });
+  est = await materialPendenteDoServico(misturado, servicoCom([{ item: "Pés de canto", comprado: false }]));
+  checar("faltando nas duas, a próxima ação é comprar (o que depende dele)", proximaAcaoPorMaterial(est) === "Comprar o material", proximaAcaoPorMaterial(est));
+
+  // =========================================================================
+  grupo("Confirmar a lista de compras (lista_compra_confirmada)");
+  // =========================================================================
+  const bancoConfirmar = (materiais, financeiro) => bancoFalso({
+    servicos: [{ id: "svc-1", status: "agendado", titulo: "Reforma de sofá", materiais_necessarios: materiais }],
+    financeiro: financeiro || [], historico: [], caixa_entrada: [],
+  });
+
+  let db1 = bancoConfirmar([{ item: "Espuma", comprado: true }]);
+  let erro = null;
+  try { await aplicarListaCompraConfirmadaOperacional(db1, "ev-1", { servicoId: "svc-1" }); } catch (e) { erro = e.message; }
+  checar("sem a declaração 'tudo em mãos', a operação recusa", /confirmadoTudoEmMaos/.test(erro || ""), erro);
+  checar("e não escreveu nada no serviço", !db1.escritas.some((e) => e.tabela === "servicos"), db1.escritas);
+
+  let db2 = bancoConfirmar([{ item: "Espuma", comprado: true }, { item: "Pés", comprado: false, pedido: true }]);
+  erro = null;
+  try { await aplicarListaCompraConfirmadaOperacional(db2, "ev-2", { servicoId: "svc-1", confirmadoTudoEmMaos: true }); } catch (e) { erro = e.message; }
+  checar("recusa quando um item ainda está a caminho, e diz qual", /Pés/.test(erro || "") && /a caminho/.test(erro || ""), erro);
+  checar("o item a caminho NÃO foi marcado como comprado", db2.dados.servicos[0].materiais_necessarios[1].comprado === false, db2.dados.servicos[0].materiais_necessarios);
+
+  let db3 = bancoConfirmar([{ item: "Espuma", comprado: true }, { item: "Tecido", comprado: true }]);
+  let r3 = await aplicarListaCompraConfirmadaOperacional(db3, "ev-3", { servicoId: "svc-1", confirmadoTudoEmMaos: true });
+  checar("tudo em mãos: entra em produção", r3.statusServico === "producao", r3);
+  checar("e arquiva os dois itens", db3.dados.servicos[0].materiais_necessarios.every((m) => m.arquivado), db3.dados.servicos[0].materiais_necessarios);
+
+  let db4 = bancoConfirmar([{ item: "Espuma", comprado: true }], [{ id: "f1", servico_id: "svc-1", tipo: "saida", categoria: "Material", descricao: "Tecido encomendado", status: "a_pagar" }]);
+  let r4 = await aplicarListaCompraConfirmadaOperacional(db4, "ev-4", { servicoId: "svc-1", confirmadoTudoEmMaos: true });
+  checar("lista fechada mas compra em trânsito no financeiro: NÃO entra em produção", r4.statusServico === "agendado" && r4.comprasEmTransito === 1, r4);
+  checar("e a próxima ação vira aguardar a chegada", db4.dados.servicos[0].proxima_acao === "Aguardar chegada do material", db4.dados.servicos[0].proxima_acao);
+
+  let db5 = bancoConfirmar([{ item: "Espuma", comprado: true }]);
+  db5.falhas.historico = "insert";
+  erro = null;
+  try { await aplicarListaCompraConfirmadaOperacional(db5, "ev-5", { servicoId: "svc-1", confirmadoTudoEmMaos: true }); } catch (e) { erro = e.message; }
+  checar("falha no meio (histórico) não passa em silêncio: estoura erro", !!erro, erro);
+  checar("estado parcial fica visível — o serviço já mudou antes da falha (é o que a RPC do P0 nº 1 vai resolver)", db5.dados.servicos[0].status === "producao", db5.dados.servicos[0].status);
+
+  // =========================================================================
+  grupo("Idempotência por ciclo de confirmação");
+  // =========================================================================
+  const svcA = { id: "svc-1", materiais_necessarios: [{ item: "Espuma", comprado: true }] };
+  const svcAdeNovo = { id: "svc-1", materiais_necessarios: [{ item: "espuma ", comprado: true }] };
+  const svcB = { id: "svc-1", materiais_necessarios: [{ item: "Espuma", comprado: true }, { item: "Pés de canto", comprado: true }] };
+  const svcArquivado = { id: "svc-1", materiais_necessarios: [{ item: "Espuma", comprado: true, arquivado: true }, { item: "Pés de canto", comprado: true }] };
+  checar("mesmo clique, mesma assinatura (idempotente)", assinaturaDaLista(svcA) === assinaturaDaLista(svcAdeNovo), [assinaturaDaLista(svcA), assinaturaDaLista(svcAdeNovo)]);
+  checar("item novo no mesmo dia muda a assinatura (não cai no checkpoint anterior)", assinaturaDaLista(svcA) !== assinaturaDaLista(svcB), [assinaturaDaLista(svcA), assinaturaDaLista(svcB)]);
+  checar("item já arquivado não conta na assinatura", assinaturaDaLista(svcArquivado) === assinaturaDaLista({ id: "svc-1", materiais_necessarios: [{ item: "Pés de canto", comprado: true }] }), assinaturaDaLista(svcArquivado));
+
+  // =========================================================================
+  grupo("Buscar o móvel não libera produção sozinho");
+  // =========================================================================
+  const bancoBusca = (materiais, financeiro) => bancoFalso({
+    agenda: [{ id: "ag-1", servico_id: "svc-1", titulo: "Buscar poltrona", tipo: "presencial", status: "planejado", data: "2026-08-15" }],
+    servicos: [{ id: "svc-1", status: "agendado", titulo: "Reforma", materiais_necessarios: materiais }],
+    financeiro: financeiro || [], historico: [],
+  });
+
+  let db6 = bancoBusca([{ item: "Espuma", comprado: false }]);
+  let r6 = await aplicarCompromissoConcluidoOperacional(db6, "ev-6", { agendaId: "ag-1", data: "2026-08-15" });
+  checar("busca concluída com item faltando: serviço NÃO vai pra produção", r6.statusServico !== "producao", r6);
+  checar("e a próxima ação manda comprar", db6.dados.servicos[0].proxima_acao === "Comprar o material", db6.dados.servicos[0].proxima_acao);
+
+  let db7 = bancoBusca([{ item: "Espuma", comprado: true }]);
+  let r7 = await aplicarCompromissoConcluidoOperacional(db7, "ev-7", { agendaId: "ag-1", data: "2026-08-15" });
+  checar("busca concluída com tudo em mãos: entra em produção", r7.statusServico === "producao", r7);
+
+  let db8 = bancoBusca([]);
+  let r8 = await aplicarCompromissoConcluidoOperacional(db8, "ev-8", { agendaId: "ag-1", data: "2026-08-15" });
+  checar("busca sem nada anotado: não libera produção e abre espaço na lista de compras", r8.statusServico !== "producao" && (db8.dados.servicos[0].materiais_necessarios || []).length === 1, db8.dados.servicos[0]);
+
+  // =========================================================================
+  grupo("Entrega com material em aberto");
+  // =========================================================================
+  const bancoEntrega = (materiais) => bancoFalso({
+    servicos: [{ id: "svc-1", status: "producao", titulo: "Reforma", valor_orcamento: 1000, materiais_necessarios: materiais }],
+    financeiro: [], historico: [], caixa_entrada: [],
+  });
+
+  let db9 = bancoEntrega([{ item: "Pés", comprado: false }]);
+  erro = null;
+  try { await aplicarEntregaConcluidaOperacional(db9, "ev-9", { servicoId: "svc-1", valor: 1000 }); } catch (e) { erro = e.message; }
+  checar("entrega com item em aberto para na primeira tentativa", /MATERIAL_PENDENTE/.test(erro || ""), erro);
+  checar("e o serviço continua em produção (não fechou escondido)", db9.dados.servicos[0].status === "producao", db9.dados.servicos[0].status);
+
+  let db10 = bancoEntrega([{ item: "Pés", comprado: false }]);
+  let r10 = await aplicarEntregaConcluidaOperacional(db10, "ev-10", { servicoId: "svc-1", valor: 1000, overrideMaterial: true, motivoOverrideMaterial: "item sobrou por engano" });
+  checar("com override explícito, a entrega passa", db10.dados.servicos[0].status === "entregue", db10.dados.servicos[0].status);
+  const hist = (db10.dados.historico || []).map((h) => h.detalhe || "").join(" ");
+  checar("e o histórico registra a exceção com o motivo", /ENTREGUE COM MATERIAL PENDENTE/.test(hist) && /engano/.test(hist), hist);
+
+  let db11 = bancoEntrega([{ item: "Pés", comprado: true }]);
+  await aplicarEntregaConcluidaOperacional(db11, "ev-11", { servicoId: "svc-1", valor: 1000 });
+  const hist11 = (db11.dados.historico || []).map((h) => h.detalhe || "").join(" ");
+  checar("entrega normal não vira exceção no histórico", db11.dados.servicos[0].status === "entregue" && !/MATERIAL PENDENTE/.test(hist11), hist11);
+
+  // =========================================================================
+  grupo("Horário — rotina real do Diego");
+  // =========================================================================
+  // 2026-08-17 segunda (igreja) · 18 terça · 19 quarta (igreja) · 20 quinta · 21 sexta (igreja) · 22 sábado · 23 domingo
+  checar("segunda em Luziânia começa 13:30", horariosSugeridos("2026-08-17", "presencial", [], "Luziânia")[0] === "13:30", horariosSugeridos("2026-08-17", "presencial", [], "Luziânia"));
+  checar("segunda em Brasília para às 15h (estrada de volta antes da igreja)", igual(horariosSugeridos("2026-08-17", "presencial", [], "Brasília"), ["13:30", "14:00", "15:00"]), horariosSugeridos("2026-08-17", "presencial", [], "Brasília"));
+  checar("terça vai até 20h", horariosSugeridos("2026-08-18", "presencial", [], "Luziânia").includes("20:00"), horariosSugeridos("2026-08-18", "presencial", [], "Luziânia"));
+  checar("sábado vai até 20h", horariosSugeridos("2026-08-22", "presencial", [], "Luziânia").includes("20:00"), horariosSugeridos("2026-08-22", "presencial", [], "Luziânia"));
+  checar("quinta NÃO tem noite (alinhado em 15/08)", !horariosSugeridos("2026-08-20", "presencial", [], "Luziânia").includes("19:00") && !horariosParaTipo("2026-08-20", "presencial", []).includes("19:00"), horariosParaTipo("2026-08-20", "presencial", []));
+  checar("domingo não sugere nada", horariosSugeridos("2026-08-23", "presencial", [], "Luziânia").length === 0, horariosSugeridos("2026-08-23", "presencial", [], "Luziânia"));
+  checar("nenhuma sugestão automática de manhã", ["2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22"].every((d) => !horariosSugeridos(d, "presencial", [], "Luziânia").some((h) => h < "13:30")), null);
+  checar("a manhã continua existindo na escolha manual", horariosParaTipo("2026-08-17", "presencial", []).includes("08:00"), null);
+  checar("horário ocupado sai da lista", !horariosSugeridos("2026-08-17", "presencial", ["14:00"], "Luziânia").includes("14:00"), horariosSugeridos("2026-08-17", "presencial", ["14:00"], "Luziânia"));
+  checar("17h em Brasília numa segunda conflita com a igreja", conflitaComIgreja("2026-08-17", "17:00", "presencial", "Brasília"), null);
+  checar("17h em Luziânia numa segunda não conflita", !conflitaComIgreja("2026-08-17", "17:00", "presencial", "Luziânia"), null);
+  checar("tarefa remota nunca conflita com a igreja", !conflitaComIgreja("2026-08-17", "19:00", "remoto", null), null);
+  checar("horaSugerida nunca devolve manhã", horaSugerida("2026-08-17", "presencial", [], "Brasília") >= "13:30", horaSugerida("2026-08-17", "presencial", [], "Brasília"));
+
+  placar.textContent = `${passou} passaram · ${falhou} falharam`;
+  placar.style.color = falhou ? "#e8776a" : "#7fbf8f";
+})();
+</script>
+</body>
+</html>
