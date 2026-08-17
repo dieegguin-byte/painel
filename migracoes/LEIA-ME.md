@@ -31,8 +31,14 @@ editor Monaco e quebra a sintaxe.
 
 | Arquivo | Aplicada em | Por |
 |---|---|---|
-| `2026-08-14_p0_seguranca.sql` | _pendente — precisa da sessão do Diego no painel do Supabase_ | — |
-| `2026-08-14_indices_desempenho.sql` | _pendente_ | — |
+| `2026-08-14_p0_seguranca.sql` | **17/08/2026** — em três migrações: `p0_seguranca_rls_fornecedores`, `p0_seguranca_trava_print_e_search_path`, `p0_seguranca_indice_agenda_sem_duplicata` | Claude, com o Supabase conectado pelo Diego |
+| `2026-08-14_indices_desempenho.sql` | _pendente — a aplicação foi barrada pelo classificador de segurança do Claude Code; refazer com autorização explícita do Diego_ | — |
+
+Conferido depois de aplicar: `fornecedores` com RLS e 1 política, 1 operador autorizado, trava do print e
+trava de agenda no futuro ativas, `agenda_sem_duplicata` criado, as duas funções com `search_path` fixo.
+A trava do print foi testada de verdade (item fictício criado, tentativa de fechar recusada, tudo desfeito
+pela exceção final — nada sobrou na caixa) e a política de fornecedores foi testada simulando as duas
+sessões: o Diego lê os 10 cadastros, anônimo lê zero.
 
 Revisão de 15/08 (conferência do ChatGPT Work) no arquivo de segurança: a política de
 `fornecedores` deixou de liberar o papel genérico `authenticated` e passou a perguntar
