@@ -33,6 +33,7 @@ editor Monaco e quebra a sintaxe.
 |---|---|---|
 | `2026-08-14_p0_seguranca.sql` | **17/08/2026** — em três migrações: `p0_seguranca_rls_fornecedores`, `p0_seguranca_trava_print_e_search_path`, `p0_seguranca_indice_agenda_sem_duplicata` | Claude, com o Supabase conectado pelo Diego |
 | `2026-08-14_indices_desempenho.sql` | _pendente — a aplicação foi barrada pelo classificador de segurança do Claude Code; refazer com autorização explícita do Diego_ | — |
+| `2026-08-20_ponte_classic_github.sql` | **20/08/2026** — em quatro migrações: `ponte_classic_github_tabela`, `ponte_classic_github_travas`, `ponte_classic_github_disparo` e a correção `ponte_classic_github_corrige_byte_nulo` | Claude |
 
 Conferido depois de aplicar: `fornecedores` com RLS e 1 política, 1 operador autorizado, trava do print e
 trava de agenda no futuro ativas, `agenda_sem_duplicata` criado, as duas funções com `search_path` fixo.
@@ -46,6 +47,15 @@ por uma lista de usuários autorizados (`usuarios_autorizados` + função
 `usuario_autorizado()`); e duplicata de agenda agora **interrompe** a migração em vez de
 só avisar. A mesma política nas outras tabelas (item nº 8 da auditoria) fica pra depois
 de confirmar que o app continua operando com `fornecedores`.
+
+Sobre a migração de 20/08 (ponte Classic → GitHub): as nove travas da fila foram
+testadas de verdade contra o banco, dentro de um bloco que faz rollback no fim —
+nada sobrou na tabela. O teste pegou um erro meu: a checagem de byte nulo usava
+`chr(0)`, que no Postgres derruba a própria função com _"null character not
+permitted"_, recusando até pedido legítimo. A checagem era redundante (`text` não
+consegue conter byte nulo) e saiu. **Lição pra próxima migração com validação em
+plpgsql: testar também o caminho feliz, não só os que devem ser recusados** — os
+recusados passariam mesmo com a função quebrada.
 
 O histórico anterior a esta pasta está em `TRAVAS_BANCO.sql` (travas 1 a 8; as
 travas 1 a 7 estão no banco, a 8 virou a migração de 14/08) e `CICLO_COBRANCA.sql`.
