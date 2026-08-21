@@ -15,7 +15,6 @@ function validDate(value: string | null): string | null {
 export default {
   fetch: withSupabase({ auth: "user", cors: "default" }, async (req, ctx) => {
     if (req.method !== "GET") return Response.json({ error: "method_not_allowed" }, { status: 405 });
-
     const userId = String(ctx.userClaims?.id ?? "").trim();
     if (!userId) return Response.json({ error: "forbidden" }, { status: 403 });
 
@@ -24,7 +23,6 @@ export default {
       .select("user_id")
       .eq("user_id", userId)
       .maybeSingle();
-
     if (allowError || !allowed) return Response.json({ error: "forbidden" }, { status: 403 });
 
     const url = new URL(req.url);
@@ -42,20 +40,10 @@ export default {
 
     try {
       const [clients, services, agenda, finance] = await Promise.all([
-        read("clientes"),
-        read("servicos"),
-        read("agenda", "data"),
-        read("financeiro", "data"),
+        read("clientes"), read("servicos"), read("agenda", "data"), read("financeiro", "data"),
       ]);
-
-      return Response.json({
-        mode: "shadow-read",
-        captured_at: new Date().toISOString(),
-        clients,
-        services,
-        agenda,
-        finance,
-      }, { headers: { "Cache-Control": "no-store" } });
+      return Response.json({ mode: "shadow-read", captured_at: new Date().toISOString(), clients, services, agenda, finance },
+        { headers: { "Cache-Control": "no-store" } });
     } catch {
       return Response.json({ error: "shadow_read_failed" }, { status: 502, headers: { "Cache-Control": "no-store" } });
     }

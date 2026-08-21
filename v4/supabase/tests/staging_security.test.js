@@ -1,0 +1,10 @@
+const fs = require("fs");
+const app = fs.readFileSync("v4/staging/staging-app.js", "utf8");
+const api = fs.readFileSync("v4/supabase/functions/v4-shadow-read/index.ts", "utf8");
+const seed = fs.readFileSync("v4/supabase/seed.sql", "utf8");
+for (const bad of [".insert(", ".update(", ".delete(", ".upsert(", ".rpc("]) if (app.includes(bad)) throw new Error(`frontend mutation found: ${bad}`);
+for (const bad of [".insert(", ".update(", ".delete(", ".upsert(", ".rpc(", "supabaseAdmin"]) if (api.includes(bad)) throw new Error(`shadow API mutation/admin found: ${bad}`);
+if (!api.includes('req.method !== "GET"')) throw new Error("shadow API must be GET-only");
+if (seed.includes("insert into auth.users")) throw new Error("seed must not write auth.users directly");
+if (!app.includes("v4-shadow-read")) throw new Error("frontend must use v4-shadow-read");
+console.log("staging security contract: ok");

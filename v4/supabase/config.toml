@@ -9,4 +9,4 @@ enabled = true
 site_url = "http://127.0.0.1:3000"
 
 [functions.v4-shadow-read]
-verify_jwt = true
+verify_jwt = false
