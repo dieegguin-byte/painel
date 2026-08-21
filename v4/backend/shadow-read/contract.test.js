@@ -1,0 +1,11 @@
+'use strict';
+const fs=require('node:fs');const assert=require('node:assert/strict');
+const s=fs.readFileSync(__dirname+'/index.ts','utf8');
+assert.match(s,/npm:@supabase\/server@1\.4\.1/);
+assert.match(s,/auth:\s*"user"/);
+assert.match(s,/V4_SHADOW_ALLOWED_USER_IDS/);
+assert.match(s,/req\.method !== "GET"/);
+assert.doesNotMatch(s,/supabaseAdmin/);
+for(const mutation of ['.insert(','.update(','.delete(','.upsert(','.rpc('])assert.equal(s.includes(mutation),false,mutation+' proibido');
+assert.match(s,/Math\.min\(500/);
+console.log('shadow-read edge contract: ok');
