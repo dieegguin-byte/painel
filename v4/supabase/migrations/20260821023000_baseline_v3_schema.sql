@@ -1,8 +1,7 @@
 -- Operacao Bahia V4 - baseline estrutural capturada da producao
 -- Captura: 2026-08-21
--- IMPORTANTE: este arquivo reproduz o estado atual para permitir teste de migracao.
--- Ele NAO representa a seguranca desejada da V4. Policies legadas permissivas sao
--- preservadas de proposito para que o caminho baseline -> hardening possa ser testado.
+-- IMPORTANTE: reproduz o estado atual para testar o caminho V3 -> V4.
+-- Policies legadas permissivas sao preservadas nesta baseline de proposito.
 
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE SCHEMA IF NOT EXISTS vault;
@@ -230,33 +229,25 @@ CREATE TABLE public.usuarios_autorizados (
   criado_em timestamp with time zone DEFAULT now() NOT NULL
 );
 
--- CONSTRAINTS
+-- CONSTRAINTS LOCAIS PRIMEIRO (PK/UNIQUE/CHECK)
 ALTER TABLE public.agenda ADD CONSTRAINT agenda_pkey PRIMARY KEY (id);
 ALTER TABLE public.agenda ADD CONSTRAINT agenda_presencial_precisa_hora_cidade CHECK (tipo IS DISTINCT FROM 'presencial'::text OR hora IS NOT NULL AND cidade IS NOT NULL AND btrim(cidade) <> ''::text) NOT VALID;
-ALTER TABLE public.agenda ADD CONSTRAINT agenda_servico_id_fkey FOREIGN KEY (servico_id) REFERENCES servicos(id) ON DELETE SET NULL;
 ALTER TABLE public.agenda ADD CONSTRAINT agenda_status_check CHECK (status = ANY (ARRAY['planejado'::text, 'feito'::text, 'cancelado'::text]));
 ALTER TABLE public.caixa_entrada ADD CONSTRAINT caixa_entrada_pkey PRIMARY KEY (id);
 ALTER TABLE public.clientes ADD CONSTRAINT clientes_pkey PRIMARY KEY (id);
 ALTER TABLE public.clientes ADD CONSTRAINT clientes_telefone_celular_br CHECK (telefone IS NULL OR regexp_replace(telefone, '\D'::text, ''::text, 'g'::text) ~ '^55[1-9][0-9]9[6-9][0-9]{7}$'::text) NOT VALID;
 ALTER TABLE public.config ADD CONSTRAINT config_id_check CHECK (id = 1);
 ALTER TABLE public.config ADD CONSTRAINT config_pkey PRIMARY KEY (id);
-ALTER TABLE public.dividas ADD CONSTRAINT dividas_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES clientes(id);
-ALTER TABLE public.dividas ADD CONSTRAINT dividas_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
 ALTER TABLE public.dividas ADD CONSTRAINT dividas_pkey PRIMARY KEY (id);
 ALTER TABLE public.dividas ADD CONSTRAINT dividas_status_check CHECK (status = ANY (ARRAY['aberta'::text, 'quitada'::text]));
 ALTER TABLE public.estoque ADD CONSTRAINT estoque_pkey PRIMARY KEY (id);
-ALTER TABLE public.financeiro ADD CONSTRAINT financeiro_agenda_id_fkey FOREIGN KEY (agenda_id) REFERENCES agenda(id) ON DELETE SET NULL;
 ALTER TABLE public.financeiro ADD CONSTRAINT financeiro_escopo_check CHECK (escopo = ANY (ARRAY['empresa'::text, 'pro_labore'::text, 'pessoal'::text]));
-ALTER TABLE public.financeiro ADD CONSTRAINT financeiro_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id) ON DELETE SET NULL;
 ALTER TABLE public.financeiro ADD CONSTRAINT financeiro_material_precisa_fornecedor CHECK (categoria IS DISTINCT FROM 'Material'::text OR fornecedor_id IS NOT NULL) NOT VALID;
 ALTER TABLE public.financeiro ADD CONSTRAINT financeiro_pkey PRIMARY KEY (id);
-ALTER TABLE public.financeiro ADD CONSTRAINT financeiro_servico_id_fkey FOREIGN KEY (servico_id) REFERENCES servicos(id) ON DELETE SET NULL;
 ALTER TABLE public.financeiro ADD CONSTRAINT financeiro_status_check CHECK (status = ANY (ARRAY['pago'::text, 'a_receber'::text, 'a_pagar'::text]));
 ALTER TABLE public.financeiro ADD CONSTRAINT financeiro_tipo_check CHECK (tipo = ANY (ARRAY['entrada'::text, 'saida'::text]));
 ALTER TABLE public.fornecedores ADD CONSTRAINT fornecedores_pkey PRIMARY KEY (id);
-ALTER TABLE public.fotos ADD CONSTRAINT fotos_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE;
 ALTER TABLE public.fotos ADD CONSTRAINT fotos_pkey PRIMARY KEY (id);
-ALTER TABLE public.fotos ADD CONSTRAINT fotos_servico_id_fkey FOREIGN KEY (servico_id) REFERENCES servicos(id) ON DELETE CASCADE;
 ALTER TABLE public.fotos ADD CONSTRAINT fotos_tipo_check CHECK (tipo = ANY (ARRAY['antes'::text, 'depois'::text, 'orcamento'::text, 'outro'::text]));
 ALTER TABLE public.github_change_requests ADD CONSTRAINT gcr_arquivos_e_lista CHECK (jsonb_typeof(arquivos) = 'array'::text AND jsonb_array_length(arquivos) >= 1 AND jsonb_array_length(arquivos) <= 20);
 ALTER TABLE public.github_change_requests ADD CONSTRAINT gcr_base_nao_e_saida CHECK (branch IS NULL OR branch <> base_branch);
@@ -274,12 +265,22 @@ ALTER TABLE public.marketing_atribuicoes ADD CONSTRAINT marketing_atribuicoes_pk
 ALTER TABLE public.marketing_atribuicoes ADD CONSTRAINT marketing_atribuicoes_tracking_ref_key UNIQUE (tracking_ref);
 ALTER TABLE public.rotinas ADD CONSTRAINT rotinas_pkey PRIMARY KEY (id);
 ALTER TABLE public.servicos ADD CONSTRAINT servicos_ativo_precisa_prazo CHECK (prazo IS NOT NULL OR (status = ANY (ARRAY['entregue'::text, 'perdido'::text])));
-ALTER TABLE public.servicos ADD CONSTRAINT servicos_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL;
 ALTER TABLE public.servicos ADD CONSTRAINT servicos_entregue_precisa_valor CHECK (status <> 'entregue'::text OR valor_orcamento IS NOT NULL) NOT VALID;
 ALTER TABLE public.servicos ADD CONSTRAINT servicos_pkey PRIMARY KEY (id);
 ALTER TABLE public.servicos ADD CONSTRAINT servicos_prioridade_check CHECK (prioridade = ANY (ARRAY['alta'::text, 'media'::text, 'baixa'::text]));
 ALTER TABLE public.servicos ADD CONSTRAINT servicos_status_check CHECK (status = ANY (ARRAY['lead'::text, 'orcamento'::text, 'agendado'::text, 'producao'::text, 'entregue'::text, 'pago'::text, 'perdido'::text]));
 ALTER TABLE public.usuarios_autorizados ADD CONSTRAINT usuarios_autorizados_pkey PRIMARY KEY (user_id);
+
+-- FOREIGN KEYS DEPOIS QUE TODAS AS PK/UNIQUE EXISTEM
+ALTER TABLE public.agenda ADD CONSTRAINT agenda_servico_id_fkey FOREIGN KEY (servico_id) REFERENCES servicos(id) ON DELETE SET NULL;
+ALTER TABLE public.dividas ADD CONSTRAINT dividas_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES clientes(id);
+ALTER TABLE public.dividas ADD CONSTRAINT dividas_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id);
+ALTER TABLE public.financeiro ADD CONSTRAINT financeiro_agenda_id_fkey FOREIGN KEY (agenda_id) REFERENCES agenda(id) ON DELETE SET NULL;
+ALTER TABLE public.financeiro ADD CONSTRAINT financeiro_fornecedor_id_fkey FOREIGN KEY (fornecedor_id) REFERENCES fornecedores(id) ON DELETE SET NULL;
+ALTER TABLE public.financeiro ADD CONSTRAINT financeiro_servico_id_fkey FOREIGN KEY (servico_id) REFERENCES servicos(id) ON DELETE SET NULL;
+ALTER TABLE public.fotos ADD CONSTRAINT fotos_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE;
+ALTER TABLE public.fotos ADD CONSTRAINT fotos_servico_id_fkey FOREIGN KEY (servico_id) REFERENCES servicos(id) ON DELETE CASCADE;
+ALTER TABLE public.servicos ADD CONSTRAINT servicos_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL;
 ALTER TABLE public.usuarios_autorizados ADD CONSTRAINT usuarios_autorizados_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 -- INDICES NAO CRIADOS POR CONSTRAINTS
@@ -524,7 +525,7 @@ CREATE VIEW public.vw_marketing_funil WITH (security_invoker=true) AS
     COALESCE(sum(valor_orcamento) FILTER (WHERE status = 'entregue'::text), 0::numeric) AS valor_entregue
    FROM servicos
   WHERE tracking_ref IS NOT NULL OR origem_campanha_id IS NOT NULL OR origem_plataforma IS NOT NULL OR gclid IS NOT NULL OR gbraid IS NOT NULL OR wbraid IS NOT NULL OR utm_source IS NOT NULL
-  GROUP BY (COALESCE(NULLIF(origem_plataforma, ''::text), 'nao_identificada'::text)), origem_campanha_id, origem_campanha_nome, landing_page;;
+  GROUP BY (COALESCE(NULLIF(origem_plataforma, ''::text), 'nao_identificada'::text)), origem_campanha_id, origem_campanha_nome, landing_page;
 
 -- TRIGGERS
 CREATE TRIGGER trg_agenda_feito_no_futuro BEFORE INSERT OR UPDATE ON agenda FOR EACH ROW EXECUTE FUNCTION trava_agenda_feito_no_futuro();
