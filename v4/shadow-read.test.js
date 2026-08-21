@@ -1,0 +1,28 @@
+'use strict';
+const assert=require('node:assert/strict');
+const c=require('./shadow-core-v2');
+const a=require('./shadow-read-adapter');
+assert.equal(c.serviceStage({status:'lead'}).value,'lead');
+assert.equal(c.serviceStage({status:'entregue'}).value,'entregue');
+assert.equal(c.serviceStage({status:'qualquer'}).certainty,'insufficient');
+assert.equal(c.agendaLifecycle({status:'planejado'}).value,'planejado');
+assert.equal(c.agendaLifecycle({status:'feito'}).value,'feito');
+assert.equal(c.agendaCertainty({status:'planejado'}).certainty,'insufficient');
+assert.equal(c.agendaCertainty({confirmacao:'confirmado'}).value,'confirmado');
+assert.equal(c.isReceivedRevenue({tipo:'entrada',escopo:'empresa',valor:100,status:'pago'}).value,true);
+assert.equal(c.isReceivedRevenue({tipo:'entrada',escopo:'empresa',valor:100,status:'a_receber'}).value,false);
+assert.equal(c.isReceivedRevenue({tipo:'entrada',escopo:'empresa',valor:48.3,status:'a_pagar'}).certainty,'insufficient');
+assert.equal(c.isReceivedRevenue({tipo:'saida',escopo:'empresa',valor:100,status:'pago'}).value,false);
+const r=c.runChecks({services:[{id:'s',status:'lead'}],agenda:[{id:'a',status:'planejado'}],finance:[{id:'f',tipo:'entrada',escopo:'empresa',valor:100,status:'pago'}]});
+assert.equal(r.ok,true);
+assert.equal(r.divergences[0].priority,'P1');
+(async()=>{
+  await assert.rejects(a.loadShadowSnapshot({}),/read_only/);
+  await assert.rejects(a.loadShadowSnapshot({select:async()=>[],update:async()=>{}}),/write_capability/);
+  const calls=[];
+  const s=await a.loadShadowSnapshot({select:async(t,f,o)=>{calls.push({t,f,o});return[];}},{fromDate:'2026-08-21'});
+  assert.equal(s.source,'supabase-shadow-read');
+  assert.equal(calls.length,4);
+  assert.equal(a.FIELDS.clientes.includes('telefone'),false);
+  console.log('v4 shadow read tests: ok');
+})().catch(e=>{console.error(e);process.exit(1)});
