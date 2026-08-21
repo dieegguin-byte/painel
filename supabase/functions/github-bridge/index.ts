@@ -289,10 +289,26 @@ async function processaPedido(pedido: any, token: string) {
 // ---------------------------------------------------------------------------
 
 Deno.serve(async (req: Request) => {
-  const bridgeSecret = Deno.env.get("BRIDGE_SECRET");
-  const githubToken = Deno.env.get("GITHUB_TOKEN");
+  const bridgeSecret = Deno.env.get("BRIDGE_SECRET")?.trim();
+  // O trim não é frescura: colar o token no painel costuma trazer junto um
+  // espaço ou uma quebra de linha, e aí o header sai inválido com a mensagem
+  // ilegível "not a valid ByteString". Foi o que aconteceu no 1º teste, 20/08.
+  const githubToken = Deno.env.get("GITHUB_TOKEN")?.trim();
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRole = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  // Header HTTP só aceita ASCII visível. Em vez de estourar com "not a valid
+  // ByteString", aponta ONDE está o problema — sem nunca imprimir o token.
+  const defeitos: string[] = [];
+  if (githubToken) {
+    for (let i = 0; i < githubToken.length; i++) {
+      const c = githubToken.charCodeAt(i);
+      if (c < 0x21 || c > 0x7e) {
+        defeitos.push(`posição ${i} de ${githubToken.length}: U+${c.toString(16).padStart(4, "0")}`);
+      }
+    }
+  }
+  const tokenInvalido = githubToken && defeitos.length > 0;
 
   const responde = (corpo: unknown, status = 200) =>
     new Response(JSON.stringify(corpo), {
@@ -337,18 +353,21 @@ Deno.serve(async (req: Request) => {
     return responde({ erro: 'informe {"request_id": "..."} ou {"action": "drain"}' }, 400);
   }
 
-  if (!githubToken) {
+  if (!githubToken || tokenInvalido) {
+    const queixa = !githubToken
+      ? "GITHUB_TOKEN não configurado nos Secrets da função"
+      : "GITHUB_TOKEN tem caractere que não vale em header HTTP. " +
+        `Comprimento ${githubToken!.length}. Onde: ${defeitos.slice(0, 6).join("; ")}` +
+        (defeitos.length > 6 ? ` e mais ${defeitos.length - 6}` : "") +
+        ". (U+000a = Enter, U+0020 = espaço, U+00a0 = espaço duro, U+200b = invisível.) " +
+        "Reponha o Secret colando só o token, numa linha só.";
     for (const id of ids) {
       await db
         .from("github_change_requests")
-        .update({
-          status: "erro",
-          erro: "GITHUB_TOKEN não configurado nos Secrets da função",
-          processado_em: new Date().toISOString(),
-        })
+        .update({ status: "erro", erro: queixa, processado_em: new Date().toISOString() })
         .eq("id", id);
     }
-    return responde({ erro: "GITHUB_TOKEN não configurado nos Secrets da função" }, 500);
+    return responde({ erro: queixa }, 500);
   }
 
   const relatorio = [];
