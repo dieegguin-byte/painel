@@ -2,7 +2,13 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- ZOOM DE DOIS DEDOS DESLIGADO (Diego, 23/08/2026: "zoom com dois dedos... é para tirar").
+     Ele usa o app em pé na oficina e dentro do carro: o dedo encosta na tela, a pinça dispara
+     sozinha e a tela sai de escala no meio da leitura. Como o app agora é só visualização e
+     todo o texto já é dimensionado pra celular, ampliar não resolve nada — só atrapalha.
+     Vai nas duas frentes porque uma só não segura: o meta cobre o Android, e o touch-action
+     no CSS cobre navegador que ignora user-scalable. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#0f0d0c">
 <title>Nova Central Operacional — Tapeçaria Bahia</title>
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -110,7 +116,10 @@ window.TB = window.TB || {};
 </script>
 <style>
 :root{--bg:#0f0d0c;--surface:#181412;--surface2:#211a16;--surface3:#2a211c;--line:#3a2d26;--line2:#4b392f;--text:#fff4e9;--muted:#baa99b;--dim:#81736a;--orange:#d86d36;--orange2:#f19b65;--cream:#f3dfcb;--green:#75a987;--red:#df6a5d;--yellow:#d4a64e;--shadow:0 18px 55px rgba(0,0,0,.35)}
-*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}button,input,textarea,select{font:inherit}button{cursor:pointer}a{color:inherit}.loading-screen,.login-screen{min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 50% 0,#48220f 0,transparent 35%),linear-gradient(145deg,#15100d,#0d0b0a)}.loading-screen{text-align:center;color:var(--muted)}.brand-seal{width:68px;height:68px;border-radius:21px;display:grid;place-items:center;margin:0 auto 18px;background:linear-gradient(145deg,#ed9057,#9f4621);font:700 25px Georgia,serif;color:#fff9f1;box-shadow:0 17px 40px #0008,inset 0 1px 0 #fff5}.brand-seal.small{width:42px;height:42px;border-radius:13px;font-size:15px;margin:0;box-shadow:0 9px 20px #0007}.login-card{width:min(460px,calc(100% - 32px));background:linear-gradient(145deg,#211915,#171310);border:1px solid var(--line2);border-radius:28px;padding:38px;box-shadow:var(--shadow);text-align:center}.login-card h1{font:500 39px Georgia,serif;margin:2px 0 10px}.login-card>p:not(.kicker){color:var(--muted);font-size:14px;line-height:1.6;margin:0 auto 24px}.login-card label{display:block;text-align:left;color:var(--muted);font-size:12px}.login-card input{margin-top:7px}.login-card .primary{width:100%;margin-top:12px}.demo-button{margin-top:12px;width:100%}.success-box{padding:13px;background:#75a98716;border:1px solid #75a98755;border-radius:12px;color:#bce0c6}.kicker{font-size:10px;font-weight:800;letter-spacing:1.5px;color:var(--orange2);margin:0 0 6px;text-transform:uppercase}.product-shell{min-height:100vh;display:grid;grid-template-columns:250px 1fr;background:radial-gradient(circle at 80% -5%,#3a1c0f 0,transparent 24%),var(--bg)}.side-nav{position:fixed;inset:0 auto 0 0;width:250px;padding:22px 15px;display:flex;flex-direction:column;background:#14110fee;border-right:1px solid var(--line);backdrop-filter:blur(22px);z-index:20}.side-brand{display:flex;align-items:center;gap:11px;padding:3px 7px 24px}.side-brand strong{font-size:14px;display:block}.side-brand span{font-size:10px;color:var(--dim)}.side-nav nav{display:flex;flex-direction:column;gap:5px}.side-nav nav button{border:0;background:transparent;color:var(--muted);display:grid;grid-template-columns:36px 1fr auto;align-items:center;text-align:left;padding:10px 12px;border-radius:11px;font-size:12px}.side-nav nav button i{font-style:normal;color:#987665;font-size:26px}.side-nav nav button b{font-size:9px;background:var(--surface3);padding:2px 7px;border-radius:999px}.side-nav nav button.active{background:linear-gradient(90deg,#d86d3622,#d86d3608);color:#ffc6a0}.side-nav nav button.active i{color:#ffad78}.operator-card{margin-top:auto;background:var(--surface2);border:1px solid var(--line);border-radius:16px;padding:13px}.operator-card span,.operator-card small{display:block;color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.8px}.operator-card strong{display:block;margin:4px 0;font:500 20px Georgia,serif}.operator-card small{text-transform:none;letter-spacing:0;font-size:10px}.operator-card button{width:100%;margin-top:11px;padding:8px;border-radius:9px;border:1px solid var(--line2);background:#17120f;color:var(--cream);font-size:10px}.mode-claude .operator-card{border-color:#75a98766}.mode-claude .operator-card strong{color:#9acaaa}.workspace{grid-column:2;min-width:0;padding:26px 28px 105px;max-width:1500px;width:100%;margin:auto}.workspace-header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}.workspace-header h1{font:500 31px Georgia,serif;margin:0}.header-actions{display:flex;gap:7px}.primary,.secondary,.ghost{border-radius:10px;padding:10px 14px;font-size:11px;font-weight:750;border:1px solid transparent}.primary{color:white;background:linear-gradient(135deg,#e17a42,#ad4d24);box-shadow:0 8px 20px #8e391e38}.primary:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#2a211c;color:#f1c09d;border-color:#5a3b2b}.ghost{background:#1a1512;color:var(--muted);border-color:var(--line)}.wide{width:100%;min-height:46px}.notice{position:fixed;right:22px;top:18px;z-index:1000;width:min(410px,calc(100% - 32px));padding:12px 15px;border-radius:12px;box-shadow:var(--shadow);font-size:12px;animation:noticeIn .2s ease}.notice.ok{background:#1f422d;border:1px solid #47785a;color:#dff5e5}.notice.error{background:#48221e;border:1px solid #8f4d44;color:#ffd8d2}.notice.info{background:#3b291e;border:1px solid #74503a;color:#ffe0c7}@keyframes noticeIn{from{transform:translateY(-9px);opacity:0}to{transform:none;opacity:1}}
+*{box-sizing:border-box}html,/* Par do meta viewport: pan-x pan-y deixa rolar em qualquer direção e corta a pinça e o
+   duplo-toque. É o que segura o zoom onde user-scalable=no é ignorado. */
+html,body{touch-action:pan-x pan-y}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}button,input,textarea,select{font:inherit}button{cursor:pointer}a{color:inherit}.loading-screen,.login-screen{min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 50% 0,#48220f 0,transparent 35%),linear-gradient(145deg,#15100d,#0d0b0a)}.loading-screen{text-align:center;color:var(--muted)}.brand-seal{width:68px;height:68px;border-radius:21px;display:grid;place-items:center;margin:0 auto 18px;background:linear-gradient(145deg,#ed9057,#9f4621);font:700 25px Georgia,serif;color:#fff9f1;box-shadow:0 17px 40px #0008,inset 0 1px 0 #fff5}.brand-seal.small{width:42px;height:42px;border-radius:13px;font-size:15px;margin:0;box-shadow:0 9px 20px #0007}.login-card{width:min(460px,calc(100% - 32px));background:linear-gradient(145deg,#211915,#171310);border:1px solid var(--line2);border-radius:28px;padding:38px;box-shadow:var(--shadow);text-align:center}.login-card h1{font:500 39px Georgia,serif;margin:2px 0 10px}.login-card>p:not(.kicker){color:var(--muted);font-size:14px;line-height:1.6;margin:0 auto 24px}.login-card label{display:block;text-align:left;color:var(--muted);font-size:12px}.login-card input{margin-top:7px}.login-card .primary{width:100%;margin-top:12px}.demo-button{margin-top:12px;width:100%}.success-box{padding:13px;background:#75a98716;border:1px solid #75a98755;border-radius:12px;color:#bce0c6}.kicker{font-size:10px;font-weight:800;letter-spacing:1.5px;color:var(--orange2);margin:0 0 6px;text-transform:uppercase}.product-shell{min-height:100vh;display:grid;grid-template-columns:250px 1fr;background:radial-gradient(circle at 80% -5%,#3a1c0f 0,transparent 24%),var(--bg)}.side-nav{position:fixed;inset:0 auto 0 0;width:250px;padding:22px 15px;display:flex;flex-direction:column;background:#14110fee;border-right:1px solid var(--line);backdrop-filter:blur(22px);z-index:20}.side-brand{display:flex;align-items:center;gap:11px;padding:3px 7px 24px}.side-brand strong{font-size:14px;display:block}.side-brand span{font-size:10px;color:var(--dim)}.side-nav nav{display:flex;flex-direction:column;gap:5px}.side-nav nav button{border:0;background:transparent;color:var(--muted);display:grid;grid-template-columns:36px 1fr auto;align-items:center;text-align:left;padding:10px 12px;border-radius:11px;font-size:12px}.side-nav nav button i{font-style:normal;color:#987665;font-size:26px}.side-nav nav button b{font-size:9px;background:var(--surface3);padding:2px 7px;border-radius:999px}.side-nav nav button.active{background:linear-gradient(90deg,#d86d3622,#d86d3608);color:#ffc6a0}.side-nav nav button.active i{color:#ffad78}.operator-card{margin-top:auto;background:var(--surface2);border:1px solid var(--line);border-radius:16px;padding:13px}.operator-card span,.operator-card small{display:block;color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.8px}.operator-card strong{display:block;margin:4px 0;font:500 20px Georgia,serif}.operator-card small{text-transform:none;letter-spacing:0;font-size:10px}.operator-card button{width:100%;margin-top:11px;padding:8px;border-radius:9px;border:1px solid var(--line2);background:#17120f;color:var(--cream);font-size:10px}.mode-claude .operator-card{border-color:#75a98766}.mode-claude .operator-card strong{color:#9acaaa}.workspace{grid-column:2;min-width:0;padding:26px 28px 105px;max-width:1500px;width:100%;margin:auto}.workspace-header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}.workspace-header h1{font:500 31px Georgia,serif;margin:0}.header-actions{display:flex;gap:7px}.primary,.secondary,.ghost{border-radius:10px;padding:10px 14px;font-size:11px;font-weight:750;border:1px solid transparent}.primary{color:white;background:linear-gradient(135deg,#e17a42,#ad4d24);box-shadow:0 8px 20px #8e391e38}.primary:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#2a211c;color:#f1c09d;border-color:#5a3b2b}.ghost{background:#1a1512;color:var(--muted);border-color:var(--line)}.wide{width:100%;min-height:46px}.notice{position:fixed;right:22px;top:18px;z-index:1000;width:min(410px,calc(100% - 32px));padding:12px 15px;border-radius:12px;box-shadow:var(--shadow);font-size:12px;animation:noticeIn .2s ease}.notice.ok{background:#1f422d;border:1px solid #47785a;color:#dff5e5}.notice.error{background:#48221e;border:1px solid #8f4d44;color:#ffd8d2}.notice.info{background:#3b291e;border:1px solid #74503a;color:#ffe0c7}@keyframes noticeIn{from{transform:translateY(-9px);opacity:0}to{transform:none;opacity:1}}
 .inbox-layout{display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:18px;align-items:start}.queue-column,.triage-column{min-width:0}.triage-column{position:sticky;top:20px}.composer{background:linear-gradient(145deg,#201915,#171310);border:1px solid var(--line);border-radius:17px;padding:12px;margin-bottom:12px}.composer textarea{width:100%;min-height:86px;resize:vertical;background:transparent;color:var(--text);border:0;outline:0;padding:5px;font-size:13px;line-height:1.5}.composer-actions{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px;gap:8px}.file-button{font-size:10px;color:var(--muted);cursor:pointer;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-button input{display:none}.queue-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px}.queue-summary div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px}.queue-summary span{font-size:8px;text-transform:uppercase;color:var(--dim);letter-spacing:.5px;display:block}.queue-summary b{font-size:19px;display:block;margin-top:3px}.queue-item{width:100%;display:block;text-align:left;padding:13px 14px;margin-bottom:8px;border:1px solid var(--line);border-left:3px solid #756153;border-radius:14px;background:linear-gradient(145deg,#1d1714,#171310);color:var(--text);transition:.17s ease}.queue-item:hover,.queue-item.selected{transform:translateY(-1px);border-color:#8a5a3e;box-shadow:0 10px 25px #0003}.queue-item.selected{background:#281a13}.queue-item.status-respondido{border-left-color:#6097c0}.queue-item.status-em_processamento{border-left-color:var(--green)}.queue-item.status-aguardando_voce{border-left-color:var(--yellow)}.queue-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.queue-top time{font-size:9px;color:var(--dim)}.queue-item>strong{display:block;font-size:12px;line-height:1.45;margin-bottom:5px}.queue-item>small{font-size:9px;color:var(--dim)}.status-pill{display:inline-flex;border:1px solid #694630;background:#d86d3617;color:#f0a06f;border-radius:999px;padding:3px 8px;font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.55px}.empty-state{padding:45px 20px;text-align:center;border:1px dashed var(--line2);border-radius:16px;color:var(--muted)}.empty-state b,.empty-state span{display:block}.empty-state span{font-size:11px;margin-top:4px;color:var(--dim)}.triage-welcome{min-height:530px;display:grid;place-content:center;justify-items:center;text-align:center;background:linear-gradient(145deg,#1b1613,#12100e);border:1px dashed #543b2f;border-radius:20px;padding:35px}.big-orb{width:72px;height:72px;border-radius:50%;display:grid;place-items:center;font-size:30px;background:#d86d3612;border:1px solid #d86d363b;color:#ef9864;margin-bottom:20px}.triage-welcome h2{font:500 29px Georgia,serif;margin:0 0 9px}.triage-welcome>p:not(.kicker){max-width:480px;color:var(--muted);font-size:13px;line-height:1.6;margin:0 0 20px}.triage-panel{background:linear-gradient(145deg,#1b1613,#12100e);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:var(--shadow);max-height:calc(100vh - 145px);overflow:auto;scrollbar-width:thin}.triage-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.triage-head h2{font:500 21px Georgia,serif;margin:7px 0 0}.source-card{background:#0f0d0c;border:1px solid var(--line);border-radius:13px;padding:13px;margin-bottom:10px}.source-card>p:not(.kicker){white-space:pre-wrap;color:#e6d4c5;font-size:12px;line-height:1.55;margin:0}.source-card img{max-width:280px;width:100%;border-radius:10px;margin-top:10px;border:1px solid var(--line2)}.source-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-top:10px}.source-gallery img{max-width:100%;width:100%;margin-top:0;aspect-ratio:1;object-fit:cover}.composer-files{display:flex;flex-wrap:wrap;gap:6px;padding:0 5px 8px}.composer-file-chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface3);border:1px solid var(--line2);border-radius:999px;padding:4px 6px 4px 10px;font-size:9px;color:var(--muted);max-width:150px}.composer-file-chip button{background:none;border:0;color:var(--dim);font-size:11px;cursor:pointer;line-height:1;padding:2px}.conversation{display:flex;flex-direction:column;gap:6px;padding:7px 0 13px}.bubble{max-width:83%;border-radius:12px;padding:9px 11px;font-size:11px;line-height:1.45;background:var(--surface3);border:1px solid var(--line2)}.bubble span{display:block;font-size:8px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:3px}.bubble.diego{align-self:flex-end;background:#9f4b29;color:white}.bubble.sistema{opacity:.68;font-size:9px}.answer-box,.claim-box,.ask-panel{border-radius:14px;padding:14px;margin-top:10px}.answer-box{background:#d4a64e13;border:1px solid #d4a64e55}.claim-box{background:#75a98712;border:1px solid #75a98746}.claim-box h3{font-size:14px;margin:0 0 5px}.claim-box p,.ask-panel>p{font-size:10px;color:var(--muted);line-height:1.45;margin:0 0 10px}.classify{display:flex;gap:6px;flex-wrap:wrap;padding:13px 0;border-top:1px solid var(--line);margin-top:8px}.classify .kicker{width:100%}.classify button{border:1px solid var(--line2);background:var(--surface2);color:var(--muted);border-radius:999px;padding:7px 10px;font-size:10px}.classify button.active{background:#c95f2e;color:white;border-color:#db7542}.classify button:disabled{opacity:.38}.form-grid{display:flex;flex-direction:column;gap:10px}.form-title{font:500 18px Georgia,serif;margin:2px 0 0}.form-grid label,.answer-box label,.ask-panel label{font-size:9px;text-transform:uppercase;letter-spacing:.55px;color:var(--dim);font-weight:700}.form-grid input,.form-grid select,.form-grid textarea,.answer-box textarea,.ask-panel textarea,.login-card input,.search{display:block;width:100%;margin-top:5px;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:12px;text-transform:none;letter-spacing:0;font-weight:400}.form-grid input:focus,.form-grid select:focus,.form-grid textarea:focus,.answer-box textarea:focus,.ask-panel textarea:focus,.login-card input:focus,.search:focus{border-color:#d37742;box-shadow:0 0 0 3px #d86d3619}.answer-box textarea,.ask-panel textarea{min-height:72px;resize:vertical;margin-bottom:9px}.row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.row.three{grid-template-columns:repeat(3,minmax(0,1fr))}.check{display:flex!important;align-items:center;gap:7px;background:var(--surface2);padding:10px;border-radius:10px}.check input,.audit-checks input{width:auto!important;margin:0!important;accent-color:var(--orange)}.sub-form{border-left:2px solid #d86d3655;padding-left:11px}.capacidade-profissionais{display:flex;flex-direction:column;gap:6px;margin-top:-2px}.capacidade-profissionais>.kicker{margin:2px 0 0}
 .capacidade-item{border:1px solid var(--line2);background:var(--surface2);border-radius:11px;overflow:hidden}.capacidade-item.active{border-color:#db7542}
 .capacidade-item-head{width:100%;display:flex;align-items:center;gap:9px;padding:9px 12px;background:transparent;border:0;color:var(--muted);text-align:left;font-size:11px}
@@ -297,18 +306,27 @@ const demoInbox = [
   { id: "cx-103", texto: "Conta da Vivo apareceu em duplicidade, verificar antes de mexer.", status: "aguardando_voce", conversa: [{ de: "ia", texto: "Conferi o Financeiro: há apenas um lançamento. Você viu a duplicidade no app ou na fatura?", em: new Date().toISOString() }], criado_em: "2026-07-10T12:00:00Z", processado: false },
 ];
 const demoCustomers = [
-  { id: "c1", nome: "Mariana Costa", telefone: "61999142020", cidade: "Jardim Ingá" },
-  { id: "c2", nome: "Carlos Eduardo", telefone: "61994037524", cidade: "Luziânia" },
-  { id: "c3", nome: "Ana Paula", telefone: "61988991122", cidade: "Valparaíso" },
+  { id: "c1", nome: "Mariana Costa", telefone: "61999142020", cidade: "Jardim Ingá", endereco: "Rua 12, Quadra 5" },
+  { id: "c2", nome: "Carlos Eduardo", telefone: "61994037524", cidade: "Luziânia", endereco: "Av. JK, 400" },
+  { id: "c3", nome: "Ana Paula", telefone: "61988991122", cidade: "Valparaíso", endereco: "Quadra 108, Lote 3" },
 ];
 const demoServices = [
   { id: "s1", cliente_id: "c1", titulo: "Reforma de sofá retrátil", status: "orcamento", prioridade: "alta", proxima_acao: "Confirmar visita", prazo: "2026-07-10", valor_orcamento: 2400, clientes: demoCustomers[0] },
-  { id: "s2", cliente_id: "c2", titulo: "6 cadeiras de jantar", status: "agendado", prioridade: "media", proxima_acao: "Buscar cadeiras", prazo: "2026-07-11", valor_orcamento: 1350, clientes: demoCustomers[1] },
+  { id: "s2", cliente_id: "c2", titulo: "6 cadeiras de jantar", status: "agendado", prioridade: "media", proxima_acao: "Buscar cadeiras", prazo: "2026-07-11", valor_orcamento: 1350, clientes: demoCustomers[1], loja_material: "Ellis Tecidos", materiais_necessarios: [{ item: "Tecido para 6 assentos", comprado: false }, { item: "Espuma D33", comprado: true }] },
   { id: "s3", cliente_id: "c3", titulo: "Cabeceira sob medida", status: "lead", prioridade: "baixa", proxima_acao: "Pedir medidas", prazo: "2026-07-12", clientes: demoCustomers[2] },
+  // s4 existe pra demo exercitar o aviso de compra repetida: mesma loja que o s2. Sem dois
+  // serviços na mesma loja, o bloco de material nunca mostra a dica de juntar o frete.
+  { id: "s4", cliente_id: "c3", titulo: "Poltrona reclinável", status: "producao", prioridade: "media", proxima_acao: "Comprar tecido", prazo: "2026-07-20", valor_orcamento: 780, clientes: demoCustomers[2], loja_material: "Ellis Tecidos", materiais_necessarios: [{ item: "Veludo grafite", comprado: false, pedido: true }] },
 ];
+// As duas primeiras usam data RELATIVA ao dia em que a demo é aberta. Com data fixa, a
+// demonstração abria sempre com "nada marcado para hoje" — que é justamente o bloco mais
+// importante da tela. As outras duas continuam no passado de propósito, pra mostrar como
+// compromisso vencido sem desfecho aparece.
 const demoAppointments = [
-  { id: "a1", titulo: "Mariana — visita sofá", data: "2026-07-10", hora: "14:00", cidade: "Jardim Ingá", tipo: "presencial", status: "planejado", servico_id: "s1" },
-  { id: "a2", titulo: "Carlos — buscar cadeiras", data: "2026-07-11", hora: "09:00", cidade: "Luziânia", tipo: "presencial", status: "planejado", servico_id: "s2" },
+  { id: "a1", titulo: "Ana Paula — entregar poltrona", data: hojeISO(), hora: "14:00", cidade: "Valparaíso", tipo: "presencial", status: "planejado", servico_id: "s4" },
+  { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", tipo: "remoto", status: "planejado", servico_id: "s2" },
+  { id: "a3", titulo: "Mariana — visita sofá", data: somarDias(hojeISO(), 1), hora: "09:30", cidade: "Jardim Ingá", tipo: "presencial", status: "planejado", servico_id: "s1" },
+  { id: "a4", titulo: "Carlos — buscar cadeiras", data: "2026-07-11", hora: "09:00", cidade: "Luziânia", tipo: "presencial", status: "planejado", servico_id: "s2" },
 ];
 const demoFinance = [
   { id: "f1", tipo: "entrada", valor: 675, descricao: "Entrada 50% — Carlos", status: "pago", data: "2026-07-09" },
@@ -2420,8 +2438,14 @@ function Home() {
   // O contador da aba conta as duas pendências do profissional: vale a descontar e trabalho a pagar.
   const contaProfissionais = valesPendentes + finances.filter(ehTrabalhoAberto).length;
   const contasFuturas = finances.filter(ehSaidaFutura).length;
+  // A CAIXA SAIU DA NAVEGAÇÃO EM 23/08/2026. Diego parou de lançar pelo app ("só serve de
+  // visualização agora", "só o Classic que mexe") e, como ninguém mais abria aquela tela,
+  // 25 itens ficaram lá dentro esperando resposta que nunca ia chegar — várias delas
+  // perguntas paradas desde 11/08. Aba que ninguém abre não é canal, é gaveta.
+  // O código da Caixa continua no arquivo, intacto: se ele voltar a operar pelo app, é só
+  // devolver a linha aqui. Nada foi apagado.
   const nav = [
-    { id: "painel", label: "Painel", icon: "⌂" }, { id: "caixa", label: "Caixa", icon: "◎", count: inbox.length }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
+    { id: "painel", label: "Painel", icon: "⌂" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
     { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "compras", label: "Compras", icon: "▣" }, { id: "futuro", label: "A pagar", icon: "◷", count: contasFuturas }, { id: "vales", label: "Profissionais", icon: "✎", count: contaProfissionais },
     { id: "clientes", label: "Clientes", icon: "○" }, { id: "fornecedores", label: "Fornecedores", icon: "▤" },
   ];
@@ -2434,27 +2458,26 @@ function Home() {
     <aside className="side-nav">
       <div className="side-brand"><div className="brand-seal small">TB</div><div><strong>Tapeçaria Bahia</strong><span>Central operacional</span></div></div>
       <nav>{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setSelectedId(null); }}><i>{item.icon}</i><span>{item.label}</span>{item.count !== undefined && <b>{item.count}</b>}</button>)}</nav>
-      <div className="operator-card"><span>Operador atual</span><strong>{mode === "claude" ? "Claude" : "Diego"}</strong><small>{mode === "claude" ? "Operações tipadas liberadas · exclusões bloqueadas" : "Controle e aprovações"}</small><button onClick={() => setMode(mode === "claude" ? "diego" : "claude")}>Trocar para {mode === "claude" ? "Diego" : "Claude"}</button></div>
+      {/* O botão "trocar operador" saiu em 23/08/2026: quem escreve na operação agora é o Classic
+          (e o Claude, quando o Diego pede numa sessão). Escolher operador aqui dentro não mudava
+          mais nada de verdade — só dava a impressão de que o app ainda era o lugar de lançar. */}
+      <div className="operator-card"><span>Este app</span><strong>Visualização</strong><small>Os lançamentos entram pelo Classic. Aqui você só consulta.</small></div>
     </aside>
     <main className="workspace">
-      <header className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{tab === "caixa" ? "Caixa de entrada" : nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
+      <header className="workspace-header"><div><p className="kicker">{tab === "painel" ? "SÓ LEITURA · QUEM LANÇA É O CLASSIC" : "CONSULTA"}</p><h1>{nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
 
-      {tab === "caixa" && <div className="inbox-layout">
-        <section className="queue-column">
-          <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busy} />
-          <div className="queue-summary"><div><span>Para Claude</span><b>{claudeQueue.length}</b></div><div><span>Em triagem</span><b>{working ? 1 : 0}</b></div><div><span>Aguardando você</span><b>{waiting.length}</b></div></div>
-          {working && <QueueItem item={working} selected={selectedId === working.id} onOpen={() => setSelectedId(working.id)} />}
-          {claudeQueue.map((item) => <QueueItem key={item.id} item={item} selected={selectedId === item.id} onOpen={() => setSelectedId(item.id)} />)}
-          {waiting.map((item) => <QueueItem key={item.id} item={item} selected={selectedId === item.id} onOpen={() => setSelectedId(item.id)} />)}
-          {!inbox.length && <div className="empty-state"><b>Fila limpa.</b><span>Cole uma mensagem acima para iniciar.</span></div>}
-        </section>
-        <section className="triage-column">
-          {!selected && <div className="triage-welcome"><div className="big-orb">◎</div><p className="kicker">UMA TAREFA POR VEZ</p><h2>{working ? "Retome a triagem em andamento" : claudeQueue.length ? "Abra o próximo item da fila" : "Nada pede ação agora"}</h2><p>O conteúdo original, as buscas e o formulário ficam juntos para evitar releitura e cliques errados.</p>{working ? <button className="primary" onClick={() => setSelectedId(working.id)}>Retomar</button> : claudeQueue[0] && <button className="primary" onClick={() => claim(claudeQueue[0])}>Pegar próximo item</button>}</div>}
-          {selected && <TriagePanel item={selected} parsed={parsedSelected} mode={mode} form={form} updateForm={updateForm} customers={customers} duplicateCustomers={duplicateCustomers} services={services} appointments={agendaVisivel} finances={finances} fornecedores={fornecedores} busy={busy} reply={reply} setReply={setReply} onClaim={() => claim(selected)} onRelease={() => release(selected)} onAnswer={() => answer(selected)} onCustomer={() => finishCustomer(selected)} onAgenda={() => finishAgenda(selected)} onFinance={() => finishFinance(selected)} onAsk={() => askDiego(selected)} onEdit={(texto) => editInboxNote(selected, texto)} onDelete={() => deleteInboxItem(selected)} />}
-        </section>
-      </div>}
+      {/* A TELA DA CAIXA DE ENTRADA FOI REMOVIDA EM 23/08/2026, a pedido do Diego.
+          Ela era a porta de digitação do app — colar mensagem, triar, virar cliente/agenda/
+          financeiro. Com a operação passando pelo Classic, virou tela morta: 25 itens ficaram
+          parados lá dentro, vários perguntas esperando resposta desde 11/08 que ninguém leu.
+          A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
+          e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onAbrirCaixa={(id) => { setTab("caixa"); setSelectedId(id || null); }} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
+      {/* PAINEL = leitura pura desde 23/08/2026. O componente Dashboard antigo continua definido
+          logo acima de PainelVisual, sem ser chamado — ele carrega os fluxos de cobrança e triagem
+          que dependiam do Diego digitar. Não apaguei: se a operação voltar pro app, é trocar o nome
+          aqui de volta. Regra Nº 7 vale pra código também — nada se apaga pra "limpar". */}
+      {tab === "painel" && <PainelVisual services={activeServices} appointments={agendaVisivel} finances={finances} customers={customers} onOpenFicha={setFichaId} />}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} finances={finances} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
@@ -2967,6 +2990,240 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
+// ============================================================================
+// PAINEL DE VISUALIZAÇÃO — 23/08/2026
+// Diego: "eu não estou lançando mais nada no app", "só serve de visualização agora",
+// "só o Classic que mexe". O app deixou de ser onde ele digita e virou onde ele OLHA —
+// quase sempre do celular, muitas vezes dentro do carro.
+//
+// Por isso este componente NÃO grava nada. Não tem formulário, não tem botão que muda
+// estado, não tem confirmação. O único jeito de errar aqui é mostrar informação errada,
+// e é contra isso que o desenho protege: cada bloco responde uma pergunta que ele faz
+// de verdade no dia, na ordem em que ele faz.
+//
+// Os únicos links que saem daqui são de leitura pura: WhatsApp, Waze e Google Maps.
+// Eles não mudam nada no sistema — abrem outro app com o dado que já existe.
+//
+// ATENÇÃO sobre Waze/Maps: o banco ainda NÃO tem latitude/longitude (ver item
+// LOC-CLIENTE no recado de 23/08). Então o link é uma BUSCA por endereço + cidade,
+// não um pino confirmado. O rótulo diz "buscar" de propósito — prometer precisão que
+// não existe é pior que não ter o botão.
+// ============================================================================
+function PainelVisual({ services, appointments, finances, customers, onOpenFicha }) {
+  const today = hojeISO();
+  const amanha = somarDias(today, 1);
+  const cliDe = (id) => customers.find((c) => c.id === id);
+  const svcDe = (a) => services.find((s) => s.id === a.servico_id);
+  const soDigitos = (t) => String(t || "").replace(/\D/g, "");
+  const destinoDe = (cli) => [cli?.endereco, cli?.cidade].filter(Boolean).join(", ");
+
+  // ---- AGENDA: hoje e amanhã, na ordem do relógio -------------------------
+  const doDia = (dia) => appointments.filter((a) => a.data === dia)
+    .sort((a, b) => String(a.hora || "").localeCompare(String(b.hora || "")));
+  const hoje = doDia(today);
+  const manha = doDia(amanha);
+  // Compromisso vencido que ninguém encerrou. É o sintoma do STALE-STATE do recado:
+  // agenda velha continuando "planejado" depois que o fato já aconteceu.
+  const atrasadosAgenda = appointments.filter((a) => a.data < today)
+    .sort((a, b) => String(a.data).localeCompare(String(b.data)));
+
+  // ---- MATERIAL FALTANDO --------------------------------------------------
+  // O buraco encontrado em 23/08: a Dulce Maria estava em produção há 13 dias e a lista
+  // de material dizia só "(anotar o material do sofá)". O dado existia e ninguém via.
+  const materialFaltando = services
+    .filter((s) => ["agendado", "producao"].includes(s.status))
+    .map((s) => ({ s, itens: (s.materiais_necessarios || []).filter((m) => !m.arquivado && !m.comprado) }))
+    .filter((x) => x.itens.length)
+    .sort((a, b) => String(a.s.prazo || "9999").localeCompare(String(b.s.prazo || "9999")));
+  // Duas compras da mesma loja no mesmo período = frete pago duas vezes. O app não decide
+  // nada, só mostra que existe a chance de juntar — a decisão continua sendo dele.
+  const porLoja = {};
+  materialFaltando.forEach(({ s, itens }) => itens.forEach((m) => {
+    const loja = (m.loja || s.loja_material || "").trim();
+    if (!loja) return;
+    (porLoja[loja] ||= new Set()).add(s.clientes?.nome || "serviço");
+  }));
+  const lojasRepetidas = Object.entries(porLoja).filter(([, nomes]) => nomes.size > 1);
+
+  // ---- SERVIÇOS ATRASADOS -------------------------------------------------
+  const atrasados = services
+    .filter((s) => ["agendado", "producao"].includes(s.status) && s.prazo && s.prazo < today)
+    .sort((a, b) => String(a.prazo).localeCompare(String(b.prazo)));
+  const diasDe = (d) => Math.round((new Date(today + "T12:00:00") - new Date(d + "T12:00:00")) / 86400000);
+
+  // ---- DINHEIRO -----------------------------------------------------------
+  // Mesma conta do Financeiro (ver FinanceView): caixa é o acumulado do que já aconteceu.
+  // Repetir a fórmula aqui em vez de inventar outra evita dois números discordando na
+  // mesma tela — que é o tipo de erro que faz ele parar de confiar no app.
+  const realizados = finances.filter((i) => i.status !== "a_pagar" && i.status !== "a_receber");
+  const caixa = realizados.reduce((s, i) => s + (i.tipo === "entrada" ? Number(i.valor) : -Number(i.valor)), 0);
+  const aReceber = finances.filter((f) => f.tipo === "entrada" && f.status === "a_receber");
+  const totalReceber = aReceber.reduce((s, f) => s + Number(f.valor), 0);
+  const aPagar = finances.filter(ehSaidaFutura);
+  const totalPagar = aPagar.reduce((s, f) => s + Number(f.valor), 0);
+  const vencidas = aPagar.filter((f) => f.data <= today);
+
+  // Conta dos profissionais: mesma lógica da aba Profissionais, só que sem os botões.
+  // As tags [ABATIDO] e [ACERTADO] são o que separa dívida viva de história já paga.
+  const contas = {};
+  const entrar = (nome) => {
+    const chave = chaveProfissional(nome);
+    const c = (contas[chave] ||= { nome, vale: 0, trabalho: 0, semValor: 0 });
+    if (nome && nome.length > c.nome.length) c.nome = nome;
+    return c;
+  };
+  finances.filter((f) => f.categoria === "Vale" && !(f.descricao || "").startsWith(VALE_ABATIDO_TAG))
+    .forEach((v) => { entrar(nomeFornecedorVale(v.descricao)).vale += Number(v.valor); });
+  finances.filter(ehTrabalhoAberto).forEach((t) => {
+    const c = entrar(nomeProfissionalMaoDeObra(t.descricao));
+    c.trabalho += Number(t.valor || 0);
+    if (!Number(t.valor)) c.semValor += 1;
+  });
+  const listaContas = Object.values(contas)
+    .map((c) => ({ ...c, liquido: Number((c.trabalho - c.vale).toFixed(2)) }))
+    .filter((c) => c.vale || c.trabalho || c.semValor)
+    .sort((a, b) => Math.abs(b.liquido) - Math.abs(a.liquido));
+
+  // AÇÕES — o mesmo par de botões em TODO item que tem cliente, não só na agenda.
+  // Diego (23/08): "o painel tem que ser mais intuitivo, com botão de whatsapp e localização".
+  // A pergunta que ele faz na frente de qualquer linha do painel é sempre a mesma: falar com
+  // quem, e como chegar lá. Se a resposta muda de lugar conforme o bloco, ele tem que procurar.
+  // Aqui não muda: mesmo botão, mesma cor, mesma posição, em cima de qualquer nome de cliente.
+  const Acoes = ({ cli, comRota }) => {
+    const destino = destinoDe(cli);
+    const tel = soDigitos(cli?.telefone);
+    if (!tel && !destino) return null;
+    const zap = tel.startsWith("55") ? tel : "55" + tel;
+    return <div className="pv-acoes">
+      {tel && <a className="pv-bt pv-bt-zap" href={`https://wa.me/${zap}`} target="_blank" rel="noreferrer">💬 WhatsApp</a>}
+      {/* Rota só onde existe deslocamento. Num follow-up remoto o botão de mapa é ruído:
+          ocupa a linha e convida pro toque errado numa leitura rápida, dentro do carro. */}
+      {comRota && destino && <a className="pv-bt pv-bt-waze" href={`https://waze.com/ul?q=${encodeURIComponent(destino)}&navigate=yes`} target="_blank" rel="noreferrer">🧭 Waze</a>}
+      {comRota && destino && <a className="pv-bt pv-bt-maps" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destino)}`} target="_blank" rel="noreferrer">📍 Maps</a>}
+      {cli?.id && onOpenFicha && <button type="button" className="pv-bt" onClick={() => onOpenFicha(cli.id)}>Ficha</button>}
+    </div>;
+  };
+  const cliDoServico = (s) => cliDe(s?.cliente_id) || s?.clientes;
+
+  const Linha = ({ a }) => {
+    const svc = svcDe(a);
+    const cli = cliDoServico(svc);
+    const destino = destinoDe(cli);
+    return <div className="pv-linha">
+      <div className="pv-linha-topo">
+        <b>{a.hora ? String(a.hora).slice(0, 5) : "—"}</b>
+        <span className={`pv-tag ${a.tipo === "presencial" ? "pv-tag-rota" : "pv-tag-remoto"}`}>{a.tipo === "presencial" ? "rota" : "remoto"}</span>
+        {a.cidade && <span className="pv-cidade">{a.cidade}</span>}
+      </div>
+      <strong>{a.titulo}</strong>
+      {cli?.nome && <span className="pv-sub">{cli.nome}{destino ? " · " + destino : ""}</span>}
+      <Acoes cli={cli} comRota={a.tipo === "presencial"} />
+    </div>;
+  };
+
+  const Bloco = ({ titulo, contagem, tom, children, vazio }) => <section className={`pv-bloco pv-${tom || "neutro"}`}>
+    <h3>{titulo}{contagem !== undefined && <b>{contagem}</b>}</h3>
+    {children}
+    {vazio && <p className="pv-vazio">{vazio}</p>}
+  </section>;
+
+  return <div className="pv-wrap">
+    <style>{`
+      .pv-wrap{display:flex;flex-direction:column;gap:14px;padding-bottom:80px}
+      .pv-bloco{background:var(--surface,#fff);border:1px solid rgba(0,0,0,.08);border-radius:14px;padding:14px}
+      .pv-bloco h3{margin:0 0 10px;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+      .pv-bloco h3 b{background:rgba(0,0,0,.07);border-radius:999px;padding:1px 9px;font-size:.78rem}
+      .pv-alerta{border-left:4px solid #d9534f} .pv-alerta h3 b{background:#d9534f;color:#fff}
+      .pv-atencao{border-left:4px solid #e6a100} .pv-atencao h3 b{background:#e6a100;color:#fff}
+      .pv-ok{border-left:4px solid #2f9e5f}
+      .pv-linha{padding:10px 0;border-top:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;gap:3px}
+      .pv-linha:first-of-type{border-top:none}
+      .pv-linha-topo{display:flex;align-items:center;gap:8px;font-size:.8rem}
+      .pv-linha-topo b{font-size:1rem}
+      .pv-tag{border-radius:999px;padding:1px 8px;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em}
+      .pv-tag-rota{background:#1f6feb;color:#fff} .pv-tag-remoto{background:rgba(0,0,0,.1)}
+      .pv-cidade{opacity:.7}
+      .pv-sub{font-size:.85rem;opacity:.75}
+      /* Botão de dedo, não de mouse: 44px de altura é o mínimo que a Apple e o Google
+         recomendam pra toque, e ele usa isso dirigindo ou em pé na oficina. Cor sólida
+         porque contorno fino some no sol. */
+      .pv-acoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+      .pv-bt{display:inline-flex;align-items:center;gap:5px;min-height:44px;padding:0 15px;border-radius:12px;
+        font-size:.88rem;font-weight:600;text-decoration:none;border:1px solid rgba(0,0,0,.14);
+        background:rgba(0,0,0,.04);color:inherit;cursor:pointer}
+      .pv-bt-zap{background:#25d366;border-color:#1faa53;color:#05310f}
+      .pv-bt-waze{background:#33ccff;border-color:#22a6cf;color:#04303d}
+      .pv-bt-maps{background:#ea4335;border-color:#c5342a;color:#fff}
+      .pv-item{padding:9px 0;border-top:1px solid rgba(0,0,0,.07)}
+      .pv-item:first-of-type{border-top:none}
+      .pv-item strong{display:block}
+      .pv-item span{font-size:.85rem;opacity:.75}
+      .pv-num{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+      .pv-num div{background:rgba(0,0,0,.04);border-radius:10px;padding:10px}
+      .pv-num small{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;opacity:.65}
+      .pv-num b{font-size:1.15rem}
+      .pv-vazio{margin:0;opacity:.6;font-size:.88rem}
+      .pv-nota{margin:10px 0 0;font-size:.82rem;opacity:.8;background:rgba(230,161,0,.12);padding:8px 10px;border-radius:8px}
+      @media(min-width:900px){.pv-wrap{display:grid;grid-template-columns:1fr 1fr;align-items:start}.pv-num{grid-template-columns:repeat(4,1fr)}}
+    `}</style>
+
+    <Bloco titulo={`Hoje · ${compactDate(today)}`} contagem={hoje.length} tom={hoje.length ? "ok" : "neutro"}
+      vazio={hoje.length ? "" : "Nada marcado para hoje."}>
+      {hoje.map((a) => <Linha key={a.id} a={a} />)}
+    </Bloco>
+
+    <Bloco titulo="Amanhã" contagem={manha.length} vazio={manha.length ? "" : "Nada marcado para amanhã."}>
+      {manha.map((a) => <Linha key={a.id} a={a} />)}
+    </Bloco>
+
+    {!!atrasadosAgenda.length && <Bloco titulo="Compromisso vencido sem desfecho" contagem={atrasadosAgenda.length} tom="alerta">
+      {atrasadosAgenda.map((a) => <div className="pv-item" key={a.id}>
+        <strong>{a.titulo}</strong>
+        <span>{compactDate(a.data)} · parado há {diasDe(a.data)} dia(s){a.cidade ? " · " + a.cidade : ""}</span>
+        <Acoes cli={cliDoServico(svcDe(a))} comRota={a.tipo === "presencial"} />
+      </div>)}
+      <p className="pv-nota">Continua como “planejado” mesmo com a data passada. Ou aconteceu e ninguém encerrou, ou não aconteceu e precisa de data nova.</p>
+    </Bloco>}
+
+    {!!materialFaltando.length && <Bloco titulo="Material faltando" contagem={materialFaltando.length} tom="atencao">
+      {materialFaltando.map(({ s, itens }) => <div className="pv-item" key={s.id}>
+        <strong>{s.clientes?.nome || "Sem cliente"}</strong>
+        <span>{itens.map((m) => m.item + (m.pedido ? " 🚚" : "")).join(" · ")}</span>
+        <span>{(s.loja_material || itens.map((m) => m.loja).filter(Boolean)[0] || "loja não definida")}{s.prazo ? " · prazo " + compactDate(s.prazo) : ""}</span>
+        <Acoes cli={cliDoServico(s)} comRota />
+      </div>)}
+      {!!lojasRepetidas.length && <p className="pv-nota">
+        Dá pra juntar a compra: {lojasRepetidas.map(([loja, nomes]) => `${loja} (${[...nomes].join(" + ")})`).join(" · ")}. Comprar separado paga frete duas vezes.
+      </p>}
+    </Bloco>}
+
+    {!!atrasados.length && <Bloco titulo="Serviço atrasado" contagem={atrasados.length} tom="alerta">
+      {atrasados.map((s) => <div className="pv-item" key={s.id}>
+        <strong>{s.clientes?.nome || "Sem cliente"} — {money(s.valor_orcamento || 0)}</strong>
+        <span>{s.titulo}</span>
+        <span>{diasDe(s.prazo)} dia(s) de atraso · {s.responsavel || "sem responsável"}</span>
+        <Acoes cli={cliDoServico(s)} comRota />
+      </div>)}
+    </Bloco>}
+
+    <Bloco titulo="Dinheiro" tom="neutro">
+      <div className="pv-num">
+        <div><small>Em caixa</small><b>{money(caixa)}</b></div>
+        <div><small>A receber</small><b>{money(totalReceber)}</b></div>
+        <div><small>A pagar</small><b>{money(totalPagar)}</b></div>
+        <div><small>Vencidas</small><b>{vencidas.length}</b></div>
+      </div>
+      {!!listaContas.length && <>
+        <h3 style={{ marginTop: 16 }}>Profissionais</h3>
+        {listaContas.map((c) => <div className="pv-item" key={c.nome}>
+          <strong>{c.nome} — {c.liquido >= 0 ? `você deve ${money(c.liquido)}` : `ele deve ${money(Math.abs(c.liquido))}`}</strong>
+          <span>trabalho {money(c.trabalho)} · vale {money(c.vale)}{c.semValor ? ` · ${c.semValor} trabalho(s) sem valor combinado` : ""}</span>
+        </div>)}
+      </>}
+    </Bloco>
+  </div>;
+}
+
 function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
