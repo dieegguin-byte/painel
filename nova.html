@@ -146,6 +146,12 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-msg{display:block;font-style:italic;color:var(--cream);font-size:12px;line-height:1.55;background:#1a1512;border-left:2px solid #5a3b2b;padding:9px 11px;border-radius:8px;margin:0 0 12px;quotes:none}
 .compromisso-acoes{display:flex;gap:7px;flex-wrap:wrap}
 .btn-wpp{flex:1;min-width:170px;text-align:center;text-decoration:none;background:linear-gradient(135deg,#2f7d4f,#1f5a38);color:#eafff0;border-radius:10px;padding:12px 14px;font-size:12px;font-weight:750;border:1px solid #3f9160}
+/* ROTA (23/08/2026). Mesma altura do WhatsApp pra linha não ficar torta, mas sem flex:1 —
+   é atalho, não a ação principal do card. Cor sólida: contorno fino some no sol, e ele abre
+   isso no celular dentro do carro. */
+.btn-rota{text-decoration:none;text-align:center;border-radius:10px;padding:12px 14px;font-size:12px;font-weight:750;min-height:44px;box-sizing:border-box}
+.btn-waze{background:linear-gradient(135deg,#2aa9d0,#1d7fa0);color:#eaf9ff;border:1px solid #3fbfe4}
+.btn-maps{background:linear-gradient(135deg,#c9453a,#9c322a);color:#fff0ee;border:1px solid #e0574b}
 .btn-reagendar{background:#3b2f16;color:#e8c877;border:1px solid #6b5424;border-radius:10px;padding:12px 14px;font-size:12px;font-weight:750}
 /* LEADS: lista compacta de funil (visual proposital diferente do Painel) */
 .funil-lista{display:flex;flex-direction:column;gap:7px}
@@ -1954,7 +1960,9 @@ function Home() {
       [cx, cl, sv, ag, fn, rt, fo] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
-        db.from("servicos").select("*,clientes(id,nome,telefone,cidade)").order("criado_em", { ascending: false }),
+        // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
+        // cidade, e "Luziânia" não leva ninguém à casa do cliente.
+        db.from("servicos").select("*,clientes(id,nome,telefone,cidade,endereco)").order("criado_em", { ascending: false }),
         db.from("agenda").select("*").eq("status", "planejado").order("data", { ascending: true }).order("hora", { ascending: true }),
         db.from("financeiro").select("*").order("data", { ascending: false }),
         db.from("rotinas").select("*").eq("ativo", true).order("criado_em", { ascending: true }),
@@ -2458,13 +2466,10 @@ function Home() {
     <aside className="side-nav">
       <div className="side-brand"><div className="brand-seal small">TB</div><div><strong>Tapeçaria Bahia</strong><span>Central operacional</span></div></div>
       <nav>{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setSelectedId(null); }}><i>{item.icon}</i><span>{item.label}</span>{item.count !== undefined && <b>{item.count}</b>}</button>)}</nav>
-      {/* O botão "trocar operador" saiu em 23/08/2026: quem escreve na operação agora é o Classic
-          (e o Claude, quando o Diego pede numa sessão). Escolher operador aqui dentro não mudava
-          mais nada de verdade — só dava a impressão de que o app ainda era o lugar de lançar. */}
-      <div className="operator-card"><span>Este app</span><strong>Visualização</strong><small>Os lançamentos entram pelo Classic. Aqui você só consulta.</small></div>
+      <div className="operator-card"><span>Operador atual</span><strong>{mode === "claude" ? "Claude" : "Diego"}</strong><small>{mode === "claude" ? "Operações tipadas liberadas · exclusões bloqueadas" : "Controle e aprovações"}</small><button onClick={() => setMode(mode === "claude" ? "diego" : "claude")}>Trocar para {mode === "claude" ? "Diego" : "Claude"}</button></div>
     </aside>
     <main className="workspace">
-      <header className="workspace-header"><div><p className="kicker">{tab === "painel" ? "SÓ LEITURA · QUEM LANÇA É O CLASSIC" : "CONSULTA"}</p><h1>{nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
+      <header className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
 
       {/* A TELA DA CAIXA DE ENTRADA FOI REMOVIDA EM 23/08/2026, a pedido do Diego.
           Ela era a porta de digitação do app — colar mensagem, triar, virar cliente/agenda/
@@ -2473,11 +2478,10 @@ function Home() {
           A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
           e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
-      {/* PAINEL = leitura pura desde 23/08/2026. O componente Dashboard antigo continua definido
-          logo acima de PainelVisual, sem ser chamado — ele carrega os fluxos de cobrança e triagem
-          que dependiam do Diego digitar. Não apaguei: se a operação voltar pro app, é trocar o nome
-          aqui de volta. Regra Nº 7 vale pra código também — nada se apaga pra "limpar". */}
-      {tab === "painel" && <PainelVisual services={activeServices} appointments={agendaVisivel} finances={finances} customers={customers} onOpenFicha={setFichaId} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
+      {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
+          por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
+          Nenhuma linha foi apagada: é só parar de passar a prop. */}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} finances={finances} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
@@ -2704,6 +2708,12 @@ function CompromissoCard({ a, svc, today, onConcluir, onReschedule, materiais })
   const sugestao = svc?.sugestao_resposta || mensagemPadraoCompromisso(a, svc, today);
   const tel = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "";
   const oQueFazer = svc?.proxima_acao || a.titulo;
+  // Destino da rota: o endereço da ficha do cliente, com a cidade do compromisso como reforço.
+  // Sem endereço sobra só a cidade, e aí o botão não aparece — mandar alguém pro centro de
+  // Luziânia é pior que não oferecer rota nenhuma.
+  const destinoRota = svc?.clientes?.endereco
+    ? [svc.clientes.endereco, svc.clientes.cidade || a.cidade].filter(Boolean).join(", ")
+    : "";
   return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}`}>
     <div className="compromisso-quando">
       <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
@@ -2725,6 +2735,12 @@ function CompromissoCard({ a, svc, today, onConcluir, onReschedule, materiais })
         <div className="compromisso-acoes">
           {tel && <a className="btn-wpp" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">Abrir WhatsApp{sugestao ? " com resposta" : ""}</a>}
           {sugestao && <button className="ghost" title="Copiar mensagem" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}
+          {/* ROTA (Diego, 23/08/2026: "botão de whatsapp e localização"). Só em compromisso
+              presencial — num remoto o botão de mapa é ruído e convida pro toque errado.
+              É BUSCA por endereço + cidade, não pino salvo: a tabela `clientes` ainda não tem
+              latitude/longitude. Por isso o rótulo não promete navegação exata. */}
+          {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-waze" href={`https://waze.com/ul?q=${encodeURIComponent(destinoRota)}&navigate=yes`} target="_blank" rel="noreferrer">🧭 Waze</a>}
+          {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-maps" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinoRota)}`} target="_blank" rel="noreferrer">📍 Maps</a>}
           <button className="btn-reagendar" onClick={() => onReschedule(a)}>Pedir reagendamento</button>
           <button className="ghost" onClick={() => onConcluir(a)}>✓ Concluir</button>
         </div>
@@ -2990,240 +3006,6 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-// ============================================================================
-// PAINEL DE VISUALIZAÇÃO — 23/08/2026
-// Diego: "eu não estou lançando mais nada no app", "só serve de visualização agora",
-// "só o Classic que mexe". O app deixou de ser onde ele digita e virou onde ele OLHA —
-// quase sempre do celular, muitas vezes dentro do carro.
-//
-// Por isso este componente NÃO grava nada. Não tem formulário, não tem botão que muda
-// estado, não tem confirmação. O único jeito de errar aqui é mostrar informação errada,
-// e é contra isso que o desenho protege: cada bloco responde uma pergunta que ele faz
-// de verdade no dia, na ordem em que ele faz.
-//
-// Os únicos links que saem daqui são de leitura pura: WhatsApp, Waze e Google Maps.
-// Eles não mudam nada no sistema — abrem outro app com o dado que já existe.
-//
-// ATENÇÃO sobre Waze/Maps: o banco ainda NÃO tem latitude/longitude (ver item
-// LOC-CLIENTE no recado de 23/08). Então o link é uma BUSCA por endereço + cidade,
-// não um pino confirmado. O rótulo diz "buscar" de propósito — prometer precisão que
-// não existe é pior que não ter o botão.
-// ============================================================================
-function PainelVisual({ services, appointments, finances, customers, onOpenFicha }) {
-  const today = hojeISO();
-  const amanha = somarDias(today, 1);
-  const cliDe = (id) => customers.find((c) => c.id === id);
-  const svcDe = (a) => services.find((s) => s.id === a.servico_id);
-  const soDigitos = (t) => String(t || "").replace(/\D/g, "");
-  const destinoDe = (cli) => [cli?.endereco, cli?.cidade].filter(Boolean).join(", ");
-
-  // ---- AGENDA: hoje e amanhã, na ordem do relógio -------------------------
-  const doDia = (dia) => appointments.filter((a) => a.data === dia)
-    .sort((a, b) => String(a.hora || "").localeCompare(String(b.hora || "")));
-  const hoje = doDia(today);
-  const manha = doDia(amanha);
-  // Compromisso vencido que ninguém encerrou. É o sintoma do STALE-STATE do recado:
-  // agenda velha continuando "planejado" depois que o fato já aconteceu.
-  const atrasadosAgenda = appointments.filter((a) => a.data < today)
-    .sort((a, b) => String(a.data).localeCompare(String(b.data)));
-
-  // ---- MATERIAL FALTANDO --------------------------------------------------
-  // O buraco encontrado em 23/08: a Dulce Maria estava em produção há 13 dias e a lista
-  // de material dizia só "(anotar o material do sofá)". O dado existia e ninguém via.
-  const materialFaltando = services
-    .filter((s) => ["agendado", "producao"].includes(s.status))
-    .map((s) => ({ s, itens: (s.materiais_necessarios || []).filter((m) => !m.arquivado && !m.comprado) }))
-    .filter((x) => x.itens.length)
-    .sort((a, b) => String(a.s.prazo || "9999").localeCompare(String(b.s.prazo || "9999")));
-  // Duas compras da mesma loja no mesmo período = frete pago duas vezes. O app não decide
-  // nada, só mostra que existe a chance de juntar — a decisão continua sendo dele.
-  const porLoja = {};
-  materialFaltando.forEach(({ s, itens }) => itens.forEach((m) => {
-    const loja = (m.loja || s.loja_material || "").trim();
-    if (!loja) return;
-    (porLoja[loja] ||= new Set()).add(s.clientes?.nome || "serviço");
-  }));
-  const lojasRepetidas = Object.entries(porLoja).filter(([, nomes]) => nomes.size > 1);
-
-  // ---- SERVIÇOS ATRASADOS -------------------------------------------------
-  const atrasados = services
-    .filter((s) => ["agendado", "producao"].includes(s.status) && s.prazo && s.prazo < today)
-    .sort((a, b) => String(a.prazo).localeCompare(String(b.prazo)));
-  const diasDe = (d) => Math.round((new Date(today + "T12:00:00") - new Date(d + "T12:00:00")) / 86400000);
-
-  // ---- DINHEIRO -----------------------------------------------------------
-  // Mesma conta do Financeiro (ver FinanceView): caixa é o acumulado do que já aconteceu.
-  // Repetir a fórmula aqui em vez de inventar outra evita dois números discordando na
-  // mesma tela — que é o tipo de erro que faz ele parar de confiar no app.
-  const realizados = finances.filter((i) => i.status !== "a_pagar" && i.status !== "a_receber");
-  const caixa = realizados.reduce((s, i) => s + (i.tipo === "entrada" ? Number(i.valor) : -Number(i.valor)), 0);
-  const aReceber = finances.filter((f) => f.tipo === "entrada" && f.status === "a_receber");
-  const totalReceber = aReceber.reduce((s, f) => s + Number(f.valor), 0);
-  const aPagar = finances.filter(ehSaidaFutura);
-  const totalPagar = aPagar.reduce((s, f) => s + Number(f.valor), 0);
-  const vencidas = aPagar.filter((f) => f.data <= today);
-
-  // Conta dos profissionais: mesma lógica da aba Profissionais, só que sem os botões.
-  // As tags [ABATIDO] e [ACERTADO] são o que separa dívida viva de história já paga.
-  const contas = {};
-  const entrar = (nome) => {
-    const chave = chaveProfissional(nome);
-    const c = (contas[chave] ||= { nome, vale: 0, trabalho: 0, semValor: 0 });
-    if (nome && nome.length > c.nome.length) c.nome = nome;
-    return c;
-  };
-  finances.filter((f) => f.categoria === "Vale" && !(f.descricao || "").startsWith(VALE_ABATIDO_TAG))
-    .forEach((v) => { entrar(nomeFornecedorVale(v.descricao)).vale += Number(v.valor); });
-  finances.filter(ehTrabalhoAberto).forEach((t) => {
-    const c = entrar(nomeProfissionalMaoDeObra(t.descricao));
-    c.trabalho += Number(t.valor || 0);
-    if (!Number(t.valor)) c.semValor += 1;
-  });
-  const listaContas = Object.values(contas)
-    .map((c) => ({ ...c, liquido: Number((c.trabalho - c.vale).toFixed(2)) }))
-    .filter((c) => c.vale || c.trabalho || c.semValor)
-    .sort((a, b) => Math.abs(b.liquido) - Math.abs(a.liquido));
-
-  // AÇÕES — o mesmo par de botões em TODO item que tem cliente, não só na agenda.
-  // Diego (23/08): "o painel tem que ser mais intuitivo, com botão de whatsapp e localização".
-  // A pergunta que ele faz na frente de qualquer linha do painel é sempre a mesma: falar com
-  // quem, e como chegar lá. Se a resposta muda de lugar conforme o bloco, ele tem que procurar.
-  // Aqui não muda: mesmo botão, mesma cor, mesma posição, em cima de qualquer nome de cliente.
-  const Acoes = ({ cli, comRota }) => {
-    const destino = destinoDe(cli);
-    const tel = soDigitos(cli?.telefone);
-    if (!tel && !destino) return null;
-    const zap = tel.startsWith("55") ? tel : "55" + tel;
-    return <div className="pv-acoes">
-      {tel && <a className="pv-bt pv-bt-zap" href={`https://wa.me/${zap}`} target="_blank" rel="noreferrer">💬 WhatsApp</a>}
-      {/* Rota só onde existe deslocamento. Num follow-up remoto o botão de mapa é ruído:
-          ocupa a linha e convida pro toque errado numa leitura rápida, dentro do carro. */}
-      {comRota && destino && <a className="pv-bt pv-bt-waze" href={`https://waze.com/ul?q=${encodeURIComponent(destino)}&navigate=yes`} target="_blank" rel="noreferrer">🧭 Waze</a>}
-      {comRota && destino && <a className="pv-bt pv-bt-maps" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destino)}`} target="_blank" rel="noreferrer">📍 Maps</a>}
-      {cli?.id && onOpenFicha && <button type="button" className="pv-bt" onClick={() => onOpenFicha(cli.id)}>Ficha</button>}
-    </div>;
-  };
-  const cliDoServico = (s) => cliDe(s?.cliente_id) || s?.clientes;
-
-  const Linha = ({ a }) => {
-    const svc = svcDe(a);
-    const cli = cliDoServico(svc);
-    const destino = destinoDe(cli);
-    return <div className="pv-linha">
-      <div className="pv-linha-topo">
-        <b>{a.hora ? String(a.hora).slice(0, 5) : "—"}</b>
-        <span className={`pv-tag ${a.tipo === "presencial" ? "pv-tag-rota" : "pv-tag-remoto"}`}>{a.tipo === "presencial" ? "rota" : "remoto"}</span>
-        {a.cidade && <span className="pv-cidade">{a.cidade}</span>}
-      </div>
-      <strong>{a.titulo}</strong>
-      {cli?.nome && <span className="pv-sub">{cli.nome}{destino ? " · " + destino : ""}</span>}
-      <Acoes cli={cli} comRota={a.tipo === "presencial"} />
-    </div>;
-  };
-
-  const Bloco = ({ titulo, contagem, tom, children, vazio }) => <section className={`pv-bloco pv-${tom || "neutro"}`}>
-    <h3>{titulo}{contagem !== undefined && <b>{contagem}</b>}</h3>
-    {children}
-    {vazio && <p className="pv-vazio">{vazio}</p>}
-  </section>;
-
-  return <div className="pv-wrap">
-    <style>{`
-      .pv-wrap{display:flex;flex-direction:column;gap:14px;padding-bottom:80px}
-      .pv-bloco{background:var(--surface,#fff);border:1px solid rgba(0,0,0,.08);border-radius:14px;padding:14px}
-      .pv-bloco h3{margin:0 0 10px;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
-      .pv-bloco h3 b{background:rgba(0,0,0,.07);border-radius:999px;padding:1px 9px;font-size:.78rem}
-      .pv-alerta{border-left:4px solid #d9534f} .pv-alerta h3 b{background:#d9534f;color:#fff}
-      .pv-atencao{border-left:4px solid #e6a100} .pv-atencao h3 b{background:#e6a100;color:#fff}
-      .pv-ok{border-left:4px solid #2f9e5f}
-      .pv-linha{padding:10px 0;border-top:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;gap:3px}
-      .pv-linha:first-of-type{border-top:none}
-      .pv-linha-topo{display:flex;align-items:center;gap:8px;font-size:.8rem}
-      .pv-linha-topo b{font-size:1rem}
-      .pv-tag{border-radius:999px;padding:1px 8px;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em}
-      .pv-tag-rota{background:#1f6feb;color:#fff} .pv-tag-remoto{background:rgba(0,0,0,.1)}
-      .pv-cidade{opacity:.7}
-      .pv-sub{font-size:.85rem;opacity:.75}
-      /* Botão de dedo, não de mouse: 44px de altura é o mínimo que a Apple e o Google
-         recomendam pra toque, e ele usa isso dirigindo ou em pé na oficina. Cor sólida
-         porque contorno fino some no sol. */
-      .pv-acoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
-      .pv-bt{display:inline-flex;align-items:center;gap:5px;min-height:44px;padding:0 15px;border-radius:12px;
-        font-size:.88rem;font-weight:600;text-decoration:none;border:1px solid rgba(0,0,0,.14);
-        background:rgba(0,0,0,.04);color:inherit;cursor:pointer}
-      .pv-bt-zap{background:#25d366;border-color:#1faa53;color:#05310f}
-      .pv-bt-waze{background:#33ccff;border-color:#22a6cf;color:#04303d}
-      .pv-bt-maps{background:#ea4335;border-color:#c5342a;color:#fff}
-      .pv-item{padding:9px 0;border-top:1px solid rgba(0,0,0,.07)}
-      .pv-item:first-of-type{border-top:none}
-      .pv-item strong{display:block}
-      .pv-item span{font-size:.85rem;opacity:.75}
-      .pv-num{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-      .pv-num div{background:rgba(0,0,0,.04);border-radius:10px;padding:10px}
-      .pv-num small{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;opacity:.65}
-      .pv-num b{font-size:1.15rem}
-      .pv-vazio{margin:0;opacity:.6;font-size:.88rem}
-      .pv-nota{margin:10px 0 0;font-size:.82rem;opacity:.8;background:rgba(230,161,0,.12);padding:8px 10px;border-radius:8px}
-      @media(min-width:900px){.pv-wrap{display:grid;grid-template-columns:1fr 1fr;align-items:start}.pv-num{grid-template-columns:repeat(4,1fr)}}
-    `}</style>
-
-    <Bloco titulo={`Hoje · ${compactDate(today)}`} contagem={hoje.length} tom={hoje.length ? "ok" : "neutro"}
-      vazio={hoje.length ? "" : "Nada marcado para hoje."}>
-      {hoje.map((a) => <Linha key={a.id} a={a} />)}
-    </Bloco>
-
-    <Bloco titulo="Amanhã" contagem={manha.length} vazio={manha.length ? "" : "Nada marcado para amanhã."}>
-      {manha.map((a) => <Linha key={a.id} a={a} />)}
-    </Bloco>
-
-    {!!atrasadosAgenda.length && <Bloco titulo="Compromisso vencido sem desfecho" contagem={atrasadosAgenda.length} tom="alerta">
-      {atrasadosAgenda.map((a) => <div className="pv-item" key={a.id}>
-        <strong>{a.titulo}</strong>
-        <span>{compactDate(a.data)} · parado há {diasDe(a.data)} dia(s){a.cidade ? " · " + a.cidade : ""}</span>
-        <Acoes cli={cliDoServico(svcDe(a))} comRota={a.tipo === "presencial"} />
-      </div>)}
-      <p className="pv-nota">Continua como “planejado” mesmo com a data passada. Ou aconteceu e ninguém encerrou, ou não aconteceu e precisa de data nova.</p>
-    </Bloco>}
-
-    {!!materialFaltando.length && <Bloco titulo="Material faltando" contagem={materialFaltando.length} tom="atencao">
-      {materialFaltando.map(({ s, itens }) => <div className="pv-item" key={s.id}>
-        <strong>{s.clientes?.nome || "Sem cliente"}</strong>
-        <span>{itens.map((m) => m.item + (m.pedido ? " 🚚" : "")).join(" · ")}</span>
-        <span>{(s.loja_material || itens.map((m) => m.loja).filter(Boolean)[0] || "loja não definida")}{s.prazo ? " · prazo " + compactDate(s.prazo) : ""}</span>
-        <Acoes cli={cliDoServico(s)} comRota />
-      </div>)}
-      {!!lojasRepetidas.length && <p className="pv-nota">
-        Dá pra juntar a compra: {lojasRepetidas.map(([loja, nomes]) => `${loja} (${[...nomes].join(" + ")})`).join(" · ")}. Comprar separado paga frete duas vezes.
-      </p>}
-    </Bloco>}
-
-    {!!atrasados.length && <Bloco titulo="Serviço atrasado" contagem={atrasados.length} tom="alerta">
-      {atrasados.map((s) => <div className="pv-item" key={s.id}>
-        <strong>{s.clientes?.nome || "Sem cliente"} — {money(s.valor_orcamento || 0)}</strong>
-        <span>{s.titulo}</span>
-        <span>{diasDe(s.prazo)} dia(s) de atraso · {s.responsavel || "sem responsável"}</span>
-        <Acoes cli={cliDoServico(s)} comRota />
-      </div>)}
-    </Bloco>}
-
-    <Bloco titulo="Dinheiro" tom="neutro">
-      <div className="pv-num">
-        <div><small>Em caixa</small><b>{money(caixa)}</b></div>
-        <div><small>A receber</small><b>{money(totalReceber)}</b></div>
-        <div><small>A pagar</small><b>{money(totalPagar)}</b></div>
-        <div><small>Vencidas</small><b>{vencidas.length}</b></div>
-      </div>
-      {!!listaContas.length && <>
-        <h3 style={{ marginTop: 16 }}>Profissionais</h3>
-        {listaContas.map((c) => <div className="pv-item" key={c.nome}>
-          <strong>{c.nome} — {c.liquido >= 0 ? `você deve ${money(c.liquido)}` : `ele deve ${money(Math.abs(c.liquido))}`}</strong>
-          <span>trabalho {money(c.trabalho)} · vale {money(c.vale)}{c.semValor ? ` · ${c.semValor} trabalho(s) sem valor combinado` : ""}</span>
-        </div>)}
-      </>}
-    </Bloco>
-  </div>;
-}
-
 function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
@@ -3378,7 +3160,9 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   return <div className="page-grid">
     {addInbox && <section className="content-card"><div className="card-head"><div><p className="kicker">ANOTAR AGORA</p><h3>O que aconteceu?</h3></div></div>
       <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />
-    </section>}<section className="metric-grid"><Metric label="Para Claude" value={paraClaude.length} detail="Novos e respondidos" tone="orange" onClick={paraClaude.length > 0 ? () => onAbrirCaixa(paraClaude[0].id) : null} /><Metric label="Aguardando você" value={aguardandoVoce.length} detail="Perguntas no app" tone="red" onClick={aguardandoVoce.length > 0 ? () => onAbrirCaixa(aguardandoVoce[0].id) : null} /><Metric label="Agenda vencendo" value={dueAll.length} detail="Hoje ou atrasada" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
+    </section>}{/* Os dois cartões da Caixa ("Para Claude" e "Aguardando você") saíram em 23/08/2026 junto
+    com a tela dela. Contador que leva pra uma tela que não existe mais só quebraria no toque. */}
+<section className="metric-grid"><Metric label="Agenda vencendo" value={dueAll.length} detail="Hoje ou atrasada" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     {/* SAIU DO PAINEL em 30/07/2026 o card "N cliente(s) esperando remarcação". Diego: "achei desnecessário
