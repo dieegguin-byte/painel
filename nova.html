@@ -337,7 +337,7 @@ const demoCustomers = [
   // Sem endereço de propósito: é o caso mais comum na base real (Andriele, Léo, Nurimar) e a
   // demo precisa mostrar como o botão de rota se comporta quando só há cidade.
   { id: "c2", nome: "Carlos Eduardo", telefone: "61994037524", cidade: "Luziânia" },
-  { id: "c3", nome: "Ana Paula", telefone: "61988991122", cidade: "Valparaíso", endereco: "Quadra 108, Lote 3" },
+  { id: "c3", nome: "Ana Paula", telefone: "61988991122", cidade: "Valparaíso", endereco: "Quadra 108, Lote 3", obs: "Portão azul, tocar no interfone 2. Cachorro solto no quintal." },
 ];
 const demoServices = [
   { id: "s1", cliente_id: "c1", titulo: "Reforma de sofá retrátil", status: "orcamento", prioridade: "alta", proxima_acao: "Confirmar visita", prazo: "2026-07-10", valor_orcamento: 2400, clientes: demoCustomers[0] },
@@ -1985,7 +1985,7 @@ function Home() {
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
         // cidade, e "Luziânia" não leva ninguém à casa do cliente.
-        db.from("servicos").select("*,clientes(id,nome,telefone,cidade,endereco,latitude,longitude,localizacao_confianca)").order("criado_em", { ascending: false }),
+        db.from("servicos").select("*,clientes(id,nome,telefone,cidade,endereco,obs,latitude,longitude,localizacao_confianca)").order("criado_em", { ascending: false }),
         db.from("agenda").select("*").eq("status", "planejado").order("data", { ascending: true }).order("hora", { ascending: true }),
         db.from("financeiro").select("*").order("data", { ascending: false }),
         db.from("rotinas").select("*").eq("ativo", true).order("criado_em", { ascending: true }),
@@ -2763,6 +2763,21 @@ function CompromissoCard({ a, svc, today, materiais }) {
   const selo = temPonto ? "" : soCidade ? " (só cidade)" : "";
   const nomeCliente = svc?.clientes?.nome || a.titulo;
   const cidadeCard = a.tipo === "remoto" ? "◌ Remoto" : `⌖ ${cli?.cidade || a.cidade || "Cidade não informada"}`;
+  // INSTRUÇÕES DO ATENDIMENTO (Diego, 23/08/2026: "cada cliente com instruções do que precisa
+  // ser feito"). Reúne aqui tudo que ele precisa saber ANTES de bater na porta, sem ter que
+  // abrir a ficha do cliente: o que fazer, qual é o serviço, o que ainda falta comprar e onde,
+  // quanto é, e o que a ficha avisa sobre esse cliente.
+  // Só entra o que existe — linha vazia com rótulo bonito é ruído, e ele lê isso dirigindo.
+  const materialPendente = (svc?.materiais_necessarios || []).filter((m) => !m.arquivado && !m.comprado);
+  const instrucoes = [];
+  if (oQueFazer) instrucoes.push(["O QUE FAZER", oQueFazer]);
+  if (svc?.titulo && svc.titulo !== oQueFazer && svc.titulo !== a.titulo) instrucoes.push(["SERVIÇO", svc.titulo]);
+  if (materialPendente.length) instrucoes.push(["MATERIAL QUE FALTA",
+    materialPendente.map((m) => m.item + (m.pedido ? " (já pedido)" : "")).join(" · ")
+    + (svc?.loja_material ? " — comprar em " + svc.loja_material : "")]);
+  if (Number(svc?.valor_orcamento)) instrucoes.push(["VALOR DO SERVIÇO",
+    money(svc.valor_orcamento) + (svc?.prazo ? " · prazo " + compactDate(svc.prazo) : "")]);
+  if (cli?.obs) instrucoes.push(["OBSERVAÇÃO DA FICHA", cli.obs]);
   return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}`}>
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
@@ -2784,8 +2799,9 @@ function CompromissoCard({ a, svc, today, materiais }) {
           ENTREGA marcada sem número). Pedir o que não dá pra fazer é pior que não pedir. */}
       {!tel && svc?.cliente_id && <p className="compromisso-material">⚠ Sem telefone na ficha — não dá pra fazer esse contato. Pegue o número antes.</p>}
       <div className="compromisso-info">
-        {svc?.clientes?.nome && <><span className="ci-label">CLIENTE</span><strong>{svc.clientes.nome}</strong></>}
-        <span className="ci-label">O QUE FAZER</span><strong>{oQueFazer}</strong>
+        {instrucoes.map(([rotulo, texto]) => <React.Fragment key={rotulo}>
+          <span className="ci-label">{rotulo}</span><strong>{texto}</strong>
+        </React.Fragment>)}
         {sugestao && <q className="compromisso-msg">{sugestao}</q>}
         <div className="compromisso-acoes">
           {tel && <a className="btn-wpp" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">Abrir WhatsApp{sugestao ? " com resposta" : ""}</a>}
