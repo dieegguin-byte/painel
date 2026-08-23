@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f0d0c">
+<title>Socorro do app — Tapeçaria Bahia</title>
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<!-- POR QUE ESTA PÁGINA EXISTE (22/08/2026). O app instalado abriu preto e MUDO: sem texto, sem botão,
+     sem erro — nada que o Diego pudesse me mandar. E quando o próprio app está quebrado, ele não tem como
+     se consertar, porque quem devolve a cópia quebrada é o service worker, que também serve o app.
+     Esta página é o contrário disso de propósito:
+     - endereço NOVO (nunca existiu, então não há cópia velha dele em lugar nenhum);
+     - HTML e CSS puros, ZERO biblioteca externa: se a internet estiver ruim, ela abre do mesmo jeito;
+     - diz em português o que está quebrado e tem UM botão que apaga cache + service worker e reabre o app.
+     Não mexe em dado nenhum: só apaga cópia guardada no celular. Os dados estão no Supabase. -->
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;padding:20px 16px 40px;background:#0f0d0c;color:#fff4e9;
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
+  .selo{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;margin:0 0 14px;
+        background:linear-gradient(145deg,#ed9057,#9f4621);font:700 20px Georgia,serif;color:#fff9f1}
+  h1{font:500 26px Georgia,serif;margin:0 0 6px}
+  p.sub{color:#baa99b;font-size:14px;margin:0 0 20px}
+  .linha{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;margin-bottom:8px;
+         background:#181412;border:1px solid #3a2d26;border-radius:12px;font-size:14px}
+  .linha i{font-style:normal;font-size:16px;line-height:1.35}
+  .linha b{display:block;font-weight:650}
+  .linha span{display:block;color:#baa99b;font-size:12px;word-break:break-word}
+  .ok{border-color:#47785a}.ruim{border-color:#8f4d44}.espera{opacity:.6}
+  button{width:100%;border:0;border-radius:14px;padding:17px;font-size:16px;font-weight:750;margin-top:12px}
+  .grande{background:linear-gradient(135deg,#e17a42,#ad4d24);color:#fff}
+  .fraco{background:#1a1512;color:#baa99b;border:1px solid #3a2d26}
+  .aviso{margin:22px 0 0;padding:13px;border-radius:12px;background:#d4a64e13;border:1px solid #d4a64e55;
+         color:#edcc90;font-size:13px}
+</style>
+</head>
+<body>
+<div class="selo">TB</div>
+<h1>Socorro do app</h1>
+<p class="sub">Esta página testa o que está travando o app no seu celular. Espere os testes acabarem e use o botão laranja.</p>
+
+<div id="testes">
+  <div class="linha espera"><i>⏳</i><div><b>Testando…</b><span>uns 10 segundos</span></div></div>
+</div>
+
+<button class="grande" id="limpar">Limpar tudo e abrir o app</button>
+<button class="fraco" id="copiar">Copiar o resultado pra me mandar</button>
+
+<div class="aviso">
+  Nada de dado seu é apagado. Cliente, serviço, agenda e financeiro ficam no servidor — o botão só joga fora
+  a cópia do app guardada no celular, que é justamente o que costuma estar quebrado.
+</div>
+
+<script>
+(function () {
+  const caixa = document.getElementById('testes');
+  const relatorio = [];
+  const linhas = {};
+
+  function por(id, estado, titulo, detalhe) {
+    let el = linhas[id];
+    if (!el) {
+      el = document.createElement('div');
+      linhas[id] = el;
+      caixa.appendChild(el);
+    }
+    el.className = 'linha ' + (estado === 'ok' ? 'ok' : estado === 'ruim' ? 'ruim' : estado === 'info' ? '' : 'espera');
+    el.innerHTML = '<i>' + (estado === 'ok' ? '✅' : estado === 'ruim' ? '❌' : estado === 'info' ? 'ℹ️' : '⏳') + '</i>' +
+                   '<div><b>' + titulo + '</b><span>' + (detalhe || '') + '</span></div>';
+    relatorio[id] = (estado === 'ok' ? 'OK' : estado === 'ruim' ? 'RUIM' : '...') + ' | ' + titulo + ' | ' + (detalhe || '');
+  }
+
+  // Sai da fila do primeiro teste assim que ele começa a responder.
+  caixa.innerHTML = '';
+
+  async function testarRede() {
+    por('rede', 'espera', 'Internet até o app', 'testando…');
+    if (!navigator.onLine) { por('rede', 'ruim', 'Internet até o app', 'o celular diz que está SEM conexão'); return null; }
+    try {
+      const r = await fetch('./nova.html?socorro=' + Date.now(), { cache: 'no-store' });
+      const t = await r.text();
+      por('rede', 'ok', 'Internet até o app', 'baixou o app do servidor (' + Math.round(t.length / 1024) + ' KB)');
+      return t;
+    } catch (e) {
+      por('rede', 'ruim', 'Internet até o app', 'não conseguiu baixar: ' + (e.message || e));
+      return null;
+    }
+  }
+
+  function testarVersao(texto) {
+    if (texto === null) { por('versao', 'ruim', 'Versão do app no servidor', 'não deu pra conferir, sem internet'); return; }
+    const novo = texto.indexOf('tb-carregando') !== -1;
+    por('versao', novo ? 'ok' : 'ruim', 'Versão do app no servidor',
+        novo ? 'é a versão nova, com a tela que explica o erro' : 'o servidor ainda está com a versão ANTIGA');
+  }
+
+  async function testarBiblioteca(id, nome, url) {
+    por(id, 'espera', nome, 'testando…');
+    try {
+      const r = await fetch(url, { cache: 'no-store', mode: 'no-cors' });
+      por(id, 'ok', nome, 'respondeu');
+    } catch (e) {
+      por(id, 'ruim', nome, 'bloqueado ou fora do ar: ' + (e.message || e));
+    }
+  }
+
+  async function testarInstalacao() {
+    let sws = 'nenhum', quantos = 0;
+    try {
+      if (navigator.serviceWorker) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        quantos = regs.length;
+        sws = regs.map((r) => (r.active ? 'ativo' : r.waiting ? 'esperando' : 'instalando')).join(', ') || 'nenhum';
+      }
+    } catch (e) { sws = 'erro: ' + e.message; }
+    let nomes = [];
+    try { if (window.caches) nomes = await caches.keys(); } catch (e) { nomes = ['erro: ' + e.message]; }
+    // Aqui não existe "certo" e "errado": é informação. Sem motor é o estado normal depois de limpar.
+    por('sw', 'info', 'Cópia guardada no celular',
+        'motor: ' + sws + ' · pacotes: ' + (nomes.join(', ') || 'nenhum'));
+
+    try {
+      if (navigator.storage && navigator.storage.estimate) {
+        const e = await navigator.storage.estimate();
+        const usado = Math.round((e.usage || 0) / 1048576);
+        const teto = Math.round((e.quota || 0) / 1048576);
+        por('espaco', teto && usado / teto > 0.95 ? 'ruim' : 'ok', 'Espaço pro app',
+            usado + ' MB usados de ' + teto + ' MB');
+      }
+    } catch (e) { /* nem todo Android responde isso */ }
+  }
+
+  (async function () {
+    const html = await testarRede();
+    testarVersao(html);
+    await testarBiblioteca('cdn1', 'Biblioteca principal (jsdelivr)', 'https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js');
+    await testarBiblioteca('cdn2', 'Biblioteca reserva (unpkg)', 'https://unpkg.com/react@18.3.1/umd/react.production.min.js');
+    await testarInstalacao();
+    por('fim', 'ok', 'Testes terminados', 'agora toque no botão laranja');
+  })();
+
+  document.getElementById('limpar').onclick = async function () {
+    this.textContent = 'Limpando…';
+    try {
+      if (window.caches) {
+        const chaves = await caches.keys();
+        await Promise.all(chaves.map((k) => caches.delete(k)));
+      }
+      if (navigator.serviceWorker) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+    } catch (e) { /* mesmo falhando, reabrir sem cache já ajuda */ }
+    location.replace('./nova.html?limpo=' + Date.now());
+  };
+
+  document.getElementById('copiar').onclick = async function () {
+    const texto = 'SOCORRO DO APP — ' + new Date().toLocaleString('pt-BR') + '\n' +
+                  navigator.userAgent + '\n' +
+                  Object.keys(linhas).map((k) => relatorio[k]).join('\n');
+    try {
+      await navigator.clipboard.writeText(texto);
+      this.textContent = 'Copiado — é só colar pra mim';
+    } catch (e) {
+      this.textContent = 'Não deixou copiar; manda um print da tela';
+    }
+  };
+})();
+</script>
+</body>
+</html>
