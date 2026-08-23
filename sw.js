@@ -17,7 +17,16 @@
      fingir que esta atualizado. Gravacao offline NAO existe de proposito: fila
      de escrita duplicaria compromisso e as travas do banco recusariam calado.
 */
-const VERSAO = 'tb-atendimento-v11';
+/* POR QUE MUDOU DE NOVO (22/08/2026 - TELA PRETA): o app instalado abriu preto, mudo. Duas falhas aqui
+   ajudavam nisso, e as duas estao consertadas abaixo:
+   1) o network-first guardava QUALQUER resposta do proprio site, inclusive 404 e pagina de portal de
+      operadora. Uma vez guardada, a copia ruim era servida offline pra sempre. Agora so resposta ok entra
+      no cache, e resposta ruim NAO ganha da copia boa que ja estava guardada;
+   2) o cache-first do CDN devolvia o que estivesse guardado sem olhar o status. Agora so devolve se estiver
+      ok, e o unpkg (o espelho que o nova.html usa quando o jsdelivr falha) tambem passa a ser cacheado.
+   A subida de v11 pra v12 tambem serve de vassoura: o activate apaga todo cache que nao seja o da versao
+   atual, entao o celular do Diego joga fora o cache antigo (possivelmente corrompido) na primeira abertura. */
+const VERSAO = 'tb-atendimento-v12';
 // COMPARTILHAR DO WHATSAPP. O Android entrega o print/texto num POST multipart pra ./compartilhar,
 // que NAO existe como arquivo - e nem poderia, o GitHub Pages so serve estatico. O service worker e
 // o unico lugar capaz de pegar esse POST. Ele guarda a carga no cache e manda o app abrir; quem le,
@@ -92,10 +101,10 @@ self.addEventListener('fetch', (e) => {
   const url = alvo;
 
   // CDN: cache-first. Abre offline e ainda economiza dados do celular dele.
-  if (url.hostname === 'cdn.jsdelivr.net') {
+  if (url.hostname === 'cdn.jsdelivr.net' || url.hostname === 'unpkg.com') {
     e.respondWith((async () => {
       const cacheado = await caches.match(req);
-      if (cacheado) {
+      if (cacheado && cacheado.ok) {
         // Atualiza em segundo plano, sem segurar a tela.
         fetch(req).then((resp) => { if (resp && resp.ok) caches.open(VERSAO).then((c) => c.put(req, resp)); }).catch(() => {});
         return cacheado;
@@ -114,12 +123,21 @@ self.addEventListener('fetch', (e) => {
   // Supabase e qualquer outra origem: passa direto, sem cache (dado nunca fica no SW).
   if (url.origin !== location.origin) return;
 
-  // Proprio site: network-first, cache como rede de seguranca.
-  e.respondWith(
-    fetch(req).then((resp) => {
-      const copia = resp.clone();
-      caches.open(VERSAO).then((c) => c.put(req, copia));
-      return resp;
-    }).catch(() => caches.match(req))
-  );
+  // Proprio site: network-first, cache como rede de seguranca - mas so resposta BOA entra no cache.
+  e.respondWith((async () => {
+    try {
+      const resp = await fetch(req);
+      if (resp && resp.ok) {
+        const copia = resp.clone();
+        caches.open(VERSAO).then((c) => c.put(req, copia)).catch(() => {});
+        return resp;
+      }
+      // 404, 5xx, portal de operadora: nao guarda e prefere a copia boa que ja existe.
+      const salvo = await caches.match(req);
+      return salvo || resp;
+    } catch (err) {
+      const salvo = await caches.match(req);
+      return salvo || Response.error();
+    }
+  })());
 });
