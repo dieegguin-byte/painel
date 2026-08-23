@@ -326,6 +326,29 @@ const demoFornecedores = [
   { id: "f2", nome: "Ellis Tecidos", contato_nome: "Edmania", telefone: "6193178065", produtos: "Espuma D40/D45, veludo slim", dias_entrega: null, observacao: "Sem dia fixo" },
 ];
 
+// CONVERSA É SEMPRE LISTA (22/08/2026). O app abriu, mostrou tudo e apagou: uma anotação gravada na
+// caixa_entrada trouxe `conversa` como OBJETO ({tipo, origem, documento_drive}) em vez de lista de
+// mensagens. O `(item.conversa || [])` espalhado pelo código NÃO protege disso — objeto é verdadeiro em
+// JS, então o `|| []` não entra e o `.filter` estoura no meio do desenho. Componente que estoura faz o
+// React apagar a tela inteira: exatamente a tela preta que o Diego viu. Toda carga passa por aqui agora
+// (ver aplicarPacote), e o que veio fora do formato vira uma mensagem do sistema em vez de sumir.
+// STATUS DESCONHECIDO NÃO PODE SUMIR (22/08/2026). A fila filtra por status. Quem grava na caixa_entrada
+// de fora do app (o Classic, uma rotina) pode escrever um status que este app não conhece — aconteceu com
+// "pendente" — e aí a anotação fica no banco, com processado=false, mas INVISÍVEL: ninguém vê, ninguém
+// tria, e o Diego só descobre quando a conta chega. Status que não existe aqui entra na fila como novo.
+const STATUS_CAIXA = ["novo", "em_processamento", "aguardando_voce", "respondido", "resolvido"];
+function statusDaCaixa(item) {
+  const s = item && item.status;
+  return STATUS_CAIXA.includes(s) ? s : "novo";
+}
+
+function comoLista(valor) {
+  if (Array.isArray(valor)) return valor;
+  if (valor === null || valor === undefined || valor === "") return [];
+  const conteudo = typeof valor === "string" ? valor : JSON.stringify(valor);
+  return [{ de: "sistema", texto: "Anotação recebida fora do formato de conversa: " + conteudo, em: new Date().toISOString() }];
+}
+
 function normalizePhone(value) {
   let digits = value.replace(/\D/g, "");
   if ((digits.length === 12 || digits.length === 13) && digits.startsWith("55")) digits = digits.slice(2);
@@ -1893,15 +1916,18 @@ function Home() {
 
   // Um lugar só pra preencher as listas: usado tanto pela carga online quanto pelo cache offline, pra as
   // duas seguirem exatamente o mesmo caminho e não divergirem com o tempo.
+  // Ponto único onde a carga do banco (ou do cache offline) entra no app. Normalizar a conversa AQUI vale
+  // mais que remendar os vinte lugares que leem esse campo: nenhum deles pode receber algo que não seja lista.
   const aplicarPacote = useCallback((p) => {
-    setInbox(p.inbox || []); setCustomers(p.customers || []); setServices(p.services || []);
+    setInbox((p.inbox || []).map((item) => ({ ...item, conversa: comoLista(item.conversa) })));
+    setCustomers(p.customers || []); setServices(p.services || []);
     setAppointments(p.appointments || []); setFinances(p.finances || []); setRotinas(p.rotinas || []);
     setFornecedores(p.fornecedores || []);
   }, []);
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox); setCustomers(demoCustomers); setServices(demoServices); setAppointments(demoAppointments); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(demoAppointments); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
@@ -2027,7 +2053,7 @@ function Home() {
   // compromisso com pendência de remarcação aberta; Agenda, rota, Compras e o seletor de horário do
   // "+ Adicionar" continuavam mostrando/permitindo agendar em cima de um compromisso fantasma.
   const agendaVisivel = useMemo(() => compromissosOperacionais(appointments, inbox), [appointments, inbox]);
-  const claudeQueue = useMemo(() => inbox.filter((item) => ["respondido", "novo"].includes(item.status || "novo")).sort((a, b) => {
+  const claudeQueue = useMemo(() => inbox.filter((item) => ["respondido", "novo"].includes(statusDaCaixa(item))).sort((a, b) => {
     const priority = (value) => value === "respondido" ? 0 : 1;
     return priority(a.status) - priority(b.status) || new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
   }), [inbox]);
@@ -2514,7 +2540,7 @@ function GuiaModal({ db, demo, notify, onClose }) {
 }
 
 function QueueItem({ item, selected, onOpen }) {
-  const parsed = parseInbox(item.texto); const status = item.status || "novo";
+  const parsed = parseInbox(item.texto); const status = statusDaCaixa(item);
   // O selo de print fica no TOPO, do lado do status. Antes "Contém imagem" ficava numa linha cinza no rodapé
   // do card, do mesmo tamanho de "2 mensagens" — some no meio da fila. E foi assim que o print da Wesliane
   // passou batido (04/08): o item parecia texto puro. Ver REGRA Nº 1.
@@ -2523,7 +2549,7 @@ function QueueItem({ item, selected, onOpen }) {
 
 function TriagePanel(props) {
   const { item, parsed, mode, form, updateForm, customers, duplicateCustomers, services, appointments, fornecedores, busy, reply, setReply } = props;
-  const status = item.status || "novo";
+  const status = statusDaCaixa(item);
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(parsed.text);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -2547,7 +2573,7 @@ function TriagePanel(props) {
     {confirmDelete && <div className="danger-box confirm-row"><span>Excluir esta entrada da caixa? Não dá pra desfazer.</span><div><button className="primary" onClick={props.onDelete}>Sim, excluir</button><button className="ghost" onClick={() => setConfirmDelete(false)}>Cancelar</button></div></div>}
     {editing ? <article className="source-card"><p className="kicker">EDITAR ANOTAÇÃO</p><textarea className="edit-note" value={editText} onChange={(e) => setEditText(e.target.value)} />{!!parsed.images.length && <div className="source-gallery">{parsed.images.map((img, i) => <a key={i} href={img.url} target="_blank" rel="noreferrer"><img src={img.url} alt={img.fileName} /></a>)}</div>}<div className="ficha-actions"><button className="primary" onClick={() => { props.onEdit(editText); setEditing(false); }}>Salvar</button><button className="ghost" onClick={() => { setEditText(parsed.text); setEditing(false); }}>Cancelar</button></div></article>
     : <article className="source-card"><p className="kicker">CONTEÚDO ORIGINAL{parsed.images.length > 1 ? ` · ${parsed.images.length} imagens` : ""}</p><p>{parsed.text || "Print sem texto adicional."}</p>{!!parsed.images.length && <div className="source-gallery">{parsed.images.map((img, i) => <a key={i} href={img.url} target="_blank" rel="noreferrer"><img src={img.url} alt={img.fileName} /></a>)}</div>}</article>}
-    {!!item.conversa?.length && <div className="conversation">{item.conversa.map((message, index) => <div key={`${message.em}-${index}`} className={`bubble ${message.de} ${message.tipo || ""}`}><span>{message.de === "ia" ? "Claude" : "Diego"}</span>{message.texto}</div>)}</div>}
+    {!!item.conversa?.length && <div className="conversation">{item.conversa.map((message, index) => <div key={`${message.em}-${index}`} className={`bubble ${message.de} ${message.tipo || ""}`}><span>{message.de === "ia" ? "Claude" : message.de === "sistema" ? "Sistema" : "Diego"}</span>{message.texto}</div>)}</div>}
     {status === "aguardando_voce" && <div className="answer-box"><label>Sua resposta para o Claude<textarea value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Responda aqui; a entrada voltará automaticamente para a fila do Claude." /></label><button className="primary" onClick={props.onAnswer} disabled={!reply.trim()}>Enviar resposta</button></div>}
     {["novo", "respondido"].includes(status) && <div className="claim-box"><h3>Esta entrada ainda não está travada.</h3><p>Assuma antes de alterar dados. Se outra sessão já pegou, esta operação será recusada.</p><button className="primary" onClick={props.onClaim} disabled={busy}>Iniciar triagem segura</button></div>}
     {status === "em_processamento" && <>
@@ -3087,7 +3113,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   // nada — e o que não fazia nada era justo o "Aguardando você", que significa que o app tem uma PERGUNTA
   // pra ele. Contador que anuncia pendência e não leva até ela é pior que não existir: mostra a dívida e
   // esconde a porta. Abre já no item, porque selecionar não assume a triagem (isso é o botão Assumir).
-  const paraClaude = inbox.filter((entry) => ["novo", "respondido"].includes(entry.status || "novo"));
+  const paraClaude = inbox.filter((entry) => ["novo", "respondido"].includes(statusDaCaixa(entry)));
   const aguardandoVoce = inbox.filter((entry) => entry.status === "aguardando_voce");
   const porTipo = (list) => filtroTipo === "todos" ? list : list.filter((entry) => (entry.tipo || "presencial") === filtroTipo);
   const due = porTipo(dueAll); const futuros = porTipo(futurosAll);
@@ -5086,8 +5112,37 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
   </div>;
 }
 
+// BARREIRA (22/08/2026). Sem isto, um erro em QUALQUER componente faz o React desmontar a árvore inteira
+// e deixar a página vazia — que num app de fundo escuro é uma tela preta muda, sem nada pra ler nem pra
+// clicar. Foi o que aconteceu com a anotação de conversa fora do formato. Agora o erro aparece escrito,
+// com o caminho de saída, e fica guardado no aparelho pra eu poder ler depois.
+class Barreira extends React.Component {
+  constructor(props) { super(props); this.state = { erro: null }; }
+  static getDerivedStateFromError(erro) { return { erro }; }
+  componentDidCatch(erro, info) {
+    try {
+      window.localStorage.setItem("tb-ultimo-erro", JSON.stringify({
+        em: new Date().toISOString(),
+        mensagem: String((erro && erro.message) || erro),
+        componente: String((info && info.componentStack) || "").trim().split("\n").slice(0, 6).join(" < ")
+      }));
+    } catch (e) { /* aparelho sem espaço: perder o registro não pode impedir a tela de aparecer */ }
+  }
+  render() {
+    if (!this.state.erro) return this.props.children;
+    return <div className="loading-screen"><div className="login-card">
+      <div className="brand-seal">TB</div>
+      <h1 style={{ font: "500 26px Georgia,serif", margin: "0 0 10px" }}>O app quebrou nesta tela</h1>
+      <p>Não foi você e não se perdeu nada: os dados estão no servidor. Recarregar resolve na maioria das vezes. Se voltar a acontecer, me mande esta mensagem de erro.</p>
+      <button className="primary wide" onClick={() => location.reload()}>Recarregar o app</button>
+      <button className="ghost wide" style={{ marginTop: 10 }} onClick={() => { location.href = "./socorro.html"; }}>Abrir a página de socorro</button>
+      <p style={{ fontSize: 10, color: "#81736a", margin: "16px 0 0", wordBreak: "break-word" }}>{String((this.state.erro && this.state.erro.message) || this.state.erro)}</p>
+    </div></div>;
+  }
+}
+
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<Home />);
+root.render(<Barreira><Home /></Barreira>);
 </script>
 <script>
 // O app só monta depois que as quatro bibliotecas responderam de verdade (ver o comentário lá no <head>).
