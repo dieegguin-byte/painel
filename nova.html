@@ -139,7 +139,16 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .responsavel-badge{display:inline-flex;align-items:center;gap:3px;background:var(--surface3);border:1px solid var(--line2);color:var(--muted);border-radius:999px;padding:3px 9px;font-size:9px;font-weight:600;margin-top:4px}button.responsavel-badge{cursor:pointer}button.responsavel-badge:hover{border-color:#8a5a3e;color:var(--cream)}.responsavel-edit-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.responsavel-edit-row input{width:150px;padding:6px 8px;font-size:11px;background:#0f0d0c;border:1px solid var(--line2);border-radius:8px;color:var(--text)}.responsavel-edit-row input[type=date]{width:132px}.responsavel-edit-row button{padding:5px 9px;font-size:9px}
 .duplicate-warning,.danger-box{border-radius:10px;padding:10px;font-size:10px}.duplicate-warning{background:#d4a64e10;border:1px solid #d4a64e3d;color:#edcc90}.duplicate-warning b{display:block;margin-bottom:5px}.duplicate-warning button,.duplicate-warning span{display:block;border:0;background:transparent;color:inherit;padding:3px 0;font-size:10px;text-decoration:underline}.danger-box{background:#df6a5d12;border:1px solid #df6a5d50;color:#f1a49c}.review-box{background:#75a9870c;border:1px solid #75a98735;border-radius:12px;padding:11px}.review-box span{display:block;color:#b8d8c1;font-size:10px;margin:4px 0}.ask-panel{background:#181412;border:1px solid var(--line);margin-top:14px}.audit-checks{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}.audit-checks label{display:flex;align-items:center;gap:5px;font-size:8px}.mode-claude .triage-panel{border-color:#75a98744}
 .page-grid{display:grid;gap:15px}.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric-card{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:15px;min-height:112px}.metric-card>span{font-size:8px;text-transform:uppercase;color:var(--dim);letter-spacing:.7px}.metric-card>b{display:block;font-size:26px;margin:11px 0 4px}.metric-card small{color:var(--muted);font-size:9px}.metric-card.orange>b{color:var(--orange2)}.metric-card.red>b{color:#e88477}.metric-card.yellow>b{color:#e4bd72}.metric-card.green>b{color:#9bc7a7}.metric-card.clickable{cursor:pointer;transition:border-color .15s,transform .15s}.metric-card.clickable:hover{border-color:var(--dim);transform:translateY(-1px)}.metric-card.clickable:active{transform:translateY(0)}.content-card{background:linear-gradient(145deg,#1b1613,#15110f);border:1px solid var(--line);border-radius:18px;padding:18px}.content-card.full{min-height:560px}.card-head{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:14px}.card-head h3{font:500 22px Georgia,serif;margin:0}.search{width:min(300px,45%);margin:0}.priority-row{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:11px;padding:11px 3px;border-bottom:1px solid var(--line)}.priority-row:last-child{border-bottom:0}.priority{width:8px;height:8px;border-radius:50%;background:var(--yellow)}.priority.alta{background:var(--red)}.priority.baixa{background:var(--green)}.priority-row strong,.priority-row span{display:block}.priority-row strong{font-size:11px;margin-bottom:3px}.priority-row span,.priority-row time{font-size:9px;color:var(--dim)}.warning-card{padding:15px 18px;border-radius:14px;background:#df6a5d12;border:1px solid #df6a5d3f}.warning-card b,.warning-card span{display:block}.warning-card b{font-size:12px}.warning-card span{font-size:9px;color:var(--muted);margin-top:3px}/* PAINEL: cards de acao grandes (o que fazer + mensagem pronta + WhatsApp) */
-.compromisso-card{display:grid;grid-template-columns:88px 1fr;gap:13px;background:linear-gradient(150deg,#1d1714,#171310);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:16px;padding:14px;margin-bottom:12px}
+.compromisso-card{display:block;background:linear-gradient(150deg,#1d1714,#171310);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:16px;padding:14px;margin-bottom:12px}
+/* CABEÇALHO CLICÁVEL: é o card fechado. Hora à esquerda, nome + cidade no meio, seta à direita.
+   `min-width:0` no meio é o que impede um nome comprido de empurrar a seta pra fora e alargar
+   o card — sem isso, um cliente de nome grande estoura a largura da tela no celular. */
+.compromisso-cab{display:grid;grid-template-columns:88px minmax(0,1fr) 20px;gap:13px;align-items:center;width:100%;background:none;border:0;color:inherit;text-align:left;padding:0;cursor:pointer;font:inherit}
+.compromisso-idc{display:flex;flex-direction:column;gap:3px;min-width:0}
+.compromisso-idc strong{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.compromisso-idc>span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}
+.compromisso-card .compromisso-corpo{margin-top:13px}
 .compromisso-card.cor-alta{border-left-color:var(--red)}.compromisso-card.cor-media{border-left-color:var(--yellow)}.compromisso-card.cor-baixa{border-left-color:var(--green)}
 .compromisso-quando{background:#0f0d0c;border:1px solid var(--line);border-radius:12px;padding:11px 6px;text-align:center;align-self:start}
 .compromisso-quando b{display:block;font:700 19px Georgia,serif;color:var(--orange2)}
@@ -244,7 +253,11 @@ button.sutil{opacity:.55;font-size:12px}
 .material-pendente em{display:block;font-size:11px;color:#e0a458;font-style:normal;margin-bottom:6px}
 .agenda-dias{display:flex;flex-direction:column;gap:10px}.agenda-dia-card{background:linear-gradient(150deg,#1d1714,#171310);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:16px;overflow:hidden}.agenda-dia-card.cor-alta{border-left-color:var(--red)}.agenda-dia-card.cor-media{border-left-color:var(--yellow)}.agenda-dia-card.cor-baixa{border-left-color:var(--green)}.agenda-dia-head{display:grid;grid-template-columns:52px 1fr auto 16px;align-items:center;gap:14px;width:100%;background:none;border:0;padding:14px 16px;cursor:pointer;text-align:left;color:inherit;font-family:inherit}.agenda-dia-data{display:flex;flex-direction:column;align-items:center;line-height:1.15}.agenda-dia-data b{font:600 24px Georgia,serif;color:var(--text)}.agenda-dia-data span{font-size:10px;color:var(--orange2);text-transform:uppercase;letter-spacing:.4px;font-style:normal}.agenda-dia-data em{font-size:9px;color:var(--dim);text-transform:uppercase;font-style:normal}.agenda-dia-badges{display:flex;flex-wrap:wrap;gap:6px}.badge-cidade,.badge-remoto,.badge-conflito{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;white-space:nowrap}.badge-cidade{background:#d86d3617;color:var(--orange2);border:1px solid #d86d3640}.badge-remoto{background:#3a2d2650;color:var(--muted);border:1px solid var(--line2)}.badge-conflito{background:#df6a5d18;color:#e88477;border:1px solid #df6a5d3f;font-size:11px}.badge-rota{background:#df6a5d18;color:#e88477;border:1px solid #df6a5d3f}.compromisso-material{margin-top:5px;font-size:10px;font-weight:600;color:#f1a06d;background:#d86d3617;border:1px solid #d86d3640;border-radius:8px;padding:5px 9px}.agenda-dia-meta{display:flex;flex-direction:column;align-items:flex-end;text-align:right}.agenda-dia-meta b{font-size:16px;color:var(--text)}.agenda-dia-meta span{font-size:9px;color:var(--dim)}.agenda-dia-seta{font-style:normal;color:var(--dim);font-size:11px}.agenda-dia-corpo{padding:0 16px 16px}.finance-metrics{grid-template-columns:repeat(3,1fr)}.finance-metrics .metric-card>b{font-size:20px}.finance-row{display:flex;justify-content:space-between;gap:15px;padding:11px 0;border-bottom:1px solid var(--line)}.finance-row strong,.finance-row span{display:block}.finance-row strong{font-size:11px}.finance-row span{font-size:8px;color:var(--dim);margin-top:3px}.finance-row>b{font-size:11px}.finance-row>b.entrada{color:#91c49f}.finance-row>b.saida{color:#e4867b}.customer-list{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.customer-list article{display:grid;grid-template-columns:38px 1fr auto;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px}.customer-avatar{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#d86d3617;color:#f1a06d;font-size:10px;font-weight:800}.customer-list strong,.customer-list span{display:block}.customer-list strong{font-size:11px}.customer-list span{font-size:8px;color:var(--dim);margin-top:2px}.customer-list article>b{font-size:9px;color:var(--muted)}.mobile-nav{display:none}
 @media(max-width:1100px){.records-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.metric-grid{grid-template-columns:repeat(2,1fr)}.finance-metrics{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:850px){.product-shell{display:block}.side-nav{display:none}.workspace{padding:18px 15px 92px}.workspace-header{align-items:flex-start}.workspace-header h1{font-size:25px}.header-actions{flex-wrap:wrap;justify-content:flex-end}.inbox-layout{grid-template-columns:1fr}.triage-column{position:static}.triage-panel{max-height:none}.triage-welcome{min-height:380px}.mobile-nav{display:flex;position:fixed;left:10px;right:10px;bottom:9px;z-index:100;background:#181412ee;border:1px solid var(--line2);border-radius:17px;padding:6px;overflow:auto;backdrop-filter:blur(18px);box-shadow:var(--shadow)}.mobile-nav button{min-width:70px;flex:1;border:0;background:transparent;color:var(--dim);border-radius:10px;padding:6px 4px;font-size:8px}.mobile-nav button i{font-style:normal;display:block;font-size:24px}.mobile-nav button.active{background:#d86d3618;color:#ffc099}}
+@media(max-width:850px){.product-shell{display:block}.side-nav{display:none}.workspace{padding:18px 15px 92px}.workspace-header{align-items:flex-start}.workspace-header h1{font-size:25px}.header-actions{flex-wrap:wrap;justify-content:flex-end}.inbox-layout{grid-template-columns:1fr}.triage-column{position:static}.triage-panel{max-height:none}.triage-welcome{min-height:380px}/* 15px pra bater com a margem do conteúdo (.workspace usa padding lateral de 15px).
+   Antes a barra ficava a 10px: 5px mais larga que tudo acima dela, e como ela é fixa no
+   rodapé, essa diferença ficava visível o tempo todo — nada do app alinhava com nada.
+   Diego, 23/08: "não ficou centralizado cada parte do app". */
+.mobile-nav{display:flex;position:fixed;left:15px;right:15px;bottom:9px;z-index:100;background:#181412ee;border:1px solid var(--line2);border-radius:17px;padding:6px;overflow:auto;backdrop-filter:blur(18px);box-shadow:var(--shadow)}.mobile-nav button{min-width:70px;flex:1;border:0;background:transparent;color:var(--dim);border-radius:10px;padding:6px 4px;font-size:8px}.mobile-nav button i{font-style:normal;display:block;font-size:24px}.mobile-nav button.active{background:#d86d3618;color:#ffc099}}
 @media(max-width:560px){.login-card{padding:28px 20px}.login-card h1{font-size:32px}.workspace-header{display:block}.header-actions{justify-content:flex-start;margin-top:12px}.header-actions .ghost{padding:8px 10px}.queue-summary{gap:5px}.queue-summary div{padding:8px}.row,.row.three{grid-template-columns:1fr}.metric-grid,.finance-metrics{grid-template-columns:1fr 1fr}.records-grid,.customer-list{grid-template-columns:1fr}.agenda-day{grid-template-columns:1fr}.day-label{margin-bottom:8px}.card-head{display:block}.search{width:100%;margin-top:10px}.triage-panel{padding:14px}.classify button{flex:1}.composer-actions{align-items:flex-end}.primary,.secondary,.ghost{font-size:10px}.notice{right:16px;top:12px}.source-card img{max-width:100%}}
 .pin-card{max-width:340px}.pin-sub{color:var(--muted);font-size:12px;margin:0 auto 20px;max-width:260px}.pin-dots{display:flex;gap:16px;justify-content:center;margin:6px 0 18px}.pin-dots span{width:15px;height:15px;border-radius:50%;border:2px solid var(--line2);background:transparent;transition:.15s}.pin-dots span.filled{background:var(--orange2);border-color:var(--orange2)}.pin-error{color:#e88477;font-size:12px;margin-bottom:12px}.pin-pad{display:grid;grid-template-columns:repeat(3,72px);gap:12px;justify-content:center;margin-top:4px}.pin-key{width:72px;height:72px;border-radius:50%;background:var(--surface2);border:1px solid var(--line2);color:var(--text);font:500 24px Georgia,serif;transition:.12s}.pin-key:active{background:#c95f2e;transform:scale(.95)}
 .modal-overlay{position:fixed;inset:0;z-index:2000;background:#0a0807cc;backdrop-filter:blur(4px);display:grid;place-items:center;padding:20px}.modal-card{width:min(680px,100%);max-height:88vh;overflow:auto;background:linear-gradient(145deg,#1c1613,#141110);border:1px solid var(--line2);border-radius:22px;padding:22px;box-shadow:var(--shadow)}.modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:6px}.modal-head h2{font:500 24px Georgia,serif;margin:4px 0 0}.modal-intro{color:var(--muted);font-size:12px;margin:0 0 16px}.guia-block{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;margin-bottom:12px}.guia-block h3{font-size:13px;margin:0 0 9px;color:var(--cream)}.guia-block textarea{width:100%;min-height:130px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:11px;font-size:12px;line-height:1.55;outline:0}.guia-block textarea:focus{border-color:#d37742;box-shadow:0 0 0 3px #d86d3619}.guia-block .primary{margin-top:9px}.guia-block.readonly{background:#0f0d0c}.guia-block.readonly pre{white-space:pre-wrap;font-family:inherit;font-size:11px;line-height:1.6;color:var(--muted);margin:0}
@@ -277,7 +290,8 @@ button.sutil{opacity:.55;font-size:12px}
 /* Alvo de toque: 36px erra no dedo, ainda mais com a mao ocupada segurando o movel. 44px e o minimo. */
 .header-actions .ghost,.agenda-acoes .ghost,.agenda-acoes .primary,.funil-filtros button{min-height:44px}
 .finance-row>b,.finance-row b{font-size:14px}
-.compromisso-card{grid-template-columns:74px 1fr;gap:10px;padding:12px}
+.compromisso-card{padding:12px}
+.compromisso-cab{grid-template-columns:66px minmax(0,1fr) 18px;gap:10px}
 .compromisso-quando b{font-size:17px}
 .compromisso-corpo h4{font-size:16px}
 .compromisso-info strong{font-size:14px}
@@ -2713,7 +2727,18 @@ function mensagemPadraoCompromisso(a, svc, hoje) {
 }
 
 // Card de AÇÃO do Painel: diz o que fazer, já com a mensagem pronta e o botão do WhatsApp.
-function CompromissoCard({ a, svc, today, onConcluir, onReschedule, materiais }) {
+// CARD RECOLHÍVEL (Diego, 23/08/2026: "em cada cliente colocar abrir e fechar, só aparecendo
+// de cara nome de cliente e cidade").
+//
+// Fechado: nome, cidade e a hora. A hora fica porque a agenda é lida na ordem do relógio —
+// sem ela a lista vira um monte de nomes sem dia. Todo o resto (o que fazer, a mensagem
+// sugerida, material, WhatsApp e rota) só aparece quando ele abre o card.
+//
+// Os botões "Pedir reagendamento", "✓ Concluir" e o de copiar mensagem saíram: eram os
+// controles de escrita do app, e quem opera agora é o Classic. Ficaram só as ações que
+// levam pra fora — falar com o cliente e traçar a rota.
+function CompromissoCard({ a, svc, today, materiais }) {
+  const [aberto, setAberto] = useState(false);
   const sugestao = svc?.sugestao_resposta || mensagemPadraoCompromisso(a, svc, today);
   const tel = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "";
   const oQueFazer = svc?.proxima_acao || a.titulo;
@@ -2736,15 +2761,23 @@ function CompromissoCard({ a, svc, today, onConcluir, onReschedule, materiais })
     : `https://waze.com/ul?q=${encodeURIComponent(destinoRota)}&navigate=yes`;
   const linkMaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinoRota)}`;
   const selo = temPonto ? "" : soCidade ? " (só cidade)" : "";
+  const nomeCliente = svc?.clientes?.nome || a.titulo;
+  const cidadeCard = a.tipo === "remoto" ? "◌ Remoto" : `⌖ ${cli?.cidade || a.cidade || "Cidade não informada"}`;
   return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}`}>
-    <div className="compromisso-quando">
-      <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
-      <span>{compactDate(a.data)}</span>
-      {a.data < today && <em>atrasado</em>}
-    </div>
-    <div className="compromisso-corpo">
+    <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
+      <span className="compromisso-quando">
+        <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
+        <span>{compactDate(a.data)}</span>
+        {a.data < today && <em>atrasado</em>}
+      </span>
+      <span className="compromisso-idc">
+        <strong>{nomeCliente}</strong>
+        <span>{cidadeCard}</span>
+      </span>
+      <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
+    </button>
+    {aberto && <div className="compromisso-corpo">
       <h4>{a.titulo}</h4>
-      <p className="compromisso-local">{a.tipo === "remoto" ? "◌ Remoto" : `⌖ ${a.cidade || "Cidade não informada"}`}</p>
       {!!(materiais || []).length && <p className="compromisso-material">⚑ Aproveitar para o material: {(materiais || []).map((m) => m.descricao || "material").join(" · ")}</p>}
       {/* CONTATO IMPOSSÍVEL: o app mandava "tentar contato de novo" sem existir telefone na ficha, e o Diego
           ficou perguntando "cadê o WhatsApp" desde 16/07 sem resposta (caso real; havia até cliente com ENTREGA marcada e
@@ -2756,18 +2789,13 @@ function CompromissoCard({ a, svc, today, onConcluir, onReschedule, materiais })
         {sugestao && <q className="compromisso-msg">{sugestao}</q>}
         <div className="compromisso-acoes">
           {tel && <a className="btn-wpp" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">Abrir WhatsApp{sugestao ? " com resposta" : ""}</a>}
-          {sugestao && <button className="ghost" title="Copiar mensagem" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}
-          {/* ROTA (Diego, 23/08/2026: "botão de whatsapp e localização"). Só em compromisso
-              presencial — num remoto o botão de mapa é ruído e convida pro toque errado.
-              É BUSCA por endereço + cidade, não pino salvo: a tabela `clientes` ainda não tem
-              latitude/longitude. Por isso o rótulo não promete navegação exata. */}
+          {/* Rota só em compromisso presencial — num remoto o botão de mapa é ruído e convida
+              pro toque errado. O sufixo do rótulo diz a precisão real do destino. */}
           {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-waze" href={linkWaze} target="_blank" rel="noreferrer">🧭 Waze{selo}</a>}
           {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>}
-          <button className="btn-reagendar" onClick={() => onReschedule(a)}>Pedir reagendamento</button>
-          <button className="ghost" onClick={() => onConcluir(a)}>✓ Concluir</button>
         </div>
       </div>
-    </div>
+    </div>}
   </article>;
 }
 
