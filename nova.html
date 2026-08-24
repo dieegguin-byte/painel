@@ -300,6 +300,43 @@ button.sutil{opacity:.55;font-size:12px}
 .funil-esq strong{font-size:15px}.funil-esq span{font-size:12px}.funil-esq em{font-size:11px}
 .funil-dir b{font-size:13px}.funil-dir time{font-size:10px}
 }
+
+/* ==========================================================================
+   TEXTO CORTADO NAS LINHAS DE VALOR — Diego, 23/08/2026:
+   "desalinhamento está comendo palavras na visualização, está cortando textos,
+    por isso estava movendo com folguinha"
+   Ele arrastava a tela pro lado pra conseguir ler o pedaço escondido. Quando eu
+   tirei a folga lateral, tirei junto o jeito dele de enxergar o texto cortado —
+   o deslize era sintoma, o corte é a doença.
+
+   CAUSA MEDIDA: as linhas de Financeiro, Profissionais e Compras são flex com
+   descrição à esquerda e valor à direita. O valor tinha `flex-shrink:1` e quebra
+   normal, então uma descrição longa (as do acerto do Marcão passam de 100
+   caracteres) espremia o valor até sobrar 56px — e "− R$ 1.350,00" se partia em
+   SETE linhas, quase um caractere por linha. Medido no app, não deduzido.
+
+   REGRA: dinheiro nunca encolhe e nunca quebra; quem cede espaço é o texto, que
+   tem lugar pra quebrar. `min-width:0` é obrigatório no lado do texto — sem ele
+   um item flex se recusa a encolher abaixo do conteúdo e empurra o vizinho.
+   ========================================================================== */
+.finance-row>b,.finance-row>strong:last-child,.plano-linha>b,.plano-linha>strong:last-child,
+.conta-linha>b,.vale-linha>b{white-space:nowrap;flex:0 0 auto}
+.finance-row>div,.plano-linha>span,.plano-linha>div,.conta-linha>div{min-width:0}
+.finance-row strong,.finance-row span,.plano-linha strong,.plano-linha span,
+.compra-item-nome,.compra-item-loja{overflow-wrap:anywhere}
+/* O item de compra também é flex: o nome precisa poder quebrar em vez de empurrar
+   o checkbox e o botão de remover pra fora da tela. */
+.compra-item>span{min-width:0}
+
+@media(max-width:850px){
+  /* A data e o status da linha financeira estavam em 8px no celular — menor que a
+     letra miúda de contrato. Ele lê isso em pé na oficina e dentro do carro. */
+  .finance-row strong{font-size:14px}
+  .finance-row span{font-size:12px}
+  .finance-row>b{font-size:14px}
+  .finance-row{gap:10px}
+  .compra-item-loja{font-size:12px}
+}
 </style>
 </head>
 <body>
@@ -366,6 +403,13 @@ const demoFinance = [
   { id: "f2", tipo: "entrada", valor: 675, descricao: "Saldo na entrega — Carlos", status: "a_receber", data: "2026-07-15" },
   { id: "f3", tipo: "saida", escopo: "empresa", categoria: "Material", valor: 480, descricao: "6m de linho Klee", status: "pago", data: "2026-07-08", fornecedor_id: "f1", servico_id: "s1" },
   { id: "f4", tipo: "saida", escopo: "empresa", categoria: "Material", valor: 210, descricao: "Espuma D40 — estoque", status: "pago", data: "2026-07-09", fornecedor_id: "f2", servico_id: null },
+  // A aba Profissionais ficava VAZIA na demo, então não dava pra testar como ela se comporta
+  // com descrição longa — que é o formato real dos lançamentos do acerto. Estas quatro linhas
+  // reproduzem os dois lados da conta de um profissional: trabalho a pagar e vale adiantado.
+  { id: "f5", tipo: "saida", escopo: "empresa", categoria: "Mão de obra", valor: 600, descricao: "Mão de obra - Marcão · Carla — reforma dos bancos e almofadas (data operacional aproximada)", status: "a_pagar", data: "2026-07-12", servico_id: "s2" },
+  { id: "f6", tipo: "saida", escopo: "empresa", categoria: "Mão de obra", valor: 200, descricao: "Mão de obra - Marcão · Entregou o móvel", status: "a_pagar", data: "2026-07-14", servico_id: null },
+  { id: "f7", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 150, descricao: "Vale - Marcão · adiantamento pedido no sábado, abater no próximo acerto", status: "pago", data: "2026-07-13", servico_id: null },
+  { id: "f8", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 80, descricao: "[ABATIDO] Vale - Marcão · conserto do compressor", status: "pago", data: "2026-07-05", servico_id: null },
 ];
 const demoRotinas = [
   { id: "r1", titulo: "Calibrar pneu do carro", intervalo_dias: 3, hora: null, observacao: null, ultima_execucao: null, ativo: true },
