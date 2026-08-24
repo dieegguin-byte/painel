@@ -3530,11 +3530,21 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       // CONTA CHEGANDO: entra sozinho no Painel na véspera do vencimento (e fica enquanto estiver vencida),
       // com o caixa possível do lado — porque a pergunta que ele faz é "tenho de onde tirar?".
       const r = resumoContas(finances, services, today);
-      if (!r.vencidas.length && !r.urgentes.length) return null;
-      const linha = (f) => `${f.descricao || f.categoria} · ${money(f.valor)} · ${(f.data || "") < today ? "venceu " + compactDate(f.data) : (f.data === today ? "vence HOJE" : "vence amanhã")}`;
+      const temPrazo = r.vencidas.length > 0 || r.urgentes.length > 0;
+      if (!temPrazo && !r.semVencimento.length) return null;
+      // Descrição de lançamento pode ser um parágrafo inteiro — o Classic escreve o contexto nela. No Painel
+      // isso vira parede de texto no meio da rota; aqui ele só precisa reconhecer a conta, então corta.
+      const curto = (f) => { const t = (descricaoFinanceiraVisivel(f.descricao) || f.categoria || "").trim(); return t.length > 64 ? t.slice(0, 61).trimEnd() + "…" : t; };
+      const linha = (f) => `${curto(f)} · ${money(f.valor)} · ${(f.data || "") < today ? "venceu " + compactDate(f.data) : (f.data === today ? "vence HOJE" : "vence amanhã")}`;
       return <section className="warning-card">
-        <b>{money(r.totalVencidas + r.totalUrgentes)} a pagar {r.vencidas.length ? "— tem conta vencida" : "nas próximas 24h"}</b>
+        {temPrazo
+          ? <b>{money(r.totalVencidas + r.totalUrgentes)} a pagar {r.vencidas.length ? "— tem conta vencida" : "nas próximas 24h"}</b>
+          : <b>{money(r.totalSemVencimento)} a pagar quando houver saldo</b>}
         {[...r.vencidas, ...r.urgentes].slice(0, 5).map((f) => <span key={f.id}>{linha(f)}</span>)}
+        {/* SEM PRAZO fica no Painel de propósito: foi assim que a dívida do Ozair saiu da rotina — o lembrete
+            irmão não nasceu e só o Financeiro guardou. Aqui ela não vence, não cobra e não some. */}
+        {r.semVencimento.slice(0, 3).map((f) => <span key={f.id}>{curto(f)} · {money(f.valor)} · sem prazo, pagar quando houver saldo</span>)}
+        {r.semVencimento.length > 3 && <span>e mais {r.semVencimento.length - 3} sem prazo marcado</span>}
         {r.potencialCaixa > 0
           ? <span>💰 Dá pra levantar {money(r.potencialCaixa)}{r.prontosSemCobranca.length ? ` — ${r.prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")} sem pagamento registrado` : ""}</span>
           : <span>Nenhum serviço pronto pra cobrar no momento.</span>}
@@ -4350,6 +4360,11 @@ const COMPRA_CONFERIDA_TAG = "[CONFERIDO] ";
 // de cidade e hora, senão quebra a Regra Nº 4. Ver [[feedback-operacao-drive-direto-sem-caixa]].
 // Conta a pagar e caixa possível num lugar só, porque a decisão é sempre a mesma: "vou ter que pagar isso,
 // tenho de onde tirar?". Usado no Painel (alerta com 1 dia de antecedência) e no Financeiro (linha de resumo).
+// COMO O APP SABE QUE NÃO TEM PRAZO: pela descrição, que é onde o Classic já diz isso hoje, com estas
+// palavras. Não inventei campo novo no banco nem convenção nova que dependa de alguém lembrar de usar —
+// funciona no lançamento que JÁ está lá. Se um dia nascer um campo de vencimento de verdade, ele vence
+// esta regra e este teste sai.
+const SEM_VENCIMENTO = /vencimento n[ãa]o (informado|confirmado)|sem vencimento|assim que (houver|tiver) saldo|quando (houver|tiver) saldo|assim que poss[íi]vel|quando (eu )?(tiver|receber) dinheiro/i;
 function resumoContas(finances, services, hoje) {
   const amanha = (() => { const d = new Date(hoje + "T12:00:00"); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
   // TRABALHO DE PROFISSIONAL NÃO É CONTA A PAGAR (Diego, 06/08: "não gostei do alerta no painel, aparece que
@@ -4358,16 +4373,25 @@ function resumoContas(finances, services, hoje) {
   // ainda vai ser abatido dos vales. Sai daqui pelo mesmo motivo que o Vale já saía — os dois vivem na aba
   // Profissionais, onde um desconta o outro.
   const aPagar = (finances || []).filter((f) => f.status === "a_pagar" && f.tipo === "saida" && f.categoria !== "Vale" && f.categoria !== CATEGORIA_MAO_DE_OBRA);
-  const vencidas = aPagar.filter((f) => (f.data || "") < hoje);
+  // OBRIGAÇÃO SEM VENCIMENTO (24/08/2026, caso Ozair — R$ 114 das espumas já em mãos). "Pago assim que
+  // houver saldo" NÃO é conta vencida. A data que está no lançamento registra o dia em que a dívida foi
+  // reconhecida, não um prazo — o próprio Classic escreve isso na descrição. Contar como vencida fazia o
+  // Painel gritar "tem conta vencida" pra sempre por uma dívida que nunca teve prazo, e alerta que mente é
+  // alerta que ele para de ler. Some do "vencido", continua visível, dito pelo que é.
+  const semPrazoMarcado = (f) => SEM_VENCIMENTO.test(f.descricao || "");
+  const semVencimento = aPagar.filter(semPrazoMarcado);
+  const comPrazo = aPagar.filter((f) => !semPrazoMarcado(f));
+  const vencidas = comPrazo.filter((f) => (f.data || "") < hoje);
   // 1 dia de antecedência: entra no Painel na véspera, não no dia, pra dar tempo de correr atrás do dinheiro.
-  const urgentes = aPagar.filter((f) => (f.data || "") === hoje || (f.data || "") === amanha);
+  const urgentes = comPrazo.filter((f) => (f.data || "") === hoje || (f.data || "") === amanha);
   const aReceber = (finances || []).filter((f) => f.tipo === "entrada" && f.status === "a_receber");
   const comEntrada = new Set((finances || []).filter((f) => f.tipo === "entrada" && f.servico_id).map((f) => f.servico_id));
   const prontosSemCobranca = (services || []).filter((s) => ["entregue", "producao"].includes(s.status) && Number(s.valor_orcamento) > 0 && !comEntrada.has(s.id));
   const soma = (l, campo) => l.reduce((s, i) => s + Number(campo ? i[campo] : i.valor), 0);
   return {
-    amanha, aPagar, vencidas, urgentes, aReceber, prontosSemCobranca,
+    amanha, aPagar, vencidas, urgentes, semVencimento, aReceber, prontosSemCobranca,
     totalVencidas: soma(vencidas), totalUrgentes: soma(urgentes), totalAPagar: soma(aPagar),
+    totalSemVencimento: soma(semVencimento),
     potencialCaixa: soma(aReceber) + soma(prontosSemCobranca, "valor_orcamento"),
   };
 }
