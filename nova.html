@@ -3217,7 +3217,24 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   const cobrancasAll = appointments.filter((entry) => ehCobranca(entry) && esperandoCliente(entry, svcDe(entry)));
   const idsCobranca = new Set(cobrancasAll.map((entry) => entry.id));
   const rotaAll = appointments.filter((entry) => !idsCobranca.has(entry.id));
-  const dueAll = rotaAll.filter((entry) => entry.data <= today); const futurosAll = rotaAll.filter((entry) => entry.data > today); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
+  // ATRASADO É O QUE JÁ PASSOU DA HORA — NÃO O QUE É DE HOJE (Diego, 24/08/2026: "compromissos
+  // de hoje deveria estar como próximos compromissos"). A divisão era por DATA, então às 8h da
+  // manhã um compromisso das 14h já caía em "de hoje e atrasados". Ele abria o Painel e via
+  // atraso onde não havia nada de errado — e alarme que mente todo dia deixa de ser lido.
+  //
+  // A pergunta certa não é "é de hoje?", é "a hora já passou?":
+  //   dia anterior                      -> atrasado
+  //   hoje, hora já passou              -> atrasado
+  //   hoje, hora ainda vem              -> PRÓXIMO
+  //   hoje, sem hora marcada            -> PRÓXIMO (ainda cabe no dia; não nasce atrasado)
+  //   dia seguinte em diante            -> PRÓXIMO
+  const agoraHHMM = new Date().toTimeString().slice(0, 5);
+  const jaPassou = (entry) => {
+    if (entry.data < today) return true;
+    if (entry.data > today) return false;
+    return !!entry.hora && String(entry.hora).slice(0, 5) < agoraHHMM;
+  };
+  const dueAll = rotaAll.filter(jaPassou); const futurosAll = rotaAll.filter((entry) => !jaPassou(entry)); const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
   // Atualização otimista pra a linha sumir NA HORA: sem isto ela só sairia depois do loadAll (5 queries) e
   // parecia que o clique não pegou — mesmo bug já corrigido nos compromissos em 15/07.
   // Guarda a DATA resolvida, não `true`: o ciclo recicla a mesma linha da agenda mudando a data, então
@@ -3358,7 +3375,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />
     </section>}{/* Os dois cartões da Caixa ("Para Claude" e "Aguardando você") saíram em 23/08/2026 junto
     com a tela dela. Contador que leva pra uma tela que não existe mais só quebraria no toque. */}
-<section className="metric-grid"><Metric label="Agenda vencendo" value={dueAll.length} detail="Hoje ou atrasada" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
+<section className="metric-grid"><Metric label="Passou da hora" value={dueAll.length} detail="Sem desfecho registrado" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     {/* SAIU DO PAINEL em 30/07/2026 o card "N cliente(s) esperando remarcação". Diego: "achei desnecessário
@@ -3405,16 +3422,20 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       // continua valendo (agendado = fechado); o que saiu foi o card diário.
       return null;
     })()}
-    {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>{due.length} compromisso(s) de hoje e atrasados</h3></div></div>
-      {/* O aviso de rota fica FORA do recolhível: rota que volta é erro que ele precisa ver sem abrir nada. */}
-      <AvisoRota compromissos={due.filter((a) => a.data === today)} />
+    {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>{due.length} compromisso(s) que já passaram da hora</h3></div></div>
       <button className="ghost" style={{ width: "100%" }} onClick={() => setListaHoje((v) => !v)}>{listaHoje ? "Fechar" : `Abrir os ${due.length}`}</button>
       {listaHoje && <div style={{ marginTop: 12 }}>{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</div>}</section>}
     {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
     {/* Bloco COBRANÇAS removido do Painel em 23/08/2026 a pedido do Diego. O ciclo de cobrança
        continua vivo no código (CobrancaCard, onCobrou, onRespondeu, onEncerrar) e nada foi
        apagado do banco — saiu só o bloco da tela do Painel. */}
-    {futuros.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></div></div>
+    {futuros.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3>
+      {futuros.some((a) => a.data === today) && <span className="ficha-note" style={{ margin: 0 }}>{futuros.filter((a) => a.data === today).length} ainda hoje</span>}</div></div>
+      {/* O aviso de rota fica FORA do recolhível: rota que volta é erro que ele precisa ver sem abrir nada.
+          Ele mudou de cartão junto com os compromissos de hoje: antes vivia no card de atrasados, que é
+          justamente onde os compromissos de hoje DEIXARAM de aparecer de manhã. Se tivesse ficado lá, o
+          aviso de rota sumiria no começo do dia — bem na hora de planejar o deslocamento. */}
+      <AvisoRota compromissos={rotaAll.filter((a) => a.data === today)} />
       <button className="ghost" style={{ width: "100%" }} onClick={() => setListaFuturos((v) => !v)}>{listaFuturos ? "Fechar" : `Abrir os ${futuros.length}`}</button>
       {listaFuturos && <div style={{ marginTop: 12 }}>{[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</div>}</section>}
     {filtroTipo !== "todos" && due.length === 0 && futuros.length === 0 && (dueAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
