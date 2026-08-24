@@ -181,6 +181,8 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .btn-rota{text-decoration:none;text-align:center;border-radius:10px;padding:12px 14px;font-size:12px;font-weight:750;min-height:44px;box-sizing:border-box}
 .btn-waze{background:linear-gradient(135deg,#2aa9d0,#1d7fa0);color:#eaf9ff;border:1px solid #3fbfe4}
 .btn-maps{background:linear-gradient(135deg,#c9453a,#9c322a);color:#fff0ee;border:1px solid #e0574b}
+/* CHATGPT (24/08/2026): mesma família dos atalhos de rota — é o terceiro botão da mesma linha. */
+.btn-gpt{background:linear-gradient(135deg,#12a37f,#0b7259);color:#eafff7;border:1px solid #1fc79b;font-family:inherit;cursor:pointer}
 .btn-reagendar{background:#3b2f16;color:#e8c877;border:1px solid #6b5424;border-radius:10px;padding:12px 14px;font-size:12px;font-weight:750}
 /* LEADS: lista compacta de funil (visual proposital diferente do Painel) */
 .funil-lista{display:flex;flex-direction:column;gap:7px}
@@ -2925,8 +2927,40 @@ function mensagemPadraoCompromisso(a, svc, hoje) {
 // Os botões "Pedir reagendamento", "✓ Concluir" e o de copiar mensagem saíram: eram os
 // controles de escrita do app, e quem opera agora é o Classic. Ficaram só as ações que
 // levam pra fora — falar com o cliente e traçar a rota.
+// COMPARTILHAR COM O CHATGPT (item CLIENTE-CHATGPT-SHARE-20260824-1121, 24/08/2026).
+// O botão leva IDENTIDADE, não estado: ids + nome + cidade, e mais nada. Telefone, endereço,
+// localização, valor, histórico e observação da ficha ficam de fora de propósito — esse texto
+// viaja por fora do app, cai numa conversa nova e não é fonte de verdade de nada. O Classic
+// usa os ids pra achar o registro e relê o estado vivo nas fontes oficiais.
+// O clique não grava nada em lugar nenhum.
+function payloadGPT(campos) {
+  const linhas = ["OPERAÇÃO BAHIA — ABRIR CLIENTE"];
+  for (const [rotulo, valor] of campos) if (valor) linhas.push(`${rotulo}: ${valor}`);
+  linhas.push("origem: app_operacao_bahia", "", "INSTRUÇÃO AO CHATGPT:",
+    "Inicialize a Operação Bahia antes de responder. Use os identificadores acima apenas para localizar o cliente/serviço e consulte as fontes oficiais atuais. Não trate este texto compartilhado como prova do status atual nem invente fatos ausentes.");
+  return linhas.join("\n");
+}
+
+// Web Share abre o menu nativo do Android (onde o app do ChatGPT aparece como destino). Precisa
+// sair do clique direto, senão o navegador recusa. Duas coisas NÃO são erro e saem caladas:
+// cancelar o menu (AbortError) e o próprio share não existir — aí cai na cópia, que sempre funciona.
+async function compartilharGPT(texto, aviso) {
+  if (navigator.share) {
+    try { await navigator.share({ text: texto }); return; }
+    catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  try {
+    await navigator.clipboard.writeText(texto);
+    aviso("Contexto copiado — abra o ChatGPT e cole na conversa.", "info");
+  } catch (e) {
+    aviso("Não deu pra compartilhar nem copiar neste navegador.", "error");
+  }
+}
+
 function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais }) {
   const [aberto, setAberto] = useState(false);
+  // Sem `notify` aqui (o card não recebe a prop) — o aviso da cópia vive no próprio card.
+  const [avisoGPT, setAvisoGPT] = useState("");
   // A sugestão GRAVADA vence sempre: ela nasce da conversa real, com julgamento comercial.
   // Só quando ela falta é que o app escreve — e apenas se provar que o interlocutor é o cliente.
   const quem = interlocutorCompromisso(a, svc, fornecedores, profissionais);
@@ -3031,7 +3065,18 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
               pro toque errado. O sufixo do rótulo diz a precisão real do destino. */}
           {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-waze" href={linkWaze} target="_blank" rel="noreferrer">🧭 Waze{selo}</a>}
           {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>}
+          {/* Aqui o `servico_id` é inequívoco: o card TEM um serviço só. Quando o compromisso não
+              tem serviço (compra de material, por exemplo), vai só o `agenda_id` — não se adivinha. */}
+          <button type="button" className="btn-rota btn-gpt" onClick={() => compartilharGPT(payloadGPT([
+            ["cliente_id", svc?.cliente_id],
+            ["servico_id", svc?.id],
+            ["agenda_id", a.id],
+            ["nome", svc?.clientes?.nome],
+            ["cidade", cli?.cidade || a.cidade],
+            ["compromisso", a.titulo],
+          ]), (msg) => setAvisoGPT(msg))}>💬 ChatGPT</button>
         </div>
+        {avisoGPT && <p className="compromisso-material">{avisoGPT}</p>}
       </div>
     </div>}
   </article>;
@@ -5527,7 +5572,9 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
             {cliente.latitude != null && <a className="ghost" href={`https://www.google.com/maps/search/?api=1&query=${cliente.latitude},${cliente.longitude}`} target="_blank" rel="noreferrer">📍 Maps</a>}
           </div>
           {colarLink && <div className="responsavel-edit-row"><input value={linkDraft} onChange={(e) => setLinkDraft(e.target.value)} placeholder="Cole o link do Google Maps já aberto" autoFocus /><button className="ghost" onClick={usarLinkMaps}>Salvar ponto</button></div>}
-          <div className="ficha-actions"><button className="ghost" onClick={() => setEditing(true)}>Editar dados</button>{cliente.telefone && <a className="ghost" href={`https://wa.me/55${normalizePhone(cliente.telefone)}`} target="_blank" rel="noreferrer">WhatsApp</a>}</div>
+          {/* Ficha é nível CLIENTE: aqui o cliente pode ter vários serviços, então `servico_id`
+              fica de fora. Escolher um seria adivinhar, e adivinhar é o que gera atendimento errado. */}
+          <div className="ficha-actions"><button className="ghost" onClick={() => setEditing(true)}>Editar dados</button>{cliente.telefone && <a className="ghost" href={`https://wa.me/55${normalizePhone(cliente.telefone)}`} target="_blank" rel="noreferrer">WhatsApp</a>}<button className="ghost" onClick={() => compartilharGPT(payloadGPT([["cliente_id", cliente.id], ["nome", cliente.nome], ["cidade", cliente.cidade]]), notify)}>💬 ChatGPT</button></div>
         </div> : <div className="ficha-edit form-grid">
           <div className="row"><label>Nome*<input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} /></label><label>Telefone<input value={form.telefone} onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))} /></label></div>
           <div className="row"><label>Cidade<input value={form.cidade} onChange={(e) => setForm((f) => ({ ...f, cidade: e.target.value }))} /></label><label>Endereço<input value={form.endereco} onChange={(e) => setForm((f) => ({ ...f, endereco: e.target.value }))} /></label></div>
