@@ -328,6 +328,20 @@ button.sutil{opacity:.55;font-size:12px}
    o checkbox e o botão de remover pra fora da tela. */
 .compra-item>span{min-width:0}
 
+/* PROFISSIONAIS — o cabeçalho de cada conta tem o mesmo defeito: nome à esquerda,
+   valor à direita, flex sem proteção. "Marcão" cabe; "Marlom Júnior" com
+   "R$ 1.250,00 adiantado demais" ao lado não cabe, e aí um dos dois é triturado.
+   A primeira correção só pegou `.finance-row` e deixou este de fora. */
+.vale-fornecedor-head{gap:10px;align-items:baseline}
+.vale-fornecedor-head strong{min-width:0;overflow-wrap:anywhere}
+.vale-fornecedor-head b{white-space:nowrap;flex:0 0 auto}
+
+/* COMPRAS — mesmo caso no cabeçalho da loja e no do cliente. */
+.compra-loja-head strong{min-width:0;overflow-wrap:anywhere}
+.compra-loja-head>*:last-child{flex:0 0 auto}
+.compra-cliente-head strong,.compra-cliente-head span{overflow-wrap:anywhere}
+.compra-item-nome{min-width:0}
+
 @media(max-width:850px){
   /* A data e o status da linha financeira estavam em 8px no celular — menor que a
      letra miúda de contrato. Ele lê isso em pé na oficina e dentro do carro. */
@@ -335,6 +349,9 @@ button.sutil{opacity:.55;font-size:12px}
   .finance-row span{font-size:12px}
   .finance-row>b{font-size:14px}
   .finance-row{gap:10px}
+  /* 11px em cabeçalho de conta e em chip de loja: mesma história. */
+  .vale-fornecedor-head{font-size:13px}
+  .compra-loja-chip{font-size:12px}
   .compra-item-loja{font-size:12px}
 }
 </style>
