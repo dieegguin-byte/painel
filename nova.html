@@ -323,7 +323,7 @@ button.sutil{opacity:.55;font-size:12px}
 .conta-linha>b,.vale-linha>b{white-space:nowrap;flex:0 0 auto}
 .finance-row>div,.plano-linha>span,.plano-linha>div,.conta-linha>div{min-width:0}
 .finance-row strong,.finance-row span,.plano-linha strong,.plano-linha span,
-.compra-item-nome,.compra-item-loja{overflow-wrap:anywhere}
+.compra-item-nome,.compra-item-loja{overflow-wrap:break-word}
 /* O item de compra também é flex: o nome precisa poder quebrar em vez de empurrar
    o checkbox e o botão de remover pra fora da tela. */
 .compra-item>span{min-width:0}
@@ -333,13 +333,13 @@ button.sutil{opacity:.55;font-size:12px}
    "R$ 1.250,00 adiantado demais" ao lado não cabe, e aí um dos dois é triturado.
    A primeira correção só pegou `.finance-row` e deixou este de fora. */
 .vale-fornecedor-head{gap:10px;align-items:baseline}
-.vale-fornecedor-head strong{min-width:0;overflow-wrap:anywhere}
+.vale-fornecedor-head strong{min-width:0;overflow-wrap:break-word}
 .vale-fornecedor-head b{white-space:nowrap;flex:0 0 auto}
 
 /* COMPRAS — mesmo caso no cabeçalho da loja e no do cliente. */
-.compra-loja-head strong{min-width:0;overflow-wrap:anywhere}
+.compra-loja-head strong{min-width:0;overflow-wrap:break-word}
 .compra-loja-head>*:last-child{flex:0 0 auto}
-.compra-cliente-head strong,.compra-cliente-head span{overflow-wrap:anywhere}
+.compra-cliente-head strong,.compra-cliente-head span{overflow-wrap:break-word}
 .compra-item-nome{min-width:0}
 
 @media(max-width:850px){
@@ -353,6 +353,48 @@ button.sutil{opacity:.55;font-size:12px}
   .vale-fornecedor-head{font-size:13px}
   .compra-loja-chip{font-size:12px}
   .compra-item-loja{font-size:12px}
+
+  /* COMPRAS ERA CAIXA DENTRO DE CAIXA DENTRO DE CAIXA. Medido a 375px: dos 375 do
+     celular, 98 iam embora só em recuo (15 do workspace + 18 do cartão + 12 do bloco
+     do cliente + 4 do item, de cada lado). Sobravam 183px pro nome do item, que então
+     quebrava em 3 linhas. Nenhum outro lugar do app empilha quatro níveis assim.
+     Apertando os dois níveis internos o nome ganha ~28px e cabe em bem menos linhas,
+     sem mudar nada nas outras telas. */
+  .content-card .compra-cliente{padding-left:8px;padding-right:8px}
+  .compra-item{padding-left:0;padding-right:0}
+}
+
+/* ==========================================================================
+   O ESTOURO DE VERDADE DA ABA COMPRAS — medido, não deduzido.
+   O chip de loja tinha `white-space:nowrap`. Com nome curto ("Ozair") isso é
+   inofensivo, mas os nomes reais da operação são frases inteiras:
+     "Afibracom (Linho Klee 09 + carpete) + Ozair (D33 selada)"
+     "Ellis Tecidos (A91 → Uber para Afibracom) + Afibracom (carpete / consolidação)"
+   Um chip desses mede 341px e não pode quebrar, então empurra a PÁGINA para 394px
+   numa tela de 375. A página inteira fica mais larga que o celular — e é aí que o
+   texto some na borda e ele precisa arrastar pro lado pra ler. Era esta a origem
+   da "folguinha", não a rolagem em si.
+   Deixar o chip quebrar resolve sem esconder nome nenhum.
+   ========================================================================== */
+.compra-loja-chip{white-space:normal;max-width:100%;text-align:left;overflow-wrap:break-word}
+
+/* AGENDA — o mesmo defeito no cabeçalho do dia. A etiqueta de cidade tinha `nowrap`,
+   e as "cidades" reais da operação não são palavras curtas: "Brasília-DF / Asa Sul",
+   "Luziânia Norte / Maravilha — endereço exato a confirmar". Medido com texto longo,
+   o cabeçalho do dia ia 385px além da borda da tela e era cortado pelo pai — texto
+   sumindo sem nem deixar a página rolar pro lado, que é a pior versão do problema:
+   o dado some e nada indica que ele existe. */
+.badge-cidade{white-space:normal;overflow-wrap:break-word;max-width:100%}
+.agenda-dia-badges{min-width:0}
+.agenda-dia-meta{min-width:0;max-width:45%}
+.agenda-dia-meta b,.agenda-dia-meta span{overflow-wrap:break-word}
+/* A coluna `auto` do grid pegava toda a largura que quisesse e esmagava a coluna `1fr`
+   das etiquetas até 28px — menos que uma palavra, então a etiqueta era cortada mesmo
+   podendo quebrar. `minmax(0, …)` nos dois lados faz as duas cederem juntas em vez de
+   uma matar a outra. É o mesmo princípio do `min-width:0` no flex, na versão grid. */
+.agenda-dia-head{grid-template-columns:52px minmax(0,1fr) minmax(0,auto) 16px}
+@media(max-width:850px){
+  .agenda-dia-head{grid-template-columns:60px minmax(0,1fr) minmax(0,auto) 16px}
 }
 </style>
 </head>
