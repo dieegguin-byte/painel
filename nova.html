@@ -138,7 +138,20 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .material-edit-block{margin-top:6px}.fornecedor-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.fornecedor-chips button{border:1px solid var(--line2);background:var(--surface2);color:var(--muted);border-radius:999px;padding:6px 11px;font-size:10px;font-weight:600}.fornecedor-chips button.active{background:#c95f2e;color:white;border-color:#db7542}
 .responsavel-badge{display:inline-flex;align-items:center;gap:3px;background:var(--surface3);border:1px solid var(--line2);color:var(--muted);border-radius:999px;padding:3px 9px;font-size:9px;font-weight:600;margin-top:4px}button.responsavel-badge{cursor:pointer}button.responsavel-badge:hover{border-color:#8a5a3e;color:var(--cream)}.responsavel-edit-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}.responsavel-edit-row input{width:150px;padding:6px 8px;font-size:11px;background:#0f0d0c;border:1px solid var(--line2);border-radius:8px;color:var(--text)}.responsavel-edit-row input[type=date]{width:132px}.responsavel-edit-row button{padding:5px 9px;font-size:9px}
 .duplicate-warning,.danger-box{border-radius:10px;padding:10px;font-size:10px}.duplicate-warning{background:#d4a64e10;border:1px solid #d4a64e3d;color:#edcc90}.duplicate-warning b{display:block;margin-bottom:5px}.duplicate-warning button,.duplicate-warning span{display:block;border:0;background:transparent;color:inherit;padding:3px 0;font-size:10px;text-decoration:underline}.danger-box{background:#df6a5d12;border:1px solid #df6a5d50;color:#f1a49c}.review-box{background:#75a9870c;border:1px solid #75a98735;border-radius:12px;padding:11px}.review-box span{display:block;color:#b8d8c1;font-size:10px;margin:4px 0}.ask-panel{background:#181412;border:1px solid var(--line);margin-top:14px}.audit-checks{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}.audit-checks label{display:flex;align-items:center;gap:5px;font-size:8px}.mode-claude .triage-panel{border-color:#75a98744}
-.page-grid{display:grid;gap:15px}.metric-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric-card{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:15px;min-height:112px}.metric-card>span{font-size:8px;text-transform:uppercase;color:var(--dim);letter-spacing:.7px}.metric-card>b{display:block;font-size:26px;margin:11px 0 4px}.metric-card small{color:var(--muted);font-size:9px}.metric-card.orange>b{color:var(--orange2)}.metric-card.red>b{color:#e88477}.metric-card.yellow>b{color:#e4bd72}.metric-card.green>b{color:#9bc7a7}.metric-card.clickable{cursor:pointer;transition:border-color .15s,transform .15s}.metric-card.clickable:hover{border-color:var(--dim);transform:translateY(-1px)}.metric-card.clickable:active{transform:translateY(0)}.content-card{background:linear-gradient(145deg,#1b1613,#15110f);border:1px solid var(--line);border-radius:18px;padding:18px}.content-card.full{min-height:560px}.card-head{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:14px}.card-head h3{font:500 22px Georgia,serif;margin:0}.search{width:min(300px,45%);margin:0}.priority-row{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:11px;padding:11px 3px;border-bottom:1px solid var(--line)}.priority-row:last-child{border-bottom:0}.priority{width:8px;height:8px;border-radius:50%;background:var(--yellow)}.priority.alta{background:var(--red)}.priority.baixa{background:var(--green)}.priority-row strong,.priority-row span{display:block}.priority-row strong{font-size:11px;margin-bottom:3px}.priority-row span,.priority-row time{font-size:9px;color:var(--dim)}.warning-card{padding:15px 18px;border-radius:14px;background:#df6a5d12;border:1px solid #df6a5d3f}.warning-card b,.warning-card span{display:block}.warning-card b{font-size:12px}.warning-card span{font-size:9px;color:var(--muted);margin-top:3px}/* PAINEL: cards de acao grandes (o que fazer + mensagem pronta + WhatsApp) */
+/* `minmax(0,1fr)` na coluna unica do .page-grid e a trava de raiz da tela inteira. Sem colunas
+   declaradas o grid cria uma coluna implicita `auto`, que e dimensionada pelo min-content do
+   maior filho: bastava UMA secao com min-content de 334px pra coluna virar 334 dentro de um
+   contedor de 290 e jogar TODAS as secoes pra fora da tela. Com minmax(0,...) a coluna nunca
+   passa da largura disponivel e o conteudo se vira quebrando linha — que e o que ele ja sabe
+   fazer (forcando a secao a 290px, nada transbordava). */
+.page-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:15px}
+/* `minmax(0,1fr)` e nao `1fr`: uma trilha `1fr` tem minimo implicito de min-content, entao ela
+   se RECUSA a encolher abaixo do texto e estica a grade. Como a grade estica, o pai estica, e
+   todo irmao (filtros, barra do mes, botao "Ver tudo") herda largura maior que a tela e some
+   na borda. Diego, 24/08: "financeiro e profissionais voltou a ficar cortando descentralizado".
+   Medido: com a escala de texto do Android em 130%, "R$ 20.342,65" a 34px pede 190px por
+   cartao; dois cartoes davam pagina de 399px numa tela de 320. Ver [[reference-painel-texto-cortado-layout]]. */
+.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metric-card{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:15px;min-height:112px;min-width:0}.metric-card>span{font-size:8px;text-transform:uppercase;color:var(--dim);letter-spacing:.7px}.metric-card>b{display:block;font-size:26px;margin:11px 0 4px}.metric-card small{color:var(--muted);font-size:9px}.metric-card.orange>b{color:var(--orange2)}.metric-card.red>b{color:#e88477}.metric-card.yellow>b{color:#e4bd72}.metric-card.green>b{color:#9bc7a7}.metric-card.clickable{cursor:pointer;transition:border-color .15s,transform .15s}.metric-card.clickable:hover{border-color:var(--dim);transform:translateY(-1px)}.metric-card.clickable:active{transform:translateY(0)}.content-card{background:linear-gradient(145deg,#1b1613,#15110f);border:1px solid var(--line);border-radius:18px;padding:18px}.content-card.full{min-height:560px}.card-head{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:14px}.card-head h3{font:500 22px Georgia,serif;margin:0}.search{width:min(300px,45%);margin:0}.priority-row{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:11px;padding:11px 3px;border-bottom:1px solid var(--line)}.priority-row:last-child{border-bottom:0}.priority{width:8px;height:8px;border-radius:50%;background:var(--yellow)}.priority.alta{background:var(--red)}.priority.baixa{background:var(--green)}.priority-row strong,.priority-row span{display:block}.priority-row strong{font-size:11px;margin-bottom:3px}.priority-row span,.priority-row time{font-size:9px;color:var(--dim)}.warning-card{padding:15px 18px;border-radius:14px;background:#df6a5d12;border:1px solid #df6a5d3f}.warning-card b,.warning-card span{display:block}.warning-card b{font-size:12px}.warning-card span{font-size:9px;color:var(--muted);margin-top:3px}/* PAINEL: cards de acao grandes (o que fazer + mensagem pronta + WhatsApp) */
 .compromisso-card{display:block;background:linear-gradient(150deg,#1d1714,#171310);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:16px;padding:14px;margin-bottom:12px}
 /* CABEÇALHO CLICÁVEL: é o card fechado. Hora à esquerda, nome + cidade no meio, seta à direita.
    `min-width:0` no meio é o que impede um nome comprido de empurrar a seta pra fora e alargar
@@ -252,19 +265,29 @@ button.sutil{opacity:.55;font-size:12px}
 .material-pendente{margin:6px 0;padding:7px 9px;border-left:2px solid #e0a458;background:var(--surface2);border-radius:6px}
 .material-pendente em{display:block;font-size:11px;color:#e0a458;font-style:normal;margin-bottom:6px}
 .agenda-dias{display:flex;flex-direction:column;gap:10px}.agenda-dia-card{background:linear-gradient(150deg,#1d1714,#171310);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:16px;overflow:hidden}.agenda-dia-card.cor-alta{border-left-color:var(--red)}.agenda-dia-card.cor-media{border-left-color:var(--yellow)}.agenda-dia-card.cor-baixa{border-left-color:var(--green)}.agenda-dia-head{display:grid;grid-template-columns:52px 1fr auto 16px;align-items:center;gap:14px;width:100%;background:none;border:0;padding:14px 16px;cursor:pointer;text-align:left;color:inherit;font-family:inherit}.agenda-dia-data{display:flex;flex-direction:column;align-items:center;line-height:1.15}.agenda-dia-data b{font:600 24px Georgia,serif;color:var(--text)}.agenda-dia-data span{font-size:10px;color:var(--orange2);text-transform:uppercase;letter-spacing:.4px;font-style:normal}.agenda-dia-data em{font-size:9px;color:var(--dim);text-transform:uppercase;font-style:normal}.agenda-dia-badges{display:flex;flex-wrap:wrap;gap:6px}.badge-cidade,.badge-remoto,.badge-conflito{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;white-space:nowrap}.badge-cidade{background:#d86d3617;color:var(--orange2);border:1px solid #d86d3640}.badge-remoto{background:#3a2d2650;color:var(--muted);border:1px solid var(--line2)}.badge-conflito{background:#df6a5d18;color:#e88477;border:1px solid #df6a5d3f;font-size:11px}.badge-rota{background:#df6a5d18;color:#e88477;border:1px solid #df6a5d3f}.compromisso-material{margin-top:5px;font-size:10px;font-weight:600;color:#f1a06d;background:#d86d3617;border:1px solid #d86d3640;border-radius:8px;padding:5px 9px}.agenda-dia-meta{display:flex;flex-direction:column;align-items:flex-end;text-align:right}.agenda-dia-meta b{font-size:16px;color:var(--text)}.agenda-dia-meta span{font-size:9px;color:var(--dim)}.agenda-dia-seta{font-style:normal;color:var(--dim);font-size:11px}.agenda-dia-corpo{padding:0 16px 16px}.finance-metrics{grid-template-columns:repeat(3,1fr)}.finance-metrics .metric-card>b{font-size:20px}.finance-row{display:flex;justify-content:space-between;gap:15px;padding:11px 0;border-bottom:1px solid var(--line)}.finance-row strong,.finance-row span{display:block}.finance-row strong{font-size:11px}.finance-row span{font-size:8px;color:var(--dim);margin-top:3px}.finance-row>b{font-size:11px}.finance-row>b.entrada{color:#91c49f}.finance-row>b.saida{color:#e4867b}.customer-list{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.customer-list article{display:grid;grid-template-columns:38px 1fr auto;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px}.customer-avatar{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#d86d3617;color:#f1a06d;font-size:10px;font-weight:800}.customer-list strong,.customer-list span{display:block}.customer-list strong{font-size:11px}.customer-list span{font-size:8px;color:var(--dim);margin-top:2px}.customer-list article>b{font-size:9px;color:var(--muted)}.mobile-nav{display:none}
-@media(max-width:1100px){.records-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.metric-grid{grid-template-columns:repeat(2,1fr)}.finance-metrics{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1100px){.records-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.finance-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:850px){.product-shell{display:block}.side-nav{display:none}.workspace{padding:18px 15px 92px}.workspace-header{align-items:flex-start}.workspace-header h1{font-size:25px}.header-actions{flex-wrap:wrap;justify-content:flex-end}.inbox-layout{grid-template-columns:1fr}.triage-column{position:static}.triage-panel{max-height:none}.triage-welcome{min-height:380px}/* 15px pra bater com a margem do conteúdo (.workspace usa padding lateral de 15px).
    Antes a barra ficava a 10px: 5px mais larga que tudo acima dela, e como ela é fixa no
    rodapé, essa diferença ficava visível o tempo todo — nada do app alinhava com nada.
    Diego, 23/08: "não ficou centralizado cada parte do app". */
 .mobile-nav{display:flex;position:fixed;left:15px;right:15px;bottom:9px;z-index:100;background:#181412ee;border:1px solid var(--line2);border-radius:17px;padding:6px;overflow:auto;backdrop-filter:blur(18px);box-shadow:var(--shadow)}.mobile-nav button{min-width:70px;flex:1;border:0;background:transparent;color:var(--dim);border-radius:10px;padding:6px 4px;font-size:8px}.mobile-nav button i{font-style:normal;display:block;font-size:24px}.mobile-nav button.active{background:#d86d3618;color:#ffc099}}
-@media(max-width:560px){.login-card{padding:28px 20px}.login-card h1{font-size:32px}.workspace-header{display:block}.header-actions{justify-content:flex-start;margin-top:12px}.header-actions .ghost{padding:8px 10px}.queue-summary{gap:5px}.queue-summary div{padding:8px}.row,.row.three{grid-template-columns:1fr}.metric-grid,.finance-metrics{grid-template-columns:1fr 1fr}.records-grid,.customer-list{grid-template-columns:1fr}.agenda-day{grid-template-columns:1fr}.day-label{margin-bottom:8px}.card-head{display:block}.search{width:100%;margin-top:10px}.triage-panel{padding:14px}.classify button{flex:1}.composer-actions{align-items:flex-end}.primary,.secondary,.ghost{font-size:10px}.notice{right:16px;top:12px}.source-card img{max-width:100%}}
+@media(max-width:560px){.login-card{padding:28px 20px}.login-card h1{font-size:32px}.workspace-header{display:block}.header-actions{justify-content:flex-start;margin-top:12px}.header-actions .ghost{padding:8px 10px}.queue-summary{gap:5px}.queue-summary div{padding:8px}.row,.row.three{grid-template-columns:1fr}/* `auto-fit` com minimo de 150px: em tela estreita OU com o texto ampliado, em vez de estourar
+   pra fora, a grade cai sozinha pra UMA coluna e o valor ganha a largura inteira. O `min(150px,100%)`
+   evita o proprio minimo virar estouro em tela menor que 150px. O valor tambem encolhe com a tela
+   (clamp), e NAO leva `nowrap`: se ainda assim nao couber, ele quebra em duas linhas — feio, mas
+   dinheiro na tela. Esconder valor de dinheiro e pior que quebrar linha. */
+.metric-grid,.finance-metrics{grid-template-columns:repeat(auto-fit,minmax(min(150px,100%),1fr))}.metric-card{padding:13px}.mes-nav{flex-wrap:wrap}.records-grid,.customer-list{grid-template-columns:1fr}.agenda-day{grid-template-columns:1fr}.day-label{margin-bottom:8px}.card-head{display:block}.search{width:100%;margin-top:10px}.triage-panel{padding:14px}.classify button{flex:1}.composer-actions{align-items:flex-end}.primary,.secondary,.ghost{font-size:10px}.notice{right:16px;top:12px}.source-card img{max-width:100%}}
 .pin-card{max-width:340px}.pin-sub{color:var(--muted);font-size:12px;margin:0 auto 20px;max-width:260px}.pin-dots{display:flex;gap:16px;justify-content:center;margin:6px 0 18px}.pin-dots span{width:15px;height:15px;border-radius:50%;border:2px solid var(--line2);background:transparent;transition:.15s}.pin-dots span.filled{background:var(--orange2);border-color:var(--orange2)}.pin-error{color:#e88477;font-size:12px;margin-bottom:12px}.pin-pad{display:grid;grid-template-columns:repeat(3,72px);gap:12px;justify-content:center;margin-top:4px}.pin-key{width:72px;height:72px;border-radius:50%;background:var(--surface2);border:1px solid var(--line2);color:var(--text);font:500 24px Georgia,serif;transition:.12s}.pin-key:active{background:#c95f2e;transform:scale(.95)}
 .modal-overlay{position:fixed;inset:0;z-index:2000;background:#0a0807cc;backdrop-filter:blur(4px);display:grid;place-items:center;padding:20px}.modal-card{width:min(680px,100%);max-height:88vh;overflow:auto;background:linear-gradient(145deg,#1c1613,#141110);border:1px solid var(--line2);border-radius:22px;padding:22px;box-shadow:var(--shadow)}.modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:6px}.modal-head h2{font:500 24px Georgia,serif;margin:4px 0 0}.modal-intro{color:var(--muted);font-size:12px;margin:0 0 16px}.guia-block{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:15px;margin-bottom:12px}.guia-block h3{font-size:13px;margin:0 0 9px;color:var(--cream)}.guia-block textarea{width:100%;min-height:130px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:11px;font-size:12px;line-height:1.55;outline:0}.guia-block textarea:focus{border-color:#d37742;box-shadow:0 0 0 3px #d86d3619}.guia-block .primary{margin-top:9px}.guia-block.readonly{background:#0f0d0c}.guia-block.readonly pre{white-space:pre-wrap;font-family:inherit;font-size:11px;line-height:1.6;color:var(--muted);margin:0}
 .customer-list article.clickable{cursor:pointer;transition:.15s}.customer-list article.clickable:hover{border-color:#8a5a3e;transform:translateY(-1px)}.ficha-link{cursor:pointer;text-decoration:underline;text-decoration-color:#8a5a3e;text-underline-offset:3px}.ficha-link:hover{color:#ffc6a0}
 .ficha-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}.ficha-field{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:10px 12px}.ficha-field.wide{grid-column:1/-1}.ficha-field small{display:block;font-size:8px;letter-spacing:.6px;color:var(--dim);margin-bottom:4px}.ficha-field span{font-size:12px;color:var(--text)}.ficha-actions{grid-column:1/-1;display:flex;gap:8px;margin-top:2px}.ficha-actions a{display:inline-flex;align-items:center;text-decoration:none}.ficha-edit{margin-bottom:6px}.ficha-edit textarea{min-height:60px;resize:vertical}.ficha-section{font:500 16px Georgia,serif;margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--line)}.ficha-servicos{display:flex;flex-direction:column;gap:8px}.ficha-servico{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--yellow);border-radius:11px;padding:11px 13px}.ficha-servico.priority-alta{border-left-color:var(--red)}.ficha-servico.priority-baixa{border-left-color:var(--green)}.ficha-servico-main strong{display:block;font-size:12px;margin-bottom:3px}.ficha-servico-main span{font-size:10px;color:var(--dim)}.ficha-servico-meta{text-align:right;flex:none}.ficha-servico-meta b{display:block;font-size:12px;color:var(--orange2)}.ficha-servico-meta time{font-size:9px;color:var(--dim)}.ficha-servico-acoes{display:flex;gap:5px;margin-top:6px;justify-content:flex-end}.ficha-servico-acoes a,.ficha-servico-acoes button{padding:4px 8px;font-size:9px}.ficha-note{font-size:10px;color:var(--dim);font-style:italic;margin:9px 0 0}
 .foto-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:4px}.foto{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;border:1px solid var(--line2)}.foto img{width:100%;height:100%;object-fit:cover;display:block}.foto-tag{position:absolute;left:6px;bottom:6px;background:#0f0d0ccc;color:var(--cream);font-size:8px;text-transform:uppercase;letter-spacing:.4px;padding:2px 7px;border-radius:999px}.foto-rm{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:#0f0d0ccc;border:1px solid var(--line2);color:#e88477;font-size:11px;display:grid;place-items:center}.foto-confirm{position:absolute;inset:0;background:#0f0d0ce6;display:flex;flex-direction:column;gap:6px;align-items:center;justify-content:center;padding:8px}.foto-confirm button{width:100%;border-radius:8px;padding:7px;font-size:10px;font-weight:700;border:1px solid var(--line2)}.foto-confirm button:first-child{background:#48221e;color:#ffd8d2;border-color:#8f4d44}.foto-confirm button:last-child{background:var(--surface2);color:var(--muted)}.foto-add{aspect-ratio:1;display:grid;place-items:center;border:1px dashed var(--line2);border-radius:12px;color:var(--muted);font-size:11px;cursor:pointer;text-align:center;background:var(--surface)}.foto-add:hover{border-color:#8a5a3e;color:var(--orange2)}.foto-add input{display:none}
-.modal-card.small{width:min(480px,100%)}.agenda-acoes{display:flex;gap:6px;flex:none}.agenda-acoes button{padding:6px 10px;font-size:9px}.concluir-opcoes{display:flex;flex-direction:column;gap:10px}.concluir-opcoes .modal-intro{margin-bottom:4px}
+/* `flex-wrap:wrap` porque esta fileira e de ESCOLHAS ("Buscou o movel", "Entregou o movel",
+   "Trabalho no estofado", "Outro trabalho") e o texto delas cresce com a acessibilidade do
+   Android. Sem quebrar linha as quatro somavam 390px num espaco de 330 e empurravam a PAGINA
+   inteira pra fora — foi o que cortou "Outro tra..." e, por tabela, esticou todas as secoes
+   irmas da tela Profissionais. Achado por eliminacao, escondendo secao por secao. */
+.modal-card.small{width:min(480px,100%)}.agenda-acoes{display:flex;flex-wrap:wrap;gap:6px;flex:none}.agenda-acoes button{padding:6px 10px;font-size:9px}.concluir-opcoes{display:flex;flex-direction:column;gap:10px}.concluir-opcoes .modal-intro{margin-bottom:4px}
 .picker-day{border-top:1px solid var(--line);padding:12px 0}.picker-day:first-of-type{border-top:0}.picker-day-label{font-size:12px;font-weight:600;color:var(--cream);margin-bottom:7px}.picker-day-label.conflito{color:#e88477}.picker-aviso{font-size:10px;color:#e88477;margin-bottom:8px;line-height:1.4}.picker-slots{display:flex;flex-wrap:wrap;gap:6px}.picker-slot{background:#75a9871a;border:1px solid #75a98750;color:#9bc7a7;border-radius:999px;padding:7px 13px;font-size:12px;min-height:34px}.picker-slot:hover{background:#75a98733}.picker-slot.risky{background:#df6a5d15;border-color:#df6a5d66;color:#e88477}.picker-slot.confirmando{background:#df6a5d33;border-color:#df6a5d;color:#f0a99e;font-weight:600}button.primary.confirmando{background:#c9553f;border-color:#c9553f}
 .triage-head-actions{display:flex;gap:6px;flex-wrap:wrap}.confirm-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}.confirm-row div{display:flex;gap:8px}.edit-note{width:100%;min-height:110px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:11px;font-size:12px;line-height:1.55;outline:0;margin-bottom:9px}.edit-note:focus{border-color:#d37742;box-shadow:0 0 0 3px #d86d3619}
 @media(max-width:560px){.pin-pad{grid-template-columns:repeat(3,64px)}.pin-key{width:64px;height:64px;font-size:21px}.modal-card{padding:16px;border-radius:16px}.ficha-fields{grid-template-columns:1fr}.foto-grid{grid-template-columns:repeat(auto-fill,minmax(95px,1fr))}.agenda-acoes{grid-column:1/-1;margin-top:6px;justify-content:flex-start}}
@@ -277,8 +300,13 @@ button.sutil{opacity:.55;font-size:12px}
 .agenda-dia-data b{font-size:26px}.agenda-dia-head{grid-template-columns:60px 1fr auto 16px;padding:16px}.badge-cidade,.badge-remoto{font-size:14px;padding:8px 14px}
 .rotina-esq strong{font-size:15px}.rotina-esq span{font-size:12px}.rotina-dir em{font-size:13px}
 .next-action small,.metric-card small,.metric-card>span{font-size:11px}
-.metric-card>b{font-size:30px}
-.finance-metrics .metric-card>b{font-size:24px}
+/* O valor em dinheiro cresce no celular pra ser legivel, mas com TETO E PISO ligados a largura
+   da tela. Fixo em 30px/24px ele nao cabia: "R$ 20.342,65" a 24px pede 146px, e o cartao tem
+   132px uteis a 360 — a coluna entao se recusava a encolher e empurrava a pagina inteira pra
+   fora da tela. Era isso que cortava SAIDAS, A RECEBER e o botao "Ver tudo" no aparelho do Diego.
+   Com clamp o valor acompanha a tela, e nas maiores continua no tamanho cheio de antes. */
+.metric-card>b{font-size:clamp(19px,6.6vw,30px)}
+.finance-metrics .metric-card>b{font-size:clamp(17px,5.4vw,24px)}
 .primary,.secondary,.ghost{font-size:14px;padding:12px 16px}
 .funil-filtros button{font-size:12px;padding:9px 15px}
 .mobile-nav button{font-size:11px;padding:9px 4px}
@@ -332,7 +360,10 @@ button.sutil{opacity:.55;font-size:12px}
    valor à direita, flex sem proteção. "Marcão" cabe; "Marlom Júnior" com
    "R$ 1.250,00 adiantado demais" ao lado não cabe, e aí um dos dois é triturado.
    A primeira correção só pegou `.finance-row` e deixou este de fora. */
-.vale-fornecedor-head{gap:10px;align-items:baseline}
+/* `flex-wrap:wrap` como valvula: o nome ja encolhe (min-width:0) e o valor nunca quebra
+   (nowrap), mas em tela de 320 a soma "nome + R$ 150,00 adiantado demais" ainda estourava.
+   Quando nao couber lado a lado, o valor desce pra linha de baixo em vez de empurrar a pagina. */
+.vale-fornecedor-head{gap:10px;align-items:baseline;flex-wrap:wrap}
 .vale-fornecedor-head strong{min-width:0;overflow-wrap:break-word}
 .vale-fornecedor-head b{white-space:nowrap;flex:0 0 auto}
 
@@ -2613,7 +2644,7 @@ function Home() {
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
-      {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} finances={finances} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
+      {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} services={activeServices} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
@@ -2815,15 +2846,63 @@ function quandoFalado(data, hora, hoje) {
 // confirmar: Cobrar retorno — ia decidir com o marido" — recado do Diego pra ele mesmo, mandado
 // pra cliente. Diego apontou em 24/07: "tem que ser algo mais natural como eu fiz".
 // O título/próxima ação agora só ESCOLHE o texto; o que vai pro cliente é frase de gente.
+// QUEM É O INTERLOCUTOR DO COMPROMISSO — item WHATSAPP-SUGESTAO-STATUS-20260824-0805.
+// A mensagem do cliente nascia de `proxima_acao + titulo`, que são anotações INTERNAS, e o app
+// não distinguia compromisso COM o cliente de compromisso POR CAUSA do cliente. Medido em
+// 24/08/2026: o card "Comprar material Nurimar — Plástico & Tal" (uma COMPRA NA LOJA, com o
+// sofá dela ainda esperando material) sugeria à cliente "Sua peça está pronta! Posso levar hoje
+// às 8 horas?". Como 72 dos 78 serviços ativos estão sem `sugestao_resposta`, esse fallback é o
+// caso comum, não a exceção.
+//
+// Isto não cria regra comercial nova: decide o DESTINATÁRIO, a mesma separação que a rota já faz
+// entre destino físico e vínculo de negócio (AGENDA-ROTA-LOCAL-20260823-2105). Compromisso na
+// loja é com o fornecedor; cobrar medida é com o profissional. Quando envolve os dois (buscar o
+// móvel na casa do cliente e levar ao profissional), o app NÃO escolhe: fica `incerto` e não
+// escreve nada. Melhor o Diego escrever do que o app afirmar o que não pode provar.
+const semAcento = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/&/g, "e");
+// Casa pela primeira palavra de 4+ letras: o título traz o apelido da loja, não a razão social
+// ("Plástico & Tal Materiais para Estofamentos Ltda." aparece como "Plástico & Tal"). Com
+// word-boundary, senão "Ativa" casaria dentro de "ativar".
+function marcaDoNome(nome) {
+  const p = semAcento(nome).split(/[^a-z0-9]+/).find((x) => x.length >= 4);
+  return p ? new RegExp("\\b" + p + "\\b") : null;
+}
+// Não existe tabela de profissionais: quem executa está em `servicos.responsavel`. Diego fora —
+// ele é o operador, não um terceiro com quem se conversa por WhatsApp.
+function nomesProfissionais(services) {
+  return [...new Set((services || []).map((s) => s.responsavel).filter(Boolean))].filter((n) => semAcento(n) !== "diego");
+}
+function interlocutorCompromisso(a, svc, fornecedores, profissionais) {
+  // Só título e local: descrevem o compromisso em si. `proxima_acao` fala do SERVIÇO inteiro e
+  // costuma citar loja ("fechar o Klee 09 na Afibracom") mesmo quando o compromisso é a visita.
+  const alvo = semAcento(`${a?.titulo || ""} ${a?.local || ""}`);
+  const primeiroNome = semAcento((svc?.clientes?.nome || "").split(" ")[0]);
+  const citaCliente = primeiroNome.length >= 3 && new RegExp("\\b" + primeiroNome + "\\b").test(alvo);
+  const forn = (fornecedores || []).map((f) => f.nome).filter((n) => n && !/avulsa|diversos/i.test(n))
+    .find((n) => marcaDoNome(n)?.test(alvo));
+  const prof = (profissionais || []).find((n) => marcaDoNome(n)?.test(alvo));
+  if (a?.tipo === "operacional") return { destino: "interno", motivo: "compromisso operacional" };
+  if (/\b(tarefa interna|bloqueio|uso interno)\b/.test(alvo)) return { destino: "interno", motivo: "tarefa interna" };
+  // "Comprar" nunca é conversa com o cliente, mesmo quando é a ficha dele que motiva a compra.
+  if (/\bcompr(a|ar|ei|as)\b/.test(alvo)) return { destino: "interno", motivo: forn ? `compra na ${forn}` : "compra de material" };
+  if (forn && !citaCliente) return { destino: "interno", motivo: `é na ${forn}` };
+  if (prof && !citaCliente) return { destino: "interno", motivo: `é com ${prof}` };
+  if ((forn || prof) && citaCliente) return { destino: "incerto", motivo: `envolve ${forn || prof} e o cliente` };
+  return { destino: "cliente", motivo: "" };
+}
 function mensagemPadraoCompromisso(a, svc, hoje) {
   const nome = svc?.clientes?.nome ? svc.clientes.nome.split(" ")[0] : "";
   const oi = `Oi${nome ? " " + nome : ""}, tudo bem?`;
   const alvo = `${svc?.proxima_acao || ""} ${a.titulo || ""}`.toLowerCase();
   if (a.tipo !== "remoto") {
     const quando = quandoFalado(a.data, a.hora, hoje || hojeISO());
-    if (/entreg/.test(alvo)) return `${oi} Sua peça está pronta! Posso levar${quando}?`;
-    if (/buscar|retirad|retirar|pegar/.test(alvo)) return `${oi} Consigo passar${quando} pra buscar a peça. Fica bom pra você?`;
-    return `${oi} Consigo passar aí${quando}. Fica bom pra você?`;
+    // Sem ponto e sem endereço na ficha, marcar o horário não resolve: ele sai sem saber onde é.
+    // Caso real de 24/08: Kely, visita às 10h, "endereço/localização pendente" no próprio evento.
+    const cli = svc?.clientes || {};
+    const pedeLocal = (!cli.latitude && !String(cli.endereco || "").trim()) ? " Me manda sua localização também, por favor." : "";
+    if (/entreg/.test(alvo)) return `${oi} Sua peça está pronta! Posso levar${quando}?${pedeLocal}`;
+    if (/buscar|retirad|retirar|pegar/.test(alvo)) return `${oi} Consigo passar${quando} pra buscar a peça. Fica bom pra você?${pedeLocal}`;
+    return `${oi} Consigo passar aí${quando}. Fica bom pra você?${pedeLocal}`;
   }
   if (/or[çc]amento pendente|mandar or[çc]amento|enviar or[çc]amento|passar or[çc]amento/.test(alvo)) return `${oi} Terminei de fazer seu orçamento aqui. Posso te mandar?`;
   if (/confirmar hor[áa]rio|encaixar na rota|confirmar data/.test(alvo)) return `${oi} Consegue me confirmar um horário bom pra você? É pra eu encaixar direito na rota.`;
@@ -2844,9 +2923,12 @@ function mensagemPadraoCompromisso(a, svc, hoje) {
 // Os botões "Pedir reagendamento", "✓ Concluir" e o de copiar mensagem saíram: eram os
 // controles de escrita do app, e quem opera agora é o Classic. Ficaram só as ações que
 // levam pra fora — falar com o cliente e traçar a rota.
-function CompromissoCard({ a, svc, today, materiais }) {
+function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais }) {
   const [aberto, setAberto] = useState(false);
-  const sugestao = svc?.sugestao_resposta || mensagemPadraoCompromisso(a, svc, today);
+  // A sugestão GRAVADA vence sempre: ela nasce da conversa real, com julgamento comercial.
+  // Só quando ela falta é que o app escreve — e apenas se provar que o interlocutor é o cliente.
+  const quem = interlocutorCompromisso(a, svc, fornecedores, profissionais);
+  const sugestao = svc?.sugestao_resposta || (quem.destino === "cliente" ? mensagemPadraoCompromisso(a, svc, today) : "");
   const tel = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "";
   const oQueFazer = svc?.proxima_acao || a.titulo;
   // ROTA — TRÊS qualidades, e o botão diz honestamente qual é.
@@ -2933,6 +3015,14 @@ function CompromissoCard({ a, svc, today, materiais }) {
           <span className="ci-label">{rotulo}</span><strong>{texto}</strong>
         </React.Fragment>)}
         {sugestao && <q className="compromisso-msg">{sugestao}</q>}
+        {/* Sem sugestão porque o app não pôde provar que a conversa é com o cliente. Dizer o
+            motivo importa: card mudo faz ele achar que quebrou. O WhatsApp abaixo continua
+            abrindo — só que vazio, pra ele escrever. */}
+        {!sugestao && quem.destino !== "cliente" && <p className="compromisso-material">
+          {quem.destino === "interno"
+            ? `✎ Compromisso interno (${quem.motivo}) — sem mensagem pronta pro cliente.`
+            : `✎ Este compromisso ${quem.motivo} — escreva você; o app não tem como saber o texto certo.`}
+        </p>}
         <div className="compromisso-acoes">
           {tel && <a className="btn-wpp" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">Abrir WhatsApp{sugestao ? " com resposta" : ""}</a>}
           {/* Rota só em compromisso presencial — num remoto o botão de mapa é ruído e convida
@@ -3205,6 +3295,7 @@ const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial"
 function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
+  const profissionais = nomesProfissionais(services);
   // `appointments` já chega filtrado pela coleção central (compromissosOperacionais, calculada uma vez na
   // raiz) — compromisso com pendência de remarcação aberta nunca chega até aqui. Só resta separar por data.
   // ROTA × COBRANÇA (28/07/2026): a agenda só mostra o que tem hora/deslocamento. Cobrança sai daqui e vai
@@ -3424,7 +3515,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     })()}
     {due.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>{due.length} compromisso(s) que já passaram da hora</h3></div></div>
       <button className="ghost" style={{ width: "100%" }} onClick={() => setListaHoje((v) => !v)}>{listaHoje ? "Fechar" : `Abrir os ${due.length}`}</button>
-      {listaHoje && <div style={{ marginTop: 12 }}>{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</div>}</section>}
+      {listaHoje && <div style={{ marginTop: 12 }}>{[...due].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}</section>}
     {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
     {/* Bloco COBRANÇAS removido do Painel em 23/08/2026 a pedido do Diego. O ciclo de cobrança
        continua vivo no código (CobrancaCard, onCobrou, onRespondeu, onEncerrar) e nada foi
@@ -3437,7 +3528,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
           aviso de rota sumiria no começo do dia — bem na hora de planejar o deslocamento. */}
       <AvisoRota compromissos={rotaAll.filter((a) => a.data === today)} />
       <button className="ghost" style={{ width: "100%" }} onClick={() => setListaFuturos((v) => !v)}>{listaFuturos ? "Fechar" : `Abrir os ${futuros.length}`}</button>
-      {listaFuturos && <div style={{ marginTop: 12 }}>{[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</div>}</section>}
+      {listaFuturos && <div style={{ marginTop: 12 }}>{[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}</section>}
     {filtroTipo !== "todos" && due.length === 0 && futuros.length === 0 && (dueAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
     {/* SAIU o aviso financeiro do rodapé: era o mesmo assunto do card "a pagar" lá em cima, só que sem o
         valor e sem o caixa possível — repetia a preocupação sem ajudar a decidir. Diego, 25/07. */}</div>;
@@ -3472,9 +3563,10 @@ function LeadsView({ services, search, setSearch, onOpenFicha, initialFiltro, on
 }
 
 // Colapsado: só o essencial pra bater o olho (dia + rota). Clica pra abrir os compromissos do dia.
-function AgendaView({ appointments, services, finances, onReschedule, onConcluir, onAdd }) {
+function AgendaView({ appointments, services, finances, fornecedores, onReschedule, onConcluir, onAdd }) {
   const [diaAberto, setDiaAberto] = useState(null);
   const hoje = hojeISO();
+  const profissionais = nomesProfissionais(services);
   // A agenda é ROTA. Cobrança (remoto sem hora) mora no Painel, não aqui — senão um dia com 3 idas reais
   // aparece com 16 linhas e deixa de servir pra planejar deslocamento. Ver ehCobranca() e o bloco
   // "Cobranças" do Dashboard. Decisão do Diego em 28/07/2026.
@@ -3509,7 +3601,7 @@ function AgendaView({ appointments, services, finances, onReschedule, onConcluir
           <div className="agenda-dia-meta"><b>{items.length}</b><span>{items.length === 1 ? "compromisso" : "compromissos"}</span></div>
           <i className="agenda-dia-seta">{aberto ? "▲" : "▼"}</i>
         </button>
-        {aberto && <div className="agenda-dia-corpo"><AvisoRota compromissos={items} />{[...items].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} />)}</div>}
+        {aberto && <div className="agenda-dia-corpo"><AvisoRota compromissos={items} />{[...items].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
       </div>;
     })}</div>
   </section>;
