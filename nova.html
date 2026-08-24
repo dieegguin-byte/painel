@@ -352,10 +352,14 @@ const demoServices = [
 // importante da tela. As outras duas continuam no passado de propósito, pra mostrar como
 // compromisso vencido sem desfecho aparece.
 const demoAppointments = [
-  { id: "a1", titulo: "Ana Paula — entregar poltrona", data: hojeISO(), hora: "14:00", cidade: "Valparaíso", tipo: "presencial", status: "planejado", servico_id: "s4" },
-  { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", tipo: "remoto", status: "planejado", servico_id: "s2" },
-  { id: "a3", titulo: "Mariana — visita sofá", data: somarDias(hojeISO(), 1), hora: "09:30", cidade: "Jardim Ingá", tipo: "presencial", status: "planejado", servico_id: "s1" },
-  { id: "a4", titulo: "Carlos — buscar cadeiras", data: "2026-07-11", hora: "09:00", cidade: "Luziânia", tipo: "presencial", status: "planejado", servico_id: "s2" },
+  // Os cinco casos de destino que existem na base real, pra demo servir de teste de regressão:
+  // loja com endereço e sem serviço · local igual à cidade · local que é aviso, não endereço ·
+  // fornecedor só com nome · cliente com endereço na ficha.
+  { id: "a0", titulo: "Comprar material Ana Paula — Plástico & Tal", data: hojeISO(), hora: "08:00", cidade: "Valparaíso de Goiás", local: "Plástico & Tal - Av. Marginal, Qd. 45, lote 32 B - Jardim Ipanema", tipo: "presencial", status: "planejado", servico_id: null },
+  { id: "a1", titulo: "Ana Paula — entregar poltrona", data: hojeISO(), hora: "14:00", cidade: "Valparaíso", local: "Valparaíso", tipo: "presencial", status: "planejado", servico_id: "s4" },
+  { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", local: "Remoto / WhatsApp", tipo: "remoto", status: "planejado", servico_id: "s2" },
+  { id: "a3", titulo: "Mariana — visita sofá", data: somarDias(hojeISO(), 1), hora: "09:30", cidade: "Jardim Ingá", local: "Jardim Ingá — endereço/localização pendente", tipo: "presencial", status: "planejado", servico_id: "s1" },
+  { id: "a4", titulo: "Carlos — buscar cadeiras", data: "2026-07-11", hora: "09:00", cidade: "Luziânia", local: "Ozair", tipo: "presencial", status: "planejado", servico_id: "s2" },
 ];
 const demoFinance = [
   { id: "f1", tipo: "entrada", valor: 675, descricao: "Entrada 50% — Carlos", status: "pago", data: "2026-07-09" },
@@ -2752,15 +2756,38 @@ function CompromissoCard({ a, svc, today, materiais }) {
   // exatamente onde ele foi olhar: Nurimar, Léo e Andriele — os presenciais de 24/08 — estão
   // todos sem endereço na ficha. Regra certa no papel, inútil na estrada.
   const cli = svc?.clientes;
+  // DESTINO DA ROTA — `agenda.local` VENCE (item AGENDA-ROTA-LOCAL-20260823-2105).
+  // Vínculo de negócio e destino físico são coisas diferentes: "comprar o material DA NURIMAR
+  // na PLÁSTICO & TAL" tem a Nurimar como cliente e a loja como destino. A versão anterior
+  // montava a rota só pelo cliente, então esse compromisso (que nem tem servico_id) caía em
+  // "Valparaíso de Goiás" e não levava à loja. Diego testou na rua e nenhum dos dois abriu certo.
+  //
+  // Nem todo `local` é destino, e os dados reais provam:
+  //   "Jardim Ingá" com cidade "Jardim Ingá"            → repete a cidade, não acrescenta nada
+  //   "Valparaíso de Goiás — endereço/localização pendente" → é um aviso, não um endereço
+  //   "Remoto / WhatsApp"                                → não é lugar
+  // Mandar esses textos pro Waze faz ele buscar a frase inteira e errar. Por isso o local só
+  // conta quando diz algo que a cidade já não diz.
+  const soTexto = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+  const localBruto = String(a.local || "").trim();
+  const localUtil = (localBruto
+    && soTexto(localBruto) !== soTexto(a.cidade)
+    && !/pendente|a confirmar|nao informad|remoto/i.test(soTexto(localBruto))) ? localBruto : "";
+
   const temPonto = cli?.latitude != null && cli?.longitude != null;
-  const enderecoTexto = [cli?.endereco, cli?.cidade || a.cidade].filter(Boolean).join(", ");
-  const soCidade = !temPonto && !cli?.endereco && !!(cli?.cidade || a.cidade);
-  const destinoRota = temPonto ? `${cli.latitude},${cli.longitude}` : enderecoTexto;
-  const linkWaze = temPonto
+  const cidadeFim = cli?.cidade || a.cidade;
+  // Precedência: destino explícito da agenda > ponto salvo do cliente > endereço > cidade.
+  const usarPonto = !localUtil && temPonto;
+  const destinoTexto = localUtil ? [localUtil, a.cidade].filter(Boolean).join(", ")
+    : cli?.endereco ? [cli.endereco, cidadeFim].filter(Boolean).join(", ")
+    : (cidadeFim || "");
+  const soCidade = !localUtil && !temPonto && !cli?.endereco && !!cidadeFim;
+  const destinoRota = usarPonto ? `${cli.latitude},${cli.longitude}` : destinoTexto;
+  const linkWaze = usarPonto
     ? `https://waze.com/ul?ll=${cli.latitude},${cli.longitude}&navigate=yes`
-    : `https://waze.com/ul?q=${encodeURIComponent(destinoRota)}&navigate=yes`;
+    : `https://waze.com/ul?q=${encodeURIComponent(destinoTexto)}&navigate=yes`;
   const linkMaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinoRota)}`;
-  const selo = temPonto ? "" : soCidade ? " (só cidade)" : "";
+  const selo = soCidade ? " (só cidade)" : "";
   const nomeCliente = svc?.clientes?.nome || a.titulo;
   const cidadeCard = a.tipo === "remoto" ? "◌ Remoto" : `⌖ ${cli?.cidade || a.cidade || "Cidade não informada"}`;
   // INSTRUÇÕES DO ATENDIMENTO (Diego, 23/08/2026: "cada cliente com instruções do que precisa
