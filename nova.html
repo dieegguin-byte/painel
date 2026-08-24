@@ -5145,6 +5145,60 @@ function CustomersView({ customers, services, search, setSearch, onOpenFicha }) 
     <div className="customer-list">{visible.map((customer) => <article className="clickable" key={customer.id} onClick={() => onOpenFicha(customer.id)}><div className="customer-avatar">{customer.nome.slice(0, 2).toUpperCase()}</div><div><strong>{customer.nome}</strong><span>{telefoneCorrigivel(customer.telefone) ? "⚠ " : ""}{customer.telefone || "Sem telefone"} · {customer.cidade || "Sem cidade"}</span></div><b>{services.filter((service) => service.cliente_id === customer.id && STATUS_VIVOS.includes(service.status)).length} ativo(s)</b></article>)}</div></section>;
 }
 
+// LOCALIZAÇÃO EXATA DO CLIENTE — item LOC-CLIENTE-20260823-1446.
+// Diego pediu para a operação parar de trabalhar só com cidade/bairro e passar a conhecer o
+// ponto real. O Classic não consegue fazer essa parte: ele não tem GPS, e link curto do Maps
+// (maps.app.goo.gl) ele não abre. Por isso a captura mora aqui, no aparelho que está na rua.
+//
+// Extrai coordenada de um link do Google Maps colado. As formas que aparecem de verdade:
+//   .../place/Nome/@-16.0597,-48.0307,17z/data=!3m1!4b1!4m6!...!8m2!3d-16.0597393!4d-48.030768
+//   .../maps/@-16.0597,-48.0307,17z
+//   ...?q=-16.05,-48.03   |   ...?api=1&query=-16.05,-48.03
+//   o par cru colado no campo: "-16.0597393, -48.030768"
+//
+// `!3d!4d` vem PRIMEIRO de propósito: é o pino do lugar. O `@` é o centro da tela do mapa, que
+// pode estar deslocado da porta se a pessoa arrastou o mapa antes de compartilhar.
+//
+// Link curto NÃO é resolvido aqui. Resolver exigiria seguir o redirecionamento, e o navegador
+// bloqueia isso por CORS. Inventar coordenada a partir de um link que eu não abri seria
+// exatamente o "não marcar ponto geocodificado como CONFIRMADA sem evidência" que o pedido proíbe.
+function extrairCoordenadaMaps(texto) {
+  const t = String(texto || "").trim();
+  if (!t) return null;
+  // Link do Waze é RECUSADO mesmo trazendo `ll=` legível. O critério de aceite do pedido é
+  // explícito: "um link temporário de Waze não é armazenado como localização canônica".
+  // Compartilhamento do Waze expira, e o ponto que sobra no cadastro depois disso é uma
+  // coordenada que ninguém consegue mais conferir de onde veio. Testado: sem esta linha o
+  // extrator engolia `waze.com/ul?ll=...` e gravava como CONFIRMADA.
+  if (/waze\.com/i.test(t)) return { waze: true };
+  if (/(maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(t)) return { curto: true };
+  const valido = (lat, lon) => Number.isFinite(lat) && Number.isFinite(lon)
+    && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180
+    && !(lat === 0 && lon === 0);
+  const tentativas = [
+    /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
+    /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+    /[?&](?:q|query|ll|destination)=(-?\d+\.\d+),\s*(-?\d+\.\d+)/i,
+    /^(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)$/,
+  ];
+  for (const re of tentativas) {
+    const m = t.match(re);
+    if (m) {
+      const lat = parseFloat(m[1]), lon = parseFloat(m[2]);
+      if (valido(lat, lon)) return { lat, lon };
+    }
+  }
+  return null;
+}
+
+// Mostrar a origem por extenso importa na rua: "capturado na porta" e "pino que alguém mandou"
+// merecem confianças diferentes quando o Waze abrir 40 metros longe.
+function origemLocalizacaoLabel(origem) {
+  if (origem === "GPS_APP_DIEGO") return "capturado na porta";
+  if (origem === "GOOGLE_MAPS_LINK_DIEGO") return "pino do Maps";
+  return origem ? String(origem).toLowerCase().replace(/_/g, " ") : "origem não registrada";
+}
+
 function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChanged }) {
   const [cliente, setCliente] = useState(null);
   const [servicos, setServicos] = useState([]);
@@ -5164,6 +5218,9 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
   const [overrideMat, setOverrideMat] = useState(null);
   const [recebidoFichaDraft, setRecebidoFichaDraft] = useState("");
   const [avisoDuplicado, setAvisoDuplicado] = useState(null);
+  const [capturando, setCapturando] = useState(false);
+  const [colarLink, setColarLink] = useState(false);
+  const [linkDraft, setLinkDraft] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -5205,6 +5262,51 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
     if (error) { notify("Erro: " + error.message, "error"); return; }
     setAvisoDuplicado(null);
     notify("Ficha atualizada.", "ok"); setEditing(false); await load(); onChanged?.();
+  };
+
+  // Grava o ponto e RELÊ antes de dizer que salvou. Sem readback não conta como gravado —
+  // é a mesma regra que vale para o resto da operação.
+  // `origem_localizacao` guarda COMO o ponto chegou, porque isso muda quanto ele vale:
+  // GPS_APP_DIEGO = ele estava fisicamente na porta; GOOGLE_MAPS_LINK_DIEGO = ele colou o pino.
+  // Os dois são evidência do próprio Diego, então entram como CONFIRMADA. Palpite não entra.
+  // O endereço em texto não é tocado: sobrescrever endereço por inferência é efeito proibido.
+  const salvarLocalizacao = async (lat, lon, origem, rotulo) => {
+    if (demo) { notify("Na demonstração a localização não é salva.", "info"); return; }
+    const { error } = await db.from("clientes").update({
+      latitude: lat, longitude: lon, origem_localizacao: origem,
+      localizacao_confirmada_em: new Date().toISOString(), localizacao_confianca: "CONFIRMADA",
+    }).eq("id", clienteId);
+    if (error) { notify("Não gravou: " + error.message, "error"); return; }
+    const { data: lido, error: erroLeitura } = await db.from("clientes").select("latitude,longitude").eq("id", clienteId).single();
+    if (erroLeitura || lido?.latitude == null) { notify("Gravou, mas não consegui reler para confirmar. Abra a ficha de novo antes de confiar.", "error"); return; }
+    notify(`Localização salva (${rotulo}).`, "ok");
+    setColarLink(false); setLinkDraft("");
+    await load(); onChanged?.();
+  };
+
+  // Permissão negada, sem sinal e timeout são três problemas diferentes e a mensagem diz qual foi —
+  // "erro ao obter localização" na rua não ajuda ninguém. Nenhum deles quebra a ficha.
+  const capturarGPS = () => {
+    if (!navigator.geolocation) { notify("Este aparelho não oferece GPS ao navegador.", "error"); return; }
+    setCapturando(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => { setCapturando(false); await salvarLocalizacao(pos.coords.latitude, pos.coords.longitude, "GPS_APP_DIEGO", "GPS, onde você está agora"); },
+      (err) => {
+        setCapturando(false);
+        notify(err.code === 1 ? "Você recusou o acesso à localização. Libere nas permissões do site e tente de novo."
+          : err.code === 2 ? "O aparelho não achou sinal agora. Tente a céu aberto, ou cole o link do Maps."
+          : "Demorou demais para achar o sinal. Tente de novo, ou cole o link do Maps.", "error");
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
+  const usarLinkMaps = async () => {
+    const r = extrairCoordenadaMaps(linkDraft);
+    if (!r) { notify("Não achei coordenada nesse texto. Cole o link do Maps já aberto, ou o par: -16.0597, -48.0307", "error"); return; }
+    if (r.waze) { notify("Link do Waze não serve como localização do cliente — ele é temporário. Use ⌖ Capturar aqui, ou o pino do Google Maps.", "error"); return; }
+    if (r.curto) { notify("Esse é o link curto — ele não carrega a coordenada. Abra ele, espere o mapa aparecer e copie o endereço da barra do navegador.", "error"); return; }
+    await salvarLocalizacao(r.lat, r.lon, "GOOGLE_MAPS_LINK_DIEGO", "pino do Maps");
   };
 
   const addFoto = async (file) => {
@@ -5292,6 +5394,20 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
           {cliente.cidade && <div className="ficha-field"><small>CIDADE</small><span>{cliente.cidade}</span></div>}
           {cliente.endereco && <div className="ficha-field"><small>ENDEREÇO</small><span>{cliente.endereco}</span></div>}
           {cliente.obs && <div className="ficha-field wide"><small>OBSERVAÇÕES</small><span>{cliente.obs}</span></div>}
+          {/* LOCALIZAÇÃO EXATA — aparece SEMPRE, inclusive quando falta. Cliente sem ponto continua
+              utilizável e a pendência fica dita com todas as letras, sem coordenada inventada. */}
+          <div className="ficha-field wide"><small>LOCALIZAÇÃO EXATA</small>
+            {cliente.latitude != null
+              ? <span>⌖ {cliente.localizacao_confianca === "APROXIMADA" ? "Ponto aproximado" : "Ponto confirmado"} · {origemLocalizacaoLabel(cliente.origem_localizacao)}{cliente.localizacao_confirmada_em ? " · " + new Date(cliente.localizacao_confirmada_em).toLocaleDateString("pt-BR") : ""}</span>
+              : <span>⚠ Pendente — a rota para {cliente.endereco ? "no endereço escrito" : "na cidade"}</span>}
+          </div>
+          <div className="ficha-actions">
+            <button className="ghost" onClick={capturarGPS} disabled={capturando}>{capturando ? "Procurando sinal…" : cliente.latitude != null ? "⌖ Atualizar aqui" : "⌖ Capturar aqui"}</button>
+            <button className="ghost" onClick={() => { setColarLink((v) => !v); setLinkDraft(""); }}>{colarLink ? "Cancelar" : "Colar link do Maps"}</button>
+            {cliente.latitude != null && <a className="ghost" href={`https://waze.com/ul?ll=${cliente.latitude},${cliente.longitude}&navigate=yes`} target="_blank" rel="noreferrer">🧭 Waze</a>}
+            {cliente.latitude != null && <a className="ghost" href={`https://www.google.com/maps/search/?api=1&query=${cliente.latitude},${cliente.longitude}`} target="_blank" rel="noreferrer">📍 Maps</a>}
+          </div>
+          {colarLink && <div className="responsavel-edit-row"><input value={linkDraft} onChange={(e) => setLinkDraft(e.target.value)} placeholder="Cole o link do Google Maps já aberto" autoFocus /><button className="ghost" onClick={usarLinkMaps}>Salvar ponto</button></div>}
           <div className="ficha-actions"><button className="ghost" onClick={() => setEditing(true)}>Editar dados</button>{cliente.telefone && <a className="ghost" href={`https://wa.me/55${normalizePhone(cliente.telefone)}`} target="_blank" rel="noreferrer">WhatsApp</a>}</div>
         </div> : <div className="ficha-edit form-grid">
           <div className="row"><label>Nome*<input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} /></label><label>Telefone<input value={form.telefone} onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))} /></label></div>
