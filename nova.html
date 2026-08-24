@@ -2878,8 +2878,10 @@ function interlocutorCompromisso(a, svc, fornecedores, profissionais) {
   const alvo = semAcento(`${a?.titulo || ""} ${a?.local || ""}`);
   const primeiroNome = semAcento((svc?.clientes?.nome || "").split(" ")[0]);
   const citaCliente = primeiroNome.length >= 3 && new RegExp("\\b" + primeiroNome + "\\b").test(alvo);
+  // Nome curto no aviso: o cadastro tem a razão social ("Plástico & Tal Materiais para
+  // Estofamentos Ltda.") e o card precisa caber na tela do celular.
   const forn = (fornecedores || []).map((f) => f.nome).filter((n) => n && !/avulsa|diversos/i.test(n))
-    .find((n) => marcaDoNome(n)?.test(alvo));
+    .find((n) => marcaDoNome(n)?.test(alvo))?.split(/\s+/).slice(0, 3).join(" ").replace(/[.,]$/, "");
   const prof = (profissionais || []).find((n) => marcaDoNome(n)?.test(alvo));
   if (a?.tipo === "operacional") return { destino: "interno", motivo: "compromisso operacional" };
   if (/\b(tarefa interna|bloqueio|uso interno)\b/.test(alvo)) return { destino: "interno", motivo: "tarefa interna" };
@@ -3043,11 +3045,15 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
 // Sem isso, a cobrança que JÁ deu certo continuava voltando a cada 3 dias, e ele ficava com um cliente
 // combinado no cartão de "esperando resposta" — o oposto do que aconteceu. E a única saída era me esperar.
 // O botão "Respondeu" pergunta o dia, vira compromisso de verdade e zera o ciclo de tentativas.
-function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar, onRespondeu, onInsistirMais, cobradaEm, busy }) {
+// NOTA (24/08/2026): este componente está ÓRFÃO — ninguém o renderiza desde que o app virou
+// visualização. Ficou com a mesma trava do CompromissoCard de propósito: se um dia voltar a ser
+// usado, volta protegido, não com o bug de sugerir mensagem de cliente em compromisso interno.
+function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar, onRespondeu, onInsistirMais, cobradaEm, busy, fornecedores, profissionais }) {
   const [marcando, setMarcando] = useState(false);
   const [dataDraft, setDataDraft] = useState(somarDias(today, 1));
   const [horaDraft, setHoraDraft] = useState("09:00");
-  const sugestao = svc?.sugestao_resposta || mensagemPadraoCompromisso(a, svc, today);
+  const quem = interlocutorCompromisso(a, svc, fornecedores, profissionais);
+  const sugestao = svc?.sugestao_resposta || (quem.destino === "cliente" ? mensagemPadraoCompromisso(a, svc, today) : "");
   const tel = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "";
   const atrasada = a.data < today;
   return <article className={`cobranca-item ${noTeto ? "cor-alta" : atrasada ? "cor-media" : "cor-baixa"}`}>
