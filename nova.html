@@ -2965,7 +2965,23 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
   // Só quando ela falta é que o app escreve — e apenas se provar que o interlocutor é o cliente.
   const quem = interlocutorCompromisso(a, svc, fornecedores, profissionais);
   const sugestao = svc?.sugestao_resposta || (quem.destino === "cliente" ? mensagemPadraoCompromisso(a, svc, today) : "");
-  const tel = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "";
+  const tituloTxt = String(a.titulo || "");
+  const localTxt = String(a.local || "");
+  const ehTriagemTemporaria = !a.servico_id
+    && /^TRIAGEM TEMPORÁRIA\s*—\s*WhatsApp\b/i.test(tituloTxt);
+  const telCliente = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "";
+  const localTecnico = ehTriagemTemporaria && /^whatsapp:\d+$/i.test(localTxt)
+    ? normalizePhone(localTxt.replace(/^whatsapp:/i, ""))
+    : "";
+  const dddTriagem = ehTriagemTemporaria
+    ? (tituloTxt.match(/WhatsApp\s+\+?55\s*(\d{2})\b/i)?.[1] || "")
+    : "";
+  const telTriagem = ehTriagemTemporaria
+    ? (localTecnico.length === 11
+      ? localTecnico
+      : (dddTriagem && localTecnico.length === 9 ? dddTriagem + localTecnico : ""))
+    : "";
+  const tel = telCliente || telTriagem;
   const oQueFazer = svc?.proxima_acao || a.titulo;
   // ROTA — TRÊS qualidades, e o botão diz honestamente qual é.
   // 1. PONTO: o Classic gravou latitude/longitude do pino que o Diego compartilhou. Porta.
