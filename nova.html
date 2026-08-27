@@ -1902,14 +1902,39 @@ async function aplicarServicoFechadoOperacional(db, eventoId, dados) {
     atualizado_em: new Date().toISOString(),
   }).eq("id", servico.id).select("*").single();
   if (error) throw error;
+  // FECHAMENTO SEM PREÇO NÃO PODE PASSAR EM SILÊNCIO (item
+  // APP-FECHAMENTO-CARIMBO-COMERCIAL-LUIZA-20260825-2259). Caso Luiza/Terra Park: o orçamento de
+  // R$ 4.300,00 à vista/Pix foi enviado, a cliente fechou, e o serviço virou `agendado` com Gaspar,
+  // fornecedor e material gravados — mas `valor_orcamento` ficou NULL. Fechou sem preço e ninguém soube.
+  // Preço perdido não aparece em lugar nenhum: não entra no a receber, não entra na margem, e só
+  // reaparece quando o cliente pergunta quanto é.
+  //
+  // O fechamento CONTINUA VALENDO — status, prazo e material são fatos e não se joga fato fora. O que
+  // muda é que ele deixa de ser silencioso: sem valor nasce uma pergunta viva na Caixa, e o resultado
+  // volta marcado como incompleto pra nenhum readback declarar sucesso cheio.
+  //
+  // O app NÃO tenta adivinhar se o preço é desconhecido ou se foi perdido — quem sabe isso é o Diego.
+  // Por isso pergunta em vez de preencher. Nunca substituir preço enviado por cálculo interno.
+  let perguntaValorId = null;
+  if (!valor) {
+    const pergunta = await criarPerguntaDeterministica(db, eventoId, "valor-fechamento",
+      "Fechamento gravado SEM VALOR: qual foi o valor do orçamento que você passou? (" + (servico.titulo || "serviço #" + servico.id) + ")",
+      { servico_id: servico.id, tipo_operacional: "valor_fechamento_pendente" });
+    perguntaValorId = pergunta.id;
+  }
   let material = null;
   if (dados.fornecedorId) material = await aplicarMaterialPlanejadoOperacional(db, eventoId, {
     servicoId: servico.id, fornecedorId: dados.fornecedorId, valor: dados.valorMaterial,
     descricao: dados.descricaoMaterial, dataNecessidade: dados.dataNecessidade, dataEntrega: dados.dataEntrega,
     por: dados.por || "claude",
   });
-  await registrarHistoricoDaOperacao(db, eventoId, "servico-fechado", { o_que: "Serviço fechado", por: dados.por || "claude", detalhe: "Serviço #" + servico.id + (material?.agendaId ? " · compra agenda #" + material.agendaId : "") });
-  return { servicoId: servico.id, statusServico: atualizado.status, material };
+  await registrarHistoricoDaOperacao(db, eventoId, "servico-fechado", { o_que: "Serviço fechado", por: dados.por || "claude", detalhe: "Serviço #" + servico.id + (material?.agendaId ? " · compra agenda #" + material.agendaId : "") + (valor ? " · " + money(valor) : " · SEM VALOR — pergunta aberta na Caixa") });
+  // READBACK DO CARIMBO COMERCIAL: status mudar não prova fechamento. Quem chamou precisa conseguir
+  // conferir o que ficou gravado de verdade — valor, responsável, prazo e próxima ação.
+  return { servicoId: servico.id, statusServico: atualizado.status, material,
+    valorOrcamento: atualizado.valor_orcamento, responsavel: atualizado.responsavel,
+    prazo: atualizado.prazo, proximaAcao: atualizado.proxima_acao,
+    fechamentoCompleto: !!atualizado.valor_orcamento, perguntaValorId };
 }
 async function processarEventoOperacaoBahia(db, evento) {
   if (!db) throw new Error("Conexão do app indisponível.");
@@ -2357,6 +2382,7 @@ function Home() {
     if (telefone === null) { notify("Telefone incompleto — celular precisa de DDD + 8 ou 9 dígitos.", "error"); return; }
     if (demo) { await resolveInbox(item, "Ficha e lead criados na demonstração"); notify("Triagem concluída na demonstração.", "ok"); return; }
     setBusy(true);
+    let fechamentoSemValor = false;
     try {
       let customer = customers.find((entry) => entry.id === form.customerId) || duplicateCustomers[0] || null;
       if (!customer) {
@@ -2382,7 +2408,9 @@ function Home() {
             fornecedorId: form.precisaMaterial ? form.fornecedorId : null, por: mode,
           },
         });
-        service = { ...service, status: fechado.resultado.statusServico };
+        // Guarda o que ficou gravado de verdade, não só o status — o carimbo comercial é o valor.
+        service = { ...service, status: fechado.resultado.statusServico, valor_orcamento: fechado.resultado.valorOrcamento };
+        fechamentoSemValor = fechado.resultado.fechamentoCompleto === false;
       }
       if (form.addAgenda) {
         const occupied = agendaVisivel.filter((entry) => entry.data === form.due && entry.tipo === "presencial").map((entry) => entry.hora?.slice(0, 5));
@@ -2401,7 +2429,11 @@ function Home() {
       const { error: hErr } = await db.from("historico").insert({ o_que: `Triagem concluída: ${form.service.trim()}`, por: mode, detalhe: `Fonte caixa_entrada#${item.id} · cliente#${customer.id} · serviço#${service.id}` });
       if (hErr) throw hErr;
       await resolveInbox(item, `cliente #${customer.id} · serviço #${service.id}`);
-      await loadAll(); notify("Ficha e serviço conferidos e salvos.", "ok");
+      await loadAll();
+      // Fechamento sem preço não sai daqui dizendo "salvo" e mais nada — a pergunta já está na Caixa.
+      notify(fechamentoSemValor
+        ? "Salvo, mas o fechamento ficou SEM VALOR. Deixei a pergunta na Caixa."
+        : "Ficha e serviço conferidos e salvos.", fechamentoSemValor ? "info" : "ok");
     } catch (error) { notify(`Nada foi encerrado: ${error.message}`, "error"); }
     finally { setBusy(false); }
   }
