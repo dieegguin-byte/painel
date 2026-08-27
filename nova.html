@@ -3218,6 +3218,51 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
   </section>;
 }
 
+// SERVIÇO VIVO SEM PRÓXIMO PASSO — itens APP-LEO-SUMIU-20260825-2255 e APP-NURIMAR-SUMIU-20260825-2338.
+// Diego disse duas vezes no mesmo dia que um cliente tinha "sumido" do app: primeiro o Léo, depois a
+// Nurimar. Nenhum dos dois tinha sumido do banco. O Painel é organizado por COMPROMISSO — dueAll e
+// futurosAll saem da agenda, não dos serviços. Trabalho fechado que ficou sem compromisso planejado
+// simplesmente não tem onde aparecer: sobra a Capacidade (que nasce fechada, atrás de um clique no nome do
+// profissional) e a aba Leads. Dois cliques longe de quem está dirigindo é o mesmo que invisível.
+//
+// Medido no banco em 27/08/2026: 8 serviços vivos nessa situação — 4 agendados e 4 em produção, e os 4 de
+// produção com o prazo já vencido. Peça na oficina com dinheiro dentro não pode depender de ele lembrar
+// de ir procurar.
+//
+// SÓ agendado e produção. Lead e orçamento sem compromisso são funil comercial e já têm casa na aba Leads;
+// trazer os ~20 pra cá afogaria os 8 que têm móvel parado esperando alguém.
+//
+// Serviço com remarcação aberta fica de fora: ele não está esquecido, está na fila da caixa esperando data.
+function ServicosSemProximoPassoCard({ services, appointments, inbox, onOpenFicha }) {
+  const parados = useMemo(() => {
+    const temCompromisso = new Set((appointments || []).filter((a) => a.servico_id).map((a) => a.servico_id));
+    const emRemarcacao = new Set(pendenciasRemarcacaoAbertas(inbox).map(({ meta }) => meta.servico_id).filter(Boolean));
+    return (services || [])
+      .filter((s) => ["agendado", "producao"].includes(s.status) && !temCompromisso.has(s.id) && !emRemarcacao.has(s.id))
+      // Produção primeiro (peça na bancada, prazo correndo), depois agendado; dentro de cada um, prazo mais
+      // apertado na frente. Mesma ordem da Capacidade, pra não ensinar duas leituras diferentes.
+      .sort((a, b) => (a.status === "agendado") - (b.status === "agendado") || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
+  }, [services, appointments, inbox]);
+  if (!parados.length) return null;
+  return <section className="content-card">
+    <div className="card-head"><div><p className="kicker">SEM PRÓXIMO PASSO</p>
+      <h3>{parados.length} serviço(s) fechado(s) sem compromisso marcado</h3></div></div>
+    <div className="funil-lista">{parados.map((s) => <article className={`funil-item st-${s.status}`} key={s.id} onClick={() => onOpenFicha(s.cliente_id)}>
+      <div className="funil-esq">
+        <strong>{s.clientes?.nome || "Cliente"}</strong>
+        <span>{s.titulo}</span>
+        <em>→ {s.proxima_acao || "Sem próxima ação"}</em>
+      </div>
+      <div className="funil-dir">
+        <span className="status-pill">{statusLabel[s.status] || s.status}</span>
+        {s.responsavel && <span className="responsavel-badge">👤 {s.responsavel}</span>}
+        <b>{s.valor_orcamento ? money(s.valor_orcamento) : "—"}</b>
+        <time title={prazoComRotulo(s)}>{prazoComRotulo(s) || "—"}</time>
+      </div>
+    </article>)}</div>
+  </section>;
+}
+
 const SEM_PROFISSIONAL = "Sem profissional atribuído";
 // PAINEL: capacidade por profissional - clica no nome pra ver os servicos dele (mesmo padrao da Agenda: colapsado, expande no clique)
 function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, onChanged }) {
@@ -3527,6 +3572,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
 <section className="metric-grid"><Metric label="Passou da hora" value={dueAll.length} detail="Sem desfecho registrado" tone="yellow" onClick={dueAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
+    <ServicosSemProximoPassoCard services={services} appointments={appointments} inbox={inbox} onOpenFicha={onOpenFicha} />
     {/* SAIU DO PAINEL em 30/07/2026 o card "N cliente(s) esperando remarcação". Diego: "achei desnecessário
         pra mim, se tem o aviso aqui para Claude". Ele estava certo: remarcar é trabalho que o Claude resolve
         pela caixa, e o item já conta no badge da aba Caixa — o card só repetia isso ocupando o topo da tela
