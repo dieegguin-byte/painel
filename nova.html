@@ -503,6 +503,13 @@ const demoFinance = [
   { id: "f7", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 150, descricao: "Vale - Marcão · adiantamento pedido no sábado, abater no próximo acerto", status: "pago", data: "2026-07-13", servico_id: null },
   { id: "f8", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 80, descricao: "[ABATIDO] Vale - Marcão · conserto do compressor", status: "pago", data: "2026-07-05", servico_id: null },
 ];
+// Três casos de propósito: um pendente no futuro, um que a data já passou (tem que virar ATRASADO sozinho,
+// sem ninguém escrever nada) e um concluído, que prova que Concluir não apaga.
+const demoPessoais = [
+  { id: "p1", titulo: "Compromisso pessoal — esposa", data_alvo: "2026-11-24", hora: "20:00", cidade: "Luziânia-GO", status: "PENDENTE", impacto_operacao: "BLOQUEIA_DISPONIBILIDADE", origem: "classic", remarcacoes: 0 },
+  { id: "p2", titulo: "Apresentação na escola do filho", data_alvo: "2026-08-10", hora: null, cidade: "Luziânia-GO", status: "PENDENTE", impacto_operacao: "A_CONFIRMAR", origem: "grupo", referencia_origem: "grupo da escola", remarcacoes: 0 },
+  { id: "p3", titulo: "Levar o carro na revisão", data_alvo: "2026-08-05", hora: null, status: "CONCLUIDO", impacto_operacao: "SEM_IMPACTO", origem: "manual", remarcacoes: 1, remarcado_de: "2026-07-29", concluido_em: "2026-08-05T18:00:00Z" },
+];
 const demoRotinas = [
   { id: "r1", titulo: "Calibrar pneu do carro", intervalo_dias: 3, hora: null, observacao: null, ultima_execucao: null, ativo: true },
   { id: "r2", titulo: "Olhar nivel de agua e oleo", intervalo_dias: 2, hora: "07:00", observacao: "Ou quando achar melhor", ultima_execucao: null, ativo: true },
@@ -2110,6 +2117,9 @@ function Home() {
   const [finances, setFinances] = useState([]);
   const [rotinas, setRotinas] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
+  // DOMÍNIO PESSOAIS (item APP-PESSOAIS-CARD-20260824-2145) — vive na mesma tela por conveniência dele,
+  // mas é outro domínio: não entra em cliente, serviço, financeiro nem em nenhum indicador da Tapeçaria.
+  const [pessoais, setPessoais] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [composer, setComposer] = useState("");
@@ -2162,18 +2172,18 @@ function Home() {
     setInbox((p.inbox || []).map((item) => ({ ...item, conversa: comoLista(item.conversa) })));
     setCustomers(p.customers || []); setServices(p.services || []);
     setAppointments(p.appointments || []); setFinances(p.finances || []); setRotinas(p.rotinas || []);
-    setFornecedores(p.fornecedores || []);
+    setFornecedores(p.fornecedores || []); setPessoais(p.pessoais || []);
   }, []);
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(demoAppointments); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(demoAppointments); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
-    let cx, cl, sv, ag, fn, rt, fo, firstError;
+    let cx, cl, sv, ag, fn, rt, fo, ps, firstError;
     try {
-      [cx, cl, sv, ag, fn, rt, fo] = await Promise.all([
+      [cx, cl, sv, ag, fn, rt, fo, ps] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
@@ -2183,8 +2193,11 @@ function Home() {
         db.from("financeiro").select("*").order("data", { ascending: false }),
         db.from("rotinas").select("*").eq("ativo", true).order("criado_em", { ascending: true }),
         db.from("fornecedores").select("*").order("nome", { ascending: true }),
+        // Traz tudo, inclusive concluído e cancelado: o volume é minúsculo e a lista de concluídos é o que
+        // prova que "Concluir" não apagou nada. Quem filtra é a tela.
+        db.from("pessoais").select("*").order("data_alvo", { ascending: true }),
       ]);
-      firstError = [cx, cl, sv, ag, fn, rt, fo].find((result) => result.error)?.error;
+      firstError = [cx, cl, sv, ag, fn, rt, fo, ps].find((result) => result.error)?.error;
     } catch (e) { firstError = e; }
     // SEM SINAL: em vez de tela vazia, abre com a última carga guardada e avisa a idade dela.
     if (firstError) {
@@ -2193,7 +2206,7 @@ function Home() {
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
     setOfflineDesde(null);
-    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [] };
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [] };
     aplicarPacote(pacote);
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
@@ -2701,7 +2714,7 @@ function Home() {
           A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
           e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerCompras={() => setTab("compras")} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
@@ -2993,11 +3006,11 @@ function mensagemPadraoCompromisso(a, svc, hoje) {
 // viaja por fora do app, cai numa conversa nova e não é fonte de verdade de nada. O Classic
 // usa os ids pra achar o registro e relê o estado vivo nas fontes oficiais.
 // O clique não grava nada em lugar nenhum.
-function payloadGPT(campos) {
-  const linhas = ["OPERAÇÃO BAHIA — ABRIR CLIENTE"];
+const INSTRUCAO_GPT_CLIENTE = "Inicialize a Operação Bahia antes de responder. Use os identificadores acima apenas para localizar o cliente/serviço e consulte as fontes oficiais atuais. Não trate este texto compartilhado como prova do status atual nem invente fatos ausentes.";
+function payloadGPT(campos, assinatura, instrucao) {
+  const linhas = [assinatura || "OPERAÇÃO BAHIA — ABRIR CLIENTE"];
   for (const [rotulo, valor] of campos) if (valor) linhas.push(`${rotulo}: ${valor}`);
-  linhas.push("origem: app_operacao_bahia", "", "INSTRUÇÃO AO CHATGPT:",
-    "Inicialize a Operação Bahia antes de responder. Use os identificadores acima apenas para localizar o cliente/serviço e consulte as fontes oficiais atuais. Não trate este texto compartilhado como prova do status atual nem invente fatos ausentes.");
+  linhas.push("origem: app_operacao_bahia", "", "INSTRUÇÃO AO CHATGPT:", instrucao || INSTRUCAO_GPT_CLIENTE);
   return linhas.join("\n");
 }
 
@@ -3108,6 +3121,10 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
     </button>
     {aberto && <div className="compromisso-corpo">
       <h4>{a.titulo}</h4>
+      {/* BLOQUEIO PESSOAL: a linha da agenda existe só pra dizer que ele está indisponível. O compromisso
+          de verdade mora no card Pessoais, e nenhum detalhe pessoal chega até aqui — a operação só precisa
+          saber que o horário não está livre, não o motivo. */}
+      {a.pessoal_id && <p className="compromisso-material">⛔ Bloqueio pessoal — você está indisponível neste horário. O compromisso está no card Pessoais.</p>}
       {!!(materiais || []).length && <p className="compromisso-material">⚑ Aproveitar para o material: {(materiais || []).map((m) => m.descricao || "material").join(" · ")}</p>}
       {/* CONTATO IMPOSSÍVEL: o app mandava "tentar contato de novo" sem existir telefone na ficha, e o Diego
           ficou perguntando "cadê o WhatsApp" desde 16/07 sem resposta (caso real; havia até cliente com ENTREGA marcada e
@@ -3274,6 +3291,122 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
     {aberto && <div style={{ marginTop: 12 }}>
       {!!atrasadas.length && <><p className="kicker">🔴 ATRASADAS</p><div className="rotina-lista">{atrasadas.map(linha)}</div></>}
       {!!doDia.length && <><p className="kicker" style={{ marginTop: atrasadas.length ? 14 : 0 }}>🟡 PRA HOJE</p><div className="rotina-lista">{doDia.map(linha)}</div></>}
+    </div>}
+  </section>;
+}
+
+// ===== DOMÍNIO PESSOAIS (item APP-PESSOAIS-CARD-20260824-2145 + adendo CROSSDOMAIN-20260824-2150) =====
+//
+// REGRA-MÃE: NOTIFICAÇÃO/VENCIMENTO NÃO É CONCLUSÃO. O problema que este card existe pra resolver é o
+// lembrete que ele vê passar e ignora — a data chegar não prova que a coisa foi feita. Por isso ATRASADO
+// é DERIVADO, nunca gravado: a passagem da data não escreve nada no banco. Se escrevesse, "venceu" viraria
+// um evento, e um dia alguém confundiria evento com cumprimento. Só ação explícita muda o estado.
+function pessoalAtrasado(p, hoje) { return p.status === "PENDENTE" && !!p.data_alvo && p.data_alvo < hoje; }
+const PESSOAL_ASSINATURA_GPT = "PAINEL — ABRIR COMPROMISSO PESSOAL";
+const PESSOAL_INSTRUCAO_GPT = "Localize o compromisso pessoal atual pelo identificador acima antes de responder. Se qualquer ação puder alterar a disponibilidade da Operação Bahia, considere também o bloqueio operacional vinculado. Não trate este texto compartilhado como prova de estado atual e não invente detalhes pessoais ausentes.";
+
+function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
+  const [aberto, setAberto] = useState(false);
+  const [verConcluidos, setVerConcluidos] = useState(false);
+  const [remarcando, setRemarcando] = useState(null);
+  const [dataDraft, setDataDraft] = useState("");
+  const [busy, setBusy] = useState(null);
+  const [avisoGPT, setAvisoGPT] = useState("");
+
+  const ativos = (pessoais || []).filter((p) => p.status === "PENDENTE");
+  const encerrados = (pessoais || []).filter((p) => p.status !== "PENDENTE");
+  const atrasados = ativos.filter((p) => pessoalAtrasado(p, hoje));
+  const proximo = ativos.filter((p) => !pessoalAtrasado(p, hoje)).sort((a, b) => String(a.data_alvo || "9999").localeCompare(String(b.data_alvo || "9999")))[0];
+  if (!pessoais || !pessoais.length) return null;
+
+  // O BLOQUEIO SEGUE O ITEM, SEMPRE. O compromisso pessoal é o fato canônico; a linha de agenda com
+  // pessoal_id é só indisponibilidade. Concluir/cancelar encerra o bloqueio, remarcar move o bloqueio —
+  // e se essa segunda parte falhar, o Diego PRECISA saber, senão fica com "pessoal novo + bloqueio velho"
+  // sem ninguém perceber. Falha parcial visível é requisito, não capricho.
+  const sincronizarBloqueio = async (pessoalId, patch) => {
+    const { error } = await db.from("agenda").update(patch).eq("pessoal_id", pessoalId).eq("status", "planejado");
+    if (error) throw new Error("o bloqueio da agenda NÃO acompanhou (" + error.message + ") — refaça a ação");
+  };
+
+  const concluir = async (p) => {
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusy(p.id);
+    try {
+      const agora = new Date().toISOString();
+      const { error } = await db.from("pessoais").update({ status: "CONCLUIDO", concluido_em: agora, atualizado_em: agora }).eq("id", p.id);
+      if (error) throw error;
+      await sincronizarBloqueio(p.id, { status: "feito" });
+      notify("Concluído. Continua guardado no histórico.", "ok");
+      await onChanged?.();
+    } catch (e) { notify("Não concluí: " + e.message, "error"); } finally { setBusy(null); }
+  };
+
+  const remarcar = async (p) => {
+    if (!dataDraft) { notify("Escolha a data nova.", "error"); return; }
+    if (demo) { notify("Na demonstração não salva.", "info"); setRemarcando(null); return; }
+    setBusy(p.id);
+    try {
+      const agora = new Date().toISOString();
+      // Rastreável de propósito: guarda de onde veio e conta quantas vezes já andou. Item que remarca
+      // toda semana é informação sobre a vida dele, não ruído.
+      const { error } = await db.from("pessoais").update({
+        data_alvo: dataDraft, remarcado_de: p.data_alvo || null,
+        remarcacoes: Number(p.remarcacoes || 0) + 1, atualizado_em: agora,
+      }).eq("id", p.id);
+      if (error) throw error;
+      await sincronizarBloqueio(p.id, { data: dataDraft });
+      notify("Remarcado para " + compactDate(dataDraft) + ".", "ok");
+      setRemarcando(null); setDataDraft("");
+      await onChanged?.();
+    } catch (e) { notify("Não remarquei: " + e.message, "error"); } finally { setBusy(null); }
+  };
+
+  const linha = (p) => {
+    const atrasado = pessoalAtrasado(p, hoje);
+    return <article className={`funil-item${atrasado ? " st-lead" : ""}`} key={p.id}>
+      <div className="funil-esq">
+        <strong>{p.titulo}</strong>
+        {/* Horário só aparece quando existe. Compromisso sem hora marcada não ganha hora inventada. */}
+        <span>{p.data_alvo ? compactDate(p.data_alvo) : "Sem data marcada"}{p.hora ? " · " + String(p.hora).slice(0, 5) : " · sem horário"}{p.cidade ? " · " + p.cidade : ""}</span>
+        {p.descricao && <em>{p.descricao}</em>}
+        {p.remarcacoes > 0 && <em>Já remarcado {p.remarcacoes}x{p.remarcado_de ? " · antes era " + compactDate(p.remarcado_de) : ""}</em>}
+      </div>
+      <div className="funil-dir">
+        <span className="status-pill">{atrasado ? "⚠ ATRASADO" : p.status}</span>
+        {p.impacto_operacao === "BLOQUEIA_DISPONIBILIDADE" && <span className="responsavel-badge">⛔ Bloqueia agenda</span>}
+        {p.impacto_operacao === "A_CONFIRMAR" && p.status === "PENDENTE" && <span className="responsavel-badge">? Impacto a confirmar</span>}
+      </div>
+      {p.status === "PENDENTE" && <div className="ficha-actions" style={{ width: "100%" }}>
+        <button className="ghost" disabled={busy === p.id} onClick={() => concluir(p)}>{busy === p.id ? "..." : "✓ Concluir"}</button>
+        <button className="ghost" disabled={busy === p.id} onClick={() => { setRemarcando(remarcando === p.id ? null : p.id); setDataDraft(p.data_alvo || ""); }}>{remarcando === p.id ? "Cancelar" : "↻ Remarcar"}</button>
+        {/* Mesmo princípio do botão do cliente: leva IDENTIDADE, não detalhe. Nada de descrição, motivo
+            médico, nome de escola ou histórico — só o id, o título e a data. */}
+        <button className="ghost" onClick={() => compartilharGPT(payloadGPT([
+          ["pessoal_id", p.id], ["titulo", p.titulo], ["data_alvo", p.data_alvo], ["impacto_operacao", p.impacto_operacao],
+        ], PESSOAL_ASSINATURA_GPT, PESSOAL_INSTRUCAO_GPT), (msg) => setAvisoGPT(msg))}>💬 ChatGPT</button>
+      </div>}
+      {remarcando === p.id && <div className="responsavel-edit-row" style={{ width: "100%" }}>
+        <input type="date" value={dataDraft} onChange={(e) => setDataDraft(e.target.value)} autoFocus />
+        <button className="ghost" disabled={busy === p.id} onClick={() => remarcar(p)}>Salvar data</button>
+      </div>}
+    </article>;
+  };
+
+  const lista = verConcluidos ? encerrados : ativos;
+  return <section className={atrasados.length ? "content-card warning-card" : "content-card"}>
+    <div className="card-head"><div><p className="kicker">PESSOAIS</p>
+      <h3>{ativos.length} pendente(s){atrasados.length ? ` · ${atrasados.length} atrasado(s)` : ""}</h3>
+      {proximo && <span className="ficha-note" style={{ margin: 0 }}>Próximo: {proximo.titulo}{proximo.data_alvo ? " · " + compactDate(proximo.data_alvo) : ""}</span>}
+    </div></div>
+    {avisoGPT && <p className="ficha-note">{avisoGPT}</p>}
+    <button className="ghost" style={{ width: "100%" }} onClick={() => setAberto((v) => !v)}>{aberto ? "Fechar" : "Abrir os pessoais"}</button>
+    {aberto && <div style={{ marginTop: 12 }}>
+      <div className="funil-filtros">
+        <button className={verConcluidos ? "" : "active"} onClick={() => setVerConcluidos(false)}>Ativos</button>
+        <button className={verConcluidos ? "active" : ""} onClick={() => setVerConcluidos(true)}>Concluídos</button>
+      </div>
+      {lista.length ? <div className="funil-lista">{[...lista].sort((a, b) => String(a.data_alvo || "9999").localeCompare(String(b.data_alvo || "9999"))).map(linha)}</div>
+        : <div className="empty-state"><b>{verConcluidos ? "Nada concluído ainda." : "Nenhuma pendência pessoal aberta."}</b></div>}
     </div>}
   </section>;
 }
@@ -3460,7 +3593,7 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, pessoais, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerCompras, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
   const profissionais = nomesProfissionais(services);
@@ -3643,6 +3776,9 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     <ServicosSemProximoPassoCard services={services} appointments={appointments} inbox={inbox} onOpenFicha={onOpenFicha} />
+    {/* PESSOAIS mora na mesma home por conveniência dele, mas é outro domínio — e fica DEPOIS do trabalho,
+        porque a primeira olhada do dia é a rota. Só sobe pra cara dele quando tem atrasado. */}
+    <PessoaisCard pessoais={pessoais} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     {/* SAIU DO PAINEL em 30/07/2026 o card "N cliente(s) esperando remarcação". Diego: "achei desnecessário
         pra mim, se tem o aviso aqui para Claude". Ele estava certo: remarcar é trabalho que o Claude resolve
         pela caixa, e o item já conta no badge da aba Caixa — o card só repetia isso ocupando o topo da tela
