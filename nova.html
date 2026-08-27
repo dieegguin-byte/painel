@@ -2028,11 +2028,32 @@ function conflitaComIgreja(dataISO, hora, tipo, cidade) {
 // manual do Diego não muda); esta lista é a de sugestão — 13h30 pra cima, noite só terça e sábado, nada que
 // faça ele chegar atrasado na igreja. O 13:30 não existe na grade de hora cheia, então entra na frente
 // quando a janela da tarde daquele dia começa 13:00 ou antes e ninguém ocupou o horário.
-function horariosSugeridos(dataISO, tipo, ocupados, cidade) {
+// PREFLIGHT DE ROTA NA SUGESTÃO AUTOMÁTICA (item AGENDA-PREFLIGHT-SOLUCAO-20260824-1557).
+//
+// O seletor manual já pinta de vermelho o horário que não dá tempo de serviço + estrada — a checagem
+// existe, é `horarioApertado`, e é confiável. Mas a sugestão AUTOMÁTICA não passava por ela: olhava
+// janela, igreja e colisão de horário exato, e mais nada. Quando o app escolhia sozinho, ele podia
+// entregar exatamente o "primeiro horário vazio" que o preflight existe pra impedir — sem cidade, sem
+// estrada, sem duração.
+//
+// Isto NÃO é regra de negócio nova: é a mesma trava do seletor, aplicada no caminho que a estava pulando.
+// `outrosDoDia` são os compromissos já marcados naquele dia, com hora e cidade. Quem não passar a lista
+// continua com o comportamento de antes — o seletor manual, por exemplo, quer ver o horário apertado (em
+// vermelho, atrás de confirmação), porque ali a escolha é do Diego.
+//
+// Bloqueio pessoal entra nessa conta de graça: desde 27/08 ele é linha de agenda presencial com cidade,
+// então ocupa a estrada como qualquer outro compromisso.
+function apertaARota(h, tipo, cidade, outrosDoDia) {
+  if (tipo === "remoto" || !cidade) return false; // remoto não desloca ninguém
+  const outros = (outrosDoDia || []).filter((a) => (a.tipo || "presencial") === "presencial" && a.cidade && a.hora && cidadeChave(a.cidade) !== cidadeChave(cidade));
+  return outros.length > 0 && horarioApertado(h, outros, cidade);
+}
+function horariosSugeridos(dataISO, tipo, ocupados, cidade, outrosDoDia) {
   const dia = new Date(dataISO + "T00:00:00").getDay();
   const teto = tipo === "remoto" ? JANELA_REMOTO[1] : (DIAS_NOITE_LIBERADA.includes(dia) ? HORA_MAX_SUGESTAO_NOITE : HORA_MAX_SUGESTAO_PADRAO);
   const min = minutosDoHorario(HORA_MIN_SUGESTAO), max = minutosDoHorario(teto);
-  const cabe = (h) => minutosDoHorario(h) >= min && minutosDoHorario(h) <= max && !conflitaComIgreja(dataISO, h, tipo, cidade);
+  const cabe = (h) => minutosDoHorario(h) >= min && minutosDoHorario(h) <= max && !conflitaComIgreja(dataISO, h, tipo, cidade)
+    && !apertaARota(h, tipo, cidade, outrosDoDia);
   const lista = horariosParaTipo(dataISO, tipo, ocupados).filter(cabe);
   const occ = new Set((ocupados || []).filter(Boolean).map((h) => h.slice(0, 5)));
   const janelaDaTarde = tipo === "remoto"
@@ -2044,11 +2065,16 @@ function horariosSugeridos(dataISO, tipo, ocupados, cidade) {
 // Uma sugestão só, pra quem precisa de um horário e não de uma lista (triagem, plano de compra). Nunca
 // devolve manhã por conta própria; se o dia não tem nada sugerível, prefere o horário mais tarde possível
 // que ainda não atropela a igreja, e só em último caso um 14:00 honesto.
-function horaSugerida(dataISO, tipo, ocupados, cidade) {
-  const sugeridos = horariosSugeridos(dataISO, tipo, ocupados, cidade);
+function horaSugerida(dataISO, tipo, ocupados, cidade, outrosDoDia) {
+  const sugeridos = horariosSugeridos(dataISO, tipo, ocupados, cidade, outrosDoDia);
   if (sugeridos.length) return sugeridos[0];
+  // Sem horário sugerível, o fallback continua existindo — mas ele também não pode escolher um slot que a
+  // estrada já reprovou. Só se NADA sobrar é que aceita o apertado, porque devolver horário nenhum
+  // quebraria o cadastro; e aí o compromisso nasce e fica visível pro Diego decidir, que é o certo.
   const possiveis = horariosParaTipo(dataISO, tipo, ocupados).filter((h) => !conflitaComIgreja(dataISO, h, tipo, cidade));
-  return possiveis[possiveis.length - 1] || "14:00";
+  const folgados = possiveis.filter((h) => !apertaARota(h, tipo, cidade, outrosDoDia));
+  const lista = folgados.length ? folgados : possiveis;
+  return lista[lista.length - 1] || "14:00";
 }
 // TRAVA DE ROTA. As praças do Diego ficam num corredor saindo de Luziânia (Valparaíso > Riacho Fundo > Águas
 // Claras > Brasília), então a distância até a base serve de posição na estrada. Se a ordem do dia não for
@@ -2438,10 +2464,11 @@ function Home() {
         fechamentoSemValor = fechado.resultado.fechamentoCompleto === false;
       }
       if (form.addAgenda) {
-        const occupied = agendaVisivel.filter((entry) => entry.data === form.due && entry.tipo === "presencial").map((entry) => entry.hora?.slice(0, 5));
+        const doDia = agendaVisivel.filter((entry) => entry.data === form.due && entry.tipo === "presencial");
+        const occupied = doDia.map((entry) => entry.hora?.slice(0, 5));
         // O QUE O APP ESCOLHE SOZINHO SEGUE A ROTINA DELE (14/08): antes era o primeiro slot livre — sempre
         // 08:00 — e, sem slot, um 18:00 que cai em cima da igreja de seg/qua/sex. Ver horaSugerida.
-        const fallback = horaSugerida(form.due, form.agendaType, occupied, form.city);
+        const fallback = horaSugerida(form.due, form.agendaType, occupied, form.city, doDia);
         const appointment = { titulo: `${customer.nome} — ${form.service.trim()}`, data: form.due, hora: form.time || fallback, cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType, status: "planejado", servico_id: service.id };
         const { data: linked } = await db.from("agenda").select("id").eq("servico_id", service.id).eq("status", "planejado").limit(1);
         if (linked?.length) { const { error } = await db.from("agenda").update(appointment).eq("id", linked[0].id); if (error) throw error; }
@@ -2468,8 +2495,9 @@ function Home() {
     if (demo) { await resolveInbox(item, "Compromisso criado na demonstração"); notify("Compromisso registrado.", "ok"); return; }
     setBusy(true);
     try {
-      const occupied = agendaVisivel.filter((entry) => entry.data === form.due && entry.tipo === "presencial").map((entry) => entry.hora?.slice(0, 5));
-      const fallback = horaSugerida(form.due, form.agendaType, occupied, form.city);
+      const doDia = agendaVisivel.filter((entry) => entry.data === form.due && entry.tipo === "presencial");
+      const occupied = doDia.map((entry) => entry.hora?.slice(0, 5));
+      const fallback = horaSugerida(form.due, form.agendaType, occupied, form.city, doDia);
       const payload = { titulo: form.service.trim(), data: form.due, hora: form.time || fallback, cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType, status: "planejado" };
       const { data: same } = await db.from("agenda").select("id").eq("titulo", payload.titulo).eq("data", payload.data).eq("status", "planejado").limit(1);
       let id = same?.[0]?.id;
@@ -4800,6 +4828,11 @@ function planoDeCompra(fornecedor) {
   // esse 08:00 fixo era o app inventando manhã pra ele (auditoria 14/08). Agora sai da mesma regra de
   // sugestão da agenda, já considerando a estrada até a loja pra não atropelar a igreja.
   const dataCompra = proximoDiaUtil(hojeISO());
+  // ⚠ LACUNA CONHECIDA (auditoria de 27/08, item AGENDA-PREFLIGHT-SOLUCAO-20260824-1557): esta chamada
+  // passa lista de ocupados VAZIA. Ou seja, a viagem de compra é marcada sem olhar a agenda daquele dia —
+  // pode nascer em cima de um compromisso existente, e não só apertada. Não corrigi aqui porque
+  // planoDeCompra é função pura, chamada de dentro das operações, e plumbar a agenda até ela exige uma
+  // consulta a mais no caminho de escrita. Fica registrado em vez de mal resolvido.
   return { tipo: "presencial", data: dataCompra, hora: horaSugerida(dataCompra, "presencial", [], fornecedor.cidade), entrega: null, rotulo: `Buscar material na ${fornecedor.nome}` };
 }
 function compraPrecisaRevisao(item) { return !item.fornecedor_id && !(item.descricao || "").startsWith(COMPRA_CONFERIDA_TAG); }
