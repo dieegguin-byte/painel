@@ -151,7 +151,9 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
    na borda. Diego, 24/08: "financeiro e profissionais voltou a ficar cortando descentralizado".
    Medido: com a escala de texto do Android em 130%, "R$ 20.342,65" a 34px pede 190px por
    cartao; dois cartoes davam pagina de 399px numa tela de 320. Ver [[reference-painel-texto-cortado-layout]]. */
-.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metric-card{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:15px;min-height:112px;min-width:0}.metric-card>span{font-size:8px;text-transform:uppercase;color:var(--dim);letter-spacing:.7px}.metric-card>b{display:block;font-size:26px;margin:11px 0 4px}.metric-card small{color:var(--muted);font-size:9px}.metric-card.orange>b{color:var(--orange2)}.metric-card.red>b{color:#e88477}.metric-card.yellow>b{color:#e4bd72}.metric-card.green>b{color:#9bc7a7}.metric-card.clickable{cursor:pointer;transition:border-color .15s,transform .15s}.metric-card.clickable:hover{border-color:var(--dim);transform:translateY(-1px)}.metric-card.clickable:active{transform:translateY(0)}.content-card{background:linear-gradient(145deg,#1b1613,#15110f);border:1px solid var(--line);border-radius:18px;padding:18px}.content-card.full{min-height:560px}.card-head{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:14px}.card-head h3{font:500 22px Georgia,serif;margin:0}.search{width:min(300px,45%);margin:0}.priority-row{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:11px;padding:11px 3px;border-bottom:1px solid var(--line)}.priority-row:last-child{border-bottom:0}.priority{width:8px;height:8px;border-radius:50%;background:var(--yellow)}.priority.alta{background:var(--red)}.priority.baixa{background:var(--green)}.priority-row strong,.priority-row span{display:block}.priority-row strong{font-size:11px;margin-bottom:3px}.priority-row span,.priority-row time{font-size:9px;color:var(--dim)}.warning-card{padding:15px 18px;border-radius:14px;background:#df6a5d12;border:1px solid #df6a5d3f}.warning-card b,.warning-card span{display:block}.warning-card b{font-size:12px}.warning-card span{font-size:9px;color:var(--muted);margin-top:3px}/* PAINEL: cards de acao grandes (o que fazer + mensagem pronta + WhatsApp) */
+.metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metric-card{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:15px;min-height:112px;min-width:0}.metric-card>span{font-size:8px;text-transform:uppercase;color:var(--dim);letter-spacing:.7px}.metric-card>b{display:block;font-size:26px;margin:11px 0 4px}.metric-card small{color:var(--muted);font-size:9px}.metric-card.orange>b{color:var(--orange2)}.metric-card.red>b{color:#e88477}.metric-card.yellow>b{color:#e4bd72}.metric-card.green>b{color:#9bc7a7}.metric-card.clickable{cursor:pointer;transition:border-color .15s,transform .15s}.metric-card.clickable:hover{border-color:var(--dim);transform:translateY(-1px)}.metric-card.clickable:active{transform:translateY(0)}.content-card{background:linear-gradient(145deg,#1b1613,#15110f);border:1px solid var(--line);border-radius:18px;padding:18px}.content-card.full{min-height:560px}.card-head{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:14px}.card-head h3{font:500 22px Georgia,serif;margin:0}
+.card-toggle{width:100%;display:flex;justify-content:space-between;gap:15px;align-items:center;background:transparent;border:0;color:inherit;text-align:left;padding:0;margin:0}.card-toggle>div{min-width:0}.card-toggle h3{font:500 22px Georgia,serif;margin:0}.card-toggle>i{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);flex:none;white-space:nowrap}.card-toggle:hover>i{color:#e0cbb8}.card-toggle[aria-expanded="true"]>i{color:var(--orange2)}.card-corpo{margin-top:14px}
+.search{width:min(300px,45%);margin:0}.priority-row{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:11px;padding:11px 3px;border-bottom:1px solid var(--line)}.priority-row:last-child{border-bottom:0}.priority{width:8px;height:8px;border-radius:50%;background:var(--yellow)}.priority.alta{background:var(--red)}.priority.baixa{background:var(--green)}.priority-row strong,.priority-row span{display:block}.priority-row strong{font-size:11px;margin-bottom:3px}.priority-row span,.priority-row time{font-size:9px;color:var(--dim)}.warning-card{padding:15px 18px;border-radius:14px;background:#df6a5d12;border:1px solid #df6a5d3f}.warning-card b,.warning-card span{display:block}.warning-card b{font-size:12px}.warning-card span{font-size:9px;color:var(--muted);margin-top:3px}/* PAINEL: cards de acao grandes (o que fazer + mensagem pronta + WhatsApp) */
 .compromisso-card{display:block;background:linear-gradient(150deg,#1d1714,#171310);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:16px;padding:14px;margin-bottom:12px}
 /* CABEÇALHO CLICÁVEL: é o card fechado. Hora à esquerda, nome + cidade no meio, seta à direita.
    `min-width:0` no meio é o que impede um nome comprido de empurrar a seta pra fora e alargar
@@ -1488,9 +1490,11 @@ async function aplicarMaterialPlanejadoOperacional(db, eventoId, dados) {
     if (financeiroExistente.fornecedor_id && financeiroExistente.fornecedor_id !== dados.fornecedorId) throw new Error("A compra pertence a outro fornecedor.");
     if (financeiroExistente.servico_id && dados.servicoId && financeiroExistente.servico_id !== dados.servicoId) throw new Error("A compra pertence a outro serviço.");
   }
-  const plano = planoDeCompra(fornecedor);
-  if (!plano) throw new Error("Não foi possível calcular o plano de compra.");
-  if (plano.tipo === "presencial" && !fornecedor.cidade) throw new Error("Fornecedor presencial sem cidade. Pergunte ao Diego; não transforme a ida em tarefa remota.");
+  const planoBase = planoDeCompra(fornecedor);
+  if (!planoBase) throw new Error("Não foi possível calcular o plano de compra.");
+  if (planoBase.tipo === "presencial" && !fornecedor.cidade) throw new Error("Fornecedor presencial sem cidade. Pergunte ao Diego; não transforme a ida em tarefa remota.");
+  // A checagem de cidade vem ANTES de ler a agenda: sem cidade a ida nem existe, não vale gastar consulta.
+  const plano = await planoDeCompraComHorario(db, fornecedor, dados.dataCompra || null);
   let agendaId = await uuidDeterministicoEvento(eventoId, "agenda:material");
   const agendaPayload = {
     titulo: plano.rotulo, data: dados.dataCompra || plano.data, hora: plano.tipo === "presencial" ? (dados.hora || plano.hora) : null,
@@ -3312,12 +3316,34 @@ function ComposerCaixa({ composer, setComposer, files, setFiles, addInbox, busy,
   </div>;
 }
 // Rotinas que vencem hoje ou estão atrasadas aparecem no Painel; "✓ Fiz hoje" reinicia a contagem.
+// TUDO RECOLHÍVEL, UM GESTO SÓ (Diego, 04/08 e de novo em 27/08: "quero tudo recolhível no painel"). Cada
+// card resolvia isso do seu jeito: uns com um botão "Abrir os N" de largura inteira, outros abertos sempre
+// — a lista de contas a pagar, os serviços sem próximo passo, a Capacidade e o campo de anotar não recolhiam
+// de jeito nenhum. Resultado: o Painel abria como parede de texto e a agenda do dia ia parar lá embaixo.
+//
+// Agora o CABEÇALHO INTEIRO é o botão, igual em todos: mesma batida, mesma posição, "▸ ABRIR" / "▾ FECHAR"
+// à direita. Um alvo grande vale mais que um chevron pequeno em tela de celular dentro do carro.
+//
+// FECHAR TROCA LISTA POR NÚMERO, NÃO ESCONDE INFORMAÇÃO: título, contagem e a nota de resumo continuam na
+// tela fechado. `resumo` é o que fica visível MESMO fechado e não é decoração — é o aviso de rota, os chips
+// de loja, a linha de "quantas atrasadas". O que sai é a lista.
+//
+// SEMPRE COMEÇA FECHADO, sem exceção e sem memória. Diego, 04/08: "quero tudo recolhível sem abrir sozinho
+// no painel principal ao iniciar". Card que abre sozinho porque o app achou urgente vira o estado normal, e
+// aí nada é urgente — foi exatamente o que aconteceu com as rotinas atrasadas.
+function CardRecolhivel({ className, id, cabecalho, resumo, children }) {
+  const [aberto, setAberto] = useState(false);
+  return <section id={id} className={className || "content-card"}>
+    <button type="button" className="card-toggle" aria-expanded={aberto} onClick={() => setAberto((v) => !v)}>
+      <div>{cabecalho}</div>
+      <i>{aberto ? "▾ fechar" : "▸ abrir"}</i>
+    </button>
+    {resumo}
+    {aberto && <div className="card-corpo">{children}</div>}
+  </section>;
+}
 function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
   const [busyId, setBusyId] = useState(null);
-  // null = ainda não mexeu, vale o padrão (abre só se tiver atrasada). Precisa ficar aqui em cima, junto dos
-  // outros hooks: abaixo tem um `return null` quando não há rotina pendente, e hook depois de return quebra
-  // a ordem entre renders.
-  const [abertoManual, setAbertoManual] = useState(null);
   // Atualização otimista: o onChanged recarrega tudo e demora, então a linha só sumiria segundos depois e
   // parecia que o clique não pegou. Aqui a data nova vale na hora e o recarregamento só reconcilia.
   const [feitasAgora, setFeitasAgora] = useState({});
@@ -3338,19 +3364,14 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
       notify(`"${rotina.titulo}" marcada como feita ${quando === hoje ? "hoje" : "ontem"}.`, "ok"); onChanged();
     } catch (e) { notify("Erro: " + e.message, "error"); } finally { setBusyId(null); }
   };
-  // RECOLHÍVEL E SEPARADO POR COR (Diego, 30/07). Rotina é a coisa menos urgente do Painel — lavar o carro
-  // não decide o dia — e com a lista aberta empurrava a agenda e o dinheiro pra baixo. Fica fechado por
-  // padrão; só abre sozinho quando tem rotina ATRASADA, que é quando vale interromper. Dentro, os dois
-  // grupos do semáforo ficam separados em vez de misturados numa lista só ordenada por dias.
+  // SEPARADO POR COR (Diego, 30/07): os dois grupos do semáforo ficam separados em vez de misturados numa
+  // lista só ordenada por dias. O recolher é o do CardRecolhivel — sempre fechado até ele tocar, nunca
+  // abrindo sozinho por ter rotina atrasada (Diego, 04/08: "ao abrir o app as rotinas pendentes já abrem,
+  // quero que abra só depois de eu clicar"). Como quase sempre há alguma atrasada — lavar o carro, backup —,
+  // o automatismo que existia pra chamar atenção era o estado normal, e o que é sempre urgente não é urgente.
+  // O título já diz quantas estão atrasadas: isso basta pra decidir se vale abrir agora.
   const atrasadas = pendentes.filter((x) => x.st.estado === "vencida");
   const doDia = pendentes.filter((x) => x.st.estado !== "vencida");
-  // SEMPRE FECHADO ATÉ ELE TOCAR. Diego, 04/08: "ao abrir o app as rotinas pendentes já abrem, quero que
-  // abra só depois de eu clicar". Antes abria sozinha quando havia rotina ATRASADA — e como quase sempre há
-  // alguma atrasada (lavar o carro, backup), na prática o Painel abria com a lista estendida empurrando
-  // agenda e dinheiro pra baixo. O automatismo que existia pra chamar atenção virou o estado normal, e o que
-  // é sempre urgente deixa de ser urgente. O título já mostra quantas estão atrasadas: isso basta pra
-  // decidir se vale abrir agora.
-  const aberto = abertoManual === true;
   const linha = ({ r, st }) => <article className={`rotina-item ${st.estado === "vencida" ? "cor-alta" : "cor-media"}`} key={r.id}>
     <div className="rotina-esq">
       <strong>{r.titulo}</strong>
@@ -3364,15 +3385,12 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged }) {
       </div>
     </div>
   </article>;
-  return <section className="content-card">
-    <div className="card-head"><div><p className="kicker">ROTINAS RECORRENTES</p><h3>{pendentes.length} rotina(s) pra hoje</h3></div></div>
-    <p className="ficha-note">{atrasadas.length ? `${atrasadas.length} atrasada(s)` : "Nenhuma atrasada"}{doDia.length ? ` · ${doDia.length} pra hoje` : ""}</p>
-    <button className="ghost" style={{ width: "100%" }} onClick={() => setAbertoManual(!aberto)}>{aberto ? "Fechar rotinas" : `Abrir as ${pendentes.length}`}</button>
-    {aberto && <div style={{ marginTop: 12 }}>
-      {!!atrasadas.length && <><p className="kicker">🔴 ATRASADAS</p><div className="rotina-lista">{atrasadas.map(linha)}</div></>}
-      {!!doDia.length && <><p className="kicker" style={{ marginTop: atrasadas.length ? 14 : 0 }}>🟡 PRA HOJE</p><div className="rotina-lista">{doDia.map(linha)}</div></>}
-    </div>}
-  </section>;
+  return <CardRecolhivel
+    cabecalho={<><p className="kicker">ROTINAS RECORRENTES</p><h3>{pendentes.length} rotina(s) pra hoje</h3></>}
+    resumo={<p className="ficha-note">{atrasadas.length ? `${atrasadas.length} atrasada(s)` : "Nenhuma atrasada"}{doDia.length ? ` · ${doDia.length} pra hoje` : ""}</p>}>
+    {!!atrasadas.length && <><p className="kicker">🔴 ATRASADAS</p><div className="rotina-lista">{atrasadas.map(linha)}</div></>}
+    {!!doDia.length && <><p className="kicker" style={{ marginTop: atrasadas.length ? 14 : 0 }}>🟡 PRA HOJE</p><div className="rotina-lista">{doDia.map(linha)}</div></>}
+  </CardRecolhivel>;
 }
 
 // ===== DOMÍNIO PESSOAIS (item APP-PESSOAIS-CARD-20260824-2145 + adendo CROSSDOMAIN-20260824-2150) =====
@@ -3386,7 +3404,6 @@ const PESSOAL_ASSINATURA_GPT = "PAINEL — ABRIR COMPROMISSO PESSOAL";
 const PESSOAL_INSTRUCAO_GPT = "Localize o compromisso pessoal atual pelo identificador acima antes de responder. Se qualquer ação puder alterar a disponibilidade da Operação Bahia, considere também o bloqueio operacional vinculado. Não trate este texto compartilhado como prova de estado atual e não invente detalhes pessoais ausentes.";
 
 function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
-  const [aberto, setAberto] = useState(false);
   const [verConcluidos, setVerConcluidos] = useState(false);
   const [remarcando, setRemarcando] = useState(null);
   const [dataDraft, setDataDraft] = useState("");
@@ -3473,22 +3490,21 @@ function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
   };
 
   const lista = verConcluidos ? encerrados : ativos;
-  return <section className={atrasados.length ? "content-card warning-card" : "content-card"}>
-    <div className="card-head"><div><p className="kicker">PESSOAIS</p>
+  return <CardRecolhivel
+    className={atrasados.length ? "content-card warning-card" : "content-card"}
+    cabecalho={<><p className="kicker">PESSOAIS</p>
       <h3>{ativos.length} pendente(s){atrasados.length ? ` · ${atrasados.length} atrasado(s)` : ""}</h3>
-      {proximo && <span className="ficha-note" style={{ margin: 0 }}>Próximo: {proximo.titulo}{proximo.data_alvo ? " · " + compactDate(proximo.data_alvo) : ""}</span>}
-    </div></div>
-    {avisoGPT && <p className="ficha-note">{avisoGPT}</p>}
-    <button className="ghost" style={{ width: "100%" }} onClick={() => setAberto((v) => !v)}>{aberto ? "Fechar" : "Abrir os pessoais"}</button>
-    {aberto && <div style={{ marginTop: 12 }}>
+      {proximo && <span className="ficha-note" style={{ margin: 0 }}>Próximo: {proximo.titulo}{proximo.data_alvo ? " · " + compactDate(proximo.data_alvo) : ""}</span>}</>}
+    resumo={avisoGPT ? <p className="ficha-note">{avisoGPT}</p> : null}>
+    <div>
       <div className="funil-filtros">
         <button className={verConcluidos ? "" : "active"} onClick={() => setVerConcluidos(false)}>Ativos</button>
         <button className={verConcluidos ? "active" : ""} onClick={() => setVerConcluidos(true)}>Concluídos</button>
       </div>
       {lista.length ? <div className="funil-lista">{[...lista].sort((a, b) => String(a.data_alvo || "9999").localeCompare(String(b.data_alvo || "9999"))).map(linha)}</div>
         : <div className="empty-state"><b>{verConcluidos ? "Nada concluído ainda." : "Nenhuma pendência pessoal aberta."}</b></div>}
-    </div>}
-  </section>;
+    </div>
+  </CardRecolhivel>;
 }
 
 // SERVIÇO VIVO SEM PRÓXIMO PASSO — itens APP-LEO-SUMIU-20260825-2255 e APP-NURIMAR-SUMIU-20260825-2338.
@@ -3517,9 +3533,9 @@ function ServicosSemProximoPassoCard({ services, appointments, inbox, onOpenFich
       .sort((a, b) => (a.status === "agendado") - (b.status === "agendado") || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
   }, [services, appointments, inbox]);
   if (!parados.length) return null;
-  return <section className="content-card">
-    <div className="card-head"><div><p className="kicker">SEM PRÓXIMO PASSO</p>
-      <h3>{parados.length} serviço(s) fechado(s) sem compromisso marcado</h3></div></div>
+  return <CardRecolhivel
+    cabecalho={<><p className="kicker">SEM PRÓXIMO PASSO</p>
+      <h3>{parados.length} serviço(s) fechado(s) sem compromisso marcado</h3></>}>
     <div className="funil-lista">{parados.map((s) => <article className={`funil-item st-${s.status}`} key={s.id} onClick={() => onOpenFicha(s.cliente_id)}>
       <div className="funil-esq">
         <strong>{s.clientes?.nome || "Cliente"}</strong>
@@ -3533,7 +3549,7 @@ function ServicosSemProximoPassoCard({ services, appointments, inbox, onOpenFich
         <time title={prazoComRotulo(s)}>{prazoComRotulo(s) || "—"}</time>
       </div>
     </article>)}</div>
-  </section>;
+  </CardRecolhivel>;
 }
 
 const SEM_PROFISSIONAL = "Sem profissional atribuído";
@@ -3638,8 +3654,12 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
   // "Sem profissional" fica sempre por último, mesmo sendo o maior grupo - é pendência, não capacidade.
   const nomes = Object.entries(porProfissional).sort((a, b) => (a[0] === SEM_PROFISSIONAL) - (b[0] === SEM_PROFISSIONAL) || b[1].length - a[1].length);
   if (!nomes.length) return null;
-  return <section className="content-card">
-    <div className="card-head"><div><p className="kicker">CAPACIDADE</p><h3>Profissionais em serviço</h3></div></div>
+  // FECHADO ELE AINDA RESPONDE "QUEM ESTÁ COM O QUÊ": a linha de resumo leva nome e quantidade de cada um,
+  // que é a pergunta que traz ele a este card. Abrir é pra ver QUAIS serviços.
+  const ativosTotal = nomes.reduce((n, [, lista]) => n + lista.length, 0);
+  return <CardRecolhivel
+    cabecalho={<><p className="kicker">CAPACIDADE</p><h3>{ativosTotal} serviço(s) com profissional</h3>
+      <span className="ficha-note" style={{ margin: 0 }}>{nomes.map(([nome, lista]) => `${nome === SEM_PROFISSIONAL ? "⚠ sem dono" : nome} ${lista.length}`).join(" · ")}</span></>}>
     <div className="capacidade-profissionais">{nomes.map(([nome, lista]) => { const isAberto = aberto === nome; return <div className={`capacidade-item${isAberto ? " active" : ""}`} key={nome}>
       <button type="button" className="capacidade-item-head" onClick={() => setAberto(isAberto ? null : nome)}>
         <span>{nome === SEM_PROFISSIONAL ? "⚠ " + nome : nome}</span><b>{lista.length} ativo{lista.length > 1 ? "s" : ""}</b><i>{isAberto ? "▲" : "▼"}</i>
@@ -3669,7 +3689,7 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
           : <button type="button" className={esperandoMaterial(s) ? "ghost sutil" : "ghost"} onClick={(e) => { e.stopPropagation(); setEntregando(s.id); setOverrideMat(null); setMotivoMat(""); setValorDraft(s.valor_orcamento ? String(s.valor_orcamento) : ""); setRecebidoDraft(""); }}>{esperandoMaterial(s) ? "Entregar mesmo assim" : "✅ Marcar como entregue"}</button>}
       </div>)}</div>}
     </div>; })}</div>
-  </section>;
+  </CardRecolhivel>;
 }
 
 // MATERIAL PRA COMPRAR, NO PAINEL (Diego, 24/08/2026: "quero um card lá embaixo de compromissos sobre
@@ -3685,10 +3705,8 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
 // SÓ LEITURA: desde 23/08 o app é visualização e quem escreve é o Classic. Marcar comprado continua na aba
 // Compras, a um toque daqui — o card mostra o estado, não muda o estado.
 function MateriaisCard({ services, today, onVerCompras }) {
-  // Fechado ao abrir, como todo o resto do Painel (Diego, 04/08: "quero tudo recolhível sem abrir sozinho no
-  // painel principal ao iniciar"). Fechado ele ainda mostra o total e as lojas — fechar troca a lista por
-  // números, não esconde informação.
-  const [aberto, setAberto] = useState(false);
+  // Fechado ao abrir, como todo o resto do Painel (ver CardRecolhivel). Fechado ele ainda mostra o total e
+  // as lojas — fechar troca a lista por números, não esconde informação.
   const pendentes = [];
   (services || []).forEach((s) => {
     // Mesmo recorte da aba Compras: trabalho fechado que ocupa a oficina. Lead e orçamento não compram nada.
@@ -3720,12 +3738,11 @@ function MateriaisCard({ services, today, onVerCompras }) {
   const atrasados = pendentes.filter((p) => p.servico.prazo && p.servico.prazo < today).length;
   const emTransito = pendentes.filter((p) => p.pedido).length;
   const palpites = pendentes.filter((p) => p.palpite).length;
-  return <section className="content-card">
-    <div className="card-head"><div><p className="kicker">COMPRAS</p><h3>{pendentes.length} material(is) pra comprar</h3>
-      {atrasados > 0 && <span className="ficha-note" style={{ margin: 0 }}>{atrasados} em serviço com prazo vencido</span>}</div></div>
-    <div className="mat-resumo">{ordenadas.map(([loja, itens]) => <span className="mat-chip" key={loja}>{loja} · {itens.length}</span>)}</div>
-    <button className="ghost" style={{ width: "100%", marginTop: 10 }} onClick={() => setAberto((v) => !v)}>{aberto ? "Fechar" : `Abrir a lista (${ordenadas.length} loja${ordenadas.length > 1 ? "s" : ""})`}</button>
-    {aberto && <div className="mat-lojas">
+  return <CardRecolhivel
+    cabecalho={<><p className="kicker">COMPRAS</p><h3>{pendentes.length} material(is) pra comprar</h3>
+      {atrasados > 0 && <span className="ficha-note" style={{ margin: 0 }}>{atrasados} em serviço com prazo vencido</span>}</>}
+    resumo={<div className="mat-resumo">{ordenadas.map(([loja, itens]) => <span className="mat-chip" key={loja}>{loja} · {itens.length}</span>)}</div>}>
+    <div className="mat-lojas">
       {ordenadas.map(([loja, itens]) => <div className="mat-loja" key={loja}>
         <div className="mat-loja-head"><strong>{loja}</strong><b>{itens.length} item(ns)</b></div>
         {itens.map((p, i) => { const atrasado = !!p.servico.prazo && p.servico.prazo < today; return <div className="mat-item" key={loja + "-" + i}>
@@ -3735,8 +3752,8 @@ function MateriaisCard({ services, today, onVerCompras }) {
       </div>)}
       {(emTransito > 0 || palpites > 0) && <p className="ficha-note" style={{ margin: 0 }}>{emTransito > 0 ? "🚚 = já pedido, ainda não chegou. " : ""}{palpites > 0 ? "? = loja que o app deduziu, confira antes de sair." : ""}</p>}
       {onVerCompras && <button className="ghost" style={{ width: "100%" }} onClick={onVerCompras}>▣ Marcar comprado na aba Compras</button>}
-    </div>}
-  </section>;
+    </div>
+  </CardRecolhivel>;
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
@@ -3797,9 +3814,6 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   // que existe antes de escolher o que olhar. Fechado, o topo mostra as CONTAGENS de tudo numa tela só, e ele
   // abre o que interessa. Cada botão diz quantos itens tem dentro, então fechar não esconde informação:
   // troca a lista inteira por um número, que é o que se lê de relance.
-  const [listaAtrasados, setListaAtrasados] = useState(false);
-  const [listaHoje, setListaHoje] = useState(false);
-  const [listaFuturos, setListaFuturos] = useState(false);
   const valorEmJogo = cobrarCliente.reduce((soma, a) => soma + Number(svcDe(a)?.valor_orcamento || 0), 0);
   const qtdNoTeto = cobrarCliente.filter((a) => cobrancaNoTeto(svcDe(a))).length;
   // COBREI: conta a tentativa e empurra o ciclo. O link do WhatsApp abre normalmente; isto roda em paralelo.
@@ -3915,9 +3929,9 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   const hojePassouDaHora = hoje.filter((entry) => !!entry.hora && String(entry.hora).slice(0, 5) < agoraHHMM).length;
   const irParaVencendo = () => { if (atrasadosAll.length === 0) return; setFiltroTipo("todos"); document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   return <div className="page-grid">
-    {addInbox && <section className="content-card"><div className="card-head"><div><p className="kicker">ANOTAR AGORA</p><h3>O que aconteceu?</h3></div></div>
+    {addInbox && <CardRecolhivel cabecalho={<><p className="kicker">ANOTAR AGORA</p><h3>O que aconteceu?</h3></>}>
       <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />
-    </section>}{/* Os dois cartões da Caixa ("Para Claude" e "Aguardando você") saíram em 23/08/2026 junto
+    </CardRecolhivel>}{/* Os dois cartões da Caixa ("Para Claude" e "Aguardando você") saíram em 23/08/2026 junto
     com a tela dela. Contador que leva pra uma tela que não existe mais só quebraria no toque. */}
 <section className="metric-grid"><Metric label="Atrasados" value={atrasadosAll.length} detail="De dias anteriores, sem desfecho" tone="yellow" onClick={atrasadosAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
@@ -3942,19 +3956,22 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       // isso vira parede de texto no meio da rota; aqui ele só precisa reconhecer a conta, então corta.
       const curto = (f) => { const t = (descricaoFinanceiraVisivel(f.descricao) || f.categoria || "").trim(); return t.length > 64 ? t.slice(0, 61).trimEnd() + "…" : t; };
       const linha = (f) => `${curto(f)} · ${money(f.valor)} · ${(f.data || "") < today ? "venceu " + compactDate(f.data) : (f.data === today ? "vence HOJE" : "vence amanhã")}`;
-      return <section className="warning-card">
-        {temPrazo
+      // O PAR "QUANTO DEVO / DE ONDE TIRO" FICA FORA DO RECOLHÍVEL, porque é ele que responde a pergunta que
+      // traz o Diego a este card. O que recolhe é a lista de QUAIS contas — isso ele só quer ver quando vai
+      // pagar, não toda vez que abre o app.
+      return <CardRecolhivel className="warning-card"
+        cabecalho={temPrazo
           ? <b>{money(r.totalVencidas + r.totalUrgentes)} a pagar {r.vencidas.length ? "— tem conta vencida" : "nas próximas 24h"}</b>
           : <b>{money(r.totalSemVencimento)} a pagar quando houver saldo</b>}
+        resumo={r.potencialCaixa > 0
+          ? <span>💰 Dá pra levantar {money(r.potencialCaixa)}{r.prontosSemCobranca.length ? ` — ${r.prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")} sem pagamento registrado` : ""}</span>
+          : <span>Nenhum serviço pronto pra cobrar no momento.</span>}>
         {[...r.vencidas, ...r.urgentes].slice(0, 5).map((f) => <span key={f.id}>{linha(f)}</span>)}
         {/* SEM PRAZO fica no Painel de propósito: foi assim que a dívida do Ozair saiu da rotina — o lembrete
             irmão não nasceu e só o Financeiro guardou. Aqui ela não vence, não cobra e não some. */}
         {r.semVencimento.slice(0, 3).map((f) => <span key={f.id}>{curto(f)} · {money(f.valor)} · sem prazo, pagar quando houver saldo</span>)}
         {r.semVencimento.length > 3 && <span>e mais {r.semVencimento.length - 3} sem prazo marcado</span>}
-        {r.potencialCaixa > 0
-          ? <span>💰 Dá pra levantar {money(r.potencialCaixa)}{r.prontosSemCobranca.length ? ` — ${r.prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")} sem pagamento registrado` : ""}</span>
-          : <span>Nenhum serviço pronto pra cobrar no momento.</span>}
-      </section>;
+      </CardRecolhivel>;
     })()}
     {/* SAIU o card "material sem dia marcado pra pedir": desde 25/07 o material que entra na lista de compras
         já nasce com compromisso na agenda, então esse aviso só acenderia pra lançamento velho — ruído diário
@@ -3980,32 +3997,32 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       // continua valendo (agendado = fechado); o que saiu foi o card diário.
       return null;
     })()}
-    {atrasados.length > 0 && <section id="secao-vencendo" className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>{atrasados.length} compromisso(s) atrasado(s)</h3>
-      <span className="ficha-note" style={{ margin: 0 }}>De dias anteriores, ainda sem desfecho</span></div></div>
-      <button className="ghost" style={{ width: "100%" }} onClick={() => setListaAtrasados((v) => !v)}>{listaAtrasados ? "Fechar" : `Abrir os ${atrasados.length}`}</button>
-      {listaAtrasados && <div style={{ marginTop: 12 }}>{[...atrasados].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}</section>}
+    {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo"
+      cabecalho={<><p className="kicker">AGENDA</p><h3>{atrasados.length} compromisso(s) atrasado(s)</h3>
+      <span className="ficha-note" style={{ margin: 0 }}>De dias anteriores, ainda sem desfecho</span></>}>
+      {[...atrasados].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
-    <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
+    {/* O aviso de rota vai no `resumo`, ou seja, FORA do recolhível: rota que volta é erro que ele precisa
+        ver sem abrir nada. Aqui é a casa definitiva dele — ele fala do deslocamento de HOJE. */}
+    <CardRecolhivel
+      cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
       <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}</h3>
-      {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora</span>}</div></div>
-      {/* O aviso de rota fica FORA do recolhível: rota que volta é erro que ele precisa ver sem abrir nada.
-          Aqui é a casa definitiva dele — ele fala do deslocamento de HOJE. */}
-      <AvisoRota compromissos={hojeAll} />
-      {hoje.length > 0 && <>
-        <button className="ghost" style={{ width: "100%" }} onClick={() => setListaHoje((v) => !v)}>{listaHoje ? "Fechar" : `Abrir os ${hoje.length}`}</button>
-        {listaHoje && <div style={{ marginTop: 12 }}>{[...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
-      </>}
-    </section>
+      {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora</span>}</>}
+      resumo={<AvisoRota compromissos={hojeAll} />}>
+      {hoje.length > 0
+        ? [...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)
+        : <div className="empty-state"><b>O dia está livre.</b><span>Nada marcado para {compactDate(today)}.</span></div>}
+    </CardRecolhivel>
     {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
     {/* Bloco COBRANÇAS removido do Painel em 23/08/2026 a pedido do Diego. O ciclo de cobrança
        continua vivo no código (CobrancaCard, onCobrou, onRespondeu, onEncerrar) e nada foi
        apagado do banco — saiu só o bloco da tela do Painel. */}
     {/* Só data POSTERIOR a hoje. O "N ainda hoje" saiu daqui: hoje tem card próprio, e repetir o mesmo
         compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
-    {futuros.length > 0 && <section className="content-card"><div className="card-head"><div><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></div></div>
-      <button className="ghost" style={{ width: "100%" }} onClick={() => setListaFuturos((v) => !v)}>{listaFuturos ? "Fechar" : `Abrir os ${futuros.length}`}</button>
-      {listaFuturos && <div style={{ marginTop: 12 }}>{[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}</section>}
+    {futuros.length > 0 && <CardRecolhivel
+      cabecalho={<><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
+      {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
     {filtroTipo !== "todos" && atrasados.length === 0 && hoje.length === 0 && futuros.length === 0 && (atrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
     {/* DEPOIS DOS COMPROMISSOS, DE PROPÓSITO (Diego, 24/08: "um card lá embaixo de compromissos"). Comprar
         material é consequência da rota do dia, não concorrente dela: ele decide onde vai, e aí olha o que
@@ -4864,16 +4881,35 @@ function planoDeCompra(fornecedor) {
       return { tipo: "remoto", data: pedirEm, hora: null, entrega, rotulo: `Fazer o pedido de material na ${fornecedor.nome} (entrega ${compactDate(entrega)})` };
     }
   }
-  // Viagem automática nunca nasce hoje depois que o horário passou nem no domingo. E não nasce mais às 08h:
-  // esse 08:00 fixo era o app inventando manhã pra ele (auditoria 14/08). Agora sai da mesma regra de
-  // sugestão da agenda, já considerando a estrada até a loja pra não atropelar a igreja.
+  // Viagem automática nunca nasce hoje depois que o horário passou nem no domingo. QUEM ESCOLHE A HORA NÃO É
+  // AQUI: esta função é pura e não enxerga a agenda, então devolver hora daqui era escolher no escuro (ver
+  // planoDeCompraComHorario logo abaixo). Só a DATA sai daqui.
   const dataCompra = proximoDiaUtil(hojeISO());
-  // ⚠ LACUNA CONHECIDA (auditoria de 27/08, item AGENDA-PREFLIGHT-SOLUCAO-20260824-1557): esta chamada
-  // passa lista de ocupados VAZIA. Ou seja, a viagem de compra é marcada sem olhar a agenda daquele dia —
-  // pode nascer em cima de um compromisso existente, e não só apertada. Não corrigi aqui porque
-  // planoDeCompra é função pura, chamada de dentro das operações, e plumbar a agenda até ela exige uma
-  // consulta a mais no caminho de escrita. Fica registrado em vez de mal resolvido.
-  return { tipo: "presencial", data: dataCompra, hora: horaSugerida(dataCompra, "presencial", [], fornecedor.cidade), entrega: null, rotulo: `Buscar material na ${fornecedor.nome}` };
+  return { tipo: "presencial", data: dataCompra, hora: null, entrega: null, rotulo: `Buscar material na ${fornecedor.nome}` };
+}
+// A VIAGEM DE COMPRA PASSA A OLHAR O DIA (item AGENDA-PREFLIGHT-SOLUCAO-20260824-1557, lacuna registrada na
+// auditoria de 27/08 e fechada aqui). O horário da ida à loja saía de `horaSugerida` com lista de ocupados
+// VAZIA e sem os compromissos do dia: o app marcava a viagem sem olhar o que já estava marcado, então ela
+// podia nascer em cima de outro compromisso — não só apertada, sobreposta. A trava existia e era boa; o que
+// faltava era o dado chegar até ela.
+//
+// Por que duas funções em vez de uma: `planoDeCompra` é chamada de três lugares e dois deles só querem o
+// TIPO (remoto ou presencial) e a PREVISÃO DE ENTREGA — não precisam de banco e não podem virar async à toa.
+// Quem vai GRAVAR a agenda chama esta aqui, que lê o dia de verdade antes de escolher a hora. É uma consulta
+// a mais e só no caminho presencial: pedido remoto não tem hora nem estrada.
+//
+// `dataForcada` existe porque o chamador pode mandar a data da compra (dados.dataCompra). Sem isso o app
+// calculava a hora para um dia e gravava o compromisso em outro — hora certa do dia errado.
+async function planoDeCompraComHorario(db, fornecedor, dataForcada) {
+  const plano = planoDeCompra(fornecedor);
+  if (!plano || plano.tipo !== "presencial") return plano;
+  const data = dataForcada || plano.data;
+  const { data: doDia, error } = await db.from("agenda").select("id,data,hora,tipo,cidade,status").eq("data", data).eq("status", "planejado");
+  if (error) throw error;
+  // Mesmo recorte do seletor manual (ver finishTriage): só presencial ocupa slot e só presencial desloca.
+  const presenciais = (doDia || []).filter((a) => (a.tipo || "presencial") === "presencial");
+  const ocupados = presenciais.map((a) => a.hora?.slice(0, 5)).filter(Boolean);
+  return { ...plano, data, hora: horaSugerida(data, "presencial", ocupados, fornecedor.cidade, presenciais) };
 }
 function compraPrecisaRevisao(item) { return !item.fornecedor_id && !(item.descricao || "").startsWith(COMPRA_CONFERIDA_TAG); }
 // O MESMO CAMPO GUARDA TRÊS COISAS DIFERENTES. Diego, 04/08, sobre o Leandro: "ele era agendado, deu entrada
