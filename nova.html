@@ -580,6 +580,33 @@ function corrigirTelefone(value) {
   if (d.length !== 11) return null;
   return `+55 ${d.slice(0, 2)} ${d.slice(2, 7)}-${d.slice(7)}`;
 }
+// TRIAGEM TEMPORÁRIA — envelope de conversa de WhatsApp que ainda não virou cliente (adendos de 25/08 do
+// item TRANSCRITOR-WHATSAPP-APP-20260825-0955). Esses envelopes têm `servico_id` NULO, então o telefone do
+// cliente não existe e o botão de WhatsApp simplesmente não renderizava — o Diego abria o card e só via o
+// ChatGPT. O telefone técnico mora em `agenda.local`, no formato exato `whatsapp:<digitos>`.
+//
+// ESTA É A ÚNICA FONTE DE TELEFONE FORA DA FICHA, e vale SÓ para esse tipo de envelope: compromisso normal
+// sem telefone continua sem botão, como sempre foi. Nada de generalizar `local` como fonte de contato.
+const RE_TRIAGEM_TEL = /^whatsapp:(\d{8,13})$/i;
+function ehEnvelopeDeTriagem(a) { return /TRIAGEM TEMPOR/i.test((a && a.titulo) || ""); }
+function telefoneDaTriagem(a) {
+  if (!ehEnvelopeDeTriagem(a)) return "";
+  const m = RE_TRIAGEM_TEL.exec(String((a && a.local) || "").trim());
+  if (!m) return "";
+  let d = m[1];
+  // O envelope guarda o número SEM DDD, e o DDD está no próprio título ("+55 61 9501-9012"). Ler de lá é
+  // usar dado que já existe no registro, não adivinhar. Se não houver DDD em lugar nenhum, prefiro não
+  // montar link nenhum — número errado no WhatsApp é mensagem pra estranho.
+  if (d.length < 10) {
+    const ddd = String((a && a.titulo) || "").replace(/\D/g, "").replace(/^55/, "").slice(0, 2);
+    if (!/^\d{2}$/.test(ddd)) return "";
+    d = ddd + d;
+  }
+  // Quem decide se o número é válido é o MESMO helper do cadastro de cliente novo — inclusive pondo o 9 que
+  // falta em número antigo. Sem normalizador paralelo.
+  const formatado = corrigirTelefone(d);
+  return formatado ? normalizePhone(formatado) : "";
+}
 function parseInbox(raw = "") {
   const note = raw.match(/\[\[TB_INBOX_NOTE\]\]([\s\S]*)$/);
   const images = [...raw.matchAll(/\[\[TB_INBOX_IMG\]\](.*)\n\[\[TB_INBOX_FILE\]\](.*)/g)].map((m) => ({ url: m[1].trim(), fileName: (m[2] || "print").trim() }));
@@ -3077,8 +3104,19 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
   // A sugestão GRAVADA vence sempre: ela nasce da conversa real, com julgamento comercial.
   // Só quando ela falta é que o app escreve — e apenas se provar que o interlocutor é o cliente.
   const quem = interlocutorCompromisso(a, svc, fornecedores, profissionais);
-  const sugestao = svc?.sugestao_resposta || (quem.destino === "cliente" ? mensagemPadraoCompromisso(a, svc, today) : "");
-  const tel = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "";
+  // ENVELOPE DE TRIAGEM NÃO GANHA MENSAGEM PRONTA. Apareceu no teste de 27/08, no minuto em que o botão de
+  // WhatsApp passou a renderizar: o app montava "Oi, tudo bem? Passando pra falar do SEU ESTOFADO" para um
+  // número que ninguém triou ainda — sem cliente, sem serviço, sem saber do que a conversa trata. É a mesma
+  // regra que já vale para compromisso interno: o app não fala pelo Diego quando não tem como provar com
+  // quem está falando. Aqui ele abre o WhatsApp vazio, que é o certo — o Diego lê a conversa e escreve.
+  const sugestao = svc?.sugestao_resposta || (quem.destino === "cliente" && !ehEnvelopeDeTriagem(a) ? mensagemPadraoCompromisso(a, svc, today) : "");
+  // UMA variável de telefone, um caminho de renderização só. A ficha do cliente continua sendo a primeira
+  // fonte; o telefone técnico do envelope de triagem só entra quando ela não existe, e alimenta ESTA mesma
+  // variável — o botão de WhatsApp abaixo é o mesmo, sem componente, estilo ou fluxo paralelo.
+  const tel = (svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "") || telefoneDaTriagem(a);
+  // Telefone técnico quebrado não pode sumir em silêncio: sem isso o envelope volta a parecer um card sem
+  // WhatsApp, que é exatamente o defeito que estamos consertando. Erro visível vale mais que omissão.
+  const triagemSemTelefone = !tel && ehEnvelopeDeTriagem(a);
   const oQueFazer = svc?.proxima_acao || a.titulo;
   // ROTA — TRÊS qualidades, e o botão diz honestamente qual é.
   // 1. PONTO: o Classic gravou latitude/longitude do pino que o Diego compartilhou. Porta.
@@ -3170,6 +3208,8 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
           ficou perguntando "cadê o WhatsApp" desde 16/07 sem resposta (caso real; havia até cliente com ENTREGA marcada e
           ENTREGA marcada sem número). Pedir o que não dá pra fazer é pior que não pedir. */}
       {!tel && svc?.cliente_id && <p className="compromisso-material">⚠ Sem telefone na ficha — não dá pra fazer esse contato. Pegue o número antes.</p>}
+      {triagemSemTelefone && <p className="compromisso-material">⚠ Envelope de triagem com telefone técnico inválido — o app não vai adivinhar o número. Corrija a triagem.</p>}
+      {tel && ehEnvelopeDeTriagem(a) && <p className="compromisso-material">✎ Conversa ainda não triada — o WhatsApp abre vazio de propósito. Leia antes de escrever.</p>}
       <div className="compromisso-info">
         {instrucoes.map(([rotulo, texto]) => <React.Fragment key={rotulo}>
           <span className="ci-label">{rotulo}</span><strong>{texto}</strong>
