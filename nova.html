@@ -4454,7 +4454,13 @@ const COMPRA_CONFERIDA_TAG = "[CONFERIDO] ";
 // palavras. Não inventei campo novo no banco nem convenção nova que dependa de alguém lembrar de usar —
 // funciona no lançamento que JÁ está lá. Se um dia nascer um campo de vencimento de verdade, ele vence
 // esta regra e este teste sai.
-const SEM_VENCIMENTO = /vencimento n[ãa]o (informado|confirmado)|sem vencimento|assim que (houver|tiver) saldo|quando (houver|tiver) saldo|assim que poss[íi]vel|quando (eu )?(tiver|receber) dinheiro/i;
+// Ampliado em 27/08 pelo item A-PAGAR-CONDICIONAL-SERVICO-20260826-1926 (nota 11032, Plástico e Tal,
+// R$ 1.316 da Luiza): a condição nem sempre é "quando houver saldo" — ali era "a pagar APÓS O SERVIÇO", e
+// a negativa vinha escrita como "vencimento/data exata de pagamento não informados". A versão estreita
+// não pegava, e a dívida voltaria a aparecer como vencida.
+// A palavra "vencimento" sozinha NÃO basta: a mensalidade da contabilidade diz "vencimento todo dia 20" e
+// tem prazo de verdade. Só conta quando ela vem NEGADA na mesma frase.
+const SEM_VENCIMENTO = /(vencimento|data (exata )?de pagamento|data exata)[^.;]{0,60}n[ãa]o (informad|confirmad|definid)|sem vencimento|(assim que|quando)[^.;]{0,40}(houver|tiver) saldo|assim que poss[íi]vel|a pagar (ap[óo]s|depois d)|pagar (ap[óo]s|depois d)[^.;]{0,50}(servi[çc]o|entrega|receb)|quando (eu )?(tiver|receber) dinheiro/i;
 function resumoContas(finances, services, hoje) {
   const amanha = (() => { const d = new Date(hoje + "T12:00:00"); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
   // TRABALHO DE PROFISSIONAL NÃO É CONTA A PAGAR (Diego, 06/08: "não gostei do alerta no painel, aparece que
