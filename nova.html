@@ -1606,17 +1606,27 @@ async function aplicarMaterialEmMaosOperacional(db, eventoId, dados) {
     // produção estava liberada — um item ainda não comprado na lista do cliente não segurava nada, e era por
     // isso que serviço em produção aparecia com material faltando. Agora as duas fontes decidem juntas.
     const estadoMaterial = await materialPendenteDoServico(db, { ...servico, id: servicoId });
-    const podeProduzir = pendentesRestantes.length === 0 && !estadoMaterial.faltaAnotado.length;
+    const materialResolvido = pendentesRestantes.length === 0 && !estadoMaterial.faltaAnotado.length;
+    // Ver acaoEhSobreMaterial: etapa de pré-produção escrita por quem conhece o caso segura a produção.
+    const preProducaoAberta = !acaoEhSobreMaterial(servico.proxima_acao);
+    const podeProduzir = materialResolvido && !preProducaoAberta;
+    const proximaAcaoFinal = preProducaoAberta ? servico.proxima_acao
+      : podeProduzir ? (dados.proximaAcao || "Produzir e acompanhar o prazo")
+      : (estadoMaterial.faltaAnotado.length ? "Comprar o material" : "Buscar materiais restantes");
+    // NUNCA REBAIXAR: material chegando não tira da produção um serviço que já estava produzindo.
+    const statusFinal = podeProduzir || servico.status === "producao" ? "producao" : "agendado";
     const { data: atualizado, error } = await db.from("servicos").update({
-      status: podeProduzir ? "producao" : "agendado",
+      status: statusFinal,
       loja_material: fornecedor.nome, data_entrega_material: dados.data || hojeISO(),
-      proxima_acao: podeProduzir ? (dados.proximaAcao || "Produzir e acompanhar o prazo") : (estadoMaterial.faltaAnotado.length ? "Comprar o material" : "Buscar materiais restantes"),
+      proxima_acao: proximaAcaoFinal,
       atualizado_em: new Date().toISOString(),
     }).eq("id", servicoId).select("status").single();
     if (error) throw error;
     if (dados.fecharAgenda && agendaId && pendentesNaAgenda.length === 0) await concluirAgendaDaOperacao(db, agendaId, dados.data || hojeISO(), servicoId);
     await registrarHistoricoDaOperacao(db, eventoId, "material-em-maos", { o_que: "Material em mãos", por: dados.por || "claude", detalhe: "Serviço #" + servicoId + " · financeiro #" + (financeiroId || "valor pendente") + " · status " + atualizado.status });
-    return { financeiroId, perguntaId, agendaId: pendentesNaAgenda.length ? null : agendaId, servicoId, statusServico: atualizado.status, materiaisPendentes: pendentesRestantes.length, materiaisPendentesNaAgenda: pendentesNaAgenda.length, itensDaListaPendentes: estadoMaterial.faltaAnotado.length };
+    // `proximaAcao` e `preProducaoAberta` voltam pra quem chamou porque a tela anunciava "entrou em produção"
+    // por conta própria. Anúncio errado é o mesmo defeito do status errado, só que na cara dele.
+    return { financeiroId, perguntaId, agendaId: pendentesNaAgenda.length ? null : agendaId, servicoId, statusServico: atualizado.status, proximaAcao: proximaAcaoFinal, preProducaoAberta, materiaisPendentes: pendentesRestantes.length, materiaisPendentesNaAgenda: pendentesNaAgenda.length, itensDaListaPendentes: estadoMaterial.faltaAnotado.length };
   }
   if (dados.fecharAgenda && agendaId && pendentesNaAgenda.length === 0) await concluirAgendaDaOperacao(db, agendaId, dados.data || hojeISO(), null);
   return { financeiroId, perguntaId, agendaId: dados.fecharAgenda && !pendentesNaAgenda.length ? agendaId : null, servicoId: null, statusServico: null, materiaisPendentes: 0, materiaisPendentesNaAgenda: pendentesNaAgenda.length };
@@ -1649,6 +1659,21 @@ async function materialPendenteDoServico(db, servico) {
     temFonte: anotados.length > 0 || doServico.length > 0,
     pendente: faltaAnotado.length > 0 || faltaChegar.length > 0,
   };
+}
+// MATERIAL EM MÃOS NÃO É PROVA DE PRODUÇÃO INICIADA — item MATERIAL-EM-MAOS-AUTO-PRODUCAO-20260826-2008.
+// Caso Luiza/Terra Park: o material foi retirado na Plástico e Tal e o app carimbou na hora `producao` +
+// "Produzir e acompanhar o prazo". Só que o passo real seguinte era ir ao Terra Park tirar os moldes com o
+// Gaspar e SÓ DEPOIS deixar o material com ele. O app apagou uma etapa que ninguém tinha feito.
+// Zero material pendente prova que o material chegou, e mais nada — moldes, medidas, a peça estar na
+// oficina e a entrega ao profissional não são materiais e não aparecem nessa conta.
+//
+// Como o app distingue: estas quatro frases são as que ELE MESMO escreve quando o assunto é material.
+// Qualquer outro texto em `proxima_acao` foi escrito por quem conhece o caso (o Classic ou o Diego) e
+// descreve uma etapa real — essa a compra não pode apagar, e enquanto ela existir a produção não começou.
+const ACOES_ESCRITAS_PELO_APP = ["comprar o material", "buscar materiais restantes", "aguardar chegada do material", "produzir e acompanhar o prazo"];
+function acaoEhSobreMaterial(texto) {
+  const t = String(texto || "").trim().toLowerCase();
+  return !t || ACOES_ESCRITAS_PELO_APP.includes(t);
 }
 // A próxima ação tem que dizer o que acontece de verdade: comprar, esperar chegar ou produzir. Comprar vem na
 // frente de esperar — é o que depende dele.
@@ -1684,8 +1709,11 @@ async function aplicarListaCompraConfirmadaOperacional(db, eventoId, dados) {
   const { error: erroLista } = await db.from("servicos").update({ materiais_necessarios: lista, atualizado_em: new Date().toISOString() }).eq("id", servicoId);
   if (erroLista) throw erroLista;
   const estado = await materialPendenteDoServico(db, { ...servico, id: servicoId, materiais_necessarios: lista });
-  const podeProduzir = !estado.pendente;
-  const patch = { proxima_acao: proximaAcaoPorMaterial(estado), atualizado_em: new Date().toISOString() };
+  // Mesma regra do material em mãos: fechar a lista de compras prova que o material acabou, não que a
+  // produção começou. Próxima ação específica (moldes, medidas, entregar ao profissional) segura os dois.
+  const preProducaoAberta = !acaoEhSobreMaterial(servico.proxima_acao);
+  const podeProduzir = !estado.pendente && !preProducaoAberta;
+  const patch = { proxima_acao: preProducaoAberta ? servico.proxima_acao : proximaAcaoPorMaterial(estado), atualizado_em: new Date().toISOString() };
   if (podeProduzir && servico.status === "agendado") patch.status = "producao";
   const { data: atualizado, error } = await db.from("servicos").update(patch).eq("id", servicoId).select("status").single();
   if (error) throw error;
@@ -3302,13 +3330,18 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
     if (!pendente && !fornecedor) { notify(`Não achei a compra nem o fornecedor "${s.loja_material || "?"}" no cadastro. Lance a compra na aba Compras primeiro.`, "error"); return; }
     setBusyMaterial(s.id);
     try {
-      await processarEventoOperacaoBahia(db, {
+      const operacao = await processarEventoOperacaoBahia(db, {
         tipo: "material_em_maos", eventoId: "app-material-maos-" + (pendente ? pendente.id : s.id),
         dados: pendente
           ? { financeiroId: pendente.id, servicoId: s.id, data: hojeISO(), por: "diego" }
           : { fornecedorId: fornecedor.id, servicoId: s.id, semValor: true, data: hojeISO(), por: "diego" },
       });
-      notify(`Material do ${s.clientes?.nome || "serviço"} está em mãos — o profissional pode começar.`, "ok");
+      // O aviso segue o que o banco respondeu, não o que a tela torcia pra ter acontecido.
+      const nome = s.clientes?.nome || "serviço";
+      const r = operacao?.resultado || {};
+      notify(r.preProducaoAberta
+        ? `Material do ${nome} está em mãos. Ainda falta: ${r.proximaAcao}`
+        : `Material do ${nome} está em mãos — o profissional pode começar.`, "ok");
       await onChanged?.();
     } catch (e) { notify("Ficou visível para retomada: " + e.message, "error"); } finally { setBusyMaterial(null); }
   };
@@ -3883,8 +3916,12 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, servic
       const r = operacao.resultado;
       notify(ehPedidoRemoto
         ? (pagamentoConfirmado ? "Pedido registrado e pago. O serviço aguarda o material chegar." : "Pedido registrado sem mexer no caixa. O serviço aguarda o material chegar.")
-        : (r.materiaisPendentes ? `Material registrado. Ainda faltam ${r.materiaisPendentes} item(ns); o serviço ainda não iniciou produção.` : "Material em mãos. O serviço entrou em produção."), "ok");
-      onDone({ agendaId: appt.id, removerAgenda: r.agendaId === appt.id, servicoId: r.servicoId, statusServico: r.statusServico, proximaAcao: ehPedidoRemoto ? "Aguardar chegada do material" : (r.materiaisPendentes ? "Buscar materiais restantes" : "Produzir e acompanhar o prazo") });
+        : (r.materiaisPendentes ? `Material registrado. Ainda faltam ${r.materiaisPendentes} item(ns); o serviço ainda não iniciou produção.`
+          : r.preProducaoAberta ? `Material em mãos. O serviço ainda não entrou em produção — falta: ${r.proximaAcao}`
+          : "Material em mãos. O serviço entrou em produção."), "ok");
+      // A próxima ação vem do resultado da operação; a tela não recalcula a sua e não sobrescreve a etapa
+      // real que o serviço já tinha marcada (item MATERIAL-EM-MAOS-AUTO-PRODUCAO-20260826-2008).
+      onDone({ agendaId: appt.id, removerAgenda: r.agendaId === appt.id, servicoId: r.servicoId, statusServico: r.statusServico, proximaAcao: ehPedidoRemoto ? "Aguardar chegada do material" : (r.proximaAcao || (r.materiaisPendentes ? "Buscar materiais restantes" : "Produzir e acompanhar o prazo")) });
     } catch (e) { notify("A compra ficou visível para retomada: " + e.message, "error"); }
     finally { setBusy(false); }
   };
