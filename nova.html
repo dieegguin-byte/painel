@@ -3004,9 +3004,16 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
     : (cidadeFim || "");
   const soCidade = !localUtil && !temPonto && !cli?.endereco && !!cidadeFim;
   const destinoRota = usarPonto ? `${cli.latitude},${cli.longitude}` : destinoTexto;
-  const linkWaze = usarPonto
-    ? `https://waze.com/ul?ll=${cli.latitude},${cli.longitude}&navigate=yes`
-    : `https://waze.com/ul?q=${encodeURIComponent(destinoTexto)}&navigate=yes`;
+  // PLACE ID DO DESTINO VENCE TUDO (item AGENDA-WAZE-PLACEID-20260824-0824). O Maps já abria certo e o
+  // Waze não: com `q=texto` quem escolhe o destino é a busca do Waze, e ela escolheu outro lugar. Place ID
+  // é o endereço exato do estabelecimento no mapa — não tem o que escolher errado. Vale só pro Waze; o Maps
+  // passou no teste real do Diego e não se mexe no que está funcionando.
+  const placeIdAgenda = String(a.google_place_id || "").trim();
+  const linkWaze = placeIdAgenda
+    ? `https://waze.com/ul?google_place_id=${encodeURIComponent(placeIdAgenda)}&navigate=yes`
+    : usarPonto
+      ? `https://waze.com/ul?ll=${cli.latitude},${cli.longitude}&navigate=yes`
+      : `https://waze.com/ul?q=${encodeURIComponent(destinoTexto)}&navigate=yes`;
   const linkMaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinoRota)}`;
   const selo = soCidade ? " (só cidade)" : "";
   const nomeCliente = svc?.clientes?.nome || a.titulo;
