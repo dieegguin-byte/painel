@@ -202,6 +202,18 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .entrega-form{display:flex;flex-direction:column;gap:8px;background:var(--surface2);border:1px solid var(--line);border-radius:11px;padding:12px;margin-top:8px}.entrega-form label{display:flex;flex-direction:column;gap:4px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}.entrega-form input{background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:9px 10px;font-size:14px;font-family:inherit}.entrega-hint{font-size:11px;color:#91c49f}
 .ficha-servico-desc{margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.45;white-space:pre-wrap}
 .material-itens{display:block;font-size:12px;color:var(--muted);margin:4px 0 6px}
+.mat-resumo{display:flex;flex-wrap:wrap;gap:6px}
+.mat-chip{font-size:12px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap;background:var(--surface2)}
+.mat-lojas{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.mat-loja{border:1px solid var(--line);border-radius:12px;background:var(--surface2);padding:11px 13px}
+.mat-loja-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+.mat-loja-head strong{font-size:15px}
+.mat-loja-head b{font-size:11px;color:var(--orange2);white-space:nowrap}
+.mat-item{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.mat-item>span{min-width:0}
+.mat-item em{display:block;font-style:normal;font-size:12px;color:var(--dim);margin-top:2px}
+.mat-item time{font-size:11px;color:var(--muted);white-space:nowrap;flex:none}
+.mat-item time.atrasado{color:#e88477;font-weight:700}
 button.sutil{opacity:.55;font-size:12px}
 .pill-print{display:inline-flex;align-items:center;background:#d4a64e22;border:1px solid #d4a64e77;color:#e8c078;border-radius:999px;padding:3px 8px;font-size:8px;font-weight:800;letter-spacing:.5px;margin-left:6px}
 .triage-print-aviso{display:block;background:#d4a64e14;border:1px solid #d4a64e55;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:12px;color:#e8c078;line-height:1.5}
@@ -3592,6 +3604,73 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
   </section>;
 }
 
+// MATERIAL PRA COMPRAR, NO PAINEL (Diego, 24/08/2026: "quero um card lá embaixo de compromissos sobre
+// materiais para comprar"). A lista já existia na aba Compras, mas ela só ajuda se ele for até lá — e a
+// decisão "passo na loja hoje?" ele toma aqui, olhando a rota do dia. O card responde duas perguntas na
+// mesma tela: QUANTO falta comprar e EM QUAL LOJA, porque é a loja que decide o desvio no caminho.
+//
+// FONTE ÚNICA: servicos.materiais_necessarios — a mesma da aba Compras e do "⏳ Esperando material" da
+// Capacidade. NUNCA deduzir falta de material por ausência de lançamento no financeiro: foi esse erro que
+// fez Ana Cristina e Madalena, prontas e com material comprado, aparecerem pedindo material que ninguém
+// devia. Ausência de dado não é informação.
+//
+// SÓ LEITURA: desde 23/08 o app é visualização e quem escreve é o Classic. Marcar comprado continua na aba
+// Compras, a um toque daqui — o card mostra o estado, não muda o estado.
+function MateriaisCard({ services, today, onVerCompras }) {
+  // Fechado ao abrir, como todo o resto do Painel (Diego, 04/08: "quero tudo recolhível sem abrir sozinho no
+  // painel principal ao iniciar"). Fechado ele ainda mostra o total e as lojas — fechar troca a lista por
+  // números, não esconde informação.
+  const [aberto, setAberto] = useState(false);
+  const pendentes = [];
+  (services || []).forEach((s) => {
+    // Mesmo recorte da aba Compras: trabalho fechado que ocupa a oficina. Lead e orçamento não compram nada.
+    if (!["agendado", "producao"].includes(s.status)) return;
+    (s.materiais_necessarios || []).forEach((m) => {
+      if (m.arquivado || m.comprado) return;
+      const lojaDoItem = String(m.loja || "").trim();
+      pendentes.push({
+        loja: lojaDoItem || String(s.loja_material || "").trim() || "Loja a definir",
+        item: String(m.item || "").trim() || "(item sem nome)",
+        pedido: !!m.pedido,
+        // Palpite do app (lojaAprendida) nunca se disfarça de fato: aparece com "?" — mandar ele pra loja
+        // errada com confiança é pior que não sugerir nada.
+        palpite: !!lojaDoItem && !!m.lojaSugerida,
+        servico: s,
+      });
+    });
+  });
+  if (!pendentes.length) return null;
+  // ORDEM É URGÊNCIA, NÃO QUANTIDADE: a loja que segura o prazo mais apertado vem primeiro, porque é ela que
+  // decide o desvio de hoje. Seis itens de um serviço folgado não passam na frente de uma espuma que trava a
+  // bancada. Quantidade só desempata.
+  const chave = (p) => String(p.servico.prazo || "9999-99-99");
+  const lojas = {};
+  pendentes.forEach((p) => (lojas[p.loja] ||= []).push(p));
+  const ordenadas = Object.entries(lojas)
+    .map(([loja, itens]) => [loja, [...itens].sort((a, b) => chave(a).localeCompare(chave(b)))])
+    .sort((a, b) => chave(a[1][0]).localeCompare(chave(b[1][0])) || b[1].length - a[1].length);
+  const atrasados = pendentes.filter((p) => p.servico.prazo && p.servico.prazo < today).length;
+  const emTransito = pendentes.filter((p) => p.pedido).length;
+  const palpites = pendentes.filter((p) => p.palpite).length;
+  return <section className="content-card">
+    <div className="card-head"><div><p className="kicker">COMPRAS</p><h3>{pendentes.length} material(is) pra comprar</h3>
+      {atrasados > 0 && <span className="ficha-note" style={{ margin: 0 }}>{atrasados} em serviço com prazo vencido</span>}</div></div>
+    <div className="mat-resumo">{ordenadas.map(([loja, itens]) => <span className="mat-chip" key={loja}>{loja} · {itens.length}</span>)}</div>
+    <button className="ghost" style={{ width: "100%", marginTop: 10 }} onClick={() => setAberto((v) => !v)}>{aberto ? "Fechar" : `Abrir a lista (${ordenadas.length} loja${ordenadas.length > 1 ? "s" : ""})`}</button>
+    {aberto && <div className="mat-lojas">
+      {ordenadas.map(([loja, itens]) => <div className="mat-loja" key={loja}>
+        <div className="mat-loja-head"><strong>{loja}</strong><b>{itens.length} item(ns)</b></div>
+        {itens.map((p, i) => { const atrasado = !!p.servico.prazo && p.servico.prazo < today; return <div className="mat-item" key={loja + "-" + i}>
+          <span>{p.item}{p.pedido ? " 🚚" : ""}{p.palpite ? " ?" : ""}<em>{p.servico.clientes?.nome || "Cliente"} · {p.servico.titulo}</em></span>
+          <time className={atrasado ? "atrasado" : ""}>{prazoComRotulo(p.servico) || "sem prazo"}</time>
+        </div>; })}
+      </div>)}
+      {(emTransito > 0 || palpites > 0) && <p className="ficha-note" style={{ margin: 0 }}>{emTransito > 0 ? "🚚 = já pedido, ainda não chegou. " : ""}{palpites > 0 ? "? = loja que o app deduziu, confira antes de sair." : ""}</p>}
+      {onVerCompras && <button className="ghost" style={{ width: "100%" }} onClick={onVerCompras}>▣ Marcar comprado na aba Compras</button>}
+    </div>}
+  </section>;
+}
+
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
 function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, pessoais, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerCompras, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
@@ -3860,6 +3939,10 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       <button className="ghost" style={{ width: "100%" }} onClick={() => setListaFuturos((v) => !v)}>{listaFuturos ? "Fechar" : `Abrir os ${futuros.length}`}</button>
       {listaFuturos && <div style={{ marginTop: 12 }}>{[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}</section>}
     {filtroTipo !== "todos" && atrasados.length === 0 && hoje.length === 0 && futuros.length === 0 && (atrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
+    {/* DEPOIS DOS COMPROMISSOS, DE PROPÓSITO (Diego, 24/08: "um card lá embaixo de compromissos"). Comprar
+        material é consequência da rota do dia, não concorrente dela: ele decide onde vai, e aí olha o que
+        aproveita comprar no caminho. Se subisse pro topo, competiria com a agenda pela primeira olhada. */}
+    <MateriaisCard services={services} today={today} onVerCompras={onVerCompras} />
     {/* SAIU o aviso financeiro do rodapé: era o mesmo assunto do card "a pagar" lá em cima, só que sem o
         valor e sem o caixa possível — repetia a preocupação sem ajudar a decidir. Diego, 25/07. */}</div>;
 }
