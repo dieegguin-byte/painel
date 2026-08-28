@@ -2044,7 +2044,37 @@ function cidadeChave(c) {
   const base = String(c || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split("(")[0].split("-")[0].trim();
   return CIDADE_SINONIMOS[base] || base;
 }
-function tempoEstradaMin(c1, c2) { const a = cidadeChave(c1), b = cidadeChave(c2); if (!a || !b || a === b) return 0; return TEMPO_ESTRADA_MIN[[a, b].sort().join("|")] ?? 60; }
+// A TABELA DE ESTRADA SAIU DO CÓDIGO (27/08/2026; decidido com o Diego em 24/07 e parado desde então).
+// Antes, cidade nova exigia editar o nova.html e publicar — e par que não existe cai num default CEGO de
+// 60 min, que foi exatamente o que fez a rota de 24/07 não bater. Agora os tempos moram na tabela
+// `distancias` e engordam na operação diária, sem deploy: ele fala "tenho compromisso em X", eu gravo o
+// tempo uma vez, e nunca mais precisa perguntar.
+//
+// MORA EM VARIÁVEL DE MÓDULO, NÃO EM ESTADO DO REACT, de propósito: tempoEstradaMin é chamada de dentro de
+// funções puras (horaSugerida, analisarRotaDoDia, planoDeCompraComHorario) que não enxergam hook nenhum.
+// Enfiar isso no React obrigaria a passar a tabela por seis assinaturas até chegar lá.
+//
+// A CONST CONTINUA COMO REDE. Se a consulta falhar, se o app abrir do cache offline gravado antes desta
+// mudança, ou se a tabela vier vazia, a rota continua saindo dos 35 pares que já estavam no código. Trocar
+// tabela cheia por default cego de 60 min seria piorar o que já funcionava.
+let DISTANCIAS_DO_BANCO = null;
+function aplicarDistanciasDoBanco(linhas) {
+  if (!Array.isArray(linhas) || !linhas.length) return;
+  const mapa = {};
+  linhas.forEach((d) => {
+    // Passa pelo cidadeChave de novo em vez de confiar no que veio: assim sinônimo gravado torto
+    // ("Jardim do Ingá") ainda casa com a chave que o app procura, em vez de virar par fantasma.
+    const a = cidadeChave(d.cidade_a), b = cidadeChave(d.cidade_b), min = Number(d.minutos);
+    if (a && b && a !== b && Number.isFinite(min)) mapa[[a, b].sort().join("|")] = min;
+  });
+  DISTANCIAS_DO_BANCO = mapa;
+}
+function tempoEstradaMin(c1, c2) {
+  const a = cidadeChave(c1), b = cidadeChave(c2);
+  if (!a || !b || a === b) return 0;
+  const chave = [a, b].sort().join("|");
+  return DISTANCIAS_DO_BANCO?.[chave] ?? TEMPO_ESTRADA_MIN[chave] ?? 60;
+}
 function horarioApertado(h, outros, cidadeNova) { return (outros || []).some((a) => Math.abs(minutosDoHorario(h) - minutosDoHorario(a.hora)) < tempoEstradaMin(cidadeNova, a.cidade) + DURACAO_SERVICO_MIN); }
 // IGREJA É COMPROMISSO, NÃO "HORÁRIO VAZIO". Seg/qua/sex às 18h30. O que trava não é a hora do serviço, é a
 // hora em que ele consegue voltar: serviço + estrada de volta pra base. Um 17h em Brasília termina 18h e
@@ -2242,6 +2272,9 @@ function Home() {
     setCustomers(p.customers || []); setServices(p.services || []);
     setAppointments(p.appointments || []); setFinances(p.finances || []); setRotinas(p.rotinas || []);
     setFornecedores(p.fornecedores || []); setPessoais(p.pessoais || []);
+    // Distâncias não são estado de tela — alimentam tempoEstradaMin, que é função pura. Entram no pacote
+    // pra virem junto no cache offline: sem sinal a trava de rota continua com os tempos aprendidos.
+    aplicarDistanciasDoBanco(p.distancias);
   }, []);
 
   const loadAll = useCallback(async () => {
@@ -2250,9 +2283,9 @@ function Home() {
     }
     if (!db || !session) return;
     setLoading(true);
-    let cx, cl, sv, ag, fn, rt, fo, ps, firstError;
+    let cx, cl, sv, ag, fn, rt, fo, ps, ds, firstError;
     try {
-      [cx, cl, sv, ag, fn, rt, fo, ps] = await Promise.all([
+      [cx, cl, sv, ag, fn, rt, fo, ps, ds] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
@@ -2265,7 +2298,11 @@ function Home() {
         // Traz tudo, inclusive concluído e cancelado: o volume é minúsculo e a lista de concluídos é o que
         // prova que "Concluir" não apagou nada. Quem filtra é a tela.
         db.from("pessoais").select("*").order("data_alvo", { ascending: true }),
+        db.from("distancias").select("cidade_a,cidade_b,minutos"),
       ]);
+      // `ds` fica FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a const
+      // TEMPO_ESTRADA_MIN). Se essa consulta falhar sozinha, o certo é o app abrir normal com os tempos do
+      // código — e não cair na tela de offline por causa de uma tabela acessória.
       firstError = [cx, cl, sv, ag, fn, rt, fo, ps].find((result) => result.error)?.error;
     } catch (e) { firstError = e; }
     // SEM SINAL: em vez de tela vazia, abre com a última carga guardada e avisa a idade dela.
@@ -2275,7 +2312,7 @@ function Home() {
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
     setOfflineDesde(null);
-    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [] };
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [] };
     aplicarPacote(pacote);
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
