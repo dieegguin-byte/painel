@@ -2075,6 +2075,31 @@ function tempoEstradaMin(c1, c2) {
   const chave = [a, b].sort().join("|");
   return DISTANCIAS_DO_BANCO?.[chave] ?? TEMPO_ESTRADA_MIN[chave] ?? 60;
 }
+// O BOTÃO DO WAZE ABRIA A LOJA, NÃO A ROTA (item WAZE-BOTAO-REGRESSAO-20260827-2255-001). Diego mandou o
+// print às 22:55 de 27/08: tocar no botão abria waze.com no navegador com "Ainda não tem o Waze? Faça o
+// download". O destino nunca chegou no aplicativo.
+//
+// A CAUSA NÃO ERA O DESTINO — era o CAMINHO. `https://waze.com/ul?...` é universal link: só vira app se o
+// Android resolver interceptar aquele https. Dentro do PWA o toque abre uma aba do próprio Chrome, que
+// trata o endereço como página comum e serve a landing de download. Por isso as correções anteriores, que
+// mexeram em `q=` e depois em `google_place_id`, não resolveram: o destino já estava certo havia tempo.
+//
+// A CORREÇÃO é falar com o app pelo esquema de intent do Android, que entrega direto ao pacote com.waze e
+// carrega o endereço web embutido como plano B (`browser_fallback_url`) — sem Waze instalado, o próprio
+// Chrome abre a página, em vez de dar tela morta. Fora do Android nada muda: segue o universal link, que é
+// o certo no computador e no iPhone.
+//
+// SEM `target=_blank` no Android de propósito: com intent, o sistema troca pro Waze e o PWA continua vivo
+// atrás. Abrir em aba nova é justamente o que devolvia o toque pro navegador.
+function ehAndroid() { return /android/i.test((typeof navigator !== "undefined" && navigator.userAgent) || ""); }
+function urlWaze(destino) {
+  const qs = destino.google_place_id ? `google_place_id=${encodeURIComponent(destino.google_place_id)}&navigate=yes`
+    : destino.ll ? `ll=${destino.ll}&navigate=yes` // vírgula literal de propósito: é o formato que já vinha funcionando
+    : `q=${encodeURIComponent(destino.q || "")}&navigate=yes`;
+  const web = `https://waze.com/ul?${qs}`;
+  if (!ehAndroid()) return web;
+  return `intent://?${qs}#Intent;scheme=waze;package=com.waze;S.browser_fallback_url=${encodeURIComponent(web)};end`;
+}
 function horarioApertado(h, outros, cidadeNova) { return (outros || []).some((a) => Math.abs(minutosDoHorario(h) - minutosDoHorario(a.hora)) < tempoEstradaMin(cidadeNova, a.cidade) + DURACAO_SERVICO_MIN); }
 // IGREJA É COMPROMISSO, NÃO "HORÁRIO VAZIO". Seg/qua/sex às 18h30. O que trava não é a hora do serviço, é a
 // hora em que ele consegue voltar: serviço + estrada de volta pra base. Um 17h em Brasília termina 18h e
@@ -3201,11 +3226,10 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
   // é o endereço exato do estabelecimento no mapa — não tem o que escolher errado. Vale só pro Waze; o Maps
   // passou no teste real do Diego e não se mexe no que está funcionando.
   const placeIdAgenda = String(a.google_place_id || "").trim();
-  const linkWaze = placeIdAgenda
-    ? `https://waze.com/ul?google_place_id=${encodeURIComponent(placeIdAgenda)}&navigate=yes`
-    : usarPonto
-      ? `https://waze.com/ul?ll=${cli.latitude},${cli.longitude}&navigate=yes`
-      : `https://waze.com/ul?q=${encodeURIComponent(destinoTexto)}&navigate=yes`;
+  // A escolha do destino não mudou (place id > ponto salvo > texto) — mudou só o transporte, ver urlWaze.
+  const linkWaze = placeIdAgenda ? urlWaze({ google_place_id: placeIdAgenda })
+    : usarPonto ? urlWaze({ ll: `${cli.latitude},${cli.longitude}` })
+      : urlWaze({ q: destinoTexto });
   const linkMaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinoRota)}`;
   const selo = soCidade ? " (só cidade)" : "";
   const nomeCliente = svc?.clientes?.nome || a.titulo;
@@ -3268,7 +3292,7 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
           {tel && <a className="btn-wpp" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">Abrir WhatsApp{sugestao ? " com resposta" : ""}</a>}
           {/* Rota só em compromisso presencial — num remoto o botão de mapa é ruído e convida
               pro toque errado. O sufixo do rótulo diz a precisão real do destino. */}
-          {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-waze" href={linkWaze} target="_blank" rel="noreferrer">🧭 Waze{selo}</a>}
+          {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-waze" href={linkWaze} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Waze{selo}</a>}
           {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>}
           {/* Aqui o `servico_id` é inequívoco: o card TEM um serviço só. Quando o compromisso não
               tem serviço (compra de material, por exemplo), vai só o `agenda_id` — não se adivinha. */}
@@ -6100,7 +6124,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
           <div className="ficha-actions">
             <button className="ghost" onClick={capturarGPS} disabled={capturando}>{capturando ? "Procurando sinal…" : cliente.latitude != null ? "⌖ Atualizar aqui" : "⌖ Capturar aqui"}</button>
             <button className="ghost" onClick={() => { setColarLink((v) => !v); setLinkDraft(""); }}>{colarLink ? "Cancelar" : "Colar link do Maps"}</button>
-            {cliente.latitude != null && <a className="ghost" href={`https://waze.com/ul?ll=${cliente.latitude},${cliente.longitude}&navigate=yes`} target="_blank" rel="noreferrer">🧭 Waze</a>}
+            {cliente.latitude != null && <a className="ghost" href={urlWaze({ ll: `${cliente.latitude},${cliente.longitude}` })} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Waze</a>}
             {cliente.latitude != null && <a className="ghost" href={`https://www.google.com/maps/search/?api=1&query=${cliente.latitude},${cliente.longitude}`} target="_blank" rel="noreferrer">📍 Maps</a>}
           </div>
           {colarLink && <div className="responsavel-edit-row"><input value={linkDraft} onChange={(e) => setLinkDraft(e.target.value)} placeholder="Cole o link do Google Maps já aberto" autoFocus /><button className="ghost" onClick={usarLinkMaps}>Salvar ponto</button></div>}
