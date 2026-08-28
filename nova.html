@@ -4984,6 +4984,181 @@ async function planoDeCompraComHorario(db, fornecedor, dataForcada) {
   return { ...plano, data, hora: horaSugerida(data, "presencial", ocupados, fornecedor.cidade, presenciais) };
 }
 function compraPrecisaRevisao(item) { return !item.fornecedor_id && !(item.descricao || "").startsWith(COMPRA_CONFERIDA_TAG); }
+
+// ===== CONFIRMAÇÃO DE SERVIÇO — o PDF do fechamento, gerado NO APARELHO =====
+//
+// O PROBLEMA (item PDF-EXPRESSO-REVISAO-20260827-001): Diego fechou na casa de uma cliente e o documento
+// demorou demais, e ainda saiu em versões diferentes do mesmo fechamento. A Skill do Classic já está
+// enxuta — o custo não é de decisão, é de MÁQUINA: localizar o modelo .docx, preencher, converter pra PDF
+// e renderizar de volta pra conferir "uma página sem corte". Essa cadeia inteira roda longe do celular.
+//
+// Aqui o caminho é outro: o aparelho JÁ tem os dados (Supabase) e o navegador JÁ imprime PDF. Então o
+// documento é montado em HTML na hora e entregue pro "Salvar como PDF" do próprio Android. Sem upload,
+// sem conversão, sem ida e volta.
+//
+// FIDELIDADE AO MODELO MESTRE: as medidas e cores abaixo foram extraídas do
+// MODELO_MESTRE_CONFIRMACAO_SERVICO.docx, não escolhidas por gosto — página Letter (12240x15840 twips),
+// margens 648/792 twips, Liberation Sans, e a paleta #17365D / #1F2937 / #6B7280 / #F8FAFC / #FFF8E8 /
+// #C89B3C. A ordem das seções é a mesma. Isto é uma SEGUNDA RENDERIZAÇÃO do mesmo desenho, não um segundo
+// modelo: se o .docx mudar, este bloco muda junto, e isso está dito no retorno técnico.
+//
+// SÓ FATO CONFIRMADO. Campo sem dado não é preenchido com suposição — a linha some. Em especial:
+// "Condição escolhida" do modelo fica FORA por decisão explícita, porque deduzir a condição a partir dos
+// lançamentos seria transformar oferta em aceite, que a própria Skill proíbe. Os cartões financeiros saem
+// dos lançamentos reais do serviço, e sem valor de orçamento o documento nem é gerado.
+const CS_ESC = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function ehServicoFechado(s) { return ["agendado", "producao", "entregue", "pago"].includes(s?.status); }
+// Referência derivada do id real do serviço — identificador de verdade, não número inventado.
+function referenciaConfirmacao(servicoId) { return "TB-" + String(servicoId || "").replace(/-/g, "").slice(0, 8).toUpperCase(); }
+function linhasFinanceirasDaConfirmacao(financeiro) {
+  const linhas = [];
+  const entradas = (financeiro || []).filter((f) => f.tipo === "entrada" && f.status === "pago");
+  const aReceber = (financeiro || []).filter((f) => f.tipo === "entrada" && f.status === "a_receber");
+  const soma = (l) => l.reduce((s, f) => s + Number(f.valor || 0), 0);
+  if (entradas.length) linhas.push({ rotulo: "Entrada recebida", valor: money(soma(entradas)), nota: entradas.length > 1 ? entradas.length + " recebimentos" : "Recebido em " + compactDate(entradas[0].data) });
+  if (aReceber.length) linhas.push({ rotulo: "Saldo", valor: money(soma(aReceber)), nota: "A receber" });
+  return linhas.slice(0, 3);
+}
+function htmlConfirmacaoServico({ cliente, servico, financeiro, hoje }) {
+  const e = CS_ESC;
+  const linhasServico = [];
+  linhasServico.push({ rotulo: "Serviço", detalhe: servico.titulo || "" });
+  const desc = String(servico.descricao || "").trim();
+  if (desc) linhasServico.push({ rotulo: "Descrição", detalhe: desc });
+  const mats = (servico.materiais_necessarios || []).filter((m) => !m.arquivado).map((m) => m.item).filter(Boolean);
+  if (mats.length) linhasServico.push({ rotulo: "Material", detalhe: mats.join(" · ") });
+  if (servico.responsavel) linhasServico.push({ rotulo: "Responsável técnico", detalhe: servico.responsavel });
+  const fins = linhasFinanceirasDaConfirmacao(financeiro);
+  const situacao = statusLabel[servico.status] || servico.status || "";
+  // O <title> vira o NOME DO ARQUIVO no "Salvar como PDF" do Chrome. Por isso ele segue exatamente o
+  // padrão canônico da Skill — Confirmacao_Servico_[CLIENTE]_[DD-MM-AAAA] —, sem _FINAL, _v2 e afins.
+  // Mesmo fechamento no mesmo dia gera o mesmo nome, que é o que impede a linhagem paralela.
+  const nomeArquivo = "Confirmacao_Servico_"
+    + String(cliente.nome || "Cliente").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "")
+    + "_" + String(hoje).split("-").reverse().join("-");
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${e(nomeArquivo)}</title>
+<style>
+@page { size: 215.9mm 279.4mm; margin: 11.4mm 14mm; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Liberation Sans",Arial,Helvetica,sans-serif;color:#1F2937;font-size:8.5pt;line-height:1.35;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+/* Espaçamentos medidos, não escolhidos: com os valores folgados o documento fechava em 261,9mm numa área
+   útil de 256,6mm e quebrava em duas páginas. A invariante "UMA PÁGINA" do modelo mestre é o que manda
+   aqui, e a folga foi calibrada pro pior caso (4 linhas de serviço + prazo + 3 cartões + situação longa). */
+.faixa{background:#17365D;color:#fff;padding:5.5mm 7mm;border-radius:2mm}
+.faixa h1{font-size:13pt;letter-spacing:.3pt;margin-bottom:1mm}
+.faixa .sub{color:#DCE6F1;font-size:8pt}
+.faixa .doc{font-size:18pt;font-weight:700;margin-top:4mm;letter-spacing:.5pt}
+.faixa .ref{color:#DCE6F1;font-size:8pt;margin-top:1.5mm}
+.empresa{color:#6B7280;font-size:7.5pt;text-align:center;margin:2mm 0 3.5mm;line-height:1.45}
+h2{color:#17365D;font-size:9pt;letter-spacing:.8pt;border-bottom:.4mm solid #17365D;padding-bottom:1mm;margin:3.5mm 0 2mm}
+.painel{background:#F8FAFC;border:.2mm solid #E5EAF0;border-radius:1.5mm;padding:3.5mm 4mm}
+.linha{display:flex;gap:4mm;padding:1.4mm 0}
+.linha .rot{color:#6B7280;font-size:7.5pt;width:34mm;flex:none}
+.linha .det{flex:1}
+.cards{display:flex;gap:3mm}
+.card{flex:1;background:#F3F6F9;border:.2mm solid #E5EAF0;border-radius:1.5mm;padding:3mm}
+.card .rot{color:#6B7280;font-size:7.5pt}
+.card .val{color:#17365D;font-size:12pt;font-weight:700;margin-top:1mm}
+.card .nota{color:#6B7280;font-size:7pt;margin-top:.8mm}
+.total{display:flex;justify-content:space-between;align-items:center;background:#17365D;color:#fff;border-radius:1.5mm;padding:3mm 4mm;margin-top:3mm}
+.total .rot{font-size:8.5pt;letter-spacing:.4pt}
+.total .val{font-size:14pt;font-weight:700}
+.situacao{background:#FFF8E8;border:.2mm solid #C89B3C;border-radius:1.5mm;padding:3.5mm 4mm}
+.situacao .rot{color:#8A6A1F;font-weight:700;font-size:9pt}
+.aceite{color:#4B5563;font-size:7.5pt;line-height:1.5;margin-top:2.5mm}
+.rodape{border-top:.2mm solid #E5EAF0;margin-top:4mm;padding-top:2mm;color:#9AA3AF;font-size:6.5pt;text-align:center;line-height:1.5}
+</style></head><body>
+<div class="faixa">
+  <h1>TAPEÇARIA E ESTOFADOS BAHIA</h1>
+  <div class="sub">Reforma de estofados com atendimento em domicílio</div>
+  <div class="doc">CONFIRMAÇÃO DE SERVIÇO</div>
+  <div class="ref">Ref. ${e(referenciaConfirmacao(servico.id))} &nbsp;•&nbsp; Emissão: ${e(compactDate(hoje))}</div>
+</div>
+<div class="empresa">TAPEÇARIA E ESTOFADOS BAHIA LTDA &nbsp;•&nbsp; CNPJ 23.184.721/0001-02 &nbsp;•&nbsp; WhatsApp (61) 99403-7524<br>Rua Raquel de Queiroz, Qd. 118, Lt. 20 - Luziânia/GO &nbsp;•&nbsp; capotariabahia@gmail.com</div>
+<h2>CLIENTE</h2>
+<div class="painel">
+  <div class="linha"><div class="rot">Nome</div><div class="det"><b>${e(cliente.nome)}</b></div></div>
+  ${cliente.telefone ? `<div class="linha"><div class="rot">WhatsApp</div><div class="det">${e(cliente.telefone)}</div></div>` : ""}
+  ${cliente.endereco || cliente.cidade ? `<div class="linha"><div class="rot">Endereço</div><div class="det">${e([cliente.endereco, cliente.cidade].filter(Boolean).join(", "))}</div></div>` : ""}
+</div>
+<h2>SERVIÇO CONTRATADO</h2>
+<div class="painel">
+  ${linhasServico.map((l) => `<div class="linha"><div class="rot">${e(l.rotulo)}</div><div class="det">${e(l.detalhe)}</div></div>`).join("")}
+  ${servico.prazo ? `<div class="linha"><div class="rot">${e(rotuloPrazo(servico.status))}</div><div class="det"><b>${e(compactDate(servico.prazo))}</b></div></div>` : ""}
+</div>
+<h2>CONDIÇÃO FINANCEIRA COMBINADA</h2>
+${fins.length ? `<div class="cards">${fins.map((f) => `<div class="card"><div class="rot">${e(f.rotulo)}</div><div class="val">${e(f.valor)}</div><div class="nota">${e(f.nota)}</div></div>`).join("")}</div>` : ""}
+<div class="total"><div class="rot">TOTAL CONTRATADO</div><div class="val">${e(money(servico.valor_orcamento))}</div></div>
+<h2>SITUAÇÃO DO SERVIÇO</h2>
+<div class="situacao">
+  <div class="rot">${e(situacao)}</div>
+  ${servico.proxima_acao ? `<div class="aceite">${e(servico.proxima_acao)}</div>` : ""}
+</div>
+<h2>CONFIRMAÇÃO E ACEITE</h2>
+<div class="aceite">Este documento registra as condições comerciais e o escopo técnico combinados para o serviço acima. A confirmação do cliente pelo WhatsApp da empresa integra o registro do atendimento.</div>
+<div class="rodape">Documento emitido eletronicamente pela Tapeçaria e Estofados Bahia Ltda.<br>Este documento é de natureza comercial e não substitui documento fiscal quando aplicável.</div>
+</body></html>`;
+}
+// IFRAME, NÃO ABA NOVA: dentro do PWA instalado, window.open cai em bloqueio de pop-up ou tira o Diego do
+// app no meio do atendimento. O iframe invisível imprime sem sair da tela em que ele está.
+//
+// A CONFERÊNCIA DE "UMA PÁGINA" É MEDIDA, NÃO OLHADA. Na Skill do Classic esse passo é um QA visual humano
+// a cada emissão — o que é lento e falha justamente quando ele está com pressa. Aqui o iframe é renderizado
+// com a largura útil real da folha, a altura do conteúdo é medida, e se passar da área útil o documento é
+// reduzido na proporção EXATA que falta. Conteúdo nenhum é cortado; o texto só fica um pouco menor.
+//
+// Por que isso importa: medindo o pior caso real (título longo + descrição + 4 materiais + situação longa)
+// sobravam 2,3mm. Margem dessa ordem quebra em duas páginas com qualquer texto um pouco maior, e ele só
+// descobriria na frente da cliente.
+//
+// O iframe fica de largura fixa em mm — não em pixels — porque a folha é medida em mm e o zoom do
+// navegador do celular não pode entrar nessa conta.
+const FOLHA_ALTURA_UTIL_MM = 279.4 - 11.4 - 11.4; // Letter menos as margens do modelo mestre
+const FOLHA_LARGURA_UTIL_MM = 215.9 - 14 - 14;
+function imprimirDocumento(html, ajustarAUmaPagina) {
+  const antigo = document.getElementById("frame-impressao");
+  if (antigo) antigo.remove();
+  const f = document.createElement("iframe");
+  f.id = "frame-impressao";
+  f.setAttribute("aria-hidden", "true");
+  f.style.cssText = `position:fixed;left:-10000px;top:0;width:${FOLHA_LARGURA_UTIL_MM}mm;height:${FOLHA_ALTURA_UTIL_MM}mm;border:0`;
+  f.onload = () => {
+    try {
+      if (ajustarAUmaPagina) {
+        const doc = f.contentDocument;
+        const pxPorMm = 96 / 25.4;
+        const alturaMm = doc.body.scrollHeight / pxPorMm;
+        if (alturaMm > FOLHA_ALTURA_UTIL_MM) {
+          // 0.995 de sobra pra não empatar no limite e cair pra segunda página por arredondamento.
+          doc.body.style.zoom = String(Math.max(0.75, (FOLHA_ALTURA_UTIL_MM / alturaMm) * 0.995));
+        }
+      }
+      f.contentWindow.focus();
+      f.contentWindow.print();
+    } catch (erro) { /* impressão recusada pelo aparelho */ }
+  };
+  document.body.appendChild(f);
+  f.srcdoc = html;
+}
+// SEM VALOR FECHADO NÃO SAI DOCUMENTO. O modelo tem "Total contratado" em destaque; emitir com o campo
+// vazio ou com palpite entregaria ao cliente um número que ninguém combinou. Mesma linha do fechamento
+// sem valor que já existe no app: avisa e manda resolver, não inventa.
+async function gerarConfirmacaoServico({ db, demo, cliente, servico, notify }) {
+  if (!(Number(servico?.valor_orcamento) > 0)) {
+    notify("Esse serviço está sem valor fechado. A confirmação mostraria um total inventado — registre o valor primeiro.", "error");
+    return;
+  }
+  let financeiro = [];
+  if (demo) financeiro = demoFinance.filter((f) => f.servico_id === servico.id);
+  else {
+    // Lê o financeiro NA HORA em vez de usar o que já está em memória: o modelo mostra entrada e saldo, e a
+    // regra da Skill é usar o fato financeiro oficial mais novo.
+    const { data, error } = await db.from("financeiro").select("tipo,status,valor,data").eq("servico_id", servico.id);
+    if (error) { notify("Não consegui ler o financeiro do serviço: " + error.message, "error"); return; }
+    financeiro = data || [];
+  }
+  imprimirDocumento(htmlConfirmacaoServico({ cliente, servico, financeiro, hoje: hojeISO() }), true);
+}
 // O MESMO CAMPO GUARDA TRÊS COISAS DIFERENTES. Diego, 04/08, sobre o Leandro: "ele era agendado, deu entrada
 // e agendei para buscar só quando fosse executar o serviço" — o 02/08 era a data de BUSCAR, não uma entrega
 // atrasada. Mas a tela mostrava só "02/08" ao lado de um serviço vencido, e ele apareceu como atraso de
@@ -6180,7 +6355,10 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
                 <div className="ficha-actions"><button className="primary" onClick={() => confirmarEntrega(s.id)}>{overrideMat === s.id ? "Entregar mesmo com material em aberto" : "Confirmar entrega"}</button><button className="ghost" onClick={() => { setEntregando(null); setOverrideMat(null); }}>Cancelar</button></div>
               </div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEntregando(s.id); setOverrideMat(null); setValorEntregaDraft(s.valor_orcamento ? String(s.valor_orcamento) : ""); setRecebidoFichaDraft(""); }}>✅ Marcar como entregue</button>)}
-        </div><div className="ficha-servico-meta">{s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <span>—</span>}{s.prazo && <time>{prazoComRotulo(s)}</time>}{(sugestao || tel) && <div className="ficha-servico-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">WhatsApp</a>}</div>}</div></div>; })}</div>}
+        </div><div className="ficha-servico-meta">{s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <span>—</span>}{s.prazo && <time>{prazoComRotulo(s)}</time>}{(sugestao || tel || ehServicoFechado(s)) && <div className="ficha-servico-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">WhatsApp</a>}
+          {/* CONFIRMAÇÃO DE SERVIÇO — só em trabalho FECHADO. Lead e orçamento não têm acordo pra confirmar,
+              e emitir documento comercial em cima de proposta viraria "condição oferecida" virando aceite. */}
+          {ehServicoFechado(s) && <button className="ghost" title="Gerar a Confirmação de Serviço em PDF" onClick={() => gerarConfirmacaoServico({ db, demo, cliente, servico: s, notify })}>📄 Confirmação</button>}</div>}</div></div>; })}</div>}
         <p className="ficha-note">Mudança de status e financeiro continuam no app atual por enquanto.</p>
 
         <h3 className="ficha-section">Fotos</h3>
