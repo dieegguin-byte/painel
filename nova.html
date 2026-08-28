@@ -2825,7 +2825,18 @@ function Home() {
     { id: "painel", label: "Painel", icon: "⌂" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
     { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "compras", label: "Compras", icon: "▣" }, { id: "futuro", label: "A pagar", icon: "◷", count: contasFuturas }, { id: "vales", label: "Profissionais", icon: "✎", count: contaProfissionais },
     { id: "clientes", label: "Clientes", icon: "○" }, { id: "fornecedores", label: "Fornecedores", icon: "▤" },
+    // ESTOQUE É PÁGINA PRÓPRIA, NÃO ABA (item ESTOQUE-V2-APP-20260827-2338-001). O backend do Estoque V2 já
+    // estava no Supabase desde 22/08, mas a tela vivia num PR aberto e nunca chegou no app — o Diego
+    // perguntou "onde fica o estoque?" e a resposta honesta era "em lugar nenhum".
+    //
+    // O PR trazia um `estoque-addon.js` que enfiava o botão na barra lateral por fora do React. Não trouxe:
+    // abaixo de 850px a barra lateral tem `display:none`, então no CELULAR — que é onde ele usa — o botão
+    // não apareceria. Entrando aqui no array, ele nasce nas DUAS barras de uma vez, porque a lateral e a de
+    // baixo renderizam da mesma lista. Menos código e sem observer brigando com o React.
+    { id: "estoque", label: "Estoque", icon: "▦", pagina: "./estoque.html" },
   ];
+  // Item que aponta pra página própria sai do app; o resto continua trocando de aba aqui dentro.
+  const irParaAba = (item) => { if (item.pagina) { window.location.href = item.pagina; return; } setTab(item.id); setSelectedId(null); };
 
   return <div className={`product-shell mode-${mode}`}>
     {notice && <div className={`notice ${notice.kind}`}>{notice.text}</div>}
@@ -2834,7 +2845,7 @@ function Home() {
     {offlineDesde && <div className="notice error">Sem conexão — mostrando os dados baixados {idadeDoDado(offlineDesde)}. Dá pra consultar agenda, telefone e endereço, mas nada que você mudar agora será salvo.</div>}
     <aside className="side-nav">
       <div className="side-brand"><div className="brand-seal small">TB</div><div><strong>Tapeçaria Bahia</strong><span>Central operacional</span></div></div>
-      <nav>{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setSelectedId(null); }}><i>{item.icon}</i><span>{item.label}</span>{item.count !== undefined && <b>{item.count}</b>}</button>)}</nav>
+      <nav>{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => irParaAba(item)}><i>{item.icon}</i><span>{item.label}</span>{item.count !== undefined && <b>{item.count}</b>}</button>)}</nav>
       <div className="operator-card"><span>Operador atual</span><strong>{mode === "claude" ? "Claude" : "Diego"}</strong><small>{mode === "claude" ? "Operações tipadas liberadas · exclusões bloqueadas" : "Controle e aprovações"}</small><button onClick={() => setMode(mode === "claude" ? "diego" : "claude")}>Trocar para {mode === "claude" ? "Diego" : "Claude"}</button></div>
     </aside>
     <main className="workspace">
@@ -2860,7 +2871,7 @@ function Home() {
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
     </main>
-    <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setTab(item.id); setSelectedId(null); }}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
+    <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => irParaAba(item)}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
     {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
     {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} />}
     {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}

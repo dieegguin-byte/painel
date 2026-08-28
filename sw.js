@@ -26,7 +26,10 @@
       ok, e o unpkg (o espelho que o nova.html usa quando o jsdelivr falha) tambem passa a ser cacheado.
    A subida de v11 pra v12 tambem serve de vassoura: o activate apaga todo cache que nao seja o da versao
    atual, entao o celular do Diego joga fora o cache antigo (possivelmente corrompido) na primeira abertura. */
-const VERSAO = 'tb-atendimento-v12';
+/* v13 (28/08/2026): entrou o ./estoque.html no SHELL. A subida de versao tambem serve de vassoura - o
+   activate apaga todo cache que nao seja o da versao atual, entao o celular do Diego para de servir a
+   copia velha do nova.html que ainda nao tinha o botao Estoque nem a correcao do Waze. */
+const VERSAO = 'tb-atendimento-v13';
 // COMPARTILHAR DO WHATSAPP. O Android entrega o print/texto num POST multipart pra ./compartilhar,
 // que NAO existe como arquivo - e nem poderia, o GitHub Pages so serve estatico. O service worker e
 // o unico lugar capaz de pegar esse POST. Ele guarda a carga no cache e manda o app abrir; quem le,
@@ -37,6 +40,9 @@ const SHELL = [
   './',
   './index.html',
   './nova.html',
+  // Estoque e pagina propria, fora do nova.html. Sem estar aqui ela abriria a tela de offline no
+  // celular sem sinal, que e justamente onde o Diego confere material antes de sair pra loja.
+  './estoque.html',
   './manifest.webmanifest',
   './icon.svg',
   './icon-maskable.svg'
