@@ -5030,11 +5030,18 @@ function htmlConfirmacaoServico({ cliente, servico, financeiro, hoje }) {
   if (servico.responsavel) linhasServico.push({ rotulo: "Responsável técnico", detalhe: servico.responsavel });
   const fins = linhasFinanceirasDaConfirmacao(financeiro);
   const situacao = statusLabel[servico.status] || servico.status || "";
-  // O <title> vira o NOME DO ARQUIVO no "Salvar como PDF" do Chrome. Por isso ele segue exatamente o
-  // padrão canônico da Skill — Confirmacao_Servico_[CLIENTE]_[DD-MM-AAAA] —, sem _FINAL, _v2 e afins.
-  // Mesmo fechamento no mesmo dia gera o mesmo nome, que é o que impede a linhagem paralela.
+  // O <title> vira o NOME DO ARQUIVO no "Salvar como PDF" do Chrome, então é ele que faz valer a regra de
+  // versão única: mesmo fechamento = mesmo nome = substitui, em vez de criar _FINAL, _v2 e afins.
+  //
+  // ⚠ A REFERÊNCIA ENTRA NO NOME, e isso é uma correção ao padrão escrito na Skill. O padrão de lá,
+  // `Confirmacao_Servico_[CLIENTE]_[DD-MM-AAAA]`, NÃO é único quando o cliente tem mais de um serviço
+  // fechado — e isso não é hipótese: a Ivoneide tem dois (R$ 2.200 e R$ 2.600, ambos agendados). Emitir os
+  // dois no mesmo dia daria arquivos de mesmo nome com conteúdo diferente, que é exatamente a confusão de
+  // "versões diferentes do mesmo documento" que este item veio resolver. Com a Ref, o nome continua estável
+  // por fechamento (o id do serviço não muda) e distinto entre fechamentos.
   const nomeArquivo = "Confirmacao_Servico_"
     + String(cliente.nome || "Cliente").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "")
+    + "_" + referenciaConfirmacao(servico.id)
     + "_" + String(hoje).split("-").reverse().join("-");
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${e(nomeArquivo)}</title>
 <style>
