@@ -2858,7 +2858,7 @@ function Home() {
           A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
           e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerCompras={() => setTab("compras")} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
@@ -3624,6 +3624,46 @@ function ServicosSemProximoPassoCard({ services, appointments, inbox, onOpenFich
   </CardRecolhivel>;
 }
 
+// O CARD QUE FAZ A DATA VENCIDA REAPARECER. Ver retornoVencido() para o porquê.
+//
+// NÃO É LISTA DE DEVER DE CASA. Diego já disse que alerta que dá trabalho é pior que alerta nenhum: o card
+// nasce FECHADO como todo o resto, e fechado ele mostra só o tamanho do problema. Aberto, traz os mais
+// antigos primeiro — que são os que ou morrem ou voltam — com o WhatsApp à mão pra resolver no mesmo toque.
+// Não muda status de ninguém sozinho: quem decide se o cliente sumiu ou fechou é o Diego, pelo Classic.
+function RetornosVencidosCard({ services, today, onVerLeads, onOpenFicha }) {
+  const vencidos = useMemo(() => (services || []).filter((s) => retornoVencido(s, today))
+    .sort((a, b) => String(a.prazo).localeCompare(String(b.prazo))), [services, today]);
+  if (!vencidos.length) return null;
+  const dias = (s) => Math.round((new Date(today + "T12:00:00") - new Date(s.prazo + "T12:00:00")) / 86400000);
+  const semAcao = vencidos.filter((s) => !String(s.proxima_acao || "").trim()).length;
+  const antigos = vencidos.filter((s) => dias(s) > 15).length;
+  // Mostra os 8 mais parados; o resto fica atrás do botão que leva pra aba Leads já filtrada. Despejar 61
+  // linhas no Painel seria trocar um problema invisível por uma parede que ele também não lê.
+  const visiveis = vencidos.slice(0, 8);
+  return <CardRecolhivel
+    cabecalho={<><p className="kicker">ESPERANDO RETORNO</p>
+      <h3>{vencidos.length} cliente(s) com a data de retorno vencida</h3>
+      <span className="ficha-note" style={{ margin: 0 }}>{antigos ? `${antigos} há mais de 15 dias` : "nenhum há mais de 15 dias"}{semAcao ? ` · ${semAcao} sem próxima ação escrita` : ""}</span></>}>
+    <div className="funil-lista">{visiveis.map((s) => {
+      const tel = s.clientes?.telefone ? normalizePhone(s.clientes.telefone) : "";
+      return <article className={`funil-item st-${s.status}`} key={s.id} onClick={() => onOpenFicha(s.cliente_id)}>
+        <div className="funil-esq">
+          <strong>{s.clientes?.nome || "Cliente"}</strong>
+          <span>{s.titulo}</span>
+          <em>→ {s.proxima_acao || "Sem próxima ação"}</em>
+        </div>
+        <div className="funil-dir">
+          <span className="status-pill">{statusLabel[s.status] || s.status}</span>
+          <b>{s.valor_orcamento ? money(s.valor_orcamento) : "—"}</b>
+          <time className="atrasado">parado há {dias(s)} dia(s)</time>
+          {tel && <div className="ficha-servico-acoes"><a className="ghost" href={`https://wa.me/55${tel}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>WhatsApp</a></div>}
+        </div>
+      </article>;
+    })}</div>
+    {vencidos.length > visiveis.length && onVerLeads && <button className="ghost" style={{ width: "100%", marginTop: 10 }} onClick={onVerLeads}>Ver os {vencidos.length} na aba Leads</button>}
+  </CardRecolhivel>;
+}
+
 const SEM_PROFISSIONAL = "Sem profissional atribuído";
 // PAINEL: capacidade por profissional - clica no nome pra ver os servicos dele (mesmo padrao da Agenda: colapsado, expande no clique)
 function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, onChanged }) {
@@ -3829,7 +3869,7 @@ function MateriaisCard({ services, today, onVerCompras }) {
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, pessoais, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerCompras, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, pessoais, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
   const profissionais = nomesProfissionais(services);
@@ -4009,6 +4049,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     <ServicosSemProximoPassoCard services={services} appointments={appointments} inbox={inbox} onOpenFicha={onOpenFicha} />
+    <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} />
     {/* PESSOAIS mora na mesma home por conveniência dele, mas é outro domínio — e fica DEPOIS do trabalho,
         porque a primeira olhada do dia é a rota. Só sobe pra cara dele quando tem atrasado. */}
     <PessoaisCard pessoais={pessoais} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
@@ -4105,14 +4146,14 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
 }
 function Metric({ label, value, detail, tone, onClick }) { return <article className={`metric-card ${tone}${onClick ? " clickable" : ""}`} onClick={onClick || undefined}><span>{label}</span><b>{value}</b><small>{detail}</small></article>; }
 
-const FUNIL_FILTROS = [{ id: "todos", label: "Todos" }, { id: "sem_acao", label: "Sem ação" }, { id: "lead", label: "Lead" }, { id: "orcamento", label: "Orçamento" }, { id: "agendado", label: "Agendado" }, { id: "producao", label: "Em produção" }, { id: "entregue", label: "Entregue" }];
+const FUNIL_FILTROS = [{ id: "todos", label: "Todos" }, { id: "sem_acao", label: "Sem ação" }, { id: "retorno_vencido", label: "Retorno vencido" }, { id: "lead", label: "Lead" }, { id: "orcamento", label: "Orçamento" }, { id: "agendado", label: "Agendado" }, { id: "producao", label: "Em produção" }, { id: "entregue", label: "Entregue" }];
 function LeadsView({ services, search, setSearch, onOpenFicha, initialFiltro, onConsumedInitialFiltro }) {
   const [filtroStatus, setFiltroStatus] = useState(initialFiltro || "todos");
   useEffect(() => { if (onConsumedInitialFiltro) onConsumedInitialFiltro(); }, []);
   // Mesma fila do card de Capacidade: produção primeiro (peça na bancada, prazo correndo), agendado no
   // final (fechado mas nem começou), e dentro de cada faixa o prazo mais apertado na frente.
   const ORDEM_FILA = { producao: 0, lead: 1, orcamento: 1, agendado: 2, entregue: 3, pago: 4, perdido: 5 };
-  const visible = services.filter((service) => `${service.clientes?.nome} ${service.titulo}`.toLowerCase().includes(search.toLowerCase())).filter((service) => filtroStatus === "todos" || (filtroStatus === "sem_acao" ? !service.proxima_acao : service.status === filtroStatus))
+  const visible = services.filter((service) => `${service.clientes?.nome} ${service.titulo}`.toLowerCase().includes(search.toLowerCase())).filter((service) => filtroStatus === "todos" || (filtroStatus === "sem_acao" ? !service.proxima_acao : filtroStatus === "retorno_vencido" ? retornoVencido(service, hojeISO()) : service.status === filtroStatus))
     .sort((a, b) => (ORDEM_FILA[a.status] ?? 9) - (ORDEM_FILA[b.status] ?? 9) || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">FUNIL DE TRABALHO</p><h3>{visible.length} serviços ativos</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente ou serviço" /></div>
     <div className="funil-filtros">{FUNIL_FILTROS.map((f) => <button key={f.id} className={filtroStatus === f.id ? "active" : ""} onClick={() => setFiltroStatus(f.id)}>{f.label}</button>)}</div>
@@ -5008,6 +5049,22 @@ function compraPrecisaRevisao(item) { return !item.fornecedor_id && !(item.descr
 // dos lançamentos reais do serviço, e sem valor de orçamento o documento nem é gerado.
 const CS_ESC = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 function ehServicoFechado(s) { return ["agendado", "producao", "entregue", "pago"].includes(s?.status); }
+// RETORNO VENCIDO — a data existe e não faz nada (item ATIVOS-COM-DATA-20260827-1805-001).
+//
+// A trava do banco `servicos_ativo_precisa_prazo` já obriga todo serviço ativo a ter data, e ela ESTÁ sendo
+// cumprida: zero lead ou orçamento sem prazo. Só que medido no banco em 28/08 havia **61 leads e orçamentos
+// com o prazo já vencido** — 47 há mais de 15 dias e 19 sem nem próxima ação escrita. Rodrigo Monteiro,
+// Rafael, Rebeca e Edimaria estavam parados há 34 dias.
+//
+// Ou seja: a regra estava cumprida e a FINALIDADE dela, não. O sentido da data é fazer o item REAPARECER, e
+// ele não reaparecia em lugar nenhum — os blocos de atrasado/hoje/próximos do Painel saem da AGENDA, e
+// cliente que só tem lead não tem compromisso marcado. Sumia por completo.
+//
+// Mesma função usada pelo card do Painel e pelo filtro da aba Leads, de propósito: duas definições de
+// "vencido" divergem com o tempo e aí os dois números param de bater.
+function retornoVencido(s, hoje) {
+  return ["lead", "orcamento"].includes(s?.status) && !!s.prazo && s.prazo < hoje;
+}
 // Referência derivada do id real do serviço — identificador de verdade, não número inventado.
 function referenciaConfirmacao(servicoId) { return "TB-" + String(servicoId || "").replace(/-/g, "").slice(0, 8).toUpperCase(); }
 function linhasFinanceirasDaConfirmacao(financeiro) {
