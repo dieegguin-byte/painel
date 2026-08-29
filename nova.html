@@ -2231,6 +2231,10 @@ function Home() {
   const [booting, setBooting] = useState(true);
   const [email, setEmail] = useState("");
   const [loginSent, setLoginSent] = useState(false);
+  // Compartilhamento que chegou com ele DESLOGADO. A tela de login não tem área de aviso — o `notify` ali
+  // grava estado e não renderiza nada. Sem isto ele compartilharia, não veria mensagem nenhuma e concluiria
+  // que o app perdeu (a carga está guardada, mas quem não vê não sabe).
+  const [compartilhamentoGuardado, setCompartilhamentoGuardado] = useState(false);
   const [tab, setTab] = useState("painel");
   const [leadsFiltroInicial, setLeadsFiltroInicial] = useState("todos");
   const [mode, setMode] = useState("diego");
@@ -2652,11 +2656,23 @@ function Home() {
     if (error) notify(error.message, "error"); else { setReply(""); await loadAll(); notify("Resposta enviada para a fila do Claude.", "ok"); }
   }
 
-  // CHEGOU DO WHATSAPP (Share Target). O service worker pegou o print/texto que o Diego compartilhou, guardou
-  // no cache e abriu o app com ?compartilhado=1. Aqui a carga vira o que já existe: texto no campo e print(s)
-  // anexados, igualzinho a colar na mão — por isso reaproveita o addInbox em vez de duplicar upload.
-  // NÃO SALVA SOZINHO DE PROPÓSITO. Print que cai na fila sem contexto é print que fica semanas parado (o caso
-  // do sofá que ficou 3 semanas). O compartilhar tira o trabalho de copiar; dizer de quem é continua com ele.
+  // CHEGOU DE QUALQUER APP (Share Target) — Fase 1 da Caixa Universal, item
+  // COMPARTILHAMENTO-UNIVERSAL-20260828-001.
+  //
+  // ⚠ O BURACO QUE ISTO TAPA, e ele era silencioso: o caminho já existia inteiro — o service worker pegava o
+  // POST, guardava no cache e abria o app — mas a última etapa jogava a carga em `setComposer`/`setFiles`,
+  // que alimentam o card "ANOTAR AGORA". Esse card só renderiza se o Dashboard receber `addInbox`, e ele
+  // parou de receber quando a Caixa saiu da tela em 23/08. Pior: o cache era apagado ANTES disso. Ou seja,
+  // desde 23/08 compartilhar algo pro app **destruía a carga e não mostrava nada** — com direito a um aviso
+  // dizendo "confira e salve", apontando pra uma tela que não existe mais.
+  //
+  // AGORA SALVA SOZINHO, e essa inversão é decisão dele: o recado de 28/08 diz que o receio antigo (print
+  // sem contexto parado por semanas) foi substituído por "quero despejar rápido e processar depois". A
+  // entrada nasce BRUTA e NÃO CLASSIFICADA na `caixa_entrada`; quem interpreta é o Classic, depois.
+  //
+  // ORDEM QUE IMPORTA: persistir primeiro, apagar o cache depois. Se qualquer passo falhar, a carga continua
+  // no aparelho e reabrir o app tenta de novo. Sucesso falso aqui é o pior desfecho possível — ele fecharia
+  // o app achando que guardou.
   useEffect(() => {
     const endereco = new URL(location.href);
     if (endereco.searchParams.get("compartilhado") !== "1") return;
@@ -2673,28 +2689,71 @@ function Home() {
           if (achou) { cache = c; carga = await achou.json(); break; }
         }
         if (!carga || cancelado) return;
+        // `carga.arquivos` traz nome e tipo reais. `carga.imagens` é o formato antigo e só tem a URL — fica
+        // aceito porque pode haver carga do service worker anterior parada no cache do aparelho dele.
+        const listaArquivos = (carga.arquivos && carga.arquivos.length)
+          ? carga.arquivos
+          : (carga.imagens || []).map((url, i) => ({ url, nome: `compartilhado_${carga.em}_${i}.jpg`, tipo: "image/jpeg" }));
         const recebidos = [];
-        for (let i = 0; i < (carga.imagens || []).length; i++) {
-          const img = await cache.match(carga.imagens[i]);
-          if (!img) continue;
-          const blob = await img.blob();
-          recebidos.push(new File([blob], `whatsapp_${carga.em}_${i}.jpg`, { type: blob.type || "image/jpeg" }));
-          await cache.delete(carga.imagens[i]);
+        for (const item of listaArquivos) {
+          const resposta = await cache.match(item.url);
+          if (!resposta) continue;
+          const blob = await resposta.blob();
+          recebidos.push(new File([blob], item.nome, { type: blob.type || item.tipo || "application/octet-stream" }));
         }
+        if (cancelado) return;
+        // DEMONSTRAÇÃO: não tem banco pra salvar, então só mostra que chegou.
+        if (demo) {
+          await cache.delete("./__compartilhado__");
+          for (const item of listaArquivos) await cache.delete(item.url);
+          setTab("painel");
+          notify("Chegou o compartilhamento (na demonstração não salva).", "info");
+          return;
+        }
+        // SEM SESSÃO OU SEM BANCO: a carga FICA no cache e ele é avisado de que ainda não foi salva.
+        // Sucesso falso aqui é pior que erro: ele fecharia o app achando que guardou.
+        if (!db || !session) {
+          setCompartilhamentoGuardado(true);
+          notify("Guardado no aparelho, ainda NÃO salvo na Caixa — entre na sua conta.", "info");
+          return;
+        }
+        const uploaded = [];
+        for (const f of recebidos) {
+          const path = `caixa-entrada/${carga.em}_${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+          const up = await db.storage.from("fotos-servicos").upload(path, f, { upsert: true });
+          if (up.error) throw up.error;
+          const assinada = await db.storage.from("fotos-servicos").createSignedUrl(path, 60 * 60 * 24 * 365);
+          if (assinada.error) throw assinada.error;
+          uploaded.push({ url: assinada.data.signedUrl, fileName: f.name });
+        }
+        // IDEMPOTÊNCIA PELO CARIMBO DA CARGA: `carga.em` é gravado pelo service worker no instante do
+        // compartilhamento e não muda se o app for recarregado ou reaberto. Mesmo compartilhamento gera
+        // sempre o mesmo id, então refresh não vira segunda entrada.
+        const id = await uuidDeterministicoEvento("compartilhado-" + carga.em, "caixa");
+        const { jaExistia } = await inserirComIdDeterministico(db, "caixa_entrada", id, {
+          texto: buildInboxPayload(uploaded, carga.texto || ""), status: "novo", conversa: [], processado: false,
+        }, ["texto"]);
+        // SÓ AGORA a evidência bruta some do aparelho: depois do insert confirmado, nunca antes.
+        // Era aqui o buraco — o app apagava o cache e jogava a carga num campo de texto que não é mais
+        // renderizado (a UI da Caixa saiu em 23/08). Compartilhamento entrava e desaparecia em silêncio.
         await cache.delete("./__compartilhado__");
+        for (const item of listaArquivos) await cache.delete(item.url);
         if (cancelado) return;
         setTab("painel");
-        if (carga.texto) setComposer((atual) => (atual ? atual + "\n" : "") + carga.texto);
-        if (recebidos.length) setFiles((fs) => [...fs, ...recebidos]);
-        notify(recebidos.length ? `Chegou do WhatsApp: ${recebidos.length} print(s). Diga de quem é e salve.` : "Chegou do WhatsApp. Confira e salve.", "ok");
+        await loadAll();
+        notify(jaExistia ? "Esse compartilhamento já estava na Caixa."
+          : `Salvo na Caixa${uploaded.length ? ` com ${uploaded.length} arquivo(s)` : ""}. O Classic processa depois.`, "ok");
       } catch (e) {
-        notify("Não consegui ler o que veio do WhatsApp: " + e.message, "error");
+        // Falhou: a carga CONTINUA no cache. Reabrir o app tenta de novo.
+        notify("Não consegui salvar na Caixa: " + e.message + " — a carga continua guardada no aparelho.", "error");
       } finally {
         history.replaceState(null, "", endereco.pathname);
       }
     })();
     return () => { cancelado = true; };
-  }, [notify]);
+  // Reentrada é segura: o replaceState tira o ?compartilhado=1 e a guarda do topo corta na hora. E mesmo
+  // que rodasse de novo, o id determinístico impede a segunda entrada.
+  }, [notify, db, session, demo, loadAll]);
 
   // A BARRA DE ABAS ROLA ATÉ ONDE VOCÊ ESTÁ. São 10 abas e só 5 cabem num celular de 375px — Compras,
   // A pagar, Profissionais, Clientes e Fornecedores nascem fora da tela. O pior não era estarem escondidas,
@@ -2803,7 +2862,7 @@ function Home() {
   }, []);
 
   if (booting) return <div className="loading-screen"><div className="brand-seal">TB</div><p>Preparando a central…</p></div>;
-  if (!session && !demo) return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">NOVA CENTRAL OPERACIONAL</p><h1>Tapeçaria Bahia</h1><p>Um ambiente separado para Diego e Claude trabalharem na mesma fila, sem apagar, duplicar ou perder o próximo passo.</p>{loginSent ? <div className="success-box">Link enviado. Abra seu e-mail neste aparelho.</div> : <><label>E-mail de acesso<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" onKeyDown={(event) => event.key === "Enter" && sendMagicLink()} /></label><button className="primary" onClick={sendMagicLink} disabled={busy || !email.trim()}>Enviar link de acesso</button></>}<button className="ghost demo-button" onClick={() => setDemo(true)}>Ver demonstração do novo site</button></div></div>;
+  if (!session && !demo) return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">NOVA CENTRAL OPERACIONAL</p><h1>Tapeçaria Bahia</h1><p>Um ambiente separado para Diego e Claude trabalharem na mesma fila, sem apagar, duplicar ou perder o próximo passo.</p>{compartilhamentoGuardado && <div className="success-box" style={{ marginBottom: 14, textAlign: "left" }}><b>Chegou um compartilhamento.</b><br />Está <b>guardado no aparelho</b> e ainda NÃO foi salvo na Caixa. Entre na sua conta que ele sobe sozinho.</div>}{loginSent ? <div className="success-box">Link enviado. Abra seu e-mail neste aparelho.</div> : <><label>E-mail de acesso<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" onKeyDown={(event) => event.key === "Enter" && sendMagicLink()} /></label><button className="primary" onClick={sendMagicLink} disabled={busy || !email.trim()}>Enviar link de acesso</button></>}<button className="ghost demo-button" onClick={() => setDemo(true)}>Ver demonstração do novo site</button></div></div>;
   if (!demo && pinState === "checking") return <div className="loading-screen"><div className="brand-seal">TB</div><p>Verificando o bloqueio…</p></div>;
   // Falha fechada: não deu pra verificar o bloqueio e não existe hash guardado neste aparelho — não abre.
   if (!demo && pinState === "bloqueado") return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">BLOQUEADO</p><h1>Não deu pra verificar o PIN</h1><p>A central não conseguiu ler a configuração de bloqueio e este aparelho ainda não tem o PIN guardado. Conecte à internet uma vez e abra de novo — depois disso ele passa a funcionar offline.</p><button className="primary" onClick={() => window.location.reload()}>Tentar de novo</button></div></div>;
@@ -3624,6 +3683,42 @@ function ServicosSemProximoPassoCard({ services, appointments, inbox, onOpenFich
   </CardRecolhivel>;
 }
 
+// A CAIXA VOLTA A TER OLHO NO PAINEL — Fase 1 da Caixa Universal (COMPARTILHAMENTO-UNIVERSAL-20260828-001).
+//
+// A tela da Caixa saiu em 23/08, quando o app virou visualização e o Classic passou a ser quem escreve. A
+// decisão foi certa, mas levou junto a única forma de VER a fila: medido em 29/08, havia 39 entradas não
+// processadas que o app não mostrava em lugar nenhum. E com o compartilhamento passando a salvar sozinho,
+// entrada sem visão vira exatamente a falha que o item chama de anti-esquecimento.
+//
+// SÓ LEITURA, de propósito. Não ressuscita a tela antiga de triagem: aqui ele vê O QUE ENTROU e o que ainda
+// não foi processado. Quem interpreta, responde e resolve continua sendo o Classic.
+function CaixaCard({ inbox, today }) {
+  const pendentes = (inbox || []).filter((i) => !i.processado);
+  if (!pendentes.length) return null;
+  const porStatus = (s) => pendentes.filter((i) => statusDaCaixa(i) === s).length;
+  const aguardando = porStatus("aguardando_voce");
+  const ordenados = [...pendentes].sort((a, b) => String(b.criado_em || "").localeCompare(String(a.criado_em || "")));
+  const hojeEntraram = ordenados.filter((i) => String(i.criado_em || "").slice(0, 10) === today).length;
+  return <CardRecolhivel
+    cabecalho={<><p className="kicker">CAIXA</p>
+      <h3>{pendentes.length} entrada(s) esperando processamento</h3>
+      <span className="ficha-note" style={{ margin: 0 }}>{hojeEntraram ? `${hojeEntraram} chegou(aram) hoje` : "nenhuma chegou hoje"}{aguardando ? ` · ${aguardando} esperando resposta sua` : ""}</span></>}>
+    <div className="funil-lista">{ordenados.slice(0, 10).map((item) => {
+      const p = parseInbox(item.texto || "");
+      const quando = item.criado_em ? new Date(item.criado_em) : null;
+      return <article className="funil-item" key={item.id}>
+        <div className="funil-esq">
+          <strong>{p.text ? p.text.slice(0, 90) + (p.text.length > 90 ? "…" : "") : "(sem texto — só arquivo)"}</strong>
+          {!!p.images.length && <span>📎 {p.images.length} arquivo(s): {p.images.map((i) => i.fileName).join(", ").slice(0, 60)}</span>}
+          {quando && <em>{quando.toLocaleString("pt-BR")}</em>}
+        </div>
+        <div className="funil-dir"><span className="status-pill">{statusDaCaixa(item)}</span></div>
+      </article>;
+    })}</div>
+    {pendentes.length > 10 && <p className="ficha-note">e mais {pendentes.length - 10} na fila.</p>}
+  </CardRecolhivel>;
+}
+
 // O CARD QUE FAZ A DATA VENCIDA REAPARECER. Ver retornoVencido() para o porquê.
 //
 // NÃO É LISTA DE DEVER DE CASA. Diego já disse que alerta que dá trabalho é pior que alerta nenhum: o card
@@ -4050,6 +4145,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     <ServicosSemProximoPassoCard services={services} appointments={appointments} inbox={inbox} onOpenFicha={onOpenFicha} />
     <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} />
+    <CaixaCard inbox={inbox} today={today} />
     {/* PESSOAIS mora na mesma home por conveniência dele, mas é outro domínio — e fica DEPOIS do trabalho,
         porque a primeira olhada do dia é a rota. Só sobe pra cara dele quando tem atrasado. */}
     <PessoaisCard pessoais={pessoais} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />

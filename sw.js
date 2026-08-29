@@ -29,7 +29,10 @@
 /* v13 (28/08/2026): entrou o ./estoque.html no SHELL. A subida de versao tambem serve de vassoura - o
    activate apaga todo cache que nao seja o da versao atual, entao o celular do Diego para de servir a
    copia velha do nova.html que ainda nao tinha o botao Estoque nem a correcao do Waze. */
-const VERSAO = 'tb-atendimento-v13';
+/* v14 (29/08/2026): a carga compartilhada passou a guardar NOME e TIPO reais do arquivo (campo `arquivos`).
+   Antes so guardava a URL, e o app renomeava tudo pra .jpg - um audio do WhatsApp virava foto. O campo
+   `imagens` continua sendo preenchido pra nao quebrar carga antiga parada no cache do aparelho. */
+const VERSAO = 'tb-atendimento-v14';
 // COMPARTILHAR DO WHATSAPP. O Android entrega o print/texto num POST multipart pra ./compartilhar,
 // que NAO existe como arquivo - e nem poderia, o GitHub Pages so serve estatico. O service worker e
 // o unico lugar capaz de pegar esse POST. Ele guarda a carga no cache e manda o app abrir; quem le,
@@ -85,14 +88,18 @@ self.addEventListener('fetch', (e) => {
         const arquivos = form.getAll('arquivos').filter((f) => f && f.size);
         const carga = {
           texto: [form.get('titulo'), form.get('texto'), form.get('link')].filter(Boolean).join('\n').trim(),
-          imagens: [],
+          imagens: [],   // mantido pelo nome antigo: pode haver carga do sw anterior ainda no cache
+          arquivos: [],  // nome e tipo REAIS - sem isso o app renomeava tudo pra .jpg e um audio virava foto
           em: Date.now()
         };
         const c = await caches.open(VERSAO);
         for (let i = 0; i < arquivos.length; i++) {
-          const chave = './__compartilhado_img_' + i + '__';
-          await c.put(chave, new Response(arquivos[i], { headers: { 'Content-Type': arquivos[i].type || 'image/jpeg' } }));
-          carga.imagens.push(new URL(chave, self.location).href);
+          const chave = './__compartilhado_arq_' + i + '__';
+          const tipo = arquivos[i].type || 'application/octet-stream';
+          await c.put(chave, new Response(arquivos[i], { headers: { 'Content-Type': tipo } }));
+          const url = new URL(chave, self.location).href;
+          carga.imagens.push(url);
+          carga.arquivos.push({ url: url, nome: arquivos[i].name || ('compartilhado_' + i), tipo: tipo });
         }
         await c.put(CARGA_COMPARTILHADA, new Response(JSON.stringify(carga), { headers: { 'Content-Type': 'application/json' } }));
       } catch (err) {
