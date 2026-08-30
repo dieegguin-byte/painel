@@ -147,10 +147,15 @@ async function cifrar(texto: string, p256dh: string, auth: string): Promise<Uint
 
 type Assinatura = { id: string; endpoint: string; p256dh: string; auth: string };
 
-async function entregar(assinatura: Assinatura, aviso: unknown): Promise<{ ok: boolean; status: number; erro: string }> {
+async function entregar(assinatura: Assinatura, aviso: unknown): Promise<{ ok: boolean; status: number; erro: string; recibo?: string }> {
   const vp = await vapid();
   const audiencia = new URL(assinatura.endpoint).origin;
-  const corpo = await cifrar(JSON.stringify(aviso), assinatura.p256dh, assinatura.auth);
+  // TELEMETRIA DE ENTREGA. Sem isto eu só enxergo até o Google: ele devolve 201 em 1 segundo e a
+  // notificação some de vista. O recibo viaja DENTRO da carga cifrada; o service worker devolve no
+  // instante em que o evento `push` chega nele. Comparar as duas horas separa as duas causas
+  // possíveis — aparelho que não recebe (Android segurando) e aparelho que recebe e não mostra.
+  const recibo = await rpc("push_recibo_abrir", { p_tag: (aviso as any)?.tag ?? null });
+  const corpo = await cifrar(JSON.stringify({ ...(aviso as any), recibo }), assinatura.p256dh, assinatura.auth);
   const r = await fetch(assinatura.endpoint, {
     method: "POST",
     headers: {
@@ -178,7 +183,7 @@ async function entregar(assinatura: Assinatura, aviso: unknown): Promise<{ ok: b
         : { ultimo_erro: `${r.status} ${erro}` }),
     });
   }
-  return { ok: r.ok, status: r.status, erro };
+  return { ok: r.ok, status: r.status, erro, recibo };
 }
 
 async function assinaturasAtivas(): Promise<Assinatura[]> {
@@ -307,6 +312,20 @@ Deno.serve(async (req) => {
     // A chave pública é pública por definição — o app precisa dela pra se inscrever. Sem segredo aqui.
     if (modo === "chave") {
       return Response.json({ chave_publica: (await vapid()).publica });
+    }
+
+    // RECIBO devolvido pelo service worker do aparelho. Sem segredo de propósito: o SW não tem a senha
+    // (ela não pode viver num arquivo público) e o id é um uuid que só existe dentro da carga cifrada —
+    // quem não recebeu a notificação não tem como adivinhar. Só carimba hora, não lê nem muda nada.
+    // GET simples de propósito: POST com JSON dispara preflight CORS, e aí o SW precisaria de mais rede
+    // justamente no momento em que o aparelho está com pressa pra voltar a dormir.
+    if (modo === "recibo") {
+      const id = String(url.searchParams.get("recibo") || doCorpo.recibo || "");
+      const campo = String(url.searchParams.get("campo") || doCorpo.campo || "recebido");
+      const cabecalhos = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
+      if (!/^[0-9a-fA-F-]{36}$/.test(id)) return new Response(JSON.stringify({ erro: "recibo invalido" }), { status: 400, headers: cabecalhos });
+      const achou = await rpc("push_recibo_marcar", { p_recibo: id, p_campo: campo });
+      return new Response(JSON.stringify({ ok: achou }), { headers: cabecalhos });
     }
 
     const segredo = await rpc("push_segredo", { nome: "PUSH_SECRET" });

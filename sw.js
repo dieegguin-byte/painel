@@ -39,7 +39,23 @@
    A carga chega CIFRADA (so este aparelho tem a chave), entao o texto vem junto no proprio push e o SW
    nao precisa de rede nem de sessao pra mostrar. Se um dia chegar push sem carga, ainda mostra algo:
    Android que recebe push e nao mostra notificacao acaba revogando a permissao do site. */
-const VERSAO = 'tb-atendimento-v15';
+/* v16 (30/08/2026): RECIBO DE ENTREGA. A notificacao chegava, mas so quando o Diego abria o app - e do
+   servidor eu so enxergava ate o Google, que devolve 201 em 1 segundo e pronto. Agora o proprio service
+   worker avisa a hora em que o evento `push` chegou NELE. Se a hora do recibo bater com a do envio, o
+   aparelho recebeu na hora e o problema e de EXIBICAO; se o recibo so chegar quando ele abre o app, o
+   Android nao acordou o processo e o problema e de ENTREGA. Sao causas diferentes com consertos
+   diferentes, e sem esse carimbo as duas parecem iguais de fora. */
+const VERSAO = 'tb-atendimento-v16';
+// Sem segredo aqui de proposito: este arquivo e publico. O que autentica o recibo e o proprio id, que
+// e um uuid que so existe dentro da carga cifrada - quem nao recebeu a notificacao nao tem como chutar.
+const PUSH_FUNCAO = 'https://iymlzdcloaeyybhefywp.supabase.co/functions/v1/push-enviar';
+function carimbarRecibo(recibo, campo) {
+  if (!recibo) return Promise.resolve();
+  // no-cors: nao preciso ler a resposta, e assim o navegador nao gasta um preflight OPTIONS justo
+  // no momento em que o aparelho quer voltar a dormir.
+  return fetch(PUSH_FUNCAO + '?modo=recibo&campo=' + campo + '&recibo=' + encodeURIComponent(recibo),
+    { mode: 'no-cors', cache: 'no-store' }).catch(function () {});
+}
 // COMPARTILHAR DO WHATSAPP. O Android entrega o print/texto num POST multipart pra ./compartilhar,
 // que NAO existe como arquivo - e nem poderia, o GitHub Pages so serve estatico. O service worker e
 // o unico lugar capaz de pegar esse POST. Ele guarda a carga no cache e manda o app abrir; quem le,
@@ -172,16 +188,21 @@ self.addEventListener('push', (e) => {
   // generico "atualizado em segundo plano" e, se repetir, revogar a permissao do site calado.
   const titulo = (aviso && aviso.titulo) || 'Painel de Atendimento';
   const corpo = (aviso && aviso.corpo) || (e.data ? String(e.data.text() || '').slice(0, 140) : 'Toque para abrir o painel.');
-  e.waitUntil(self.registration.showNotification(titulo, {
-    body: corpo,
-    // A tag carrega o id do item: o mesmo compromisso substitui o aviso anterior em vez de empilhar.
-    tag: (aviso && aviso.tag) || 'painel',
-    renotify: true,
-    icon: './icon-192.png',
-    badge: './icon-192.png',
-    vibrate: [80, 40, 80],
-    data: { url: (aviso && aviso.url) || './nova.html' }
-  }));
+  e.waitUntil(Promise.all([
+    // O carimbo vem PRIMEIRO na lista de proposito: se o Android matar o processo no meio, prefiro ter
+    // o recibo (que me diz o que aconteceu) do que perder as duas coisas.
+    carimbarRecibo(aviso && aviso.recibo, 'recebido'),
+    self.registration.showNotification(titulo, {
+      body: corpo,
+      // A tag carrega o id do item: o mesmo compromisso substitui o aviso anterior em vez de empilhar.
+      tag: (aviso && aviso.tag) || 'painel',
+      renotify: true,
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      vibrate: [80, 40, 80],
+      data: { url: (aviso && aviso.url) || './nova.html', recibo: (aviso && aviso.recibo) || null }
+    })
+  ]));
 });
 
 // TOQUE NA NOTIFICACAO. Se o app ja esta aberto numa aba, foca ela - reabrir do zero perderia o que ele
@@ -189,6 +210,7 @@ self.addEventListener('push', (e) => {
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const destino = new URL((e.notification.data && e.notification.data.url) || './nova.html', self.location).href;
+  carimbarRecibo(e.notification.data && e.notification.data.recibo, 'aberto');
   e.waitUntil((async () => {
     const abertas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const janela of abertas) {
