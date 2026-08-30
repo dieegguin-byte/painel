@@ -185,23 +185,27 @@ async function assinaturasAtivas(): Promise<Assinatura[]> {
   return await rest("push_assinaturas?ativo=eq.true&select=id,endpoint,p256dh,auth");
 }
 
-// Manda o mesmo aviso pra todos os aparelhos. Se NENHUM aceitou, solta a reserva da chave pra que a
-// próxima varredura tente de novo — perder um lembrete por causa de um 500 do FCM seria pior.
-async function difundir(avisos: { chave: string; aviso: unknown }[]): Promise<any[]> {
-  if (!avisos.length) return [];
+// Um envio pode cobrir VÁRIOS itens: quando quatro compromissos caem na mesma hora, vai uma notificação
+// só, e as quatro chaves ficam marcadas como entregues.
+type Envio = { chaves: string[]; aviso: unknown };
+
+// Manda o mesmo aviso pra todos os aparelhos. Se NENHUM aceitou, solta as reservas pra que a próxima
+// varredura tente de novo — perder um lembrete por causa de um 500 do FCM seria pior.
+async function difundir(envios: Envio[]): Promise<any[]> {
+  if (!envios.length) return [];
   const alvos = await assinaturasAtivas();
   const relatorio: any[] = [];
-  for (const item of avisos) {
+  for (const item of envios) {
     if (!alvos.length) {
-      await rpc("push_soltar", { chaves: [item.chave] });
-      relatorio.push({ chave: item.chave, status: "sem aparelho inscrito" });
+      await rpc("push_soltar", { chaves: item.chaves });
+      relatorio.push({ chaves: item.chaves, status: "sem aparelho inscrito" });
       continue;
     }
     const saidas = [];
     for (const alvo of alvos) saidas.push(await entregar(alvo, item.aviso));
-    if (!saidas.some((s) => s.ok)) await rpc("push_soltar", { chaves: [item.chave] });
+    if (!saidas.some((s) => s.ok)) await rpc("push_soltar", { chaves: item.chaves });
     relatorio.push({
-      chave: item.chave,
+      chaves: item.chaves,
       entregues: saidas.filter((s) => s.ok).length,
       de: saidas.length,
       erros: saidas.filter((s) => !s.ok).map((s) => `${s.status} ${s.erro}`),
@@ -214,18 +218,35 @@ async function difundir(avisos: { chave: string; aviso: unknown }[]): Promise<an
 
 const dinheiro = (v: number) => "R$ " + Number(v).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
-function avisosDaVarredura(p: any): { chave: string; aviso: unknown }[] {
-  const lista: { chave: string; aviso: unknown }[] = [];
+// Recebe SÓ o que ainda não foi notificado (a reserva acontece antes, no roteador). Por isso pode
+// agrupar sem medo: o texto do lote é montado apenas com item novo.
+function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
+  const lista: Envio[] = [];
 
-  // COMPROMISSO DA AGENDA — individual, porque tem hora e lugar: é acionável.
-  for (const a of p.agenda || []) {
+  // COMPROMISSO DA AGENDA. Um só vira notificação individual, com lugar e quanto falta — é acionável.
+  if (agenda.length === 1) {
+    const a = agenda[0];
     const onde = [a.local, a.cidade].filter(Boolean).join(" · ");
     lista.push({
-      chave: `agenda:${a.id}`,
+      chaves: [`agenda:${a.id}`],
       aviso: {
-        titulo: `${a.hora} · ${a.titulo}`,
+        titulo: `${a.hora} · ${String(a.titulo || "").slice(0, 80)}`,
         corpo: [onde, a.faltam >= 0 ? `em ${a.faltam} min` : null].filter(Boolean).join(" — ") || "Compromisso agendado",
         tag: `agenda-${a.id}`,
+        url: "./nova.html?ir=agenda",
+      },
+    });
+  } else if (agenda.length > 1) {
+    // VÁRIOS NA MESMA HORA VIRAM UM AVISO SÓ. Medido em 30/08: os envelopes de TRIAGEM que o Classic
+    // cria caem de 15 em 15 min (08:00, 08:15, 08:30, 08:45) — quatro notificações seguidas às 7h da
+    // manhã seriam o caminho mais curto pra ele desligar a permissão. Agrupar não descarta nada: os
+    // quatro títulos vão no corpo, e nenhum deles é notificado de novo depois.
+    lista.push({
+      chaves: agenda.map((a) => `agenda:${a.id}`),
+      aviso: {
+        titulo: `${agenda.length} compromissos na próxima hora`,
+        corpo: agenda.map((a) => `${a.hora} ${String(a.titulo || "").slice(0, 40)}`).join(" · ").slice(0, 170),
+        tag: "agenda-lote",
         url: "./nova.html?ir=agenda",
       },
     });
@@ -233,9 +254,10 @@ function avisosDaVarredura(p: any): { chave: string; aviso: unknown }[] {
 
   // CAIXA DE ENTRADA — individual, mas só o que chegou nas últimas 24h. O backlog foi semeado como
   // já-enviado na virada, senão a primeira execução mandaria 41 notificações de uma vez.
-  for (const c of p.caixa || []) {
+  if (caixa.length === 1) {
+    const c = caixa[0];
     lista.push({
-      chave: `caixa:${c.id}`,
+      chaves: [`caixa:${c.id}`],
       aviso: {
         titulo: "Nova entrada na caixa",
         corpo: String(c.texto || "").replace(/\s+/g, " ").slice(0, 140),
@@ -243,11 +265,21 @@ function avisosDaVarredura(p: any): { chave: string; aviso: unknown }[] {
         url: "./nova.html?ir=caixa",
       },
     });
+  } else if (caixa.length > 1) {
+    lista.push({
+      chaves: caixa.map((c) => `caixa:${c.id}`),
+      aviso: {
+        titulo: `${caixa.length} entradas novas na caixa`,
+        corpo: caixa.map((c) => String(c.texto || "").replace(/\s+/g, " ").slice(0, 50)).join(" · ").slice(0, 170),
+        tag: "caixa-lote",
+        url: "./nova.html?ir=caixa",
+      },
+    });
   }
   return lista;
 }
 
-function avisoDoResumo(p: any): { chave: string; aviso: unknown }[] {
+function avisoDoResumo(p: any): Envio[] {
   const r = p.resumo || {};
   const partes: string[] = [];
   if (Number(r.retornos_vencidos) > 0) partes.push(`${r.retornos_vencidos} retorno(s) vencido(s)`);
@@ -259,7 +291,7 @@ function avisoDoResumo(p: any): { chave: string; aviso: unknown }[] {
     ? `${r.compromissos_hoje} compromisso(s) hoje${r.proximo_hoje ? ` — o primeiro ${r.proximo_hoje}` : ""}`
     : "Hoje sem compromisso marcado";
   return [{
-    chave: `resumo:${p.hoje}`,
+    chaves: [`resumo:${p.hoje}`],
     aviso: { titulo, corpo: partes.join(" · ") || "Nada pendente.", tag: "resumo-diario", url: "./nova.html" },
   }];
 }
@@ -300,14 +332,36 @@ Deno.serve(async (req) => {
     }
 
     const pendencias = await rpc("push_pendencias");
-    const candidatos = modo === "resumo" ? avisoDoResumo(pendencias) : avisosDaVarredura(pendencias);
 
-    // Reserva ANTES de mandar: duas varreduras que se cruzem não podem mandar o mesmo lembrete duas vezes.
-    const liberadas: string[] = candidatos.length ? await rpc("push_reservar", { chaves: candidatos.map((c) => c.chave) }) : [];
-    const aMandar = candidatos.filter((c) => liberadas.includes(c.chave));
-    const relatorio = await difundir(aMandar);
+    // A RESERVA VEM ANTES DE MONTAR O TEXTO, não depois. Reservar antes é o que impede duas varreduras
+    // cruzadas de mandarem o mesmo lembrete; fazer isso ANTES de montar é o que permite agrupar sem
+    // repetir — o lote nasce só com o que ainda não foi notificado.
+    let envios: Envio[] = [];
+    let candidatos = 0;
 
-    return Response.json({ modo, candidatos: candidatos.length, novos: aMandar.length, relatorio, resumo: pendencias.resumo });
+    if (modo === "resumo") {
+      const monta = avisoDoResumo(pendencias);
+      candidatos = monta.length;
+      if (monta.length) {
+        const liberadas: string[] = await rpc("push_reservar", { chaves: monta[0].chaves });
+        if (liberadas.length) envios = monta;
+      }
+    } else {
+      const agenda = pendencias.agenda || [];
+      const caixa = pendencias.caixa || [];
+      candidatos = agenda.length + caixa.length;
+      if (candidatos) {
+        const chaves = [...agenda.map((a: any) => `agenda:${a.id}`), ...caixa.map((c: any) => `caixa:${c.id}`)];
+        const liberadas = new Set<string>(await rpc("push_reservar", { chaves }));
+        envios = avisosDaVarredura(
+          agenda.filter((a: any) => liberadas.has(`agenda:${a.id}`)),
+          caixa.filter((c: any) => liberadas.has(`caixa:${c.id}`)),
+        );
+      }
+    }
+
+    const relatorio = await difundir(envios);
+    return Response.json({ modo, candidatos, envios: envios.length, relatorio, resumo: pendencias.resumo });
   } catch (e) {
     return new Response(JSON.stringify({ erro: String((e as Error)?.message || e) }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
