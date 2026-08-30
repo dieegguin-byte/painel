@@ -3278,27 +3278,46 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
   // conta quando diz algo que a cidade já não diz.
   const soTexto = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
   const localBruto = String(a.local || "").trim();
+  // Tem um quarto padrão, e é o que quebrou o botão: o Classic escreve no `local` a PROCEDÊNCIA do ponto,
+  // não o ponto. "Águas Claras — ponto exato compartilhado pelo cliente no WhatsApp" (Gilmar, 05/09),
+  // "Ponto confirmado pela cliente no WhatsApp" (Marilda). É anotação sobre a coordenada, não endereço —
+  // mandar o Waze buscar essa frase é garantir que ele não ache nada. Quem vale aí é a coordenada, abaixo.
   const localUtil = (localBruto
     && soTexto(localBruto) !== soTexto(a.cidade)
-    && !/pendente|a confirmar|nao informad|remoto/i.test(soTexto(localBruto))) ? localBruto : "";
+    && !/pendente|a confirmar|nao informad|remoto/i.test(soTexto(localBruto))
+    && !/ponto (exato|confirmado)|localizacao (compartilhad|confirmad|enviad)/i.test(soTexto(localBruto))) ? localBruto : "";
 
   const temPonto = cli?.latitude != null && cli?.longitude != null;
+  // O PONTO DA PRÓPRIA AGENDA (item WAZE-PONTO-AGENDA-20260829). A tabela `agenda` tem latitude/longitude e
+  // o Classic PREENCHE: Gilmar, Fabrício, Marilda, Anny e Jackson estão lá, todos com PONTO_CONFIRMADO. O
+  // app nunca olhou pra elas — lia só o ponto do cliente, e o texto do `local` passava na frente dos dois.
+  // Medido nos dados reais de 29/08: o Waze abria certo em 2 de 122 compromissos. O Classic gravava a porta
+  // e o botão jogava a porta fora pra mandar uma frase pra busca do Waze.
+  //
+  // Coordenada não se discute com texto: esta é a coordenada DESTE compromisso, então vence o `local` —
+  // inclusive quando o local é um terceiro (a loja), porque o ponto foi gravado pra este compromisso.
+  // Não desfaz o AGENDA-ROTA-LOCAL-20260823-2105: sem ponto na agenda, o local continua vencendo o ponto do
+  // CLIENTE, que é o que impede "comprar o material DA NURIMAR na PLÁSTICO & TAL" de virar rota pra casa
+  // da Nurimar. E não desfaz o AGENDA-WAZE-PLACEID-20260824-0824: place id continua sendo o primeiro.
+  const pontoAgenda = (a.latitude != null && a.longitude != null) ? `${a.latitude},${a.longitude}` : "";
   const cidadeFim = cli?.cidade || a.cidade;
-  // Precedência: destino explícito da agenda > ponto salvo do cliente > endereço > cidade.
-  const usarPonto = !localUtil && temPonto;
+  // Precedência: ponto do compromisso > destino explícito da agenda > ponto do cliente > endereço > cidade.
+  const pontoRota = pontoAgenda || (!localUtil && temPonto ? `${cli.latitude},${cli.longitude}` : "");
+  const usarPonto = !!pontoRota;
   const destinoTexto = localUtil ? [localUtil, a.cidade].filter(Boolean).join(", ")
     : cli?.endereco ? [cli.endereco, cidadeFim].filter(Boolean).join(", ")
     : (cidadeFim || "");
-  const soCidade = !localUtil && !temPonto && !cli?.endereco && !!cidadeFim;
-  const destinoRota = usarPonto ? `${cli.latitude},${cli.longitude}` : destinoTexto;
+  const soCidade = !usarPonto && !localUtil && !cli?.endereco && !!cidadeFim;
+  const destinoRota = pontoRota || destinoTexto;
   // PLACE ID DO DESTINO VENCE TUDO (item AGENDA-WAZE-PLACEID-20260824-0824). O Maps já abria certo e o
   // Waze não: com `q=texto` quem escolhe o destino é a busca do Waze, e ela escolheu outro lugar. Place ID
   // é o endereço exato do estabelecimento no mapa — não tem o que escolher errado. Vale só pro Waze; o Maps
   // passou no teste real do Diego e não se mexe no que está funcionando.
   const placeIdAgenda = String(a.google_place_id || "").trim();
-  // A escolha do destino não mudou (place id > ponto salvo > texto) — mudou só o transporte, ver urlWaze.
+  // A ORDEM continua a mesma (place id > ponto > texto) e o transporte intent:// de 27/08 segue intocado.
+  // O que mudou é o que conta como "ponto": agora o da agenda também, não só o do cliente — ver pontoRota.
   const linkWaze = placeIdAgenda ? urlWaze({ google_place_id: placeIdAgenda })
-    : usarPonto ? urlWaze({ ll: `${cli.latitude},${cli.longitude}` })
+    : usarPonto ? urlWaze({ ll: pontoRota })
       : urlWaze({ q: destinoTexto });
   const linkMaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinoRota)}`;
   const selo = soCidade ? " (só cidade)" : "";
