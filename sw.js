@@ -32,7 +32,14 @@
 /* v14 (29/08/2026): a carga compartilhada passou a guardar NOME e TIPO reais do arquivo (campo `arquivos`).
    Antes so guardava a URL, e o app renomeava tudo pra .jpg - um audio do WhatsApp virava foto. O campo
    `imagens` continua sendo preenchido pra nao quebrar carga antiga parada no cache do aparelho. */
-const VERSAO = 'tb-atendimento-v14';
+/* v15 (29/08/2026): NOTIFICACAO. Ate a v14 este arquivo nao tinha um `push` nem um `notificationclick` -
+   e nenhum outro arquivo do app tinha. "A notificacao nao chega no celular" nunca foi regressao: era
+   funcionalidade que nunca existiu. O service worker e o UNICO lugar capaz de receber push com o app
+   fechado, entao os dois ouvintes moram aqui embaixo.
+   A carga chega CIFRADA (so este aparelho tem a chave), entao o texto vem junto no proprio push e o SW
+   nao precisa de rede nem de sessao pra mostrar. Se um dia chegar push sem carga, ainda mostra algo:
+   Android que recebe push e nao mostra notificacao acaba revogando a permissao do site. */
+const VERSAO = 'tb-atendimento-v15';
 // COMPARTILHAR DO WHATSAPP. O Android entrega o print/texto num POST multipart pra ./compartilhar,
 // que NAO existe como arquivo - e nem poderia, o GitHub Pages so serve estatico. O service worker e
 // o unico lugar capaz de pegar esse POST. Ele guarda a carga no cache e manda o app abrir; quem le,
@@ -152,5 +159,45 @@ self.addEventListener('fetch', (e) => {
       const salvo = await caches.match(req);
       return salvo || Response.error();
     }
+  })());
+});
+
+// NOTIFICACAO CHEGANDO. Quem manda e a Edge Function push-enviar; a carga vem cifrada com a chave deste
+// aparelho, entao `e.data.json()` ja e o texto pronto - nada de buscar no Supabase daqui (o SW nao
+// enxerga o localStorage da pagina, logo nao tem a sessao do Diego).
+self.addEventListener('push', (e) => {
+  let aviso = null;
+  try { aviso = e.data ? e.data.json() : null; } catch (err) { aviso = null; }
+  // SEMPRE mostrar alguma coisa. Push recebido sem notificacao exibida faz o Android mostrar o aviso
+  // generico "atualizado em segundo plano" e, se repetir, revogar a permissao do site calado.
+  const titulo = (aviso && aviso.titulo) || 'Painel de Atendimento';
+  const corpo = (aviso && aviso.corpo) || (e.data ? String(e.data.text() || '').slice(0, 140) : 'Toque para abrir o painel.');
+  e.waitUntil(self.registration.showNotification(titulo, {
+    body: corpo,
+    // A tag carrega o id do item: o mesmo compromisso substitui o aviso anterior em vez de empilhar.
+    tag: (aviso && aviso.tag) || 'painel',
+    renotify: true,
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    vibrate: [80, 40, 80],
+    data: { url: (aviso && aviso.url) || './nova.html' }
+  }));
+});
+
+// TOQUE NA NOTIFICACAO. Se o app ja esta aberto numa aba, foca ela - reabrir do zero perderia o que ele
+// estava vendo e ainda faria o Babel transpilar 580 KB de novo.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const destino = new URL((e.notification.data && e.notification.data.url) || './nova.html', self.location).href;
+  e.waitUntil((async () => {
+    const abertas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const janela of abertas) {
+      if (janela.url.indexOf(self.location.origin) !== 0) continue;
+      if (janela.url.indexOf('nova.html') === -1 && 'navigate' in janela) {
+        try { await janela.navigate(destino); } catch (err) { /* aba em estado que nao aceita navegar */ }
+      }
+      if ('focus' in janela) return janela.focus();
+    }
+    if (self.clients.openWindow) return self.clients.openWindow(destino);
   })());
 });

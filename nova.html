@@ -456,6 +456,109 @@ const { useCallback, useEffect, useMemo, useState } = React;
 const SUPABASE_URL = "https://iymlzdcloaeyybhefywp.supabase.co";
 const SUPABASE_KEY = "sb_publishable_kGmPlLLQdFSxdslH6Y9f2w_Cuox7hFm";
 
+// NOTIFICAÇÃO NO CELULAR — 29/08/2026, item 003 da fila.
+//
+// A chave PÚBLICA do VAPID. É pública por definição: ela só identifica quem manda o push, e é o próprio
+// aparelho que exige recebê-la pra criar a assinatura. A privada correspondente nasceu e ficou dentro do
+// Supabase (vault), gerada pela Edge Function push-enviar — nunca passou por aqui nem pelo repositório.
+// NÃO TROCAR esta chave: trocar invalida a assinatura já feita no celular, e o Diego pararia de receber
+// sem nenhum erro aparecer em lugar nenhum.
+const VAPID_PUBLICA = "BJbZ9OXmY5W45zAShaF9Aho29T2Mg-CXTqKohy9WG9XQtH81tI83yS58Sx2elFzKImoEC4UgoUsf33P3Hnl1hhw";
+
+// O pushManager exige a chave como bytes, não como texto.
+function chavePushEmBytes(b64) {
+  const normal = (b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(normal);
+  const saida = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) saida[i] = bin.charCodeAt(i);
+  return saida;
+}
+
+// BOTÃO DE LIGAR/DESLIGAR O AVISO. Fica no cabeçalho porque precisa ser achável sem procurar: se ele
+// desinstalar e reinstalar o app, o Android cria OUTRO endpoint e a assinatura antiga morre — ele tem
+// que conseguir religar sozinho, sem pedir socorro.
+//
+// PERMISSÃO SÓ SE PEDE UMA VEZ DE VERDADE: negada no Android, o navegador não pergunta de novo, tem que
+// ir nos ajustes do sistema. Por isso o pedido acontece só no clique — nunca sozinho ao abrir o app.
+function BotaoNotificacao({ db, demo, notify }) {
+  const [estado, setEstado] = useState("checando");
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      const temSuporte = "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
+      if (demo || !db || !temSuporte) { if (vivo) setEstado("indisponivel"); return; }
+      if (Notification.permission === "denied") { if (vivo) setEstado("negado"); return; }
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const assinatura = await reg.pushManager.getSubscription();
+        if (vivo) setEstado(assinatura && Notification.permission === "granted" ? "ligado" : "desligado");
+      } catch (e) { if (vivo) setEstado("desligado"); }
+    })();
+    return () => { vivo = false; };
+  }, [db, demo]);
+
+  const ligar = useCallback(async () => {
+    setEstado("ligando");
+    try {
+      const permissao = await Notification.requestPermission();
+      if (permissao !== "granted") {
+        setEstado(permissao === "denied" ? "negado" : "desligado");
+        notify("A permissão de notificação não foi concedida.", "error");
+        return;
+      }
+      const reg = await navigator.serviceWorker.ready;
+      let assinatura = await reg.pushManager.getSubscription();
+      if (!assinatura) {
+        assinatura = await reg.pushManager.subscribe({
+          // Obrigatório no Chrome: promete que todo push recebido vira notificação visível. O sw.js
+          // cumpre isso mostrando um aviso genérico mesmo quando a carga vem vazia.
+          userVisibleOnly: true,
+          applicationServerKey: chavePushEmBytes(VAPID_PUBLICA),
+        });
+      }
+      const chaves = assinatura.toJSON().keys || {};
+      // O endpoint é a identidade do aparelho. Upsert por ele: religar no mesmo celular atualiza a linha
+      // em vez de criar uma segunda, que faria toda notificação chegar duplicada.
+      const { error } = await db.from("push_assinaturas").upsert({
+        endpoint: assinatura.endpoint,
+        p256dh: chaves.p256dh,
+        auth: chaves.auth,
+        aparelho: String(navigator.userAgent || "").slice(0, 180),
+        ativo: true, falhas: 0, ultimo_erro: null,
+      }, { onConflict: "endpoint" });
+      if (error) throw error;
+      setEstado("ligado");
+      notify("Aviso ligado neste aparelho.", "ok");
+    } catch (e) {
+      setEstado("desligado");
+      notify("Não deu pra ligar o aviso: " + (e?.message || e), "error");
+    }
+  }, [db, notify]);
+
+  const desligar = useCallback(async () => {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const assinatura = await reg.pushManager.getSubscription();
+      if (assinatura) {
+        // Desativa no banco ANTES de cancelar no aparelho: se a ordem fosse inversa e a rede caísse no
+        // meio, o servidor continuaria mandando push pra um endpoint que já não existe mais.
+        await db.from("push_assinaturas").update({ ativo: false }).eq("endpoint", assinatura.endpoint);
+        await assinatura.unsubscribe();
+      }
+      setEstado("desligado");
+      notify("Aviso desligado neste aparelho.", "info");
+    } catch (e) { notify("Não deu pra desligar: " + (e?.message || e), "error"); }
+  }, [db, notify]);
+
+  if (estado === "indisponivel" || estado === "checando") return null;
+  if (estado === "negado") {
+    return <button className="ghost" onClick={() => notify("A permissão está bloqueada pelo Android. Abra os ajustes do site no celular e libere a notificação.", "error")}>🔕 Aviso bloqueado</button>;
+  }
+  if (estado === "ligado") return <button className="ghost" onClick={desligar} title="Este aparelho está recebendo os avisos">🔔 Aviso ligado</button>;
+  return <button className="ghost" onClick={ligar} disabled={estado === "ligando"}>{estado === "ligando" ? "Ligando…" : "🔔 Ativar aviso"}</button>;
+}
+
 const emptyForm = {
   kind: "cliente", customerId: "", name: "", phone: "", city: "", address: "", service: "", responsavel: "",
   serviceStatus: "lead", priority: "media", nextAction: "Responder o cliente e confirmar os detalhes", due: "", value: "",
@@ -2908,7 +3011,7 @@ function Home() {
       <div className="operator-card"><span>Operador atual</span><strong>{mode === "claude" ? "Claude" : "Diego"}</strong><small>{mode === "claude" ? "Operações tipadas liberadas · exclusões bloqueadas" : "Controle e aprovações"}</small><button onClick={() => setMode(mode === "claude" ? "diego" : "claude")}>Trocar para {mode === "claude" ? "Diego" : "Claude"}</button></div>
     </aside>
     <main className="workspace">
-      <header className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
+      <header className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><BotaoNotificacao db={db} demo={demo} notify={notify} /><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
 
       {/* A TELA DA CAIXA DE ENTRADA FOI REMOVIDA EM 23/08/2026, a pedido do Diego.
           Ela era a porta de digitação do app — colar mensagem, triar, virar cliente/agenda/
@@ -6621,7 +6724,9 @@ root.render(<Barreira><Home /></Barreira>);
 // (que é o caso do dia a dia) nunca instalava o cache, e por isso nada funcionava offline. Registrar aqui
 // também: o escopo './' cobre a pasta inteira, então os dois compartilham o mesmo SW.
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=12').catch(() => {}));
+  // O ?v= acompanha a VERSAO dentro do sw.js. Ficou parado no v=12 enquanto o arquivo já ia no v14: o
+  // navegador atualiza pelo conteúdo, então funcionava, mas quem lê o código acha que não subiu.
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=15').catch(() => {}));
 }
 </script>
 </body>
