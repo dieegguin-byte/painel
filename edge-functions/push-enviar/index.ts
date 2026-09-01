@@ -223,6 +223,27 @@ async function difundir(envios: Envio[]): Promise<any[]> {
 
 const dinheiro = (v: number) => "R$ " + Number(v).toFixed(2).replace(".", ",").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 
+// A LEVA. O `push_pendencias` devolve as próximas 6 horas; aqui se decide onde cortar.
+//
+// POR QUE ISTO EXISTE (01/09/2026): na manhã de 31/08 o Diego recebeu CINCO lembretes separados, que é
+// justamente o que o agrupamento devia impedir. O agrupamento funcionava, mas nunca tinha dois itens
+// pra juntar: a varredura roda a cada 5 min e só enxergava a janela de 60 min, então cada compromisso
+// entrava sozinho na sua vez. O defeito não estava em juntar, estava em olhar perto demais.
+//
+// A regra é a de uma leva de verdade: dispara pelo primeiro que entrou na janela e encadeia os
+// seguintes enquanto o intervalo entre eles for de no máximo 60 min. Uma sequência (08:00, 08:15,
+// 08:45, 09:00) vira um aviso só; um compromisso isolado às 10:30 NÃO é arrastado junto — ele ganha o
+// próprio lembrete na hora dele, que é o ponto de ter lembrete.
+function levaDaAgenda(agenda: any[]): any[] {
+  if (!agenda.length || !agenda[0].na_janela) return [];
+  const leva = [agenda[0]];
+  for (let i = 1; i < agenda.length; i++) {
+    if (agenda[i].faltam - leva[leva.length - 1].faltam > 60) break;
+    leva.push(agenda[i]);
+  }
+  return leva;
+}
+
 // Recebe SÓ o que ainda não foi notificado (a reserva acontece antes, no roteador). Por isso pode
 // agrupar sem medo: o texto do lote é montado apenas com item novo.
 function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
@@ -242,14 +263,15 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
       },
     });
   } else if (agenda.length > 1) {
-    // VÁRIOS NA MESMA HORA VIRAM UM AVISO SÓ. Medido em 30/08: os envelopes de TRIAGEM que o Classic
-    // cria caem de 15 em 15 min (08:00, 08:15, 08:30, 08:45) — quatro notificações seguidas às 7h da
-    // manhã seriam o caminho mais curto pra ele desligar a permissão. Agrupar não descarta nada: os
-    // quatro títulos vão no corpo, e nenhum deles é notificado de novo depois.
+    // A LEVA INTEIRA NUM AVISO SÓ. Os envelopes de TRIAGEM que o Classic cria caem de 15 em 15 min —
+    // na manhã de 31/08 isso virou CINCO notificações seguidas, que é o caminho mais curto pra ele
+    // desligar a permissão. O título diz a hora do primeiro, e não "na próxima hora": a leva pode
+    // passar de uma hora quando os compromissos vêm encadeados. Agrupar não descarta nada: todos os
+    // títulos vão no corpo, e nenhum deles é notificado de novo depois.
     lista.push({
       chaves: agenda.map((a) => `agenda:${a.id}`),
       aviso: {
-        titulo: `${agenda.length} compromissos na próxima hora`,
+        titulo: `${agenda.length} compromissos a partir das ${agenda[0].hora}`,
         corpo: agenda.map((a) => `${a.hora} ${String(a.titulo || "").slice(0, 40)}`).join(" · ").slice(0, 170),
         tag: "agenda-lote",
         url: "./nova.html?ir=agenda",
@@ -366,14 +388,16 @@ Deno.serve(async (req) => {
         if (liberadas.length) envios = monta;
       }
     } else {
-      const agenda = pendencias.agenda || [];
+      // Só a leva entra na reserva. Reservar as 6 horas inteiras marcaria como "já avisado" um
+      // compromisso das 10:30 que ninguém viu ainda, e ele nunca ganharia lembrete.
+      const leva = levaDaAgenda(pendencias.agenda || []);
       const caixa = pendencias.caixa || [];
-      candidatos = agenda.length + caixa.length;
+      candidatos = leva.length + caixa.length;
       if (candidatos) {
-        const chaves = [...agenda.map((a: any) => `agenda:${a.id}`), ...caixa.map((c: any) => `caixa:${c.id}`)];
+        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...caixa.map((c: any) => `caixa:${c.id}`)];
         const liberadas = new Set<string>(await rpc("push_reservar", { chaves }));
         envios = avisosDaVarredura(
-          agenda.filter((a: any) => liberadas.has(`agenda:${a.id}`)),
+          leva.filter((a: any) => liberadas.has(`agenda:${a.id}`)),
           caixa.filter((c: any) => liberadas.has(`caixa:${c.id}`)),
         );
       }
