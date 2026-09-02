@@ -606,6 +606,13 @@ const demoAppointments = [
   { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", local: "Remoto / WhatsApp", tipo: "remoto", status: "planejado", servico_id: "s2" },
   { id: "a3", titulo: "Mariana — visita sofá", data: somarDias(hojeISO(), 1), hora: "09:30", cidade: "Jardim Ingá", local: "Jardim Ingá — endereço/localização pendente", tipo: "presencial", status: "planejado", servico_id: "s1" },
   { id: "a4", titulo: "Carlos — buscar cadeiras", data: "2026-07-11", hora: "09:00", cidade: "Luziânia", local: "Ozair", tipo: "presencial", status: "planejado", servico_id: "s2" },
+  // Dois casos que entraram em 01/09/2026 e que a demo não cobria:
+  // a5 = bloqueio pessoal. O card TEM que mostrar "Apresentação na escola do filho", não "Compromisso
+  //      pessoal" — era o defeito do item APP-AGENDA-TITULO-PESSOAL-20260829-01.
+  // a6 = compromisso de cliente SEM serviço, ligado direto por `cliente_id`. TEM que nascer com o nome da
+  //      Ana Paula, o telefone dela e o botão de WhatsApp — o buraco que o Jackson revelou em 30/08.
+  { id: "a5", titulo: "Compromisso pessoal", data: hojeISO(), hora: "19:00", cidade: "Luziânia", local: null, tipo: "operacional", status: "planejado", servico_id: null, pessoal_id: "p2" },
+  { id: "a6", titulo: "PROVISÓRIO — Retirada Ana Paula — Valparaíso", data: hojeISO(), hora: "10:30", cidade: "Valparaíso", local: "Quadra 108, Lote 3", tipo: "presencial", status: "planejado", servico_id: null, cliente_id: "c3" },
 ];
 const demoFinance = [
   { id: "f1", tipo: "entrada", valor: 675, descricao: "Entrada 50% — Carlos", status: "pago", data: "2026-07-09" },
@@ -711,6 +718,27 @@ function telefoneDaTriagem(a) {
   // falta em número antigo. Sem normalizador paralelo.
   const formatado = corrigirTelefone(d);
   return formatado ? normalizePhone(formatado) : "";
+}
+// COMPROMISSO PESSOAL PRECISA SER LEGÍVEL (item APP-AGENDA-TITULO-PESSOAL-20260829-01).
+// A linha de bloqueio na agenda nasce com o título genérico "Compromisso pessoal" enquanto o registro
+// vinculado em `pessoais` diz "Dentista", "Levar esposa ao dentista", "Arrumar parafuso do banco do carro".
+// O Diego lia a agenda do dia e não sabia o que era o próprio compromisso. Decisão dele em 29/08:
+// "Compromisso pessoal" pode continuar existindo como CATEGORIA, mas não é o texto que ele lê.
+//
+// Resolvido AQUI, no ponto único de carga, e não nas telas: são cinco superfícies lendo `titulo` e a
+// próxima nasceria errada de novo. Campo NOVO e derivado (`titulo_visivel`) de propósito — `titulo`
+// continua sendo o dado do banco, porque é ele que a remarcação persiste no sucessor. Tela lê o visível,
+// gravação lê o original.
+function comTituloVisivel(appointments, pessoais) {
+  const porId = new Map((pessoais || []).map((p) => [p.id, p]));
+  return (appointments || []).map((a) => {
+    const p = a.pessoal_id ? porId.get(a.pessoal_id) : null;
+    if (!p) return a; // sem vínculo pessoal o card mostra o que sempre mostrou. Nada de inventar.
+    const titulo = (p.titulo || "").trim();
+    const detalhe = (p.descricao || "").trim();
+    if (!titulo && !detalhe) return a;
+    return { ...a, titulo_visivel: titulo && titulo !== a.titulo ? titulo : undefined, detalhe_visivel: detalhe || undefined };
+  });
 }
 function parseInbox(raw = "") {
   const note = raw.match(/\[\[TB_INBOX_NOTE\]\]([\s\S]*)$/);
@@ -2203,6 +2231,23 @@ function urlWaze(destino) {
   if (!ehAndroid()) return web;
   return `intent://?${qs}#Intent;scheme=waze;package=com.waze;S.browser_fallback_url=${encodeURIComponent(web)};end`;
 }
+// WHATSAPP — MESMO DEFEITO DE TRANSPORTE QUE QUEBROU O WAZE EM 27/08, e a mesma cura.
+// `https://wa.me/...` é universal link. No navegador comum o Android entrega pro WhatsApp; dentro do app
+// instalado o Chrome trata como PÁGINA e abre a landing "Continuar para o chat", que pede outro toque e
+// nem sempre chega na conversa. Caso real: Shirlei, 31/08 — o telefone estava certo na ficha
+// (+55 61 99852-0902), o botão renderizava, o Diego tocava e a conversa não abria. O número nunca foi o
+// problema; o transporte era.
+//
+// `S.browser_fallback_url` garante o piso: sem WhatsApp instalado (ou se o intent falhar) o Android abre
+// exatamente o wa.me de hoje. Ou seja, isto não tem como ficar pior que o comportamento atual.
+// `tel` chega SEM o 55 (é o que normalizePhone devolve) — o país entra aqui, num lugar só.
+function urlWhatsapp(tel, texto) {
+  const numero = `55${tel}`;
+  const web = `https://wa.me/${numero}${texto ? "?text=" + encodeURIComponent(texto) : ""}`;
+  if (!ehAndroid()) return web;
+  const qs = `phone=${numero}${texto ? "&text=" + encodeURIComponent(texto) : ""}`;
+  return `intent://send?${qs}#Intent;scheme=whatsapp;package=com.whatsapp;S.browser_fallback_url=${encodeURIComponent(web)};end`;
+}
 function horarioApertado(h, outros, cidadeNova) { return (outros || []).some((a) => Math.abs(minutosDoHorario(h) - minutosDoHorario(a.hora)) < tempoEstradaMin(cidadeNova, a.cidade) + DURACAO_SERVICO_MIN); }
 // IGREJA É COMPROMISSO, NÃO "HORÁRIO VAZIO". Seg/qua/sex às 18h30. O que trava não é a hora do serviço, é a
 // hora em que ele consegue voltar: serviço + estrada de volta pra base. Um 17h em Brasília termina 18h e
@@ -2402,7 +2447,7 @@ function Home() {
   const aplicarPacote = useCallback((p) => {
     setInbox((p.inbox || []).map((item) => ({ ...item, conversa: comoLista(item.conversa) })));
     setCustomers(p.customers || []); setServices(p.services || []);
-    setAppointments(p.appointments || []); setFinances(p.finances || []); setRotinas(p.rotinas || []);
+    setAppointments(comTituloVisivel(p.appointments, p.pessoais)); setFinances(p.finances || []); setRotinas(p.rotinas || []);
     setFornecedores(p.fornecedores || []); setPessoais(p.pessoais || []);
     // Distâncias não são estado de tela — alimentam tempoEstradaMin, que é função pura. Entram no pacote
     // pra virem junto no cache offline: sem sinal a trava de rota continua com os tempos aprendidos.
@@ -2411,7 +2456,7 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(demoAppointments); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
@@ -2951,7 +2996,10 @@ function Home() {
 
   // `data` vai junto porque o reagendamento fecha o compromisso antigo: se ele estava marcado pra
   // frente e o Diego resolveu antes, a data tem que virar hoje (mesmo motivo do Concluir).
-  const abrirReagendar = (a) => setExplicar({ item: { tipoItem: "agenda", id: a.id, titulo: a.titulo, cidade: a.cidade, tipo: a.tipo, servico_id: a.servico_id, data: a.data, hora: a.hora }, kind: "reagendar" });
+  // `titulo` e `titulo_visivel` viajam SEPARADOS de propósito: o modal MOSTRA o visível, mas o que ele grava
+  // (meta.titulo_original da pendência, e daí o título do compromisso sucessor) é o `titulo` do banco.
+  // Se fossem um só, remarcar um bloqueio pessoal escreveria o texto de tela dentro da agenda.
+  const abrirReagendar = (a) => setExplicar({ item: { tipoItem: "agenda", id: a.id, titulo: a.titulo, titulo_visivel: a.titulo_visivel, cidade: a.cidade, tipo: a.tipo, servico_id: a.servico_id, data: a.data, hora: a.hora }, kind: "reagendar" });
   // Atualização otimista: some da tela na hora; o loadAll depois só reconcilia com o banco.
   const aplicarResolucao = useCallback((patch) => {
     if (!patch) return;
@@ -3025,7 +3073,7 @@ function Home() {
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
       {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
-      {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
+      {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} services={activeServices} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
@@ -3336,7 +3384,7 @@ async function compartilharGPT(texto, aviso) {
   }
 }
 
-function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais }) {
+function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais }) {
   const [aberto, setAberto] = useState(false);
   // Sem `notify` aqui (o card não recebe a prop) — o aviso da cópia vive no próprio card.
   const [avisoGPT, setAvisoGPT] = useState("");
@@ -3348,15 +3396,31 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
   // número que ninguém triou ainda — sem cliente, sem serviço, sem saber do que a conversa trata. É a mesma
   // regra que já vale para compromisso interno: o app não fala pelo Diego quando não tem como provar com
   // quem está falando. Aqui ele abre o WhatsApp vazio, que é o certo — o Diego lê a conversa e escreve.
-  const sugestao = svc?.sugestao_resposta || (quem.destino === "cliente" && !ehEnvelopeDeTriagem(a) ? mensagemPadraoCompromisso(a, svc, today) : "");
+  // MESMA TRAVA, CASO NOVO: compromisso ligado direto ao cliente (sem serviço) também não ganha mensagem
+  // pronta. É o caso do Jackson — o serviço não existe justamente porque o que foi combinado estava num
+  // áudio que ninguém transcreveu. Sem serviço não há prazo, peça, valor nem próxima ação; a frase padrão
+  // sairia adivinhando pelo título ("Retirada" vira "posso buscar a peça hoje?") e isso vai pro WhatsApp da
+  // cliente. O botão abre vazio: o vínculo prova COM QUEM ele fala, não O QUE foi combinado.
+  const semServico = !svc;
+  const sugestao = svc?.sugestao_resposta || (quem.destino === "cliente" && !semServico && !ehEnvelopeDeTriagem(a) ? mensagemPadraoCompromisso(a, svc, today) : "");
   // UMA variável de telefone, um caminho de renderização só. A ficha do cliente continua sendo a primeira
   // fonte; o telefone técnico do envelope de triagem só entra quando ela não existe, e alimenta ESTA mesma
   // variável — o botão de WhatsApp abaixo é o mesmo, sem componente, estilo ou fluxo paralelo.
-  const tel = (svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "") || telefoneDaTriagem(a);
+  // CLIENTE DIRETO NA AGENDA (item COMPROMISSOS-WHATSAPP-JACKSON-20260830-001). Até 31/08 existia UM
+  // caminho pro cliente: agenda.servico_id -> servicos.cliente_id. Compromisso de cliente de verdade que
+  // ainda não tem serviço caía fora dele — sem nome, sem telefone, sem WhatsApp. O Jackson mostrou o buraco:
+  // o serviço não foi criado de propósito (os dados comerciais estavam num áudio que ninguém transcreveu),
+  // e criar serviço falso pra fazer um botão nascer seria mentir no banco pra consertar tela.
+  // A precedência é a mesma de sempre: quem tem serviço continua resolvendo pelo serviço.
+  const cli = svc?.clientes || cliente;
+  const tel = (cli?.telefone ? normalizePhone(cli.telefone) : "") || telefoneDaTriagem(a);
   // Telefone técnico quebrado não pode sumir em silêncio: sem isso o envelope volta a parecer um card sem
   // WhatsApp, que é exatamente o defeito que estamos consertando. Erro visível vale mais que omissão.
   const triagemSemTelefone = !tel && ehEnvelopeDeTriagem(a);
-  const oQueFazer = svc?.proxima_acao || a.titulo;
+  // `titulo_visivel` é o título do registro pessoal vinculado (ver comTituloVisivel). Só existe quando há
+  // vínculo real; sem ele nada muda.
+  const tituloCard = a.titulo_visivel || a.titulo;
+  const oQueFazer = svc?.proxima_acao || tituloCard;
   // ROTA — TRÊS qualidades, e o botão diz honestamente qual é.
   // 1. PONTO: o Classic gravou latitude/longitude do pino que o Diego compartilhou. Porta.
   // 2. ENDEREÇO: sem ponto ainda, o mapa busca o texto. Costuma acertar a rua.
@@ -3366,7 +3430,7 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
   // A versão anterior escondia o botão quando faltava endereço, e isso o deixou invisível
   // exatamente onde ele foi olhar: Nurimar, Léo e Andriele — os presenciais de 24/08 — estão
   // todos sem endereço na ficha. Regra certa no papel, inútil na estrada.
-  const cli = svc?.clientes;
+  // (`cli` sai lá de cima — serviço primeiro, cliente direto da agenda depois.)
   // DESTINO DA ROTA — `agenda.local` VENCE (item AGENDA-ROTA-LOCAL-20260823-2105).
   // Vínculo de negócio e destino físico são coisas diferentes: "comprar o material DA NURIMAR
   // na PLÁSTICO & TAL" tem a Nurimar como cliente e a loja como destino. A versão anterior
@@ -3424,7 +3488,7 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
       : urlWaze({ q: destinoTexto });
   const linkMaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinoRota)}`;
   const selo = soCidade ? " (só cidade)" : "";
-  const nomeCliente = svc?.clientes?.nome || a.titulo;
+  const nomeCliente = cli?.nome || tituloCard;
   const cidadeCard = a.tipo === "remoto" ? "◌ Remoto" : `⌖ ${cli?.cidade || a.cidade || "Cidade não informada"}`;
   // INSTRUÇÕES DO ATENDIMENTO (Diego, 23/08/2026: "cada cliente com instruções do que precisa
   // ser feito"). Reúne aqui tudo que ele precisa saber ANTES de bater na porta, sem ter que
@@ -3455,16 +3519,19 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
       <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
     </button>
     {aberto && <div className="compromisso-corpo">
-      <h4>{a.titulo}</h4>
-      {/* BLOQUEIO PESSOAL: a linha da agenda existe só pra dizer que ele está indisponível. O compromisso
-          de verdade mora no card Pessoais, e nenhum detalhe pessoal chega até aqui — a operação só precisa
-          saber que o horário não está livre, não o motivo. */}
-      {a.pessoal_id && <p className="compromisso-material">⛔ Bloqueio pessoal — você está indisponível neste horário. O compromisso está no card Pessoais.</p>}
+      <h4>{tituloCard}</h4>
+      {/* BLOQUEIO PESSOAL: a linha da agenda existe pra dizer que ele está indisponível, e o registro
+          completo continua morando no card Pessoais.
+          MUDOU EM 29/08 (item APP-AGENDA-TITULO-PESSOAL-20260829-01): antes o card escondia o motivo de
+          propósito — "a operação só precisa saber que o horário não está livre". Só que quem lê a agenda é
+          o próprio Diego, e ele estava vendo "Compromisso pessoal" às 14h sem saber que era o parafuso do
+          banco do carro. Decisão dele: pessoal tem que ser legível em todo lugar do app. */}
+      {a.pessoal_id && <p className="compromisso-material">⛔ Pessoal — você está indisponível neste horário{a.detalhe_visivel ? ` · ${a.detalhe_visivel}` : ""}. O registro completo está no card Pessoais.</p>}
       {!!(materiais || []).length && <p className="compromisso-material">⚑ Aproveitar para o material: {(materiais || []).map((m) => m.descricao || "material").join(" · ")}</p>}
       {/* CONTATO IMPOSSÍVEL: o app mandava "tentar contato de novo" sem existir telefone na ficha, e o Diego
           ficou perguntando "cadê o WhatsApp" desde 16/07 sem resposta (caso real; havia até cliente com ENTREGA marcada e
           ENTREGA marcada sem número). Pedir o que não dá pra fazer é pior que não pedir. */}
-      {!tel && svc?.cliente_id && <p className="compromisso-material">⚠ Sem telefone na ficha — não dá pra fazer esse contato. Pegue o número antes.</p>}
+      {!tel && (svc?.cliente_id || a.cliente_id) && <p className="compromisso-material">⚠ Sem telefone na ficha — não dá pra fazer esse contato. Pegue o número antes.</p>}
       {triagemSemTelefone && <p className="compromisso-material">⚠ Envelope de triagem com telefone técnico inválido — o app não vai adivinhar o número. Corrija a triagem.</p>}
       {tel && ehEnvelopeDeTriagem(a) && <p className="compromisso-material">✎ Conversa ainda não triada — o WhatsApp abre vazio de propósito. Leia antes de escrever.</p>}
       <div className="compromisso-info">
@@ -3480,8 +3547,13 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
             ? `✎ Compromisso interno (${quem.motivo}) — sem mensagem pronta pro cliente.`
             : `✎ Este compromisso ${quem.motivo} — escreva você; o app não tem como saber o texto certo.`}
         </p>}
+        {/* Card mudo faz ele achar que quebrou — então o motivo aparece aqui também. */}
+        {!sugestao && quem.destino === "cliente" && semServico && !ehEnvelopeDeTriagem(a) && cli && <p className="compromisso-material">
+          ✎ Compromisso ligado ao cliente, mas ainda sem serviço — o WhatsApp abre vazio de propósito. Nada foi combinado no app pra ele repetir.
+        </p>}
         <div className="compromisso-acoes">
-          {tel && <a className="btn-wpp" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">Abrir WhatsApp{sugestao ? " com resposta" : ""}</a>}
+          {/* Sem `target="_blank"` no Android, igual ao Waze: aba nova não sabe abrir intent:// e ficaria em branco. */}
+          {tel && <a className="btn-wpp" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">Abrir WhatsApp{sugestao ? " com resposta" : ""}</a>}
           {/* Rota só em compromisso presencial — num remoto o botão de mapa é ruído e convida
               pro toque errado. O sufixo do rótulo diz a precisão real do destino. */}
           {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-waze" href={linkWaze} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Waze{selo}</a>}
@@ -3489,10 +3561,10 @@ function CompromissoCard({ a, svc, today, materiais, fornecedores, profissionais
           {/* Aqui o `servico_id` é inequívoco: o card TEM um serviço só. Quando o compromisso não
               tem serviço (compra de material, por exemplo), vai só o `agenda_id` — não se adivinha. */}
           <button type="button" className="btn-rota btn-gpt" onClick={() => compartilharGPT(payloadGPT([
-            ["cliente_id", svc?.cliente_id],
+            ["cliente_id", svc?.cliente_id || a.cliente_id],
             ["servico_id", svc?.id],
             ["agenda_id", a.id],
-            ["nome", svc?.clientes?.nome],
+            ["nome", cli?.nome],
             ["cidade", cli?.cidade || a.cidade],
             ["compromisso", a.titulo],
           ]), (msg) => setAvisoGPT(msg))}>💬 ChatGPT</button>
@@ -3544,7 +3616,7 @@ function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar,
           </div>
         </div>
       : <div className="cobranca-dir">
-          {tel && <a className="btn-wpp" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer" onClick={() => onCobrou(a, svc)}>{cobradaEm ? "Cobrar de novo" : "Cobrar no WhatsApp"}</a>}
+          {tel && <a className="btn-wpp" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => onCobrou(a, svc)}>{cobradaEm ? "Cobrar de novo" : "Cobrar no WhatsApp"}</a>}
           {sugestao && <button className="ghost" title="Copiar mensagem" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}
           <button className={cobradaEm ? "primary" : "ghost"} disabled={busy} onClick={() => setMarcando(true)}>✓ Respondeu</button>
           {noTeto && <button className="ghost" disabled={busy} onClick={() => onInsistirMais(a, svc)}>Insistir mais</button>}
@@ -3873,7 +3945,7 @@ function RetornosVencidosCard({ services, today, onVerLeads, onOpenFicha }) {
           <span className="status-pill">{statusLabel[s.status] || s.status}</span>
           <b>{s.valor_orcamento ? money(s.valor_orcamento) : "—"}</b>
           <time className="atrasado">parado há {dias(s)} dia(s)</time>
-          {tel && <div className="ficha-servico-acoes"><a className="ghost" href={`https://wa.me/55${tel}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>WhatsApp</a></div>}
+          {tel && <div className="ficha-servico-acoes"><a className="ghost" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={(e) => e.stopPropagation()}>WhatsApp</a></div>}
         </div>
       </article>;
     })}</div>
@@ -4331,7 +4403,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo"
       cabecalho={<><p className="kicker">AGENDA</p><h3>{atrasados.length} compromisso(s) atrasado(s)</h3>
       <span className="ficha-note" style={{ margin: 0 }}>De dias anteriores, ainda sem desfecho</span></>}>
-      {[...atrasados].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
+      {[...atrasados].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
     {/* O aviso de rota vai no `resumo`, ou seja, FORA do recolhível: rota que volta é erro que ele precisa
@@ -4342,7 +4414,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
       {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora</span>}</>}
       resumo={<AvisoRota compromissos={hojeAll} />}>
       {hoje.length > 0
-        ? [...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)
+        ? [...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)
         : <div className="empty-state"><b>O dia está livre.</b><span>Nada marcado para {compactDate(today)}.</span></div>}
     </CardRecolhivel>
     {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
@@ -4353,7 +4425,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
         compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
     {futuros.length > 0 && <CardRecolhivel
       cabecalho={<><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
-      {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
+      {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
     {filtroTipo !== "todos" && atrasados.length === 0 && hoje.length === 0 && futuros.length === 0 && (atrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
     {/* DEPOIS DOS COMPROMISSOS, DE PROPÓSITO (Diego, 24/08: "um card lá embaixo de compromissos"). Comprar
         material é consequência da rota do dia, não concorrente dela: ele decide onde vai, e aí olha o que
@@ -4392,7 +4464,7 @@ function LeadsView({ services, search, setSearch, onOpenFicha, initialFiltro, on
 }
 
 // Colapsado: só o essencial pra bater o olho (dia + rota). Clica pra abrir os compromissos do dia.
-function AgendaView({ appointments, services, finances, fornecedores, onReschedule, onConcluir, onAdd }) {
+function AgendaView({ appointments, services, customers, finances, fornecedores, onReschedule, onConcluir, onAdd }) {
   const [diaAberto, setDiaAberto] = useState(null);
   const hoje = hojeISO();
   const profissionais = nomesProfissionais(services);
@@ -4430,7 +4502,7 @@ function AgendaView({ appointments, services, finances, fornecedores, onReschedu
           <div className="agenda-dia-meta"><b>{items.length}</b><span>{items.length === 1 ? "compromisso" : "compromissos"}</span></div>
           <i className="agenda-dia-seta">{aberto ? "▲" : "▼"}</i>
         </button>
-        {aberto && <div className="agenda-dia-corpo"><AvisoRota compromissos={items} />{[...items].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
+        {aberto && <div className="agenda-dia-corpo"><AvisoRota compromissos={items} />{[...items].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
       </div>;
     })}</div>
   </section>;
@@ -4781,7 +4853,7 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
   };
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="modal-card small">
-      <div className="modal-head"><div><p className="kicker">{ehReagendar ? "REAGENDAR" : "CONCLUIR"}</p><h2>{item.titulo}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
+      <div className="modal-head"><div><p className="kicker">{ehReagendar ? "REAGENDAR" : "CONCLUIR"}</p><h2>{item.titulo_visivel || item.titulo}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
       <div className="form-grid">
         <label>{ehReagendar ? "O que explicar pro Claude?" : "O que foi feito / o que o Claude deve fazer?"}<textarea value={texto} onChange={(e) => setTexto(e.target.value)} /></label>
         {files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}
@@ -5684,7 +5756,7 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
           {vinculando === c.id && <label className="material-edit-block">Aproveitar qual viagem?
             <select value="" onChange={(e) => e.target.value && pendurarNaViagem(c, e.target.value)}>
               <option value="">Escolha um compromisso já marcado…</option>
-              {proximos.map((a) => <option key={a.id} value={a.id}>{compactDate(a.data)}{a.hora ? " " + a.hora.slice(0, 5) : ""} — {a.cidade || "remoto"} · {a.titulo}</option>)}
+              {proximos.map((a) => <option key={a.id} value={a.id}>{compactDate(a.data)}{a.hora ? " " + a.hora.slice(0, 5) : ""} — {a.cidade || "remoto"} · {a.titulo_visivel || a.titulo}</option>)}
             </select>
           </label>}
         </div>
@@ -6314,7 +6386,7 @@ function FornecedoresView({ fornecedores }) {
         {f.dias_entrega && <span>Entrega {f.dias_entrega.split(",").map((d) => DIA_LABEL[d.trim()] || d.trim()).join(" e ")}</span>}
         {f.observacao && <span>{f.observacao}</span>}
       </div>
-      {f.telefone && <a className="ghost" href={`https://wa.me/55${normalizePhone(f.telefone)}`} target="_blank" rel="noreferrer">WhatsApp</a>}
+      {f.telefone && <a className="ghost" href={urlWhatsapp(normalizePhone(f.telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}
     </article>)}
     {!fornecedores.length && <div className="empty-state"><b>Nenhum fornecedor cadastrado.</b></div>}</div>
   </section>;
@@ -6598,7 +6670,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
           {colarLink && <div className="responsavel-edit-row"><input value={linkDraft} onChange={(e) => setLinkDraft(e.target.value)} placeholder="Cole o link do Google Maps já aberto" autoFocus /><button className="ghost" onClick={usarLinkMaps}>Salvar ponto</button></div>}
           {/* Ficha é nível CLIENTE: aqui o cliente pode ter vários serviços, então `servico_id`
               fica de fora. Escolher um seria adivinhar, e adivinhar é o que gera atendimento errado. */}
-          <div className="ficha-actions"><button className="ghost" onClick={() => setEditing(true)}>Editar dados</button>{cliente.telefone && <a className="ghost" href={`https://wa.me/55${normalizePhone(cliente.telefone)}`} target="_blank" rel="noreferrer">WhatsApp</a>}<button className="ghost" onClick={() => compartilharGPT(payloadGPT([["cliente_id", cliente.id], ["nome", cliente.nome], ["cidade", cliente.cidade]]), notify)}>💬 ChatGPT</button></div>
+          <div className="ficha-actions"><button className="ghost" onClick={() => setEditing(true)}>Editar dados</button>{cliente.telefone && <a className="ghost" href={urlWhatsapp(normalizePhone(cliente.telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}<button className="ghost" onClick={() => compartilharGPT(payloadGPT([["cliente_id", cliente.id], ["nome", cliente.nome], ["cidade", cliente.cidade]]), notify)}>💬 ChatGPT</button></div>
         </div> : <div className="ficha-edit form-grid">
           <div className="row"><label>Nome*<input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} /></label><label>Telefone<input value={form.telefone} onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))} /></label></div>
           <div className="row"><label>Cidade<input value={form.cidade} onChange={(e) => setForm((f) => ({ ...f, cidade: e.target.value }))} /></label><label>Endereço<input value={form.endereco} onChange={(e) => setForm((f) => ({ ...f, endereco: e.target.value }))} /></label></div>
@@ -6637,7 +6709,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
                 <div className="ficha-actions"><button className="primary" onClick={() => confirmarEntrega(s.id)}>{overrideMat === s.id ? "Entregar mesmo com material em aberto" : "Confirmar entrega"}</button><button className="ghost" onClick={() => { setEntregando(null); setOverrideMat(null); }}>Cancelar</button></div>
               </div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEntregando(s.id); setOverrideMat(null); setValorEntregaDraft(s.valor_orcamento ? String(s.valor_orcamento) : ""); setRecebidoFichaDraft(""); }}>✅ Marcar como entregue</button>)}
-        </div><div className="ficha-servico-meta">{s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <span>—</span>}{s.prazo && <time>{prazoComRotulo(s)}</time>}{(sugestao || tel || ehServicoFechado(s)) && <div className="ficha-servico-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={`https://wa.me/55${tel}${sugestao ? "?text=" + encodeURIComponent(sugestao) : ""}`} target="_blank" rel="noreferrer">WhatsApp</a>}
+        </div><div className="ficha-servico-meta">{s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <span>—</span>}{s.prazo && <time>{prazoComRotulo(s)}</time>}{(sugestao || tel || ehServicoFechado(s)) && <div className="ficha-servico-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}
           {/* CONFIRMAÇÃO DE SERVIÇO — só em trabalho FECHADO. Lead e orçamento não têm acordo pra confirmar,
               e emitir documento comercial em cima de proposta viraria "condição oferecida" virando aceite. */}
           {ehServicoFechado(s) && <button className="ghost" title="Gerar a Confirmação de Serviço em PDF" onClick={() => gerarConfirmacaoServico({ db, demo, cliente, servico: s, notify })}>📄 Confirmação</button>}</div>}</div></div>; })}</div>}
