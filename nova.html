@@ -261,6 +261,14 @@ button.sutil{opacity:.55;font-size:12px}
 .compra-cliente-head strong{font-size:15px}
 .compra-cliente-head span{font-size:12px;color:var(--muted)}
 .compra-item{display:flex;align-items:center;gap:10px;padding:9px 4px;border-top:1px solid var(--line);cursor:pointer;font-size:15px}
+/* FAIXAS DE MATERIAL: cabeçalho discreto, porque a lista é pra ser lida de relance na loja. A faixa
+   travada fica esmaecida — o olho pula pro que dá pra comprar, que é o que ele foi fazer ali. */
+.compra-faixa{display:flex;flex-direction:column;gap:1px;margin:12px 0 2px;padding-top:8px;border-top:1px solid var(--line)}
+.compra-faixa b{font-size:10px;letter-spacing:.9pt;color:var(--muted);text-transform:uppercase}
+.compra-faixa em{font-size:11px;color:var(--muted);font-style:normal;opacity:.8}
+.compra-item.travado{opacity:.62}
+.compra-item.travado input[type=checkbox]{opacity:.5}
+.compra-item-motivo{display:block;font-size:11px;color:var(--muted);font-style:normal;margin-top:2px}
 .compra-item input[type=checkbox]{width:22px;height:22px;flex:0 0 22px;accent-color:var(--accent);cursor:pointer}
 .compra-item span{flex:1}
 .compra-item.feito span{color:var(--muted)}
@@ -592,6 +600,20 @@ const demoServices = [
   // s4 existe pra demo exercitar o aviso de compra repetida: mesma loja que o s2. Sem dois
   // serviços na mesma loja, o bloco de material nunca mostra a dica de juntar o frete.
   { id: "s4", cliente_id: "c3", titulo: "Poltrona reclinável", status: "producao", prioridade: "media", proxima_acao: "Comprar tecido", prazo: "2026-07-20", valor_orcamento: 780, clientes: demoCustomers[2], loja_material: "Ellis Tecidos", materiais_necessarios: [{ item: "Veludo grafite", comprado: false, pedido: true }] },
+  // s5 É O TESTE DE REGRESSÃO DAS FAIXAS DE MATERIAL (02/09/2026). Os cinco formatos aqui são os que
+  // existem DE VERDADE em `servicos.materiais_necessarios` — copiados da forma, não do conteúdo:
+  //   1. formato do app ............................ tem que cair em COMPRAR AGORA
+  //   2. sem a chave `item` ........................ o rótulo tem que sair de material+densidade+espessura
+  //   3. quantidade_status PENDENTE_MEDIDAS ........ AGUARDANDO DEFINIÇÃO, com o motivo na tela
+  //   4. valor NAO_INFORMADA num campo qualquer .... AGUARDANDO DEFINIÇÃO (a varredura é sobre TODO valor)
+  //   5. comprado:true + observação "pendente" ..... EM MÃOS (o fato físico vence a nota de planejamento)
+  { id: "s5", cliente_id: "c1", titulo: "Sofá 3 lugares — reforma completa", status: "agendado", prioridade: "alta", proxima_acao: "Retirar o sofá", prazo: "2026-09-10", valor_orcamento: 3200, clientes: demoCustomers[0], loja_material: "Ellis Tecidos", materiais_necessarios: [
+    { item: "Linha 40 preta", loja: "Ellis Tecidos", comprado: false, pedido: false, arquivado: false },
+    { material: "espuma", densidade: "D40", espessura_cm: 7, aplicacao: "assentos", status: "medido", fornecedor: "Luis Tecidos" },
+    { item: "Carpete dos pezinhos", estado: "material_planejado", comprado: false, fornecedor: "Afibracom", quantidade_status: "PENDENTE_MEDIDAS_PROFISSIONAL" },
+    { item: "Catraca de encosto", acao: "trocar", status: "estimativa", base_do_preco: "NAO_CONFIRMADA", quantidade_pares: 4 },
+    { item: "Tecido Klee 09", estado: "material_entregue_ao_profissional", comprado: true, entregue_a: "Marlom Júnior", observacao: "Metragem pendente de definição" },
+  ] },
 ];
 // As duas primeiras usam data RELATIVA ao dia em que a demo é aberta. Com data fixa, a
 // demonstração abria sempre com "nada marcado para hoje" — que é justamente o bloco mais
@@ -5622,7 +5644,15 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
   const nomeFornecedor = (id) => fornecedores.find((f) => f.id === id)?.nome || "Sem fornecedor";
   const servicoDe = (id) => services.find((s) => s.id === id);
   const total = compras.reduce((soma, c) => soma + Number(c.valor), 0);
-  const totalAComprar = todas.filter((c) => c.status === "a_pagar").reduce((soma, c) => soma + Number(c.valor), 0);
+  // ⚠ "A COMPRAR" SOMAVA MATERIAL QUE JÁ ESTÁ NA OFICINA. O filtro somava TODO `a_pagar`, incluindo
+  // `[EM MÃOS]` e `[EM TRÂNSITO]` — enquanto o subtítulo contava só `aComprar`. Valor e contagem
+  // discordavam, e ninguém percebia porque cada um vinha de uma lista.
+  // Medido em 02/09/2026: o ÚNICO `a_pagar` de material no banco é a nota 11032 da Luiza/Terra Park,
+  // R$ 1.316,00, marcada `[EM MÃOS]`. Ou seja, o card dizia literalmente "A comprar R$ 1.316,00 ·
+  // 0 item(ns) na lista" — o valor inteiro era material que ele já tinha buscado. Isso é dívida com
+  // fornecedor, não compra a fazer, e inflava o que ele acha que ainda vai gastar.
+  const totalAComprar = aComprar.reduce((soma, c) => soma + Number(c.valor), 0);
+  const totalEmMaosAPagar = emMaosAPagar.reduce((soma, c) => soma + Number(c.valor), 0);
   const mesAtual = mesISO(hojeISO());
   const totalMes = compras.filter((c) => mesISO(c.data) === mesAtual).reduce((soma, c) => soma + Number(c.valor), 0);
 
@@ -5779,6 +5809,7 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
     <section className="metric-grid finance-metrics">
       <Metric label="Material neste mês" value={money(totalMes)} detail={mesLabel(mesAtual)} tone="red" />
       <Metric label="A comprar" value={money(totalAComprar)} detail={`${aComprar.length} item(ns) na lista`} tone="orange" />
+      {emMaosAPagar.length > 0 && <Metric label="Em mãos, falta pagar" value={money(totalEmMaosAPagar)} detail={`${emMaosAPagar.length} nota(s) com o fornecedor`} tone="red" />}
       <Metric label="Total em material" value={money(total)} detail={`${compras.length} compra(s)`} tone="green" />
     </section>
 
@@ -5927,6 +5958,82 @@ function assinaturaDaLista(servico) {
   for (const ch of abertos.join("|")) h = ((h << 5) - h + ch.charCodeAt(0)) | 0;
   return abertos.length + "i" + Math.abs(h).toString(36);
 }
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// O PAINEL DE COMPRAS MISTURAVA TUDO — e a causa NÃO era a regra, era o FORMATO DO DADO.
+//
+// Medição de 02/09/2026 sobre os 67 itens vivos de `servicos.materiais_necessarios`: eles chegam em
+// CINCO formatos diferentes, porque quem escreve é o Classic, durante a conversa, com o que sabe:
+//   Carla    → {item, loja, comprado, pedido, arquivado}                    ← o único que o app entendia
+//   Ivoneide → {item, estado:"material_planejado", quantidade_status:"PENDENTE_MEDIDAS_PROFISSIONAL"}
+//   Gilmar   → {item, status:"PENDENTE_DE_DEFINICAO", observacao:"...só após avaliação; não inventar"}
+//   Jucilene → {item, status:"PREÇO PENDENTE", quantidade_estimada:27}
+//   Fabrício → {material:"espuma", densidade:"D40", espessura_cm:7, status:"medido"}   ← SEM a chave `item`
+//
+// Dois números explicam o sintoma inteiro:
+//   `comprado` existe em 52 dos 67. Nos outros 15 vem `undefined` — que é FALSY. O app lia "não
+//   comprado" e jogava em COMPRAR, inclusive material que ninguém pode comprar porque a medida não
+//   existe ("PENDENTE_MEDIDAS_PROFISSIONAL", "NAO_INFORMADA").
+//   `item` falta em 3 — esses viravam linha em branco na lista.
+//
+// A cura NÃO é exigir formato fixo do Classic: ele escreve no meio do atendimento e o formato vai
+// derivar de novo na semana que vem. É o app ACEITAR o que chega e classificar pelo vocabulário que o
+// próprio dado usa. Por isso a varredura é sobre TODOS os valores de texto do item, não sobre um campo
+// combinado — campo combinado é exatamente o que não sobreviveu até aqui.
+const MAT_EM_MAOS = /\b(em[_ ]?maos|entregue|recebid)/i;
+const MAT_A_CAMINHO = /\b(a[_ ]caminho|em[_ ]transito|pedido[_ ](feito|enviado))/i;
+// Vocabulário de "ainda não dá pra comprar", tirado do banco (não inventado): PENDENTE_DE_DEFINICAO,
+// PENDENTE_MEDIDAS_PROFISSIONAL, PREÇO PENDENTE, NAO_INFORMADA, NAO_CONFIRMADA, "compra exata ainda a
+// confirmar", estimativa, material_planejado, levantado_em_avaliacao.
+// ⚠ "definido_em_orcamento" e "definido_em_avaliacao" NÃO entram aqui de propósito: "definido" é o
+// oposto de pendente. Quem barra o item da Fabrício com esse status é outro campo dele (quantidade
+// "NAO_INFORMADA"), e é assim que tem que ser — a decisão sai do dado, não do nome do cliente.
+const MAT_INDEFINIDO = /(pendente|nao[_ ]informad|nao[_ ]confirmad|a[_ ]confirmar|estimativa|planejado|levantado[_ ]em[_ ]avaliacao|a[_ ]definir)/i;
+function semAcentoBaixo(t) { return String(t == null ? "" : t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+// Junta os valores de TEXTO do item num alvo só. Números e booleanos ficam de fora: `quantidade: 4` não
+// diz nada sobre estar definido, e `comprado: false` é lido pelo campo, não pela varredura.
+// Devolve os pedaços de texto do item preservando o ORIGINAL (com acento) ao lado da versão normalizada:
+// a busca precisa da normalizada, mas quem vai ler o motivo na tela é o Diego, e "PREÇO PENDENTE" com
+// cedilha é o texto que ele reconhece do próprio atendimento.
+function pedacosDoMaterial(m) {
+  return Object.entries(m || {})
+    .filter(([k, v]) => typeof v === "string" && v.trim() && k !== "loja" && k !== "origem_ref")
+    .map(([k, v]) => ({ chave: k, texto: v.trim(), busca: semAcentoBaixo(`${k} ${v}`) }));
+}
+function textoDoMaterial(m) { return pedacosDoMaterial(m).map((p) => p.busca).join(" | "); }
+// O rótulo tem que existir mesmo sem a chave `item` — senão a linha some da tela sem avisar ninguém.
+function rotuloDoMaterial(m) {
+  const direto = String(m?.item || "").trim();
+  if (direto) return direto;
+  const partes = [m?.acao, m?.material || m?.tecido, m?.referencia || m?.densidade,
+    m?.espessura_cm ? `${m.espessura_cm} cm` : "", m?.aplicacao ? `(${m.aplicacao})` : ""];
+  return partes.filter(Boolean).join(" ").trim() || "Material sem descrição";
+}
+// Precedência: o que já está na mão vence o que está planejado. Um item pode ter `comprado: true` E
+// `quantidade_status: PENDENTE_MEDIDAS` ao mesmo tempo (acontece em 3 registros reais) — ali a nota de
+// planejamento ficou velha, e o fato físico é que o material chegou.
+function classificarMaterial(m) {
+  const alvo = textoDoMaterial(m);
+  if (m?.comprado === true || MAT_EM_MAOS.test(alvo)) return { faixa: "em_maos", motivo: "" };
+  if (m?.pedido === true || MAT_A_CAMINHO.test(alvo)) return { faixa: "a_caminho", motivo: "pedido feito, ainda não chegou" };
+  if (MAT_INDEFINIDO.test(alvo)) {
+    // Devolve o TRECHO que barrou, não um rótulo genérico: o Diego precisa saber o que falta pra
+    // destravar, senão a faixa vira só mais um lugar onde a compra está parada sem explicação.
+    // E entre dois trechos que batem, ganha o mais ESPECÍFICO: "PENDENTE_MEDIDAS_PROFISSIONAL" diz o que
+    // fazer (medir), "material_planejado" não diz nada. Sem esta ordem o motivo saía o primeiro do objeto,
+    // que é ordem de escrita do Classic — ou seja, sorte.
+    const pedacos = pedacosDoMaterial(m).filter((p) => MAT_INDEFINIDO.test(p.busca));
+    const forte = pedacos.find((p) => /(pendente|nao[_ ]informad|nao[_ ]confirmad|a[_ ]confirmar)/i.test(p.busca));
+    const escolhido = forte || pedacos[0];
+    return { faixa: "indefinido", motivo: escolhido ? escolhido.texto.slice(0, 90) : "" };
+  }
+  return { faixa: "comprar", motivo: "" };
+}
+const FAIXAS_MATERIAL = [
+  { id: "comprar", titulo: "COMPRAR AGORA", nota: "Especificação suficiente pra sair e comprar." },
+  { id: "indefinido", titulo: "AGUARDANDO MEDIDA / DEFINIÇÃO", nota: "Falta medida, quantidade, preço ou avaliação. Comprar aqui é chutar." },
+  { id: "a_caminho", titulo: "PEDIDO / A CAMINHO", nota: "Já pedido ao fornecedor. Não é material em mãos e não libera produção." },
+  { id: "em_maos", titulo: "EM MÃOS", nota: "Chegou. Se ainda falta pagar, a pendência é financeira — está no Financeiro, não aqui." },
+];
 function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   const [busy, setBusy] = useState(null);
   const [novoItem, setNovoItem] = useState({});
@@ -5952,10 +6059,18 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   const ativos = (services || []).filter((s) => ["agendado", "producao"].includes(s.status) && visiveisDe(s).length);
   const ordenados = [...ativos].sort((a, b) => String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
   const totalItens = ativos.reduce((n, s) => n + visiveisDe(s).length, 0);
-  const faltam = ativos.reduce((n, s) => n + visiveisDe(s).filter((m) => !m.comprado).length, 0);
+  // "Faltam N" agora responde a pergunta que ele abre a aba pra fazer: O QUE EU PRECISO COMPRAR AGORA.
+  // Antes contava todo item sem `comprado` — e como 15 dos 67 nem têm essa chave, entravam aí material
+  // sem medida, item que é ação técnica e pedido já a caminho. O número dizia 20 e nenhum era comprável.
+  const faixaDe = (m) => classificarMaterial(m).faixa;
+  const faltam = ativos.reduce((n, s) => n + visiveisDe(s).filter((m) => faixaDe(m) === "comprar").length, 0);
+  const travados = ativos.reduce((n, s) => n + visiveisDe(s).filter((m) => faixaDe(m) === "indefinido").length, 0);
+  const emMaosTotal = ativos.reduce((n, s) => n + visiveisDe(s).filter((m) => faixaDe(m) === "em_maos").length, 0);
   // Quantos itens pendentes rendem cada loja — o que decide se a viagem vale a pena.
+  // Só entra o que é COMPRÁVEL: mandar ele à Ellis por causa de um item cuja medida ninguém tirou é
+  // fazer a viagem render menos do que o chip prometeu.
   const porLoja = {};
-  ativos.forEach((s) => visiveisDe(s).filter((m) => !m.comprado).forEach((m) => { const L = (m.loja || s.loja_material || "").trim() || "Loja a definir"; porLoja[L] = (porLoja[L] || 0) + 1; }));
+  ativos.forEach((s) => visiveisDe(s).filter((m) => faixaDe(m) === "comprar").forEach((m) => { const L = (m.loja || s.loja_material || "").trim() || "Loja a definir"; porLoja[L] = (porLoja[L] || 0) + 1; }));
   // MARCAR AQUI TEM QUE VALER NO RESTO DO APP. Diego, 04/08: "quando confirmo na aba compras, ela já confirma
   // automaticamente em Capacidade, ou tenho que marcar lá também?". O alerta "Esperando material" já sumia
   // sozinho (lê esta mesma lista), mas a PRÓXIMA AÇÃO do serviço continuava escrita "Comprar o material" no
@@ -6023,7 +6138,7 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   const lojaDoItem = (m, s) => ((m.loja || s.loja_material || "").trim() || "Loja a definir");
   const itensDaLoja = (loja) => ativos.flatMap((s) => visiveisDe(s)
     .map((m, vi) => ({ m, s, idx: (s.materiais_necessarios || []).indexOf(m) }))
-    .filter((x) => !x.m.comprado && lojaDoItem(x.m, x.s) === loja));
+    .filter((x) => classificarMaterial(x.m).faixa === "comprar" && lojaDoItem(x.m, x.s) === loja));
   // Pedido pra colar no WhatsApp do fornecedor. SÓ O MATERIAL. Diego, 04/08: "sobre o nome da cliente ir ao
   // copiar para o WhatsApp, não precisa o fornecedor saber disso" — e está certo: nome de cliente é dado da
   // Tapeçaria, não do fornecedor. Mandar junto vaza a carteira dele sem necessidade nenhuma.
@@ -6091,8 +6206,11 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   if (!ordenados.length) return <section className="content-card"><div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>Nada pra comprar</h3></div></div>
     <div className="empty-state"><b>Nenhum serviço ativo tem material anotado.</b><span>Peça pro Claude anotar o que falta em cada cliente, ou adicione na ficha do serviço.</span></div></section>;
   return <section className="content-card">
-    <div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>{faltam} item(ns) pra comprar</h3></div>
-      {totalItens > faltam && <span className="status-pill">{totalItens - faltam} já comprado(s)</span>}</div>
+    <div className="card-head"><div><p className="kicker">LISTA DE COMPRAS</p><h3>{faltam} item(ns) pra comprar</h3>
+      {/* O travado aparece no cabeçalho porque é decisão dele, não do app: material sem medida não some
+          sozinho — alguém tem que medir. Mostrar o número é avisar; some da conta do "pra comprar". */}
+      {travados > 0 && <span className="ficha-note" style={{ margin: 0 }}>+ {travados} esperando medida ou definição</span>}</div>
+      {emMaosTotal > 0 && <span className="status-pill">{emMaosTotal} já em mãos</span>}</div>
     {/* QUEM COMPRA PENSA POR LOJA, NÃO POR CLIENTE. Diego, 04/08, sobre o Leandro: "suede amassado grafite e
         espuma D33 no Ozair" e "espuma do encosto é na Ellis Tecidos" — o material de UM cliente vem de lojas
         diferentes, e numa ida à Ellis ele quer pegar o que é da Ellis de todo mundo de uma vez. A lista
@@ -6122,22 +6240,41 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
       // Guarda o índice REAL junto do item: a tela mostra só os não arquivados, mas alternar/remover precisam
       // apontar pra posição verdadeira no array salvo.
       const itens = (s.materiais_necessarios || []).map((m, i) => ({ m, i })).filter((x) => !x.m.arquivado);
+      // ⚠ A CLASSIFICAÇÃO É SÓ PRA MOSTRAR. `tudoComprado` continua olhando o campo `comprado` cru, e isso
+      // é de propósito: ele libera o botão que ARQUIVA a lista e manda o serviço pra produção. Deixar um
+      // texto solto ("entregue" numa observação) destravar produção seria dar poder de escrita a uma
+      // heurística de leitura — o oposto do que estas faixas existem pra fazer.
       const pendentes = itens.filter((x) => !x.m.comprado).length;
-      const aCaminho = itens.filter((x) => !x.m.comprado && x.m.pedido).length;
       const tudoComprado = !pendentes && itens.length > 0;
+      const porFaixa = {};
+      itens.forEach((x) => { const f = classificarMaterial(x.m); (porFaixa[f.faixa] ||= []).push({ ...x, motivo: f.motivo }); });
+      const nComprar = (porFaixa.comprar || []).length;
+      const nTravado = (porFaixa.indefinido || []).length;
+      const nCaminho = (porFaixa.a_caminho || []).length;
+      const resumo = [nComprar ? `${nComprar} pra comprar` : "", nTravado ? `${nTravado} sem definição` : "",
+        nCaminho ? `${nCaminho} a caminho` : ""].filter(Boolean).join(" · ") || "tudo em mãos ✓";
       return <div className={`compra-cliente${tudoComprado ? " tudo-comprado" : ""}`} key={s.id}>
         <div className="compra-cliente-head">
           <strong>{s.clientes?.nome || "Cliente"}</strong>
-          <span>{pendentes ? `faltam ${pendentes}${aCaminho ? ` (${aCaminho} a caminho)` : ""}` : "tudo em mãos ✓"}{s.prazo ? ` · ${prazoComRotulo(s)}` : ""}{s.loja_material ? ` · ${s.loja_material}` : ""}</span>
+          <span>{resumo}{s.prazo ? ` · ${prazoComRotulo(s)}` : ""}{s.loja_material ? ` · ${s.loja_material}` : ""}</span>
         </div>
-        {itens.map(({ m, i }) => <label className={`compra-item${m.comprado ? " feito" : ""}`} key={i}>
+        {FAIXAS_MATERIAL.filter((f) => (porFaixa[f.id] || []).length).map((f) => <React.Fragment key={f.id}>
+          {/* O cabeçalho da faixa só nasce quando ela tem item — cliente com uma coisa só continua uma
+              linha, não vira formulário com quatro títulos vazios. */}
+          <div className="compra-faixa"><b>{f.titulo}</b><em>{f.nota}</em></div>
+          {(porFaixa[f.id] || []).map(({ m, i, motivo }) => <label className={`compra-item${m.comprado ? " feito" : ""}${f.id === "indefinido" ? " travado" : ""}`} key={i}>
           <input type="checkbox" checked={!!m.comprado} disabled={busy === s.id || mode === "claude"} onChange={() => alternar(s, i)} />
+          {/* O nome vem de `rotuloDoMaterial`, não de `m.item`: 3 itens reais não têm essa chave — a espuma
+              da Fabrício é {"{material, densidade, espessura_cm}"} — e apareciam como linha em branco. */}
           <span>
             {editandoItem === `${s.id}:${i}`
               ? <input className="compra-item-input" value={itemDraft} autoFocus
                   onClick={(e) => e.preventDefault()} onChange={(e) => setItemDraft(e.target.value)}
                   onBlur={() => salvarItem(s, i)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); salvarItem(s, i); } if (e.key === "Escape") setEditandoItem(null); }} />
-              : <b className="compra-item-nome" onClick={(e) => { e.preventDefault(); setItemDraft(m.item || ""); setEditandoItem(`${s.id}:${i}`); }}>{m.item}{!m.comprado && m.pedido ? " 🚚 a caminho" : ""}</b>}
+              : <b className="compra-item-nome" onClick={(e) => { e.preventDefault(); setItemDraft(rotuloDoMaterial(m)); setEditandoItem(`${s.id}:${i}`); }}>{rotuloDoMaterial(m)}{!m.comprado && m.pedido ? " 🚚 a caminho" : ""}</b>}
+            {/* O QUE ESTÁ TRAVANDO, em vez de só "não comprado". Sem isso a faixa vira mais um lugar onde a
+                compra está parada sem dizer o que destrava. É o trecho literal do dado, não um rótulo meu. */}
+            {motivo && <em className="compra-item-motivo">⏳ {motivo}</em>}
             {editandoLoja === `${s.id}:${i}`
               ? <input className="compra-loja-input" value={lojaDraft} autoFocus list="lojas-conhecidas"
                   onClick={(e) => e.preventDefault()} onChange={(e) => setLojaDraft(e.target.value)}
@@ -6149,6 +6286,7 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
           </span>
           <button type="button" className="compra-remover" title="Tirar da lista" disabled={busy === s.id} onClick={(e) => { e.preventDefault(); remover(s, i); }}>✕</button>
         </label>)}
+        </React.Fragment>)}
         {/* O tapeceiro pede material a mais no meio do serviço — tem que dar pra somar na hora, sem sair da tela. */}
         <div className="compra-add">
           <input value={novoItem[s.id] || ""} onChange={(e) => setNovoItem((n) => ({ ...n, [s.id]: e.target.value }))}
