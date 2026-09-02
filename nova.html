@@ -269,6 +269,8 @@ button.sutil{opacity:.55;font-size:12px}
 .compra-item.travado{opacity:.62}
 .compra-item.travado input[type=checkbox]{opacity:.5}
 .compra-item-motivo{display:block;font-size:11px;color:var(--muted);font-style:normal;margin-top:2px}
+/* A CAUSA do serviço parado tem que saltar mais que a próxima ação — é ela que diz o que fazer. */
+.fluxo-causa{color:#e0a24a;font-style:normal;font-weight:650}
 .compra-item input[type=checkbox]{width:22px;height:22px;flex:0 0 22px;accent-color:var(--accent);cursor:pointer}
 .compra-item span{flex:1}
 .compra-item.feito span{color:var(--muted)}
@@ -2430,6 +2432,9 @@ function Home() {
   // DOMÍNIO PESSOAIS (item APP-PESSOAIS-CARD-20260824-2145) — vive na mesma tela por conveniência dele,
   // mas é outro domínio: não entra em cliente, serviço, financeiro nem em nenhum indicador da Tapeçaria.
   const [pessoais, setPessoais] = useState([]);
+  // Só agenda NÃO planejada (cancelada/feita). Contexto pra explicar por que um serviço parou — nunca
+  // fonte de compromisso vivo. Ver a consulta em loadAll.
+  const [agendaHistorico, setAgendaHistorico] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [composer, setComposer] = useState("");
@@ -2482,7 +2487,7 @@ function Home() {
     setInbox((p.inbox || []).map((item) => ({ ...item, conversa: comoLista(item.conversa) })));
     setCustomers(p.customers || []); setServices(p.services || []);
     setAppointments(comTituloVisivel(p.appointments, p.pessoais)); setFinances(p.finances || []); setRotinas(p.rotinas || []);
-    setFornecedores(p.fornecedores || []); setPessoais(p.pessoais || []);
+    setFornecedores(p.fornecedores || []); setPessoais(p.pessoais || []); setAgendaHistorico(p.agendaHistorico || []);
     // Distâncias não são estado de tela — alimentam tempoEstradaMin, que é função pura. Entram no pacote
     // pra virem junto no cache offline: sem sinal a trava de rota continua com os tempos aprendidos.
     aplicarDistanciasDoBanco(p.distancias);
@@ -2494,9 +2499,9 @@ function Home() {
     }
     if (!db || !session) return;
     setLoading(true);
-    let cx, cl, sv, ag, fn, rt, fo, ps, ds, firstError;
+    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, firstError;
     try {
-      [cx, cl, sv, ag, fn, rt, fo, ps, ds] = await Promise.all([
+      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
@@ -2510,6 +2515,14 @@ function Home() {
         // prova que "Concluir" não apagou nada. Quem filtra é a tela.
         db.from("pessoais").select("*").order("data_alvo", { ascending: true }),
         db.from("distancias").select("cidade_a,cidade_b,minutos"),
+        // AGENDA QUE NÃO ESTÁ MAIS PLANEJADA — só o suficiente pra explicar POR QUE um serviço parou.
+        // A carga principal filtra `status = planejado` (e tem que continuar filtrando: é ela que alimenta
+        // Painel, rota e seletores). Mas sem as canceladas o app não consegue dizer "a retirada foi
+        // cancelada e ninguém remarcou" — só consegue dizer "não tem compromisso", que é o sintoma, não a
+        // causa. Item PAINEL DE SERVIÇOS FECHADOS SEM AVANÇO, caso Fabrício.
+        // Cinco colunas, não `*`: isto é contexto de explicação, não fonte de operação, e não pode virar
+        // uma segunda lista de compromissos que alguém confunda com a de verdade.
+        db.from("agenda").select("id,servico_id,status,titulo,data").neq("status", "planejado").order("data", { ascending: false }),
       ]);
       // `ds` fica FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a const
       // TEMPO_ESTRADA_MIN). Se essa consulta falhar sozinha, o certo é o app abrir normal com os tempos do
@@ -2523,7 +2536,7 @@ function Home() {
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
     setOfflineDesde(null);
-    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [] };
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [] };
     aplicarPacote(pacote);
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
@@ -3127,11 +3140,11 @@ function Home() {
           A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
           e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
-      {tab === "leads" && <LeadsView services={activeServices} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
+      {tab === "leads" && <LeadsView services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} inbox={inbox} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
@@ -3891,6 +3904,74 @@ function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
   </CardRecolhivel>;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// CLASSIFICADOR ÚNICO DE FLUXO DO SERVIÇO — item PAINEL DE SERVIÇOS FECHADOS SEM AVANÇO (01/09/2026).
+//
+// O defeito era de RÓTULO, e rótulo errado esconde a causa: o app juntava "não existe texto em
+// `proxima_acao`" com "existe ação escrita, mas não há mais nada representando a continuidade" debaixo
+// do mesmo título "sem próximo passo".
+//
+// Caso que revelou (Fabrício, serviço 2aa66eac): `proxima_acao` diz "Combinar horário e retirar o sofá
+// até 04-09-2026". Ele NÃO está sem próxima ação — está sem RETIRADA, porque o compromisso de 04/09 foi
+// cancelado e ninguém remarcou. Com R$ 2.800 já recebidos. Chamar isso de "sem próxima ação" faz o Diego
+// procurar o problema no lugar errado: ele vai ler a frase, ver que existe, e fechar o card.
+//
+// Uma função só, consumida por Painel, Funil e Capacidade — o recado pede isso explicitamente, e é a
+// razão de existir: três telas com três critérios divergentes foi como a Nurimar "sumiu" em agosto.
+const FLUXO_TERMINAIS = ["entregue", "pago", "perdido"];
+const FLUXO_FECHADOS = ["agendado", "producao"];
+// `ctx` traz o estado vivo já indexado: quem monta é `contextoDeFluxo`, uma vez por render, e não cada
+// tela do seu jeito.
+function classificarFluxoServico(servico, ctx) {
+  const s = servico || {};
+  if (FLUXO_TERMINAIS.includes(s.status)) return { estado: "normal", causa: "" };
+  const temAcao = !!String(s.proxima_acao || "").trim();
+  // SEM PRÓXIMA AÇÃO é literal: o campo está vazio. Vale pra qualquer status não terminal, inclusive
+  // lead/orçamento — lá é funil comercial, e quem mostra é a aba Leads.
+  if (!temAcao) return { estado: "sem_acao", causa: "sem próxima ação definida" };
+  // Daqui pra baixo só entra trabalho FECHADO. Lead com próxima ação escrita e sem compromisso é
+  // funil normal, não serviço parado — trazer os ~20 pro Painel afogaria os que têm móvel na oficina.
+  if (!FLUXO_FECHADOS.includes(s.status)) return { estado: "normal", causa: "" };
+  // Remarcação aberta = já está na fila esperando data. Não é esquecimento, e duplicar o aviso aqui
+  // seria pedir que ele resolva duas vezes a mesma coisa.
+  if (ctx?.emRemarcacao?.has(s.id)) return { estado: "normal", causa: "" };
+  // Compromisso planejado é encaminhamento ativo — é o caso normal e sai daqui primeiro.
+  if (ctx?.comCompromisso?.has(s.id)) return { estado: "normal", causa: "" };
+
+  // Sem compromisso ativo. Agora a pergunta é POR QUE, e a resposta mais útil vem do histórico:
+  // se existia um compromisso e ele foi cancelado, isso é o que precisa ser refeito.
+  const cancelado = ctx?.canceladoPorServico?.get(s.id);
+  if (cancelado) {
+    // O título do compromisso cancelado diz o que era (retirada, entrega, visita) — usar o texto dele é
+    // melhor que qualquer rótulo meu, porque foi escrito por quem sabia do caso.
+    const oQueEra = String(cancelado.titulo || "").replace(/^PROVIS[ÓO]RIO\s*—\s*/i, "").trim();
+    return { estado: "precisa_avancar", causa: `${oQueEra || "compromisso"} foi cancelado — precisa combinar nova data` };
+  }
+  // MATERIAL É EXPLICAÇÃO SUFICIENTE, e tem card próprio. Duplicar aqui é o "alerta que dá trabalho".
+  if (ctx?.esperandoMaterial?.has(s.id)) return { estado: "normal", causa: "" };
+  if (s.status === "producao" && !String(s.responsavel || "").trim()) {
+    return { estado: "precisa_avancar", causa: "em produção sem profissional atribuído" };
+  }
+  return { estado: "precisa_avancar", causa: "nunca teve compromisso marcado" };
+}
+// Índices montados UMA vez. `appointments` são só os planejados (é a carga do app); `agendaHistorico`
+// traz cancelada/feita só pra explicar. Agenda cancelada nunca conta como encaminhamento ativo, e agenda
+// feita nunca conta como próximo evento — os dois critérios saem de graça dessa separação.
+function contextoDeFluxo({ appointments, agendaHistorico, inbox, services }) {
+  const comCompromisso = new Set((appointments || []).filter((a) => a.servico_id).map((a) => a.servico_id));
+  const emRemarcacao = new Set(pendenciasRemarcacaoAbertas(inbox).map(({ meta }) => meta.servico_id).filter(Boolean));
+  const canceladoPorServico = new Map();
+  (agendaHistorico || []).forEach((a) => {
+    if (a.status !== "cancelado" || !a.servico_id) return;
+    if (comCompromisso.has(a.servico_id)) return;      // já foi remarcado; o cancelamento é história
+    if (!canceladoPorServico.has(a.servico_id)) canceladoPorServico.set(a.servico_id, a); // o mais recente
+  });
+  const esperandoMaterial = new Set((services || [])
+    .filter((s) => (s.materiais_necessarios || []).some((m) => !m.arquivado && classificarMaterial(m).faixa !== "em_maos"))
+    .map((s) => s.id));
+  return { comCompromisso, emRemarcacao, canceladoPorServico, esperandoMaterial };
+}
+
 // SERVIÇO VIVO SEM PRÓXIMO PASSO — itens APP-LEO-SUMIU-20260825-2255 e APP-NURIMAR-SUMIU-20260825-2338.
 // Diego disse duas vezes no mesmo dia que um cliente tinha "sumido" do app: primeiro o Léo, depois a
 // Nurimar. Nenhum dos dois tinha sumido do banco. O Painel é organizado por COMPROMISSO — dueAll e
@@ -3906,25 +3987,31 @@ function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
 // trazer os ~20 pra cá afogaria os 8 que têm móvel parado esperando alguém.
 //
 // Serviço com remarcação aberta fica de fora: ele não está esquecido, está na fila da caixa esperando data.
-function ServicosSemProximoPassoCard({ services, appointments, inbox, onOpenFicha }) {
+function ServicosSemProximoPassoCard({ services, appointments, agendaHistorico, inbox, onOpenFicha }) {
   const parados = useMemo(() => {
-    const temCompromisso = new Set((appointments || []).filter((a) => a.servico_id).map((a) => a.servico_id));
-    const emRemarcacao = new Set(pendenciasRemarcacaoAbertas(inbox).map(({ meta }) => meta.servico_id).filter(Boolean));
+    const ctx = contextoDeFluxo({ appointments, agendaHistorico, inbox, services });
     return (services || [])
-      .filter((s) => ["agendado", "producao"].includes(s.status) && !temCompromisso.has(s.id) && !emRemarcacao.has(s.id))
+      .map((s) => ({ s, fluxo: classificarFluxoServico(s, ctx) }))
+      .filter((x) => x.fluxo.estado === "precisa_avancar")
       // Produção primeiro (peça na bancada, prazo correndo), depois agendado; dentro de cada um, prazo mais
       // apertado na frente. Mesma ordem da Capacidade, pra não ensinar duas leituras diferentes.
-      .sort((a, b) => (a.status === "agendado") - (b.status === "agendado") || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
-  }, [services, appointments, inbox]);
+      .sort((a, b) => (a.s.status === "agendado") - (b.s.status === "agendado") || String(a.s.prazo || "9999").localeCompare(String(b.s.prazo || "9999")));
+  }, [services, appointments, agendaHistorico, inbox]);
   if (!parados.length) return null;
   return <CardRecolhivel
-    cabecalho={<><p className="kicker">SEM PRÓXIMO PASSO</p>
-      <h3>{parados.length} serviço(s) fechado(s) sem compromisso marcado</h3></>}>
-    <div className="funil-lista">{parados.map((s) => <article className={`funil-item st-${s.status}`} key={s.id} onClick={() => onOpenFicha(s.cliente_id)}>
+    cabecalho={<><p className="kicker">PRECISA AVANÇAR</p>
+      <h3>{parados.length} serviço(s) fechado(s) sem encaminhamento ativo</h3>
+      {/* O título mudou de "sem próximo passo" pra "precisa avançar" porque quase nenhum destes está sem
+          próxima ação escrita — o que falta é o que representa a continuidade. Ver classificarFluxoServico. */}
+      <span className="ficha-note" style={{ margin: 0 }}>Cada um mostra o que está faltando. O app não marca compromisso sozinho.</span></>}>
+    <div className="funil-lista">{parados.map(({ s, fluxo }) => <article className={`funil-item st-${s.status}`} key={s.id} onClick={() => onOpenFicha(s.cliente_id)}>
       <div className="funil-esq">
         <strong>{s.clientes?.nome || "Cliente"}</strong>
         <span>{s.titulo}</span>
-        <em>→ {s.proxima_acao || "Sem próxima ação"}</em>
+        {/* A CAUSA vem antes da próxima ação: é ela que diz o que fazer. A próxima ação continua embaixo
+            porque costuma trazer o combinado com o cliente, mas ela não é o problema. */}
+        <em className="fluxo-causa">⚠ {fluxo.causa}</em>
+        {!!String(s.proxima_acao || "").trim() && <em>→ {s.proxima_acao}</em>}
       </div>
       <div className="funil-dir">
         <span className="status-pill">{statusLabel[s.status] || s.status}</span>
@@ -4049,7 +4136,11 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
   // Ana Cristina e a Madalena — prontas, só esperando entrega — apareciam pedindo material que ninguém devia.
   // Ausência de dado não é informação. Agora a fonte é a lista de compras (materiais_necessarios): tem item
   // não marcado, está esperando material; não tem, está pronto pra andar.
-  const materiaisAnotadosPendentes = (s) => (s.materiais_necessarios || []).filter((m) => !m.arquivado && !m.comprado).length;
+  // ⚠ ALINHADO COM A ABA COMPRAS EM 02/09/2026. Isto contava `!m.comprado`, e `comprado` não existe em 15
+  // dos 67 itens reais — vinha `undefined`, falsy, e a Capacidade dizia "esperando material" para serviço
+  // cujo material já estava com o profissional. Era o mesmo defeito de leitura da aba Compras, na terceira
+  // tela. Agora as duas perguntam a mesma coisa à mesma função: o que ainda não está EM MÃOS.
+  const materiaisAnotadosPendentes = (s) => (s.materiais_necessarios || []).filter((m) => !m.arquivado && classificarMaterial(m).faixa !== "em_maos").length;
   const esperandoMaterial = (s) => {
     if (!["agendado", "producao"].includes(s.status)) return false;
     if (materiaisAnotadosPendentes(s)) return true;
@@ -4232,7 +4323,7 @@ function MateriaisCard({ services, today, onVerCompras }) {
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-function Dashboard({ inbox, services, appointments, finances, rotinas, customers, fornecedores, pessoais, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+function Dashboard({ inbox, services, appointments, agendaHistorico, finances, rotinas, customers, fornecedores, pessoais, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
   const profissionais = nomesProfissionais(services);
@@ -4266,7 +4357,10 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
   const atrasadosAll = rotaAll.filter((entry) => entry.data < today);
   const hojeAll = rotaAll.filter((entry) => entry.data === today);
   const futurosAll = rotaAll.filter((entry) => entry.data > today);
-  const noAction = services.filter((entry) => !entry.proxima_acao); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
+  // Mesma função do card e do Funil — a métrica não pode ter critério próprio, foi assim que as três
+  // telas passaram a discordar. `sem_acao` aqui é literal: campo vazio, e só.
+  const ctxFluxoPainel = contextoDeFluxo({ appointments, agendaHistorico, inbox, services });
+  const noAction = services.filter((entry) => classificarFluxoServico(entry, ctxFluxoPainel).estado === "sem_acao"); const openFin = finances.filter((entry) => entry.status && entry.status !== "pago" && entry.data <= today);
   // Atualização otimista pra a linha sumir NA HORA: sem isto ela só sairia depois do loadAll (5 queries) e
   // parecia que o clique não pegou — mesmo bug já corrigido nos compromissos em 15/07.
   // Guarda a DATA resolvida, não `true`: o ciclo recicla a mesma linha da agenda mudando a data, então
@@ -4411,7 +4505,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
 <section className="metric-grid"><Metric label="Atrasados" value={atrasadosAll.length} detail="De dias anteriores, sem desfecho" tone="yellow" onClick={atrasadosAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
-    <ServicosSemProximoPassoCard services={services} appointments={appointments} inbox={inbox} onOpenFicha={onOpenFicha} />
+    <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} onOpenFicha={onOpenFicha} />
     <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
     <CaixaCard inbox={inbox} today={today} />
     {/* PESSOAIS mora na mesma home por conveniência dele, mas é outro domínio — e fica DEPOIS do trabalho,
@@ -4510,21 +4604,31 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
 }
 function Metric({ label, value, detail, tone, onClick }) { return <article className={`metric-card ${tone}${onClick ? " clickable" : ""}`} onClick={onClick || undefined}><span>{label}</span><b>{value}</b><small>{detail}</small></article>; }
 
-const FUNIL_FILTROS = [{ id: "todos", label: "Todos" }, { id: "sem_acao", label: "Sem ação" }, { id: "retorno_vencido", label: "Retorno vencido" }, { id: "lead", label: "Lead" }, { id: "orcamento", label: "Orçamento" }, { id: "agendado", label: "Agendado" }, { id: "producao", label: "Em produção" }, { id: "entregue", label: "Entregue" }];
-function LeadsView({ services, search, setSearch, onOpenFicha, initialFiltro, onConsumedInitialFiltro }) {
+const FUNIL_FILTROS = [{ id: "todos", label: "Todos" }, { id: "sem_acao", label: "Sem ação" }, { id: "precisa_avancar", label: "Precisa avançar" }, { id: "retorno_vencido", label: "Retorno vencido" }, { id: "lead", label: "Lead" }, { id: "orcamento", label: "Orçamento" }, { id: "agendado", label: "Agendado" }, { id: "producao", label: "Em produção" }, { id: "entregue", label: "Entregue" }];
+function LeadsView({ services, appointments, agendaHistorico, inbox, search, setSearch, onOpenFicha, initialFiltro, onConsumedInitialFiltro }) {
   const [filtroStatus, setFiltroStatus] = useState(initialFiltro || "todos");
   useEffect(() => { if (onConsumedInitialFiltro) onConsumedInitialFiltro(); }, []);
+  // MESMA classificação do Painel, não uma cópia do critério. Era exatamente aqui que as telas divergiam:
+  // o Funil filtrava por `!proxima_acao` e o Painel por "não tem compromisso", então o mesmo serviço
+  // aparecia num lugar e sumia no outro. Ver classificarFluxoServico.
+  const ctxFluxo = useMemo(() => contextoDeFluxo({ appointments, agendaHistorico, inbox, services }), [appointments, agendaHistorico, inbox, services]);
+  const fluxoDe = (s) => classificarFluxoServico(s, ctxFluxo);
   // Mesma fila do card de Capacidade: produção primeiro (peça na bancada, prazo correndo), agendado no
   // final (fechado mas nem começou), e dentro de cada faixa o prazo mais apertado na frente.
   const ORDEM_FILA = { producao: 0, lead: 1, orcamento: 1, agendado: 2, entregue: 3, pago: 4, perdido: 5 };
-  const visible = services.filter((service) => `${service.clientes?.nome} ${service.titulo}`.toLowerCase().includes(search.toLowerCase())).filter((service) => filtroStatus === "todos" || (filtroStatus === "sem_acao" ? !service.proxima_acao : filtroStatus === "retorno_vencido" ? retornoVencido(service, hojeISO()) : service.status === filtroStatus))
+  const visible = services.filter((service) => `${service.clientes?.nome} ${service.titulo}`.toLowerCase().includes(search.toLowerCase())).filter((service) => filtroStatus === "todos"
+      || (filtroStatus === "sem_acao" ? fluxoDe(service).estado === "sem_acao"
+        : filtroStatus === "precisa_avancar" ? fluxoDe(service).estado === "precisa_avancar"
+          : filtroStatus === "retorno_vencido" ? retornoVencido(service, hojeISO())
+            : service.status === filtroStatus))
     .sort((a, b) => (ORDEM_FILA[a.status] ?? 9) - (ORDEM_FILA[b.status] ?? 9) || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">FUNIL DE TRABALHO</p><h3>{visible.length} serviços ativos</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente ou serviço" /></div>
     <div className="funil-filtros">{FUNIL_FILTROS.map((f) => <button key={f.id} className={filtroStatus === f.id ? "active" : ""} onClick={() => setFiltroStatus(f.id)}>{f.label}</button>)}</div>
-    <div className="funil-lista">{visible.map((service) => <article className={`funil-item st-${service.status || "lead"}`} key={service.id} onClick={() => onOpenFicha(service.cliente_id)}>
+    <div className="funil-lista">{visible.map((service) => { const fluxo = fluxoDe(service); return <article className={`funil-item st-${service.status || "lead"}`} key={service.id} onClick={() => onOpenFicha(service.cliente_id)}>
       <div className="funil-esq">
         <strong>{service.clientes?.nome || "Cliente"}</strong>
         <span>{service.titulo}</span>
+        {fluxo.estado === "precisa_avancar" && <em className="fluxo-causa">⚠ {fluxo.causa}</em>}
         <em>→ {service.proxima_acao || "Sem próxima ação"}</em>
       </div>
       <div className="funil-dir">
@@ -4533,7 +4637,7 @@ function LeadsView({ services, search, setSearch, onOpenFicha, initialFiltro, on
         <b>{service.valor_orcamento ? money(service.valor_orcamento) : "—"}</b>
         <time title={prazoComRotulo(service)}>{prazoComRotulo(service) || "—"}</time>
       </div>
-    </article>)}
+    </article>; })}
     {!visible.length && <div className="empty-state"><b>Nenhum serviço nesse filtro.</b></div>}</div></section>;
 }
 
@@ -5415,6 +5519,8 @@ const CS_ESC = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;"
 function ehServicoFechado(s) { return ["agendado", "producao", "entregue", "pago"].includes(s?.status); }
 // RETORNO VENCIDO — a data existe e não faz nada (item ATIVOS-COM-DATA-20260827-1805-001).
 //
+// RETORNO VENCIDO — a data existe e não faz nada (item ATIVOS-COM-DATA-20260827-1805-001).
+//
 // A trava do banco `servicos_ativo_precisa_prazo` já obriga todo serviço ativo a ter data, e ela ESTÁ sendo
 // cumprida: zero lead ou orçamento sem prazo. Só que medido no banco em 28/08 havia **61 leads e orçamentos
 // com o prazo já vencido** — 47 há mais de 15 dias e 19 sem nem próxima ação escrita. Rodrigo Monteiro,
@@ -5440,75 +5546,160 @@ function linhasFinanceirasDaConfirmacao(financeiro) {
   if (aReceber.length) linhas.push({ rotulo: "Saldo", valor: money(soma(aReceber)), nota: "A receber" });
   return linhas.slice(0, 3);
 }
-function htmlConfirmacaoServico({ cliente, servico, financeiro, hoje }) {
+// O DOCUMENTO É DO FECHAMENTO, NÃO DO SERVIÇO. Diego comparou o PDF que este app gerava com o
+// Confirmacao_Servico_Ivoneide de 22/08 (montado do MODELO_MESTRE_CONFIRMACAO_SERVICO.docx) e o dele era
+// melhor. Duas diferenças estruturais, não estéticas:
+//
+// 1) O documento de 22/08 cobre os DOIS serviços da Ivoneide como UM acordo de R$ 4.800. Aqui eram duas
+//    linhas de banco, R$ 2.200 e R$ 2.600, e sairiam dois papéis, nenhum com o valor que a cliente
+//    combinou. O commit fa5ce49 tratou isso como colisão de NOME DE ARQUIVO — era sintoma.
+// 2) O modelo mestre é um formulário com ROTULO_1..4/DETALHE_1..4 escritos por gente: é por isso que o
+//    documento bom diz "Itens: 2 sofás retráteis + 3 poltronas". Isso é SÍNTESE, nenhum campo contém.
+//    Sem espaço curado, a versão anterior despejou a `descricao` inteira — o vazamento corrigido em
+//    a7a56b0. Documento pobre e vazamento tinham a MESMA causa.
+//
+// Decisão de Diego em 02/09/2026: HÍBRIDO. Campo curado (`servicos.confirmacao`) manda; sem ele, o app
+// deriva como antes. Começa funcionando sem depender de ninguém preencher.
+function confirmacaoCuradaDoGrupo(servicos) {
+  for (const s of servicos) {
+    const c = s && s.confirmacao;
+    if (c && typeof c === "object" && !Array.isArray(c)) return c;
+  }
+  return {};
+}
+// Serviços que formam UM fechamento. `fechamento_ref` igual e não-nulo = mesmo acordo. Sem ela, o serviço
+// é o próprio fechamento — que é o comportamento de sempre, e continua sendo o padrão.
+function servicosDoFechamento(servico, todosDoCliente) {
+  const ref = servico && servico.fechamento_ref;
+  if (!ref) return [servico];
+  const grupo = (todosDoCliente || []).filter((s) => s.fechamento_ref === ref && ehServicoFechado(s));
+  if (!grupo.length) return [servico];
+  // Ordem determinística: os dois serviços da Ivoneide nasceram no mesmo dia, e sem o desempate por id o
+  // grupo poderia trocar de ordem entre uma emissão e outra — mudando a Ref e o "Serviço 1/2" do papel.
+  return grupo.slice().sort((a, b) => String(a.criado_em || "").localeCompare(String(b.criado_em || "")) || String(a.id).localeCompare(String(b.id)));
+}
+// Data de EMISSÃO vai por extenso completo, não no `compactDate`. O compacto imprime "02 de set." — num
+// documento comercial que o cliente guarda, o ano some e a data vira ambígua no ano seguinte. Os dois
+// documentos que o Diego já emitiu usam 28/08/2026 e 22/08/2026.
+function dataDocumento(iso) {
+  const p = String(iso || "").split("-");
+  return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : String(iso || "");
+}
+function htmlConfirmacaoServico({ cliente, servicos, financeiro, hoje }) {
   const e = CS_ESC;
-  const linhasServico = [];
-  linhasServico.push({ rotulo: "Serviço", detalhe: servico.titulo || "" });
-  // ⚠ A `descricao` NÃO ENTRA NESTE DOCUMENTO, e isso é decisão, não esquecimento. Ela é diário interno
-  // escrito pelo Classic, não texto de cliente: na Ivoneide sai "taxa InfinitePay 12,40%" e "preço base do
-  // contrato R$ 4.800,00" logo acima de um total de R$ 2.200; no Fabrício, o orçamento já vencido de
-  // R$ 5.300 e "NÃO considerar fechado sem aceite claro". Provado imprimindo os dois com dado real em
-  // 01/09/2026. É o mesmo defeito do "Cobrar retorno — ia decidir com o marido" que vazou no WhatsApp.
-  // Filtrar por regra foi descartado por Diego: texto livre sempre escapa, e o erro só aparece na mão do
-  // cliente. O que descreve o trabalho aqui é o título + o material, que são campos de fato.
-  const mats = (servico.materiais_necessarios || []).filter((m) => !m.arquivado).map((m) => m.item).filter(Boolean);
-  if (mats.length) linhasServico.push({ rotulo: "Material", detalhe: mats.join(" · ") });
-  if (servico.responsavel) linhasServico.push({ rotulo: "Responsável técnico", detalhe: servico.responsavel });
-  const fins = linhasFinanceirasDaConfirmacao(financeiro);
-  const situacao = statusLabel[servico.status] || servico.status || "";
-  // O <title> vira o NOME DO ARQUIVO no "Salvar como PDF" do Chrome, então é ele que faz valer a regra de
-  // versão única: mesmo fechamento = mesmo nome = substitui, em vez de criar _FINAL, _v2 e afins.
-  //
-  // ⚠ A REFERÊNCIA ENTRA NO NOME, e isso é uma correção ao padrão escrito na Skill. O padrão de lá,
-  // `Confirmacao_Servico_[CLIENTE]_[DD-MM-AAAA]`, NÃO é único quando o cliente tem mais de um serviço
-  // fechado — e isso não é hipótese: a Ivoneide tem dois (R$ 2.200 e R$ 2.600, ambos agendados). Emitir os
-  // dois no mesmo dia daria arquivos de mesmo nome com conteúdo diferente, que é exatamente a confusão de
-  // "versões diferentes do mesmo documento" que este item veio resolver. Com a Ref, o nome continua estável
-  // por fechamento (o id do serviço não muda) e distinto entre fechamentos.
+  const lista = (servicos || []).filter(Boolean);
+  const principal = lista[0];
+  const curado = confirmacaoCuradaDoGrupo(lista);
+  const totalNumero = lista.reduce((soma, s) => soma + Number(s.valor_orcamento || 0), 0);
+  const referencia = curado.referencia || referenciaConfirmacao(principal.id);
+
+  // ---- SERVIÇO CONTRATADO: até 4 pares rótulo/detalhe, iguais aos do modelo mestre ----
+  let linhas = Array.isArray(curado.linhas) ? curado.linhas.filter((l) => l && l.rotulo && l.detalhe).slice(0, 4) : [];
+  if (!linhas.length) {
+    if (lista.length === 1) linhas.push({ rotulo: "Serviço", detalhe: principal.titulo || "" });
+    else lista.forEach((s, i) => linhas.push({ rotulo: "Serviço " + (i + 1), detalhe: s.titulo || "" }));
+    // `item` OU `material`: a chave varia conforme quem gravou. Ler só `item` perdia a espuma D40 e o
+    // tecido Klee 03 do Fabrício, e o documento descrevia o serviço pela metade.
+    const mats = [...new Set(lista.flatMap((s) => (s.materiais_necessarios || []).filter((m) => m && !m.arquivado).map((m) => m.item || m.material).filter(Boolean)))];
+    if (mats.length) linhas.push({ rotulo: "Material", detalhe: mats.join(" · ") });
+    const resp = [...new Set(lista.map((s) => s.responsavel).filter(Boolean))];
+    if (resp.length) linhas.push({ rotulo: "Responsável técnico", detalhe: resp.join(" · ") });
+    linhas = linhas.slice(0, 4);
+  }
+  const prazoRotulo = curado.prazo ? "Prazo" : (principal.prazo ? rotuloPrazo(principal.status) : "");
+  const prazoDetalhe = curado.prazo || (principal.prazo ? compactDate(principal.prazo) : "");
+
+  // ---- CONDIÇÃO FINANCEIRA: 3 cartões, como no modelo ----
+  let cartoes = Array.isArray(curado.financeiro) ? curado.financeiro.filter((f) => f && f.rotulo && f.valor).slice(0, 3) : [];
+  if (!cartoes.length) {
+    if (totalNumero > 0) cartoes.push({ rotulo: "Valor base do serviço", valor: money(totalNumero), nota: "Preço-base contratado." });
+    linhasFinanceirasDaConfirmacao(financeiro).forEach((f) => cartoes.push(f));
+    cartoes = cartoes.slice(0, 3);
+  }
+  // "Condição escolhida" SÓ sai do campo curado, nunca derivada. Deduzir a condição a partir dos
+  // lançamentos transformaria oferta em aceite, que a Skill proíbe — a regra de 28/08 continua valendo.
+  // A diferença é que agora existe um lugar onde alguém pode escrevê-la de propósito.
+  const condicao = curado.condicao_escolhida || "";
+  const total = curado.total || (totalNumero > 0 ? money(totalNumero) : "");
+  // O RÓTULO DO TOTAL TAMBÉM É CURADO. Nos dois documentos que o Diego já emitiu ele é diferente:
+  // o do Fabrício diz "Total contratado: R$ 5.600,00" (o preço do contrato), e o da Ivoneide diz
+  // "Total financeiro nesta condição: R$ 5.048,00" — que NÃO é o contrato (R$ 4.800), é o que a cliente
+  // paga escolhendo 12x. Fixar "Total contratado" imprimiria o número certo com a legenda errada.
+  const totalRotulo = curado.total_rotulo || "Total contratado";
+
+  // ---- SITUAÇÃO: badge + resumo. O resumo é curado; `proxima_acao` NÃO entra (é anotação interna). ----
+  const statusRotulo = curado.status_rotulo || String(statusLabel[principal.status] || principal.status || "").toUpperCase();
+  const statusResumo = curado.status_resumo || "";
+
   const nomeArquivo = "Confirmacao_Servico_"
     + String(cliente.nome || "Cliente").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "")
-    + "_" + referenciaConfirmacao(servico.id)
+    + "_" + String(referencia).replace(/[^A-Za-z0-9-]+/g, "")
     + "_" + String(hoje).split("-").reverse().join("-");
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${e(nomeArquivo)}</title>
 <style>
 @page { size: 215.9mm 279.4mm; margin: 11.4mm 14mm; }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"Liberation Sans",Arial,Helvetica,sans-serif;color:#1F2937;font-size:8.5pt;line-height:1.35;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-/* Espaçamentos medidos, não escolhidos: com os valores folgados o documento fechava em 261,9mm numa área
-   útil de 256,6mm e quebrava em duas páginas. A invariante "UMA PÁGINA" do modelo mestre é o que manda
-   aqui, e a folga foi calibrada pro pior caso (4 linhas de serviço + prazo + 3 cartões + situação longa). */
-.faixa{background:#17365D;color:#fff;padding:5.5mm 7mm;border-radius:2mm}
-.faixa h1{font-size:13pt;letter-spacing:.3pt;margin-bottom:1mm}
-.faixa .sub{color:#DCE6F1;font-size:8pt}
-.faixa .doc{font-size:18pt;font-weight:700;margin-top:4mm;letter-spacing:.5pt}
-.faixa .ref{color:#DCE6F1;font-size:8pt;margin-top:1.5mm}
-.empresa{color:#6B7280;font-size:7.5pt;text-align:center;margin:2mm 0 3.5mm;line-height:1.45}
-h2{color:#17365D;font-size:9pt;letter-spacing:.8pt;border-bottom:.4mm solid #17365D;padding-bottom:1mm;margin:3.5mm 0 2mm}
-.painel{background:#F8FAFC;border:.2mm solid #E5EAF0;border-radius:1.5mm;padding:3.5mm 4mm}
-.linha{display:flex;gap:4mm;padding:1.4mm 0}
-.linha .rot{color:#6B7280;font-size:7.5pt;width:34mm;flex:none}
-.linha .det{flex:1}
-.cards{display:flex;gap:3mm}
-.card{flex:1;background:#F3F6F9;border:.2mm solid #E5EAF0;border-radius:1.5mm;padding:3mm}
-.card .rot{color:#6B7280;font-size:7.5pt}
-.card .val{color:#17365D;font-size:12pt;font-weight:700;margin-top:1mm}
-.card .nota{color:#6B7280;font-size:7pt;margin-top:.8mm}
-.total{display:flex;justify-content:space-between;align-items:center;background:#17365D;color:#fff;border-radius:1.5mm;padding:3mm 4mm;margin-top:3mm}
-.total .rot{font-size:8.5pt;letter-spacing:.4pt}
-.total .val{font-size:14pt;font-weight:700}
-.situacao{background:#FFF8E8;border:.2mm solid #C89B3C;border-radius:1.5mm;padding:3.5mm 4mm}
-.situacao .rot{color:#8A6A1F;font-weight:700;font-size:9pt}
-.aceite{color:#4B5563;font-size:7.5pt;line-height:1.5;margin-top:2.5mm}
-.rodape{border-top:.2mm solid #E5EAF0;margin-top:4mm;padding-top:2mm;color:#9AA3AF;font-size:6.5pt;text-align:center;line-height:1.5}
+.faixa{display:flex;justify-content:space-between;align-items:flex-start;gap:8mm;background:#17365D;color:#fff;padding:5mm 6mm;border-radius:1mm}
+.faixa h1{font-size:13pt;letter-spacing:.2pt}
+.faixa h1 b{color:#C89B3C}
+.faixa .sub{color:#DCE6F1;font-size:8pt;margin-top:1mm}
+.faixa .dir{text-align:right;flex:none}
+.faixa .doc{font-size:12pt;font-weight:700;letter-spacing:.3pt}
+.faixa .ref{color:#DCE6F1;font-size:8pt;margin-top:1mm}
+.empresa{font-size:8pt;font-weight:700;margin:3mm 0 .8mm}
+.empresa+.end{color:#6B7280;font-size:8pt;margin-bottom:3mm}
+h2{color:#17365D;font-size:8.5pt;letter-spacing:.7pt;margin:3.5mm 0 1.5mm}
+.cliente{background:#F8FAFC;border:.2mm solid #E5EAF0;border-radius:1mm;padding:3mm 4mm}
+.cliente .tag{color:#C89B3C;font-size:7.5pt;font-weight:700;letter-spacing:.7pt}
+.cliente .nome{font-size:11pt;font-weight:700;margin:1.5mm 0 1mm}
+.cliente div{font-size:8.5pt;line-height:1.5}
+table{width:100%;border-collapse:collapse}
+td{padding:1.8mm 3mm;border-bottom:.2mm solid #E5EAF0;vertical-align:top}
+td.rot{width:36mm;background:#F8FAFC;font-weight:700;font-size:8pt;color:#17365D}
+tr:last-child td{border-bottom:0}
+.cards{display:flex;gap:2.5mm;margin-bottom:2.5mm}
+.card{flex:1;background:#F8FAFC;border:.2mm solid #E5EAF0;border-radius:1mm;padding:2.5mm;text-align:center}
+.card .rot{color:#6B7280;font-size:7pt;letter-spacing:.4pt;text-transform:uppercase}
+.card .val{color:#17365D;font-size:13pt;font-weight:700;margin:1mm 0}
+.card .val.ok{color:#1E7A46}
+.card .nota{color:#6B7280;font-size:7pt}
+.condicao{background:#FFF8E8;border:.2mm solid #C89B3C;border-radius:1mm;padding:3mm 4mm}
+.condicao p{font-size:8.5pt}
+.condicao p+p{margin-top:1.5mm}
+.situacao{display:flex;border:.2mm solid #E5EAF0;border-radius:1mm;overflow:hidden}
+.situacao .badge{flex:none;width:46mm;background:#17365D;color:#fff;font-weight:700;font-size:8.5pt;padding:3mm;display:flex;align-items:center}
+.situacao .txt{flex:1;padding:3mm 4mm;font-size:8.5pt;line-height:1.5}
+.aceite{font-size:8pt;line-height:1.5;margin-top:1.5mm}
+.rodape{border-top:.2mm solid #E5EAF0;margin-top:4mm;padding-top:2mm;color:#9AA3AF;font-size:7pt;text-align:center;line-height:1.5}
 </style></head><body data-tb-doc="1">
 <div class="faixa">
-  <h1>TAPEÇARIA E ESTOFADOS BAHIA</h1>
-  <div class="sub">Reforma de estofados com atendimento em domicílio</div>
-  <div class="doc">CONFIRMAÇÃO DE SERVIÇO</div>
-  <div class="ref">Ref. ${e(referenciaConfirmacao(servico.id))} &nbsp;•&nbsp; Emissão: ${e(compactDate(hoje))}</div>
+  <div><h1>TAPEÇARIA E ESTOFADOS <b>BAHIA</b></h1><div class="sub">Reforma de estofados com atendimento em domicílio</div></div>
+  <div class="dir"><div class="doc">CONFIRMAÇÃO DE SERVIÇO</div><div class="ref">Ref. ${e(referencia)}<br>Emissão: ${e(dataDocumento(hoje))}</div></div>
 </div>
-<div class="empresa">TAPEÇARIA E ESTOFADOS BAHIA LTDA &nbsp;•&nbsp; CNPJ 23.184.721/0001-02 &nbsp;•&nbsp; WhatsApp (61) 99403-7524<br>Rua Raquel de Queiroz, Qd. 118, Lt. 20 - Luziânia/GO &nbsp;•&nbsp; capotariabahia@gmail.com</div>
-<h2>CLIENTE</h2>
+<div class="empresa">TAPEÇARIA E ESTOFADOS BAHIA LTDA &nbsp;•&nbsp; CNPJ 23.184.721/0001-02 &nbsp;•&nbsp; WhatsApp (61) 99403-7524</div>
+<div class="end">Rua Raquel de Queiroz, Qd. 118, Lt. 20 - Luziânia/GO &nbsp;•&nbsp; capotariabahia@gmail.com</div>
+<div class="cliente">
+  <div class="tag">CLIENTE</div>
+  <div class="nome">${e(cliente.nome)}</div>
+  ${cliente.telefone ? `<div>WhatsApp: ${e(cliente.telefone)}</div>` : ""}
+  ${cliente.endereco || cliente.cidade ? `<div>Endereço: ${e([cliente.endereco, cliente.cidade].filter(Boolean).join(", "))}</div>` : ""}
+</div>
+<h2>SERVIÇO CONTRATADO</h2>
+<table>
+  ${linhas.map((l) => `<tr><td class="rot">${e(l.rotulo)}</td><td>${e(l.detalhe)}</td></tr>`).join("")}
+  ${prazoDetalhe ? `<tr><td class="rot">${e(prazoRotulo || "Prazo")}</td><td>${e(prazoDetalhe)}</td></tr>` : ""}
+</table>
+<h2>CONDIÇÃO FINANCEIRA COMBINADA</h2>
+${cartoes.length ? `<div class="cards">${cartoes.map((c, i) => `<div class="card"><div class="rot">${e(c.rotulo)}</div><div class="val${i === 1 ? " ok" : ""}">${e(c.valor)}</div>${c.nota ? `<div class="nota">${e(c.nota)}</div>` : ""}</div>`).join("")}</div>` : ""}
+${condicao || total ? `<div class="condicao">${condicao ? `<p><b>Condição escolhida:</b> ${e(condicao)}</p>` : ""}${total ? `<p><b>${e(totalRotulo)}:</b> ${e(total)}</p>` : ""}</div>` : ""}
+<h2>SITUAÇÃO DO SERVIÇO</h2>
+<div class="situacao"><div class="badge">${e(statusRotulo)}</div><div class="txt">${statusResumo ? e(statusResumo) : "Serviço registrado nas condições acima."}</div></div>
+<h2>CONFIRMAÇÃO E ACEITE</h2>
+<div class="aceite">Este documento registra as condições comerciais e o escopo técnico combinados para o serviço acima. A confirmação do cliente pelo WhatsApp da empresa integra o registro do atendimento.</div>
+<div class="rodape">Documento emitido eletronicamente pela Tapeçaria e Estofados Bahia Ltda.<br>Este documento é de natureza comercial e não substitui documento fiscal quando aplicável.</div>
+</body></html>`;
+}
 <div class="painel">
   <div class="linha"><div class="rot">Nome</div><div class="det"><b>${e(cliente.nome)}</b></div></div>
   ${cliente.telefone ? `<div class="linha"><div class="rot">WhatsApp</div><div class="det">${e(cliente.telefone)}</div></div>` : ""}
@@ -5587,21 +5778,27 @@ function imprimirDocumento(html, ajustarAUmaPagina) {
 // SEM VALOR FECHADO NÃO SAI DOCUMENTO. O modelo tem "Total contratado" em destaque; emitir com o campo
 // vazio ou com palpite entregaria ao cliente um número que ninguém combinou. Mesma linha do fechamento
 // sem valor que já existe no app: avisa e manda resolver, não inventa.
-async function gerarConfirmacaoServico({ db, demo, cliente, servico, notify }) {
-  if (!(Number(servico?.valor_orcamento) > 0)) {
+async function gerarConfirmacaoServico({ db, demo, cliente, servico, servicosDoCliente, notify }) {
+  // O documento é do FECHAMENTO: se este serviço tem `fechamento_ref`, os irmãos entram junto e o total é
+  // a soma. A Ivoneide combinou UM acordo de R$ 4.800 que no banco são dois serviços de R$ 2.200 e R$ 2.600
+  // — emitir só um deles entregaria à cliente um "total contratado" que ela nunca combinou.
+  const grupo = servicosDoFechamento(servico, servicosDoCliente);
+  const totalGrupo = grupo.reduce((soma, s) => soma + Number(s.valor_orcamento || 0), 0);
+  if (!(totalGrupo > 0)) {
     notify("Esse serviço está sem valor fechado. A confirmação mostraria um total inventado — registre o valor primeiro.", "error");
     return;
   }
+  const ids = grupo.map((s) => s.id);
   let financeiro = [];
-  if (demo) financeiro = demoFinance.filter((f) => f.servico_id === servico.id);
+  if (demo) financeiro = demoFinance.filter((f) => ids.includes(f.servico_id));
   else {
     // Lê o financeiro NA HORA em vez de usar o que já está em memória: o modelo mostra entrada e saldo, e a
     // regra da Skill é usar o fato financeiro oficial mais novo.
-    const { data, error } = await db.from("financeiro").select("tipo,status,valor,data").eq("servico_id", servico.id);
+    const { data, error } = await db.from("financeiro").select("tipo,status,valor,data").in("servico_id", ids);
     if (error) { notify("Não consegui ler o financeiro do serviço: " + error.message, "error"); return; }
     financeiro = data || [];
   }
-  imprimirDocumento(htmlConfirmacaoServico({ cliente, servico, financeiro, hoje: hojeISO() }), true);
+  imprimirDocumento(htmlConfirmacaoServico({ cliente, servicos: grupo, financeiro, hoje: hojeISO() }), true);
 }
 // O MESMO CAMPO GUARDA TRÊS COISAS DIFERENTES. Diego, 04/08, sobre o Leandro: "ele era agendado, deu entrada
 // e agendei para buscar só quando fosse executar o serviço" — o 02/08 era a data de BUSCAR, não uma entrega
@@ -6925,7 +7122,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
         </div><div className="ficha-servico-meta">{s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <span>—</span>}{s.prazo && <time>{prazoComRotulo(s)}</time>}{(sugestao || tel || ehServicoFechado(s)) && <div className="ficha-servico-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}
           {/* CONFIRMAÇÃO DE SERVIÇO — só em trabalho FECHADO. Lead e orçamento não têm acordo pra confirmar,
               e emitir documento comercial em cima de proposta viraria "condição oferecida" virando aceite. */}
-          {ehServicoFechado(s) && <button className="ghost" title="Gerar a Confirmação de Serviço em PDF" onClick={() => gerarConfirmacaoServico({ db, demo, cliente, servico: s, notify })}>📄 Confirmação</button>}</div>}</div></div>; })}</div>}
+          {ehServicoFechado(s) && <button className="ghost" title="Gerar a Confirmação de Serviço em PDF" onClick={() => gerarConfirmacaoServico({ db, demo, cliente, servico: s, servicosDoCliente: servicos, notify })}>📄 Confirmação</button>}</div>}</div></div>; })}</div>}
         <p className="ficha-note">Mudança de status e financeiro continuam no app atual por enquanto.</p>
 
         <h3 className="ficha-section">Fotos</h3>
