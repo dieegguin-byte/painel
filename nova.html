@@ -616,6 +616,13 @@ const demoServices = [
     { item: "Catraca de encosto", acao: "trocar", status: "estimativa", base_do_preco: "NAO_CONFIRMADA", quantidade_pares: 4 },
     { item: "Tecido Klee 09", estado: "material_entregue_ao_profissional", comprado: true, entregue_a: "Marlom Júnior", observacao: "Metragem pendente de definição" },
   ] },
+  // s6 É O CASO FABRÍCIO: fechado, com dinheiro dentro, com próxima ação ESCRITA — e mesmo assim parado,
+  // porque a retirada de 04/09 foi cancelada e nenhuma sucessora nasceu (ver demoAgendaHistorico).
+  // Tem que sair como PRECISA AVANÇAR com a causa da retirada, NUNCA como "sem próxima ação".
+  // Material todo em mãos de propósito: senão "esperando material" explicaria a parada e o card se calaria.
+  { id: "s6", cliente_id: "c2", titulo: "Sofá retrátil — reforma completa", status: "agendado", prioridade: "alta", proxima_acao: "Combinar horário e retirar o sofá até 04-09-2026", prazo: "2026-09-04", valor_orcamento: 2800, clientes: demoCustomers[1], responsavel: "Gaspar", materiais_necessarios: [
+    { item: "Espuma D40", comprado: true, arquivado: false },
+  ] },
 ];
 // As duas primeiras usam data RELATIVA ao dia em que a demo é aberta. Com data fixa, a
 // demonstração abria sempre com "nada marcado para hoje" — que é justamente o bloco mais
@@ -657,6 +664,13 @@ const demoPessoais = [
   { id: "p1", titulo: "Compromisso pessoal — esposa", data_alvo: "2026-11-24", hora: "20:00", cidade: "Luziânia-GO", status: "PENDENTE", impacto_operacao: "BLOQUEIA_DISPONIBILIDADE", origem: "classic", remarcacoes: 0 },
   { id: "p2", titulo: "Apresentação na escola do filho", data_alvo: "2026-08-10", hora: null, cidade: "Luziânia-GO", status: "PENDENTE", impacto_operacao: "A_CONFIRMAR", origem: "grupo", referencia_origem: "grupo da escola", remarcacoes: 0 },
   { id: "p3", titulo: "Levar o carro na revisão", data_alvo: "2026-08-05", hora: null, status: "CONCLUIDO", impacto_operacao: "SEM_IMPACTO", origem: "manual", remarcacoes: 1, remarcado_de: "2026-07-29", concluido_em: "2026-08-05T18:00:00Z" },
+];
+// AGENDA QUE NÃO ESTÁ MAIS PLANEJADA — só o que explica por que um serviço parou. Aqui mora o caso
+// FABRÍCIO do item "painel de serviços fechados sem avanço": a retirada foi CANCELADA e ninguém
+// remarcou, então o serviço tem próxima ação escrita e mesmo assim não anda. Sem esta linha a demo não
+// consegue exercitar o "PRECISA AVANÇAR" — e foi por não conseguir ver que o card ficou sem prova.
+const demoAgendaHistorico = [
+  { id: "ah1", servico_id: "s6", status: "cancelado", titulo: "PROVISÓRIO — Retirada do sofá — Carlos", data: "2026-09-04" },
 ];
 const demoRotinas = [
   { id: "r1", titulo: "Calibrar pneu do carro", intervalo_dias: 3, hora: null, observacao: null, ultima_execucao: null, ativo: true },
@@ -2495,7 +2509,7 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
