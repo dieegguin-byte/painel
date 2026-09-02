@@ -214,6 +214,8 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .mat-item{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
 .mat-item>span{min-width:0}
 .mat-item em{display:block;font-style:normal;font-size:12px;color:var(--dim);margin-top:2px}
+/* Aviso de estoque: verde de "olha isso", não vermelho de erro — comprar de novo não quebra nada, só custa. */
+.mat-item em.mat-estoque{color:#9bc7a7;background:#75a9871a;border:1px solid #75a98733;border-radius:7px;padding:4px 7px;margin-top:5px;display:inline-block}
 .mat-item time{font-size:11px;color:var(--muted);white-space:nowrap;flex:none}
 .mat-item time.atrasado{color:#e88477;font-weight:700}
 button.sutil{opacity:.55;font-size:12px}
@@ -614,6 +616,11 @@ const demoServices = [
     { material: "espuma", densidade: "D40", espessura_cm: 7, aplicacao: "assentos", status: "medido", fornecedor: "Luis Tecidos" },
     { item: "Carpete dos pezinhos", estado: "material_planejado", comprado: false, fornecedor: "Afibracom", quantidade_status: "PENDENTE_MEDIDAS_PROFISSIONAL" },
     { item: "Catraca de encosto", acao: "trocar", status: "estimativa", base_do_preco: "NAO_CONFIRMADA", quantidade_pares: 4 },
+    // Escrito assim de propósito: é o texto REAL de um material que o Diego já tem na prateleira, com
+    // outra grafia ("PX 1200" separado, espessura diferente). Serve pra demonstração mostrar o aviso
+    // "isso você já tem" acontecendo de verdade — e pra provar que ele nasce de casamento de texto
+    // imperfeito, não de um id igual dos dois lados.
+    { item: "Espuma PX 1200 soft de 10cm 0.55cm", loja: "Ellis Tecidos", comprado: false },
     { item: "Tecido Klee 09", estado: "material_entregue_ao_profissional", comprado: true, entregue_a: "Marlom Júnior", observacao: "Metragem pendente de definição" },
   ] },
   // s6 É O CASO FABRÍCIO: fechado, com dinheiro dentro, com próxima ação ESCRITA — e mesmo assim parado,
@@ -676,6 +683,12 @@ const demoRotinas = [
   { id: "r1", titulo: "Calibrar pneu do carro", intervalo_dias: 3, hora: null, observacao: null, ultima_execucao: null, ativo: true },
   { id: "r2", titulo: "Olhar nivel de agua e oleo", intervalo_dias: 2, hora: "07:00", observacao: "Ou quando achar melhor", ultima_execucao: null, ativo: true },
   { id: "r3", titulo: "Cortar cabelo e barba", intervalo_dias: 14, hora: "17:00", observacao: null, ultima_execucao: "2026-07-18", ativo: true },
+];
+// Estoque de demonstração: os dois itens têm a MESMA forma dos reais (nome escrito à mão, unidade solta),
+// senão o modo demo provaria um casamento de texto que não é o que acontece no banco.
+const demoEstoque = [
+  { id: "e1", item: "Espuma PX1200 Soft 3 cm", saldo: 1.1, unidade: "m", status: "MINIMO_NAO_DEFINIDO" },
+  { id: "e2", item: "TNT", saldo: 0, unidade: "m", status: "ZERADO_REPOR_URGENTE" },
 ];
 const demoFornecedores = [
   { id: "f1", nome: "Afibracom", contato_nome: "Rafael", telefone: "6185580041", produtos: "Tecidos (linho Klee, Chagall), PVC couro, pés de PVC, insumos", dias_entrega: "terca,quinta", observacao: "Pedido 1 dia antes" },
@@ -2443,6 +2456,7 @@ function Home() {
   const [finances, setFinances] = useState([]);
   const [rotinas, setRotinas] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
+  const [estoque, setEstoque] = useState([]);
   // DOMÍNIO PESSOAIS (item APP-PESSOAIS-CARD-20260824-2145) — vive na mesma tela por conveniência dele,
   // mas é outro domínio: não entra em cliente, serviço, financeiro nem em nenhum indicador da Tapeçaria.
   const [pessoais, setPessoais] = useState([]);
@@ -2502,6 +2516,9 @@ function Home() {
     setCustomers(p.customers || []); setServices(p.services || []);
     setAppointments(comTituloVisivel(p.appointments, p.pessoais)); setFinances(p.finances || []); setRotinas(p.rotinas || []);
     setFornecedores(p.fornecedores || []); setPessoais(p.pessoais || []); setAgendaHistorico(p.agendaHistorico || []);
+    // Estoque entra no pacote (e portanto no cache offline) porque o aviso "isso você já tem" precisa
+    // existir JUSTAMENTE na estrada, sem sinal, que é quando ele decide desviar pra loja.
+    setEstoque(p.estoque || []);
     // Distâncias não são estado de tela — alimentam tempoEstradaMin, que é função pura. Entram no pacote
     // pra virem junto no cache offline: sem sinal a trava de rota continua com os tempos aprendidos.
     aplicarDistanciasDoBanco(p.distancias);
@@ -2509,13 +2526,13 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
-    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, firstError;
+    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, firstError;
     try {
-      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah] = await Promise.all([
+      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
@@ -2537,10 +2554,14 @@ function Home() {
         // Cinco colunas, não `*`: isto é contexto de explicação, não fonte de operação, e não pode virar
         // uma segunda lista de compromissos que alguém confunda com a de verdade.
         db.from("agenda").select("id,servico_id,status,titulo,data").neq("status", "planejado").order("data", { ascending: false }),
+        // ESTOQUE — para o card de Compras poder perguntar "isso você já tem?". A view é security_invoker,
+        // então respeita a mesma trava de RLS do resto; sem autorização ela volta VAZIA em vez de dar erro,
+        // e o app simplesmente deixa de sugerir — que é o comportamento de antes, não uma tela quebrada.
+        db.from("estoque_painel").select("id,item,saldo,unidade,status"),
       ]);
-      // `ds` fica FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a const
-      // TEMPO_ESTRADA_MIN). Se essa consulta falhar sozinha, o certo é o app abrir normal com os tempos do
-      // código — e não cair na tela de offline por causa de uma tabela acessória.
+      // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
+      // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
+      // sozinha, o certo é o app abrir normal — e não cair na tela de offline por causa de tabela acessória.
       firstError = [cx, cl, sv, ag, fn, rt, fo, ps].find((result) => result.error)?.error;
     } catch (e) { firstError = e; }
     // SEM SINAL: em vez de tela vazia, abre com a última carga guardada e avisa a idade dela.
@@ -2550,7 +2571,7 @@ function Home() {
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
     setOfflineDesde(null);
-    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [] };
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [] };
     aplicarPacote(pacote);
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
@@ -3154,7 +3175,7 @@ function Home() {
           A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
           e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
@@ -4284,7 +4305,62 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
 //
 // SÓ LEITURA: desde 23/08 o app é visualização e quem escreve é o Classic. Marcar comprado continua na aba
 // Compras, a um toque daqui — o card mostra o estado, não muda o estado.
-function MateriaisCard({ services, today, onVerCompras }) {
+// ===== "ISSO EU JÁ TENHO?" — o estoque encontra a lista de compras =====
+//
+// Diego, 02/09/2026: *"comprei de novo, não usei o estoque porque não lembrava"*. Material parado na
+// prateleira e compra feita por cima — dinheiro que saiu à toa.
+//
+// O Estoque V2 existe desde 22/08 e a tela dele desde 28/08, mas até aqui o `nova.html` NÃO consultava o
+// estoque em lugar nenhum: nem a tabela, nem a view, nem as duas RPCs. A única ligação era o botão da barra
+// que MANDA ELE EMBORA pra outra página. Ou seja, o Estoque só funcionava se ele lembrasse de abrir o
+// Estoque — que é exatamente o contrário do que aconteceu. Não era distração dele; era peça faltando.
+//
+// ⚠ POR QUE ISTO É AVISO E NUNCA BLOQUEIO, nem preenchimento automático: o material da ficha é texto livre
+// ("Espuma PX 1200 soft de 10cm 0.55cm") e o estoque tem outro texto livre ("Espuma PX1200 Soft 3 cm").
+// Casar isso automaticamente erra nas DUAS direções — deixa passar o que era igual e junta o que era
+// diferente. Espessura, densidade e cor moram dentro dessas strings, e 3 cm não substitui 10 cm. Então o
+// app mostra o que encontrou e QUEM DECIDE É ELE, na mesma linha do [[travas inteligentes]]: o app avisa o
+// que é burro na prática, não conserta por conta própria.
+const PALAVRAS_VAZIAS = new Set(["de", "da", "do", "para", "pra", "com", "sem", "em", "no", "na", "um", "uma",
+  "cm", "mm", "m", "metro", "metros", "un", "kg", "cor", "ref", "referencia", "sao", "the"]);
+// ⚠ CÓDIGO GRUDADO NO NÚMERO NÃO SE SEPARA, e isso é o oposto do que eu tinha feito primeiro. Separar
+// "px1000" em "px" + "1000" parece esperto — junta "PX1200" com "PX 1200" —, mas transforma o prefixo "px"
+// numa palavra comum a TODAS as espumas. Testado: "Espuma px1000 3cm" casava com "Espuma PX1200 Soft 3 cm"
+// por "espuma"+"px". PX1000 e PX1200 são densidades diferentes; sugerir uma no lugar da outra manda ele
+// usar espuma errada no sofá do cliente. Inteiros, os dois códigos simplesmente não se parecem.
+// Aqui precisão vale mais que alcance: um aviso que erra é um aviso que ele aprende a ignorar, e aí o
+// card inteiro perde a função.
+function tokensMaterial(texto) {
+  return String(texto || "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 2 && !PALAVRAS_VAZIAS.has(t));
+}
+// Devolve o item de estoque mais parecido que TEM SALDO, ou null. Duas regras, as duas conservadoras:
+//  1. o nome inteiro do item de estoque cabe dentro do texto da ficha ("TNT" dentro de "Tnt 2 metros");
+//  2. ou os dois compartilham 2+ palavras distintivas ("espuma" + "soft").
+// Uma palavra genérica sozinha ("espuma") NÃO casa — senão toda espuma da lista apontaria pra qualquer
+// espuma da prateleira, e um aviso que erra sempre é um aviso que ele aprende a ignorar.
+// Saldo é quantidade, não dinheiro: `money()` imprimiria "R$ 1,10" pra 1,10 metro de espuma.
+function fmtQtd(v) { return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(Number(v) || 0); }
+function estoqueParecido(textoDoItem, itensEstoque) {
+  const alvo = tokensMaterial(textoDoItem);
+  if (!alvo.length) return null;
+  const conjunto = new Set(alvo);
+  let melhor = null;
+  (itensEstoque || []).forEach((e) => {
+    if (!(Number(e.saldo) > 0)) return; // prateleira vazia não ajuda ninguém
+    const dele = tokensMaterial(e.item);
+    if (!dele.length) return;
+    const comuns = dele.filter((t) => conjunto.has(t));
+    const cabeInteiro = comuns.length === dele.length;
+    if (!cabeInteiro && comuns.length < 2) return;
+    const forca = comuns.length + (cabeInteiro ? 10 : 0);
+    if (!melhor || forca > melhor.forca) melhor = { item: e, forca, comuns };
+  });
+  return melhor;
+}
+function MateriaisCard({ services, today, estoque, onVerCompras }) {
   // Fechado ao abrir, como todo o resto do Painel (ver CardRecolhivel). Fechado ele ainda mostra o total e
   // as lojas — fechar troca a lista por números, não esconde informação.
   const pendentes = [];
@@ -4301,6 +4377,8 @@ function MateriaisCard({ services, today, onVerCompras }) {
         // Palpite do app (lojaAprendida) nunca se disfarça de fato: aparece com "?" — mandar ele pra loja
         // errada com confiança é pior que não sugerir nada.
         palpite: !!lojaDoItem && !!m.lojaSugerida,
+        // Pode já estar na prateleira. Sugestão, não conclusão — ver estoqueParecido().
+        noEstoque: estoqueParecido(m.item, estoque),
         servico: s,
       });
     });
@@ -4326,7 +4404,9 @@ function MateriaisCard({ services, today, onVerCompras }) {
       {ordenadas.map(([loja, itens]) => <div className="mat-loja" key={loja}>
         <div className="mat-loja-head"><strong>{loja}</strong><b>{itens.length} item(ns)</b></div>
         {itens.map((p, i) => { const atrasado = !!p.servico.prazo && p.servico.prazo < today; return <div className="mat-item" key={loja + "-" + i}>
-          <span>{p.item}{p.pedido ? " 🚚" : ""}{p.palpite ? " ?" : ""}<em>{p.servico.clientes?.nome || "Cliente"} · {p.servico.titulo}</em></span>
+          <span>{p.item}{p.pedido ? " 🚚" : ""}{p.palpite ? " ?" : ""}<em>{p.servico.clientes?.nome || "Cliente"} · {p.servico.titulo}</em>
+            {/* Pergunta, não afirmação: o app não sabe se a espuma de 3 cm serve pra quem precisa de 10 cm. */}
+            {p.noEstoque && <em className="mat-estoque">▦ tem {fmtQtd(p.noEstoque.item.saldo)} {p.noEstoque.item.unidade || ""} de “{p.noEstoque.item.item}” na prateleira — serve?</em>}</span>
           <time className={atrasado ? "atrasado" : ""}>{prazoComRotulo(p.servico) || "sem prazo"}</time>
         </div>; })}
       </div>)}
@@ -4337,7 +4417,7 @@ function MateriaisCard({ services, today, onVerCompras }) {
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-function Dashboard({ inbox, services, appointments, agendaHistorico, finances, rotinas, customers, fornecedores, pessoais, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+function Dashboard({ inbox, services, appointments, agendaHistorico, finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
   const profissionais = nomesProfissionais(services);
@@ -4612,7 +4692,7 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, finances, r
     {/* DEPOIS DOS COMPROMISSOS, DE PROPÓSITO (Diego, 24/08: "um card lá embaixo de compromissos"). Comprar
         material é consequência da rota do dia, não concorrente dela: ele decide onde vai, e aí olha o que
         aproveita comprar no caminho. Se subisse pro topo, competiria com a agenda pela primeira olhada. */}
-    <MateriaisCard services={services} today={today} onVerCompras={onVerCompras} />
+    <MateriaisCard services={services} today={today} estoque={estoque} onVerCompras={onVerCompras} />
     {/* SAIU o aviso financeiro do rodapé: era o mesmo assunto do card "a pagar" lá em cima, só que sem o
         valor e sem o caixa possível — repetia a preocupação sem ajudar a decidir. Diego, 25/07. */}</div>;
 }
