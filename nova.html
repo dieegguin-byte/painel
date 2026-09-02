@@ -5395,8 +5395,13 @@ function htmlConfirmacaoServico({ cliente, servico, financeiro, hoje }) {
   const e = CS_ESC;
   const linhasServico = [];
   linhasServico.push({ rotulo: "Serviço", detalhe: servico.titulo || "" });
-  const desc = String(servico.descricao || "").trim();
-  if (desc) linhasServico.push({ rotulo: "Descrição", detalhe: desc });
+  // ⚠ A `descricao` NÃO ENTRA NESTE DOCUMENTO, e isso é decisão, não esquecimento. Ela é diário interno
+  // escrito pelo Classic, não texto de cliente: na Ivoneide sai "taxa InfinitePay 12,40%" e "preço base do
+  // contrato R$ 4.800,00" logo acima de um total de R$ 2.200; no Fabrício, o orçamento já vencido de
+  // R$ 5.300 e "NÃO considerar fechado sem aceite claro". Provado imprimindo os dois com dado real em
+  // 01/09/2026. É o mesmo defeito do "Cobrar retorno — ia decidir com o marido" que vazou no WhatsApp.
+  // Filtrar por regra foi descartado por Diego: texto livre sempre escapa, e o erro só aparece na mão do
+  // cliente. O que descreve o trabalho aqui é o título + o material, que são campos de fato.
   const mats = (servico.materiais_necessarios || []).filter((m) => !m.arquivado).map((m) => m.item).filter(Boolean);
   if (mats.length) linhasServico.push({ rotulo: "Material", detalhe: mats.join(" · ") });
   if (servico.responsavel) linhasServico.push({ rotulo: "Responsável técnico", detalhe: servico.responsavel });
@@ -5446,7 +5451,7 @@ h2{color:#17365D;font-size:9pt;letter-spacing:.8pt;border-bottom:.4mm solid #173
 .situacao .rot{color:#8A6A1F;font-weight:700;font-size:9pt}
 .aceite{color:#4B5563;font-size:7.5pt;line-height:1.5;margin-top:2.5mm}
 .rodape{border-top:.2mm solid #E5EAF0;margin-top:4mm;padding-top:2mm;color:#9AA3AF;font-size:6.5pt;text-align:center;line-height:1.5}
-</style></head><body>
+</style></head><body data-tb-doc="1">
 <div class="faixa">
   <h1>TAPEÇARIA E ESTOFADOS BAHIA</h1>
   <div class="sub">Reforma de estofados com atendimento em domicílio</div>
@@ -5471,8 +5476,10 @@ ${fins.length ? `<div class="cards">${fins.map((f) => `<div class="card"><div cl
 <h2>SITUAÇÃO DO SERVIÇO</h2>
 <div class="situacao">
   <div class="rot">${e(situacao)}</div>
-  ${servico.proxima_acao ? `<div class="aceite">${e(servico.proxima_acao)}</div>` : ""}
 </div>
+${/* `proxima_acao` saiu daqui pela MESMA razão da descrição: é a sua anotação do que fazer em seguida,
+     não um recado ao cliente. Estava imprimindo "slot escolhido pelo Classic dentro da janela informada
+     por Diego" na caixa amarela do documento da Ivoneide. */""}
 <h2>CONFIRMAÇÃO E ACEITE</h2>
 <div class="aceite">Este documento registra as condições comerciais e o escopo técnico combinados para o serviço acima. A confirmação do cliente pelo WhatsApp da empresa integra o registro do atendimento.</div>
 <div class="rodape">Documento emitido eletronicamente pela Tapeçaria e Estofados Bahia Ltda.<br>Este documento é de natureza comercial e não substitui documento fiscal quando aplicável.</div>
@@ -5501,10 +5508,19 @@ function imprimirDocumento(html, ajustarAUmaPagina) {
   f.id = "frame-impressao";
   f.setAttribute("aria-hidden", "true");
   f.style.cssText = `position:fixed;left:-10000px;top:0;width:${FOLHA_LARGURA_UTIL_MM}mm;height:${FOLHA_ALTURA_UTIL_MM}mm;border:0`;
+  // ⚠ O IFRAME DISPARA `onload` DUAS VEZES, e a primeira é do `about:blank` que todo iframe carrega antes
+  // do conteúdo. Na versão de 28/08 o print() era chamado nesse primeiro disparo — e no Android quem ganha
+  // o diálogo de impressão é ele: Diego testou no celular em 01/09/2026 e salvou uma FOLHA EM BRANCO. No
+  // PC o segundo disparo corrigia sozinho, que é por que a conferência de bancada não pegou.
+  //
+  // Duas travas, de propósito: o `srcdoc` é atribuído ANTES do appendChild (aí o about:blank nem chega a
+  // carregar), e mesmo assim o onload só age se achar o marcador do documento gerado. A segunda sozinha já
+  // resolveria; ela fica porque não depende do motor do navegador se comportar de um jeito específico.
   f.onload = () => {
     try {
+      const doc = f.contentDocument;
+      if (!doc || !doc.body || !doc.body.dataset.tbDoc) return; // ainda não é o documento; não imprime
       if (ajustarAUmaPagina) {
-        const doc = f.contentDocument;
         const pxPorMm = 96 / 25.4;
         const alturaMm = doc.body.scrollHeight / pxPorMm;
         if (alturaMm > FOLHA_ALTURA_UTIL_MM) {
@@ -5516,8 +5532,8 @@ function imprimirDocumento(html, ajustarAUmaPagina) {
       f.contentWindow.print();
     } catch (erro) { /* impressão recusada pelo aparelho */ }
   };
-  document.body.appendChild(f);
   f.srcdoc = html;
+  document.body.appendChild(f);
 }
 // SEM VALOR FECHADO NÃO SAI DOCUMENTO. O modelo tem "Total contratado" em destaque; emitir com o campo
 // vazio ou com palpite entregaria ao cliente um número que ninguém combinou. Mesma linha do fechamento
