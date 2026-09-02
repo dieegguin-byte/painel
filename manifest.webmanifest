@@ -24,7 +24,7 @@
       "text": "texto",
       "url": "link",
       "files": [
-        { "name": "arquivos", "accept": ["image/*"] }
+        { "name": "arquivos", "accept": ["image/*", "text/plain"] }
       ]
     }
   }
