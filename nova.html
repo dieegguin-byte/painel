@@ -5700,31 +5700,6 @@ ${condicao || total ? `<div class="condicao">${condicao ? `<p><b>Condição esco
 <div class="rodape">Documento emitido eletronicamente pela Tapeçaria e Estofados Bahia Ltda.<br>Este documento é de natureza comercial e não substitui documento fiscal quando aplicável.</div>
 </body></html>`;
 }
-<div class="painel">
-  <div class="linha"><div class="rot">Nome</div><div class="det"><b>${e(cliente.nome)}</b></div></div>
-  ${cliente.telefone ? `<div class="linha"><div class="rot">WhatsApp</div><div class="det">${e(cliente.telefone)}</div></div>` : ""}
-  ${cliente.endereco || cliente.cidade ? `<div class="linha"><div class="rot">Endereço</div><div class="det">${e([cliente.endereco, cliente.cidade].filter(Boolean).join(", "))}</div></div>` : ""}
-</div>
-<h2>SERVIÇO CONTRATADO</h2>
-<div class="painel">
-  ${linhasServico.map((l) => `<div class="linha"><div class="rot">${e(l.rotulo)}</div><div class="det">${e(l.detalhe)}</div></div>`).join("")}
-  ${servico.prazo ? `<div class="linha"><div class="rot">${e(rotuloPrazo(servico.status))}</div><div class="det"><b>${e(compactDate(servico.prazo))}</b></div></div>` : ""}
-</div>
-<h2>CONDIÇÃO FINANCEIRA COMBINADA</h2>
-${fins.length ? `<div class="cards">${fins.map((f) => `<div class="card"><div class="rot">${e(f.rotulo)}</div><div class="val">${e(f.valor)}</div><div class="nota">${e(f.nota)}</div></div>`).join("")}</div>` : ""}
-<div class="total"><div class="rot">TOTAL CONTRATADO</div><div class="val">${e(money(servico.valor_orcamento))}</div></div>
-<h2>SITUAÇÃO DO SERVIÇO</h2>
-<div class="situacao">
-  <div class="rot">${e(situacao)}</div>
-</div>
-${/* `proxima_acao` saiu daqui pela MESMA razão da descrição: é a sua anotação do que fazer em seguida,
-     não um recado ao cliente. Estava imprimindo "slot escolhido pelo Classic dentro da janela informada
-     por Diego" na caixa amarela do documento da Ivoneide. */""}
-<h2>CONFIRMAÇÃO E ACEITE</h2>
-<div class="aceite">Este documento registra as condições comerciais e o escopo técnico combinados para o serviço acima. A confirmação do cliente pelo WhatsApp da empresa integra o registro do atendimento.</div>
-<div class="rodape">Documento emitido eletronicamente pela Tapeçaria e Estofados Bahia Ltda.<br>Este documento é de natureza comercial e não substitui documento fiscal quando aplicável.</div>
-</body></html>`;
-}
 // IFRAME, NÃO ABA NOVA: dentro do PWA instalado, window.open cai em bloqueio de pop-up ou tira o Diego do
 // app no meio do atendimento. O iframe invisível imprime sem sair da tela em que ele está.
 //
