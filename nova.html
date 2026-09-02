@@ -2874,12 +2874,37 @@ function Home() {
           if (assinada.error) throw assinada.error;
           uploaded.push({ url: assinada.data.signedUrl, fileName: f.name });
         }
+        // CONVERSA EXPORTADA DO WHATSAPP. "Exportar conversa" manda um `_chat.txt` e o conteúdo está
+        // DENTRO do arquivo — o campo de texto do compartilhamento vem vazio. Sem ler aqui, a Caixa
+        // guardaria só um link assinado e o Classic teria que baixar uma URL pra descobrir o que chegou.
+        // O arquivo bruto continua no Storage: isto ACRESCENTA o conteúdo, não substitui a evidência.
+        const LIMITE_TEXTO = 300000;
+        let textoDeArquivos = "";
+        for (const f of recebidos) {
+          const ehTexto = (f.type || "").startsWith("text/") || /\.(txt|csv|log)$/i.test(f.name);
+          if (!ehTexto) continue;
+          try {
+            let conteudo = (await f.text()).trim();
+            if (!conteudo) continue;
+            // Conversa de anos passa de megabyte. Corta com aviso VISÍVEL em vez de truncar calado —
+            // o arquivo inteiro continua anexado pra quem precisar do resto.
+            if (conteudo.length > LIMITE_TEXTO) {
+              const total = conteudo.length;
+              conteudo = conteudo.slice(0, LIMITE_TEXTO) +
+                `\n\n[...cortado aqui: ${f.name} tem ${total} caracteres. O arquivo completo está anexado nesta mesma entrada.]`;
+            }
+            textoDeArquivos += `\n\n--- conteúdo de ${f.name} ---\n${conteudo}`;
+          } catch (e) {
+            // Arquivo ilegível não pode derrubar o salvamento: o anexo já subiu e vale como evidência.
+            textoDeArquivos += `\n\n[não consegui ler o conteúdo de ${f.name}: ${e.message}]`;
+          }
+        }
         // IDEMPOTÊNCIA PELO CARIMBO DA CARGA: `carga.em` é gravado pelo service worker no instante do
         // compartilhamento e não muda se o app for recarregado ou reaberto. Mesmo compartilhamento gera
         // sempre o mesmo id, então refresh não vira segunda entrada.
         const id = await uuidDeterministicoEvento("compartilhado-" + carga.em, "caixa");
         const { jaExistia } = await inserirComIdDeterministico(db, "caixa_entrada", id, {
-          texto: buildInboxPayload(uploaded, carga.texto || ""), status: "novo", conversa: [], processado: false,
+          texto: buildInboxPayload(uploaded, ((carga.texto || "") + textoDeArquivos).trim()), status: "novo", conversa: [], processado: false,
         }, ["texto"]);
         // SÓ AGORA a evidência bruta some do aparelho: depois do insert confirmado, nunca antes.
         // Era aqui o buraco — o app apagava o cache e jogava a carga num campo de texto que não é mais
