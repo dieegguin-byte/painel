@@ -2238,15 +2238,27 @@ function urlWaze(destino) {
 // (+55 61 99852-0902), o botão renderizava, o Diego tocava e a conversa não abria. O número nunca foi o
 // problema; o transporte era.
 //
-// `S.browser_fallback_url` garante o piso: sem WhatsApp instalado (ou se o intent falhar) o Android abre
+// `S.browser_fallback_url` garante o piso: sem o app instalado (ou se o intent falhar) o Android abre
 // exatamente o wa.me de hoje. Ou seja, isto não tem como ficar pior que o comportamento atual.
 // `tel` chega SEM o 55 (é o que normalizePhone devolve) — o país entra aqui, num lugar só.
+//
+// ⚠ 02/09: o pacote é o do **WhatsApp BUSINESS** (`com.whatsapp.w4b`), não o do WhatsApp comum.
+// A primeira versão desta função fixou `com.whatsapp` e isso provavelmente manteve o defeito de pé:
+// quando o pacote fixado não está instalado, o Android não tenta outro app — cai direto no
+// `browser_fallback_url`, ou seja, **volta a abrir a página**, que é exatamente o sintoma que o Diego
+// relatou. O atendimento da Tapeçaria é no Business, e foi ele que o recado de 01/09 pediu:
+// "abrir diretamente a conversa do número correto no WhatsApp Business".
+//
+// Se um dia o número voltar pro WhatsApp comum, a correção é UMA constante aqui — não mexer no resto.
+// Tirar a linha do `package` faz o Android perguntar qual app usar quando os dois estiverem instalados;
+// é o plano B se o Business não for o certo.
+const WHATSAPP_PACOTE = "com.whatsapp.w4b";
 function urlWhatsapp(tel, texto) {
   const numero = `55${tel}`;
   const web = `https://wa.me/${numero}${texto ? "?text=" + encodeURIComponent(texto) : ""}`;
   if (!ehAndroid()) return web;
   const qs = `phone=${numero}${texto ? "&text=" + encodeURIComponent(texto) : ""}`;
-  return `intent://send?${qs}#Intent;scheme=whatsapp;package=com.whatsapp;S.browser_fallback_url=${encodeURIComponent(web)};end`;
+  return `intent://send?${qs}#Intent;scheme=whatsapp;package=${WHATSAPP_PACOTE};S.browser_fallback_url=${encodeURIComponent(web)};end`;
 }
 function horarioApertado(h, outros, cidadeNova) { return (outros || []).some((a) => Math.abs(minutosDoHorario(h) - minutosDoHorario(a.hora)) < tempoEstradaMin(cidadeNova, a.cidade) + DURACAO_SERVICO_MIN); }
 // IGREJA É COMPROMISSO, NÃO "HORÁRIO VAZIO". Seg/qua/sex às 18h30. O que trava não é a hora do serviço, é a
@@ -3944,7 +3956,7 @@ function CaixaCard({ inbox, today }) {
 // nasce FECHADO como todo o resto, e fechado ele mostra só o tamanho do problema. Aberto, traz os mais
 // antigos primeiro — que são os que ou morrem ou voltam — com o WhatsApp à mão pra resolver no mesmo toque.
 // Não muda status de ninguém sozinho: quem decide se o cliente sumiu ou fechou é o Diego, pelo Classic.
-function RetornosVencidosCard({ services, today, onVerLeads, onOpenFicha }) {
+function RetornosVencidosCard({ services, today, onVerLeads, onOpenFicha, notify }) {
   const vencidos = useMemo(() => (services || []).filter((s) => retornoVencido(s, today))
     .sort((a, b) => String(a.prazo).localeCompare(String(b.prazo))), [services, today]);
   if (!vencidos.length) return null;
@@ -3970,7 +3982,22 @@ function RetornosVencidosCard({ services, today, onVerLeads, onOpenFicha }) {
           <span className="status-pill">{statusLabel[s.status] || s.status}</span>
           <b>{s.valor_orcamento ? money(s.valor_orcamento) : "—"}</b>
           <time className="atrasado">parado há {dias(s)} dia(s)</time>
-          {tel && <div className="ficha-servico-acoes"><a className="ghost" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={(e) => e.stopPropagation()}>WhatsApp</a></div>}
+          {/* O 💬 ChatGPT NUNCA existiu neste card — o recado de 01/09 fala em "alguns clientes sem o
+              botão", mas medindo é mais simples que isso: não tinha em nenhum. Ele é o atalho que leva o
+              atendimento pro Classic sem o Diego digitar id nenhum, e é justamente aqui, na lista de quem
+              parou de responder, que ele mais serve.
+              Fica FORA do `tel &&`: cliente sem telefone é exatamente quem mais precisa cair no Classic.
+              `stopPropagation` nos dois porque o cartão inteiro abre a ficha no clique. */}
+          <div className="ficha-servico-acoes">
+            {tel && <a className="ghost" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={(e) => e.stopPropagation()}>WhatsApp</a>}
+            <button className="ghost" onClick={(e) => { e.stopPropagation(); compartilharGPT(payloadGPT([
+              ["cliente_id", s.cliente_id],
+              ["servico_id", s.id],
+              ["nome", s.clientes?.nome],
+              ["cidade", s.clientes?.cidade],
+              ["servico", s.titulo],
+            ]), notify || (() => {})); }}>💬 ChatGPT</button>
+          </div>
         </div>
       </article>;
     })}</div>
@@ -4363,7 +4390,7 @@ function Dashboard({ inbox, services, appointments, finances, rotinas, customers
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     <ServicosSemProximoPassoCard services={services} appointments={appointments} inbox={inbox} onOpenFicha={onOpenFicha} />
-    <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} />
+    <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
     <CaixaCard inbox={inbox} today={today} />
     {/* PESSOAIS mora na mesma home por conveniência dele, mas é outro domínio — e fica DEPOIS do trabalho,
         porque a primeira olhada do dia é a rota. Só sobe pra cara dele quando tem atrasado. */}
@@ -5836,7 +5863,14 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
     <div className="funil-filtros">{COMPRAS_ABAS.map((a) => <button key={a.id} className={aba === a.id ? "active" : ""} onClick={() => setAba(a.id)}>{a.label}</button>)}</div>
 
     <section className="content-card">
-      <div className="card-head"><div><p className="kicker">{aba === "servico" ? "MARGEM REAL POR SERVIÇO" : "GASTO AGRUPADO"}</p><h3>{compras.length} compra(s)</h3></div></div>
+      {/* ⚠ NÃO ERA "MARGEM REAL", e o número nunca foi margem: a conta é só orçamento − material.
+          Falta mão de obra, deslocamento e a taxa do cartão — na Skill de Orçamentos, margem de
+          contribuição é (receita líquida − custo direto − logístico − variáveis) / receita líquida.
+          Chamar isso de margem faz o Diego decidir preço com um número que ignora o que ele mais paga.
+          O rótulo agora diz exatamente o que a conta faz. A margem de verdade depende de custo de mão de
+          obra vinculado ao serviço (`v_servico_aprendizado` já consolida parte disso) e é item próprio —
+          ver o recado INTELIGÊNCIA DE SERVIÇO + CONSUMO REAL, de 01/09. */}
+      <div className="card-head"><div><p className="kicker">{aba === "servico" ? "SALDO APÓS O MATERIAL, POR SERVIÇO" : "GASTO AGRUPADO"}</p><h3>{compras.length} compra(s)</h3></div></div>
       {!compras.length && <div className="empty-state"><b>Nenhuma compra de material registrada ainda.</b><span>Compras antigas lançadas soltas no Financeiro aparecem aqui depois de reclassificadas.</span></div>}
       {chaves.map((chave) => {
         const itens = grupos[chave];
@@ -5845,7 +5879,7 @@ function ComprasView({ finances, fornecedores, services, appointments, db, demo,
         const orcamento = Number(servico?.valor_orcamento || 0);
         return <div key={chave || "sem"} className="vale-fornecedor">
           <div className="vale-fornecedor-head"><strong>{tituloGrupo(chave)}</strong><b>{money(subtotal)}</b></div>
-          {servico && orcamento > 0 && <div className="finance-row"><div><strong>Margem real</strong><span>Orçamento {money(orcamento)} − material {money(subtotal)}</span></div><b className={orcamento - subtotal >= 0 ? "entrada" : "saida"}>{money(orcamento - subtotal)}</b></div>}
+          {servico && orcamento > 0 && <div className="finance-row"><div><strong>Sobra depois do material</strong><span>Orçamento {money(orcamento)} − material {money(subtotal)} · ainda NÃO desconta mão de obra, deslocamento nem taxa de cartão</span></div><b className={orcamento - subtotal >= 0 ? "entrada" : "saida"}>{money(orcamento - subtotal)}</b></div>}
           {itens.map((c) => <div className="finance-row" key={c.id}>
             <div><strong>{descricaoFinanceiraVisivel(c.descricao) || "Material"}</strong><span>{compactDate(c.data)}{aba !== "fornecedor" ? ` · ${nomeFornecedor(c.fornecedor_id)}` : ""}{aba !== "servico" && c.servico_id ? ` · ${labelServico(c.servico_id)}` : ""}</span></div>
             <b className="saida">− {money(c.valor)}</b>
