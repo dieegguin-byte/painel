@@ -671,6 +671,11 @@ const demoPessoais = [
   { id: "p1", titulo: "Compromisso pessoal — esposa", data_alvo: "2026-11-24", hora: "20:00", cidade: "Luziânia-GO", status: "PENDENTE", impacto_operacao: "BLOQUEIA_DISPONIBILIDADE", origem: "classic", remarcacoes: 0 },
   { id: "p2", titulo: "Apresentação na escola do filho", data_alvo: "2026-08-10", hora: null, cidade: "Luziânia-GO", status: "PENDENTE", impacto_operacao: "A_CONFIRMAR", origem: "grupo", referencia_origem: "grupo da escola", remarcacoes: 0 },
   { id: "p3", titulo: "Levar o carro na revisão", data_alvo: "2026-08-05", hora: null, status: "CONCLUIDO", impacto_operacao: "SEM_IMPACTO", origem: "manual", remarcacoes: 1, remarcado_de: "2026-07-29", concluido_em: "2026-08-05T18:00:00Z" },
+  // O CASO QUE O RECADO DE 02/09 DESCREVE, copiado do registro real 34be0543: pessoal PENDENTE, com data,
+  // SEM HORA e sem bloqueio na agenda (a trava AGENDA_PLANEJADA_EXIGE_HORA impediu, e com razão). Sem este
+  // fixture a demo não exercita o defeito — p1 tem hora e p2 já tem bloqueio, então nenhum dos dois prova
+  // que o item invisível voltou pra fila. Mesma razão do caso Fabrício logo abaixo.
+  { id: "p4", titulo: "Viagem com minha mãe para Goiânia — hospedagem", data_alvo: "2026-09-19", hora: null, cidade: "Goiânia", status: "PENDENTE", impacto_operacao: "A_CONFIRMAR", origem: "classic", remarcacoes: 0 },
 ];
 // AGENDA QUE NÃO ESTÁ MAIS PLANEJADA — só o que explica por que um serviço parou. Aqui mora o caso
 // FABRÍCIO do item "painel de serviços fechados sem avanço": a retirada foi CANCELADA e ninguém
@@ -790,6 +795,32 @@ function comTituloVisivel(appointments, pessoais) {
     if (!titulo && !detalhe) return a;
     return { ...a, titulo_visivel: titulo && titulo !== a.titulo ? titulo : undefined, detalhe_visivel: detalhe || undefined };
   });
+}
+// LEMBRETE PESSOAL SEM HORA NÃO VIRA BLOQUEIO — E SUMIA DO DIA (adendo de 02/09 ao recado de 29/08).
+// Caso real: "Viagem com minha mãe para Goiânia — hospedagem", 19/09, ficou SÓ em `pessoais`. A agenda tem
+// a trava AGENDA_PLANEJADA_EXIGE_HORA e ninguém sabia a hora. A trava está CERTA — inventar 08:00 pra fazer
+// o item aparecer é mentir no banco pra consertar tela. O errado era o app tratar "compromisso" como
+// sinônimo de "linha em agenda": sem a linha, o item não entrava na fila do dia e o Diego só o encontrava
+// se descesse até o card Pessoais. Ele fala uma vez e espera sair com o compromisso resolvido e visível.
+//
+// A correção é de LEITURA, não de escrita: o item é projetado na fila a partir de `pessoais`, sem criar
+// nada no banco e sem exigir hora. Quem JÁ tem bloqueio planejado na agenda não entra aqui — senão o mesmo
+// compromisso apareceria duas vezes, que é justo o contador que faz ele parar de confiar na conta.
+function pessoaisNaFila(pessoais, appointments) {
+  const comBloqueio = new Set((appointments || []).filter((a) => a.pessoal_id && a.status === "planejado").map((a) => a.pessoal_id));
+  return (pessoais || [])
+    .filter((p) => p.status === "PENDENTE" && p.data_alvo && !comBloqueio.has(p.id))
+    .map((p) => ({
+      id: "pessoal:" + p.id, pessoal_virtual: true, pessoal_id: p.id,
+      titulo: p.titulo, data: p.data_alvo, hora: p.hora ? String(p.hora).slice(0, 5) : null,
+      cidade: p.cidade || null, local: null, servico_id: null, cliente_id: null, status: "planejado",
+      // `tipo: "pessoal"` de propósito, e NÃO "presencial": entregar uma base da Mary Kay não é atendimento
+      // de cliente e não pode ocupar a rota comercial — analisarRotaDoDia só olha `presencial`, então este
+      // item não dispara aviso de rota nem conta como parada. O preço é sair do filtro ⌖/◌ do Painel, que
+      // é o certo: aqueles dois botões filtram rota de trabalho.
+      tipo: "pessoal", impacto_operacao: p.impacto_operacao,
+      detalhe_visivel: (p.descricao || "").trim() || undefined,
+    }));
 }
 function parseInbox(raw = "") {
   const note = raw.match(/\[\[TB_INBOX_NOTE\]\]([\s\S]*)$/);
@@ -3495,6 +3526,24 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   const [aberto, setAberto] = useState(false);
   // Sem `notify` aqui (o card não recebe a prop) — o aviso da cópia vive no próprio card.
   const [avisoGPT, setAvisoGPT] = useState("");
+  // ITEM PESSOAL PROJETADO (ver pessoaisNaFila): não existe linha de agenda por trás dele. Este card não
+  // conclui e não reagenda de propósito — as duas ações escrevem em `agenda`, e aqui não há linha pra
+  // escrever; um botão que não tem o que gravar é pior que botão nenhum. Quem encerra ou remarca é o card
+  // Pessoais, que é o dono do fato. Este card existe pra ele enxergar o dia inteiro num lugar só.
+  if (a.pessoal_virtual) return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}`}>
+    <div className="compromisso-cab" style={{ cursor: "default" }}>
+      <span className="compromisso-quando">
+        <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
+        <span>{compactDate(a.data)}</span>
+        {a.data < today && <em>atrasado</em>}
+      </span>
+      <span className="compromisso-idc">
+        <strong>{a.titulo || "Compromisso pessoal"}</strong>
+        <span>{a.cidade || "pessoal"}</span>
+      </span>
+    </div>
+    <p className="compromisso-material">⛔ Pessoal{a.detalhe_visivel ? ` · ${a.detalhe_visivel}` : ""}{a.hora ? "" : " · sem hora marcada, por isso não bloqueia horário na agenda"}. Concluir ou remarcar é no card Pessoais.</p>
+  </article>;
   // A sugestão GRAVADA vence sempre: ela nasce da conversa real, com julgamento comercial.
   // Só quando ela falta é que o app escreve — e apenas se provar que o interlocutor é o cliente.
   const quem = interlocutorCompromisso(a, svc, fornecedores, profissionais);
@@ -4432,7 +4481,9 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, finances, r
   // ciclo de 3 dias, que não faz sentido nenhum pra tarefa própria. Antes os dois viravam CobrancaCard.
   const cobrancasAll = appointments.filter((entry) => ehCobranca(entry) && esperandoCliente(entry, svcDe(entry)));
   const idsCobranca = new Set(cobrancasAll.map((entry) => entry.id));
-  const rotaAll = appointments.filter((entry) => !idsCobranca.has(entry.id));
+  // Os pessoais sem bloqueio na agenda entram AQUI, junto da rota, e não num card à parte: a queixa era
+  // exatamente que o compromisso não estava na fila do dia. Ver pessoaisNaFila.
+  const rotaAll = [...appointments.filter((entry) => !idsCobranca.has(entry.id)), ...pessoaisNaFila(pessoais, appointments)];
   // HISTÓRICO DESTA DIVISÃO, porque ela já mudou duas vezes e o motivo importa:
   // Em 24/08 ela era por DATA e o Diego reclamou do contrário — às 8h da manhã um compromisso das 14h
   // aparecia como "atrasado". A correção passou o corte pra HORA. Aí, em 25/08, apareceu o outro lado do
