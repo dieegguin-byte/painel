@@ -748,6 +748,29 @@ function corrigirTelefone(value) {
   if (d.length !== 11) return null;
   return `+55 ${d.slice(0, 2)} ${d.slice(2, 7)}-${d.slice(7)}`;
 }
+// UM RESOLVEDOR SÓ PRO NÚMERO DO WHATSAPP (reforço de 03/09 ao recado de 01/09, critério literal:
+// "nenhuma tela deve manter implementação divergente que volte a quebrar o mesmo fluxo").
+//
+// Até aqui cada tela montava o número do seu jeito: o CompromissoCard e a triagem passavam por
+// `corrigirTelefone`, e outras QUATRO — Cobrança, Esperando Retorno, ficha do cliente e Fornecedores —
+// chamavam `normalizePhone` cru. E `normalizePhone` só tira o que não é dígito: não põe o 9 que falta em
+// celular antigo e não sabe distinguir fixo de celular.
+//
+// ⚠ MEDIDO EM 03/09 ANTES DE MEXER, e o número importa pra não vender correção que não corrige: hoje isso
+// NÃO está quebrando. Os 141 clientes e os 6 fornecedores com telefone têm todos 11 dígitos, e não há um
+// fixo sequer na base — a trava do formulário (`corrigirTelefone`) vem segurando desde que existe. Ou seja,
+// o defeito está LATENTE, não ativo. Centralizo agora porque o primeiro número de 10 dígitos que entrar por
+// fora do formulário (importação, Classic, edição direta no banco) quebra o botão sem avisar ninguém.
+//
+// FIXO NÃO ABRE WHATSAPP. `corrigirTelefone` devolve o fixo formatado de propósito — o número é bom, só não
+// é celular. Aqui ele vira "", porque montar um wa.me pra fixo é entregar botão que nunca abre, e botão
+// quebrado é pior que botão ausente.
+function telefoneWhatsapp(valor) {
+  if (!valor) return "";
+  if (ehTelefoneFixo(valor)) return "";
+  const formatado = corrigirTelefone(valor);
+  return formatado ? normalizePhone(formatado) : "";
+}
 // TRIAGEM TEMPORÁRIA — envelope de conversa de WhatsApp que ainda não virou cliente (adendos de 25/08 do
 // item TRANSCRITOR-WHATSAPP-APP-20260825-0955). Esses envelopes têm `servico_id` NULO, então o telefone do
 // cliente não existe e o botão de WhatsApp simplesmente não renderizava — o Diego abria o card e só via o
@@ -3569,7 +3592,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   // e criar serviço falso pra fazer um botão nascer seria mentir no banco pra consertar tela.
   // A precedência é a mesma de sempre: quem tem serviço continua resolvendo pelo serviço.
   const cli = svc?.clientes || cliente;
-  const tel = (cli?.telefone ? normalizePhone(cli.telefone) : "") || telefoneDaTriagem(a);
+  const tel = telefoneWhatsapp(cli?.telefone) || telefoneDaTriagem(a);
   // Telefone técnico quebrado não pode sumir em silêncio: sem isso o envelope volta a parecer um card sem
   // WhatsApp, que é exatamente o defeito que estamos consertando. Erro visível vale mais que omissão.
   const triagemSemTelefone = !tel && ehEnvelopeDeTriagem(a);
@@ -3748,7 +3771,7 @@ function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar,
   const [horaDraft, setHoraDraft] = useState("09:00");
   const quem = interlocutorCompromisso(a, svc, fornecedores, profissionais);
   const sugestao = svc?.sugestao_resposta || (quem.destino === "cliente" ? mensagemPadraoCompromisso(a, svc, today) : "");
-  const tel = svc?.clientes?.telefone ? normalizePhone(svc.clientes.telefone) : "";
+  const tel = telefoneWhatsapp(svc?.clientes?.telefone);
   const atrasada = a.data < today;
   return <article className={`cobranca-item ${noTeto ? "cor-alta" : atrasada ? "cor-media" : "cor-baixa"}`}>
     <div className="cobranca-esq">
@@ -4164,7 +4187,7 @@ function RetornosVencidosCard({ services, today, onVerLeads, onOpenFicha, notify
       <h3>{vencidos.length} cliente(s) com a data de retorno vencida</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{antigos ? `${antigos} há mais de 15 dias` : "nenhum há mais de 15 dias"}{semAcao ? ` · ${semAcao} sem próxima ação escrita` : ""}</span></>}>
     <div className="funil-lista">{visiveis.map((s) => {
-      const tel = s.clientes?.telefone ? normalizePhone(s.clientes.telefone) : "";
+      const tel = telefoneWhatsapp(s.clientes?.telefone);
       return <article className={`funil-item st-${s.status}`} key={s.id} onClick={() => onOpenFicha(s.cliente_id)}>
         <div className="funil-esq">
           <strong>{s.clientes?.nome || "Cliente"}</strong>
@@ -6916,7 +6939,7 @@ function FornecedoresView({ fornecedores }) {
         {f.dias_entrega && <span>Entrega {f.dias_entrega.split(",").map((d) => DIA_LABEL[d.trim()] || d.trim()).join(" e ")}</span>}
         {f.observacao && <span>{f.observacao}</span>}
       </div>
-      {f.telefone && <a className="ghost" href={urlWhatsapp(normalizePhone(f.telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}
+      {telefoneWhatsapp(f.telefone) && <a className="ghost" href={urlWhatsapp(telefoneWhatsapp(f.telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}
     </article>)}
     {!fornecedores.length && <div className="empty-state"><b>Nenhum fornecedor cadastrado.</b></div>}</div>
   </section>;
@@ -7200,7 +7223,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
           {colarLink && <div className="responsavel-edit-row"><input value={linkDraft} onChange={(e) => setLinkDraft(e.target.value)} placeholder="Cole o link do Google Maps já aberto" autoFocus /><button className="ghost" onClick={usarLinkMaps}>Salvar ponto</button></div>}
           {/* Ficha é nível CLIENTE: aqui o cliente pode ter vários serviços, então `servico_id`
               fica de fora. Escolher um seria adivinhar, e adivinhar é o que gera atendimento errado. */}
-          <div className="ficha-actions"><button className="ghost" onClick={() => setEditing(true)}>Editar dados</button>{cliente.telefone && <a className="ghost" href={urlWhatsapp(normalizePhone(cliente.telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}<button className="ghost" onClick={() => compartilharGPT(payloadGPT([["cliente_id", cliente.id], ["nome", cliente.nome], ["cidade", cliente.cidade]]), notify)}>💬 ChatGPT</button></div>
+          <div className="ficha-actions"><button className="ghost" onClick={() => setEditing(true)}>Editar dados</button>{telefoneWhatsapp(cliente.telefone) && <a className="ghost" href={urlWhatsapp(telefoneWhatsapp(cliente.telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}<button className="ghost" onClick={() => compartilharGPT(payloadGPT([["cliente_id", cliente.id], ["nome", cliente.nome], ["cidade", cliente.cidade]]), notify)}>💬 ChatGPT</button></div>
         </div> : <div className="ficha-edit form-grid">
           <div className="row"><label>Nome*<input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} /></label><label>Telefone<input value={form.telefone} onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))} /></label></div>
           <div className="row"><label>Cidade<input value={form.cidade} onChange={(e) => setForm((f) => ({ ...f, cidade: e.target.value }))} /></label><label>Endereço<input value={form.endereco} onChange={(e) => setForm((f) => ({ ...f, endereco: e.target.value }))} /></label></div>
@@ -7213,7 +7236,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
         </div>}
 
         <h3 className="ficha-section">Histórico de serviços</h3>
-        {!servicos.length ? <div className="empty-state"><b>Nenhum serviço registrado.</b></div> : <div className="ficha-servicos">{servicos.map((s) => { const sugestao = s.sugestao_resposta || ""; const tel = cliente.telefone ? normalizePhone(cliente.telefone) : ""; return <div className={`ficha-servico priority-${s.prioridade || "media"}`} key={s.id}><div className="ficha-servico-main"><strong>{s.titulo}</strong><span>{statusLabel[s.status] || s.status}{s.proxima_acao ? " · " + s.proxima_acao : ""}</span>
+        {!servicos.length ? <div className="empty-state"><b>Nenhum serviço registrado.</b></div> : <div className="ficha-servicos">{servicos.map((s) => { const sugestao = s.sugestao_resposta || ""; const tel = telefoneWhatsapp(cliente.telefone); return <div className={`ficha-servico priority-${s.prioridade || "media"}`} key={s.id}><div className="ficha-servico-main"><strong>{s.titulo}</strong><span>{statusLabel[s.status] || s.status}{s.proxima_acao ? " · " + s.proxima_acao : ""}</span>
           {/* A DESCRIÇÃO ERA UM BURACO NEGRO. Auditoria de 04/08: `servicos.descricao` era gravada em 13
               serviços e não aparecia em NENHUMA tela — só o financeiro renderiza descrição. Era ali que o
               detalhe do que foi combinado (espuma, catraca, tecido) ia parar quando eu processava a ficha,
