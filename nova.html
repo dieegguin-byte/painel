@@ -2697,12 +2697,18 @@ function Home() {
 
   useEffect(() => { if (demo || session) loadAll(); }, [demo, session, loadAll]);
 
-  // AGENDA EM TEMPO REAL (recado de 04/09: "compromisso gravado na fonte oficial e ainda assim não
+  // O APP EM TEMPO REAL (recado de 04/09: "compromisso gravado na fonte oficial e ainda assim não
   // aparece"). O Classic grava direto no Supabase; até aqui o app só via isso se o Diego lembrasse de
   // apertar Atualizar — e apertar Atualizar num app que já mostra a tela errada não devolve confiança.
   //
   // ⚠ MEDIDO ANTES: a publicação `supabase_realtime` existia e estava VAZIA (zero tabelas), então nenhum
-  // evento chegava. A migração `realtime_agenda` publicou `public.agenda`.
+  // evento chegava — de nenhuma tabela.
+  //
+  // AS TABELAS FORAM ESCOLHIDAS POR MEDIÇÃO, não por palpite. Gravações nos últimos 7 dias:
+  // financeiro 42 · agenda 34 · clientes 14 · servicos 13 · caixa_entrada 11 · pessoais 8 · avisos (nova).
+  // Ficaram DE FORA `fornecedores` (1), `rotinas` (0), `estoque_movimentos` (0), `distancias`,
+  // `profissionais` e `dividas`: publicar tabela parada não deixa o app mais vivo, só põe mais uma
+  // inscrição no socket de um celular que trabalha no 4G. Elas continuam vindo no Atualizar.
   //
   // O EVENTO É GATILHO, NÃO PATCH. Recebido o `postgres_changes`, o app RECARREGA pelo mesmo `loadAll`
   // de sempre em vez de aplicar o INSERT/UPDATE/DELETE no estado React. Isso é de propósito e é o que
@@ -2717,9 +2723,14 @@ function Home() {
     if (!db || !session || demo) return;
     let timer = null;
     const recarregarLogo = () => { clearTimeout(timer); timer = setTimeout(() => loadAll(), 700); };
-    const canal = db.channel("agenda-viva")
-      .on("postgres_changes", { event: "*", schema: "public", table: "agenda" }, recarregarLogo)
-      .subscribe();
+    // UM canal só para as sete: cada `.on()` é uma inscrição barata, mas cada CANAL é um socket a mais.
+    // E como todas caem no mesmo `recarregarLogo` com debounce, uma escrita do Classic que toca serviço +
+    // financeiro + agenda de uma vez vira UMA recarga, não três.
+    const TABELAS_VIVAS = ["agenda", "servicos", "financeiro", "caixa_entrada", "clientes", "pessoais", "avisos_operacionais"];
+    const canal = TABELAS_VIVAS.reduce(
+      (ch, table) => ch.on("postgres_changes", { event: "*", schema: "public", table }, recarregarLogo),
+      db.channel("operacao-viva")
+    ).subscribe();
     // RECONCILIAÇÃO CONTRA EVENTO PERDIDO (item 6 do recado). Socket cai no elevador, no metrô e quando o
     // Android congela a aba em segundo plano — e evento perdido não volta sozinho. Então, ao voltar pro
     // primeiro plano e ao recuperar rede, o app relê do zero em vez de confiar que não perdeu nada.
