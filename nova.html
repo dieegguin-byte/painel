@@ -7548,23 +7548,85 @@ root.render(<Barreira><Home /></Barreira>);
 // O app só monta depois que as quatro bibliotecas responderam de verdade (ver o comentário lá no <head>).
 // Antes isto rodava solto: se o Babel não estivesse na página, estourava aqui e a tela ficava preta e muda.
 (function () {
-  function montar() {
+  // ⚠ TRANSPILAR NO CELULAR CUSTA CARO, E CUSTAVA TODA ABERTURA (04/09/2026).
+  //
+  // O app é um arquivo só com JSX/TS transpilado pelo Babel NO NAVEGADOR. Medido neste PC: o fonte tem
+  // 568 KB e `Babel.transform` leva ~760 ms — três medições, 812/703/764. No Galaxy A23 do Diego isso é
+  // facilmente 2 a 4 segundos, e ele paga esse pedágio TODA vez que abre o app frio, no carro.
+  //
+  // A correção não é encolher o arquivo (os comentários são 159 KB e valem mais que o tempo): é não
+  // transpilar DUAS VEZES o mesmo código. O resultado do Babel é determinístico a partir do fonte, então
+  // é cacheável — e a chave é o hash do próprio fonte, que invalida sozinho a cada publicação. Sem
+  // versão pra lembrar de subir, sem cache velho servindo código novo.
+  //
+  // ESCOLHAS QUE IMPORTAM:
+  // · Cache Storage, não localStorage: são ~544 KB, e ler isso do localStorage é SÍNCRONO — travaria a
+  //   thread justamente na abertura, trocando um custo por outro.
+  // · `caches.match` NÃO passa pelo service worker: é leitura direta, sem rede e sem interceptação.
+  // · O BABEL CONTINUA SENDO O CAMINHO GARANTIDO. Tudo aqui é atalho: cache indisponível (aba anônima),
+  //   corrompido, hash diferente ou qualquer exceção cai no caminho de sempre. Isto é o boot do app — se
+  //   quebrar, a tela fica preta, e já aconteceu em 02/09. Então falha aqui não pode ser fatal.
+  const CACHE_BABEL = "tb-babel-v1";
+
+  async function hashDo(texto) {
+    const dados = new TextEncoder().encode(texto);
+    const buf = await crypto.subtle.digest("SHA-256", dados);
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function doCache(chave) {
+    try {
+      const cache = await caches.open(CACHE_BABEL);
+      const resp = await cache.match(chave);
+      return resp ? await resp.text() : null;
+    } catch (e) { return null; } // sem Cache Storage o app abre igual, só mais devagar
+  }
+
+  async function guardarNoCache(chave, codigo) {
+    try {
+      const cache = await caches.open(CACHE_BABEL);
+      await cache.put(chave, new Response(codigo, { headers: { "Content-Type": "text/javascript" } }));
+      // Faxina: cada publicação gera uma chave nova, e sem isto o aparelho acumularia meio mega por
+      // versão até o navegador despejar tudo de uma vez — inclusive a atual.
+      // ⚠ COMPARAR URL ABSOLUTA COM ABSOLUTA. `cache.keys()` devolve a URL resolvida
+      // ("http://host/__tb-app-x.js"); `chave` é relativa ("/__tb-app-x.js"). Comparar as duas direto dá
+      // sempre diferente, e a faxina apagava a entrada que TINHA ACABADO de ser gravada — o cache nunca
+      // servia pra nada e o app seguia transpilando toda vez, sem erro nenhum aparecer. Peguei no teste.
+      const chaveAbsoluta = new URL(chave, location.href).href;
+      for (const req of await cache.keys()) if (req.url !== chaveAbsoluta) await cache.delete(req);
+    } catch (e) { /* aparelho sem espaço: segue sem cache, só mais devagar */ }
+  }
+
+  function injetar(codigo) {
+    const script = document.createElement("script");
+    script.textContent = codigo;
+    document.body.appendChild(script);
+  }
+
+  async function montar() {
     const source = document.getElementById("app-source").textContent;
+    let chave = null;
+    try { chave = "/__tb-app-" + (await hashDo(source)) + ".js"; } catch (e) { chave = null; }
+
+    if (chave) {
+      const guardado = await doCache(chave);
+      // ATALHO: mesmo fonte, mesmo resultado. Pula o Babel inteiro.
+      if (guardado) { injetar(guardado); return; }
+    }
+
     const output = Babel.transform(source, {
       presets: [["react", { runtime: "classic" }], "typescript"],
       filename: "app.tsx",
     }).code;
-    const script = document.createElement("script");
-    script.textContent = output;
-    document.body.appendChild(script);
+    // Injeta ANTES de guardar: o app abrir é o que importa, gravar cache é consequência. Sem `await`
+    // de propósito — esperar a escrita atrasaria a abertura que estamos tentando acelerar.
+    injetar(output);
+    if (chave) guardarNoCache(chave, output);
   }
 
   TB.carregarTudo()
-    .then(() => {
-      try { montar(); }
-      catch (e) { TB.telaDeSocorro("erro ao montar o app: " + (e && e.message ? e.message : e)); }
-    })
-    .catch((e) => TB.telaDeSocorro(e && e.message ? e.message : String(e)));
+    .then(montar)
+    .catch((e) => TB.telaDeSocorro("erro ao montar o app: " + (e && e.message ? e.message : String(e))));
 
   // Cão de guarda. Erro dentro do próprio app não volta pro try/catch acima (script injetado avisa o
   // window.onerror, não quem o injetou), e o React esvazia a #root quando um componente quebra no primeiro
