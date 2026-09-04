@@ -677,6 +677,14 @@ const demoPessoais = [
   // que o item invisível voltou pra fila. Mesma razão do caso Fabrício logo abaixo.
   { id: "p4", titulo: "Viagem com minha mãe para Goiânia — hospedagem", data_alvo: "2026-09-19", hora: null, cidade: "Goiânia", status: "PENDENTE", impacto_operacao: "A_CONFIRMAR", origem: "classic", remarcacoes: 0 },
 ];
+// CAIXA DE AVISOS — mesmo formato do aviso real da Fátima, que é o caso de aceitação do item
+// AGENDA-CAIXA-AVISOS-20260831-001. Aponta pro `a6`, a retirada PROVISÓRIA de Valparaíso que já existia
+// aqui: marcar um presencial perto dela sem saber que ela está esperando encaixe é perder a viagem.
+// A cidade NÃO se repete no aviso — sai de `referencia_id`, do próprio compromisso. Dado duplicado diverge.
+const demoAvisos = [
+  { id: "av1", dominio: "agenda", prioridade: "alta", ativo: true, expira_em: null, referencia_id: "a6",
+    aviso: "Retirada ainda PROVISÓRIA, não confirmada com a cliente. Exige desmontagem do sofá — protege a janela da tarde: só encaixar outro presencial se for pequeno e couber com folga." },
+];
 // AGENDA QUE NÃO ESTÁ MAIS PLANEJADA — só o que explica por que um serviço parou. Aqui mora o caso
 // FABRÍCIO do item "painel de serviços fechados sem avanço": a retirada foi CANCELADA e ninguém
 // remarcou, então o serviço tem próxima ação escrita e mesmo assim não anda. Sem esta linha a demo não
@@ -2438,6 +2446,43 @@ function estradaTotalMin(paradas) {
   paradas.forEach((p) => { total += tempoEstradaMin(atual, p.cidade); atual = p.cidade; });
   return total + tempoEstradaMin(atual, CIDADE_BASE);
 }
+// CAIXA DE AVISOS OPERACIONAIS — item AGENDA-CAIXA-AVISOS-20260831-001.
+//
+// O PROBLEMA que ela resolve, com caso vivo: o compromisso da Fátima (09/09, Valparaíso) carrega no campo
+// `agenda.local` 357 caracteres de condição operacional — "slot provisório 13:30, não confirmado
+// externamente, RETIRADA TRABALHOSA: exige desmontagem, protege a janela da tarde". Isso é um AVISO
+// escrito no campo do ENDEREÇO, e some duas vezes: ninguém lê `local` antes de marcar outra coisa, e o
+// botão de rota tenta mandar o parágrafo inteiro pro Maps buscar. Condição operacional precisa de casa
+// própria — é o que esta tabela é.
+//
+// ENXUTA DE PROPÓSITO, e o recado é explícito nisso: não é diário, journal, claim nem protocolo. Ler os
+// avisos é uma passada numa lista minúscula, e aviso ativo NÃO eleva tudo pra FULL — ele só aparece.
+//
+// A cidade do aviso sai do compromisso referenciado, nunca do próprio aviso: `referencia_id` aponta a
+// linha da agenda e a cidade é lida DE LÁ. Guardar a cidade nos dois lugares é criar duas verdades que
+// divergem no dia em que o compromisso for remarcado pra outro lugar.
+const PESO_AVISO = { alta: 3, media: 2, baixa: 1 };
+// Comparação de texto sem acento e sem caixa. Era uma const LOCAL do CompromissoCard até 03/09; subiu pra
+// cá quando a Caixa de Avisos precisou comparar cidade — dois normalizadores diferentes para a mesma
+// pergunta ("é a mesma cidade?") é como se cria divergência silenciosa entre telas.
+function soTexto(t) { return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim(); }
+function avisosDaAgenda(avisos, appointments, hojeISO_, cidadeAlvo) {
+  const hoje = hojeISO_ || hojeISO();
+  return (avisos || [])
+    .filter((av) => av.dominio === "agenda" && av.ativo !== false)
+    .filter((av) => !av.expira_em || String(av.expira_em) >= hoje)
+    .map((av) => {
+      const ref = av.referencia_id ? (appointments || []).find((a) => a.id === av.referencia_id) : null;
+      const cidadeRef = ref?.cidade || "";
+      // ENCAIXE DE ROTA: mesma cidade, ou perto o bastante pra valer a viagem. 25 min é o mesmo tempo que
+      // o app já usa como vizinhança em outras contas — não inventei limiar novo. Sem cidade dos dois
+      // lados não há como afirmar proximidade, e aí o aviso aparece igual, só sem o selo de encaixe.
+      const perto = !!(cidadeAlvo && cidadeRef) && (soTexto(cidadeAlvo) === soTexto(cidadeRef) || tempoEstradaMin(cidadeAlvo, cidadeRef) <= 25);
+      return { ...av, ref, cidadeRef, encaixe: perto };
+    })
+    // Encaixe de rota primeiro, depois prioridade: o que muda a decisão de HOJE sobe.
+    .sort((a, b) => (Number(b.encaixe) - Number(a.encaixe)) || (PESO_AVISO[b.prioridade] || 0) - (PESO_AVISO[a.prioridade] || 0));
+}
 function analisarRotaDoDia(compromissos) {
   const paradas = (compromissos || [])
     .filter((a) => a.tipo === "presencial" && a.cidade && a.hora)
@@ -2511,6 +2556,7 @@ function Home() {
   const [rotinas, setRotinas] = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
   const [estoque, setEstoque] = useState([]);
+  const [avisos, setAvisos] = useState([]);
   // DOMÍNIO PESSOAIS (item APP-PESSOAIS-CARD-20260824-2145) — vive na mesma tela por conveniência dele,
   // mas é outro domínio: não entra em cliente, serviço, financeiro nem em nenhum indicador da Tapeçaria.
   const [pessoais, setPessoais] = useState([]);
@@ -2573,6 +2619,9 @@ function Home() {
     // Estoque entra no pacote (e portanto no cache offline) porque o aviso "isso você já tem" precisa
     // existir JUSTAMENTE na estrada, sem sinal, que é quando ele decide desviar pra loja.
     setEstoque(p.estoque || []);
+    // Avisos entram no pacote (e no cache offline) pelo mesmo motivo do estoque: a decisão de encaixar um
+    // compromisso na rota acontece na estrada, muitas vezes sem sinal.
+    setAvisos(p.avisos || []);
     // Distâncias não são estado de tela — alimentam tempoEstradaMin, que é função pura. Entram no pacote
     // pra virem junto no cache offline: sem sinal a trava de rota continua com os tempos aprendidos.
     aplicarDistanciasDoBanco(p.distancias);
@@ -2580,13 +2629,13 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
-    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, firstError;
+    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, firstError;
     try {
-      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es] = await Promise.all([
+      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
@@ -2612,10 +2661,16 @@ function Home() {
         // então respeita a mesma trava de RLS do resto; sem autorização ela volta VAZIA em vez de dar erro,
         // e o app simplesmente deixa de sugerir — que é o comportamento de antes, não uma tela quebrada.
         db.from("estoque_painel").select("id,item,saldo,unidade,status"),
+        // CAIXA DE AVISOS OPERACIONAIS (item AGENDA-CAIXA-AVISOS-20260831-001). Condição viva que quem vai
+        // marcar compromisso precisa ver ANTES de marcar. Só os ativos e só os que ainda não expiraram —
+        // aviso vencido é ruído, e ruído faz ele parar de ler o aviso que importa.
+        db.from("avisos_operacionais").select("id,dominio,aviso,prioridade,expira_em,referencia_id").eq("ativo", true),
       ]);
       // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
       // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
       // sozinha, o certo é o app abrir normal — e não cair na tela de offline por causa de tabela acessória.
+      // `av` entra na mesma categoria de `ds`/`es`: aviso é camada de apoio. Se a Caixa falhar sozinha o
+      // app abre normal e deixa de avisar — nunca cai em tela de offline por causa dela.
       firstError = [cx, cl, sv, ag, fn, rt, fo, ps].find((result) => result.error)?.error;
     } catch (e) { firstError = e; }
     // SEM SINAL: em vez de tela vazia, abre com a última carga guardada e avisa a idade dela.
@@ -2625,7 +2680,7 @@ function Home() {
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
     setOfflineDesde(null);
-    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [] };
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [] };
     aplicarPacote(pacote);
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
@@ -3247,7 +3302,7 @@ function Home() {
     {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} />}
     {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} services={services} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
-    {addAgendaOpen && <AddAgendaModal appointments={agendaVisivel} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
+    {addAgendaOpen && <AddAgendaModal appointments={agendaVisivel} avisos={avisos} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
   </div>;
 }
 
@@ -3622,8 +3677,16 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   //   "Remoto / WhatsApp"                                → não é lugar
   // Mandar esses textos pro Waze faz ele buscar a frase inteira e errar. Por isso o local só
   // conta quando diz algo que a cidade já não diz.
-  const soTexto = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
-  const localBruto = String(a.local || "").trim();
+  // QUINTO PADRÃO, achado em 03/09 com o compromisso da Fátima: o `local` traz o endereço E, depois de um
+  // `|`, um parágrafo de condição operacional — "Jardim Oriente — Valparaíso de Goiás | Quarta 09/09 no
+  // início da tarde. Slot interno provisório 13:30, não confirmado externamente. RETIRADA TRABALHOSA:
+  // exige desmontagem do sofá...". São 357 caracteres, e o botão de rota mandava o parágrafo INTEIRO pro
+  // Maps buscar, porque a frase não casa nenhum dos filtros anteriores.
+  //
+  // Aqui não descarto: **corto no `|` e fico com a primeira parte**, que é o endereço de verdade. Jogar
+  // tudo fora perderia "Jardim Oriente", que é justamente o que o Diego precisa pra chegar. A condição
+  // operacional que vinha depois agora tem casa própria — ver avisosDaAgenda() e a Caixa de Avisos.
+  const localBruto = String(a.local || "").split("|")[0].trim();
   // Tem um quarto padrão, e é o que quebrou o botão: o Classic escreve no `local` a PROCEDÊNCIA do ponto,
   // não o ponto. "Águas Claras — ponto exato compartilhado pelo cliente no WhatsApp" (Gilmar, 05/09),
   // "Ponto confirmado pela cliente no WhatsApp" (Marilda). É anotação sobre a coordenada, não endereço —
@@ -4854,7 +4917,7 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
   </section>;
 }
 
-function AddAgendaModal({ appointments, db, demo, notify, onClose, onDone }) {
+function AddAgendaModal({ appointments, avisos, db, demo, notify, onClose, onDone }) {
   const [form, setForm] = useState({ titulo: "", tipo: "presencial", cidade: "" });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -4880,6 +4943,24 @@ function AddAgendaModal({ appointments, db, demo, notify, onClose, onDone }) {
       <div className="form-grid">
         <label>Compromisso*<input value={form.titulo} onChange={(e) => setForm((f) => ({ ...f, titulo: e.target.value }))} /></label>
         <div className="row"><label>Tipo<select value={form.tipo} onChange={(e) => setForm((f) => ({ ...f, tipo: e.target.value }))}><option value="presencial">Presencial</option><option value="remoto">Remoto</option></select></label><label>Cidade{form.tipo === "presencial" ? "*" : ""}<input value={form.cidade} onChange={(e) => setForm((f) => ({ ...f, cidade: e.target.value }))} disabled={form.tipo === "remoto"} /></label></div>
+        {/* A CAIXA DE AVISOS APARECE AQUI, ANTES DO DIA E DA HORA — é o ponto em que a decisão ainda pode
+            mudar. Depois de escolher o horário ele já decidiu; um aviso na tela seguinte só faria ele
+            refazer o trabalho. A ordem que o recado pede é literalmente essa: ler avisos → consultar a
+            agenda necessária → decidir → executar → readback.
+            AVISA, NÃO BLOQUEIA: o botão continua liberado. Quem decide se compensa encaixar é ele — o app
+            não sabe se a peça cabe no carro nem se a cliente pode receber. */}
+        {(() => {
+          const relevantes = avisosDaAgenda(avisos, appointments, hojeISO(), form.tipo === "presencial" ? form.cidade.trim() : "");
+          if (!relevantes.length) return null;
+          return <div className="warning-card" style={{ margin: 0 }}>
+            <b>⚑ Antes de marcar — {relevantes.length} aviso(s) da agenda</b>
+            {relevantes.map((av) => <span key={av.id}>
+              {av.encaixe ? "🚗 PODE DAR ENCAIXE DE ROTA · " : ""}
+              {av.ref ? `${av.ref.titulo}${av.cidadeRef ? " · " + av.cidadeRef : ""}${av.ref.data ? " · " + compactDate(av.ref.data) : ""} — ` : ""}
+              {av.aviso}
+            </span>)}
+          </div>;
+        })()}
         <button className="primary wide" onClick={submit} disabled={busy}>Escolher dia e horário</button>
       </div>
     </div></div>
