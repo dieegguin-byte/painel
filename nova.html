@@ -696,6 +696,13 @@ const demoAvisos = [
 // consegue exercitar o "PRECISA AVANÇAR" — e foi por não conseguir ver que o card ficou sem prova.
 const demoAgendaHistorico = [
   { id: "ah1", servico_id: "s6", status: "cancelado", titulo: "PROVISÓRIO — Retirada do sofá — Carlos", data: "2026-09-04" },
+  // ah2 = CONVERSA ENCERRADA SEM DESTINO (recado de 03/09). Envelope cancelado, sem serviço, e o número
+  // não aparece em nenhum compromisso vivo nem na ficha de cliente nenhum — foi assim que 8 conversas
+  // sumiram em agosto. Sem este fixture o card não tem como ser testado.
+  { id: "ah2", servico_id: null, status: "cancelado", titulo: "TRIAGEM TEMPORÁRIA — WhatsApp +55 61 99501-9012 — revisar conversa", data: "2026-08-30", local: "whatsapp:61995019012" },
+  // ah3 = mesmo formato, MAS o número é o da Ana Paula (c3), que já é cliente. NÃO pode aparecer no card:
+  // é o teste de que "encerrada" não significa "perdida" quando a conversa virou gente cadastrada.
+  { id: "ah3", servico_id: null, status: "cancelado", titulo: "TRIAGEM TEMPORÁRIA — WhatsApp +55 61 98899-1122 — revisar conversa", data: "2026-08-30", local: "whatsapp:61988991122" },
 ];
 const demoRotinas = [
   { id: "r1", titulo: "Calibrar pneu do carro", intervalo_dias: 3, hora: null, observacao: null, ultima_execucao: null, ativo: true },
@@ -792,7 +799,23 @@ function telefoneWhatsapp(valor) {
 // ESTA É A ÚNICA FONTE DE TELEFONE FORA DA FICHA, e vale SÓ para esse tipo de envelope: compromisso normal
 // sem telefone continua sem botão, como sempre foi. Nada de generalizar `local` como fonte de contato.
 const RE_TRIAGEM_TEL = /^whatsapp:(\d{8,13})$/i;
-function ehEnvelopeDeTriagem(a) { return /TRIAGEM TEMPOR/i.test((a && a.titulo) || ""); }
+// O GATILHO É O CAMPO ESTRUTURADO, NÃO O TÍTULO (adendo de 03/09 ao recado de 01/09).
+// Antes isto olhava só `titulo ~ "TRIAGEM TEMPOR"`. O caso que revelou o buraco: `381dee22`, título
+// "AGUARDANDO RESPOSTA — WhatsApp +55 61 99335-7934 — mensagem enviada", com `local` no formato certo
+// e o número ali no próprio registro — e mesmo assim sem botão de WhatsApp, porque o título mudou.
+//
+// Título é texto livre e o Classic reescreve conforme a fase do atendimento ("TRIAGEM TEMPORÁRIA",
+// depois "AGUARDANDO RESPOSTA", depois "RECUPERAÇÃO — ..."). `local = whatsapp:<dígitos>` é contrato:
+// ou casa o formato, ou não casa. Ler o formato conserta a classe inteira em vez do título da vez.
+//
+// ⚠ ISSO NÃO TORNA `agenda.local` FONTE OFICIAL DE CONTATO — o adendo é explícito e a regra continua:
+// compromisso NOVO nasce com `cliente_id`/`servico_id`, e é de lá que sai o telefone. Este caminho vale
+// só para o registro que já existe carregando o número e não tem vínculo nenhum. Sem `whatsapp:` no
+// formato exato, nada muda: compromisso comum sem telefone continua sem botão, como sempre foi.
+function ehEnvelopeDeTriagem(a) {
+  if (RE_TRIAGEM_TEL.test(String((a && a.local) || "").trim())) return true;
+  return /TRIAGEM TEMPOR/i.test((a && a.titulo) || "");
+}
 function telefoneDaTriagem(a) {
   if (!ehEnvelopeDeTriagem(a)) return "";
   const m = RE_TRIAGEM_TEL.exec(String((a && a.local) || "").trim());
@@ -2466,6 +2489,37 @@ function estradaTotalMin(paradas) {
 // A cidade do aviso sai do compromisso referenciado, nunca do próprio aviso: `referencia_id` aponta a
 // linha da agenda e a cidade é lida DE LÁ. Guardar a cidade nos dois lugares é criar duas verdades que
 // divergem no dia em que o compromisso for remarcado pra outro lugar.
+// CONVERSA ENCERRADA SEM DESTINO — recado de 03/09, "impedir triagem cancelada sem sucessor".
+//
+// O recado pede uma trava no código que cancela a triagem. Esse código NÃO EXISTE no app: quem cancela
+// envelope é o Classic, direto no banco — o app só lê. Travar de fora sairia caro e arriscado (um
+// trigger que recusa UPDATE pode parar uma correção legítima no meio, e a operação some sem ninguém
+// entender por quê).
+//
+// Então o app faz o que ele sabe fazer bem: VIGIA. O dano real não é o cancelamento em si — é o
+// cancelamento SEM RASTRO, que foi como 4 conversas sumiram em 25/08 e outras 4 em 30/08 sem virar
+// cliente, serviço nem compromisso. Aqui elas voltam a aparecer, e o Diego decide.
+//
+// Não é acusação de erro: encerrar conversa que era engano ou spam é legítimo. O que o card diz é
+// "isto encerrou e não deixou destino" — se foi de propósito, ele ignora e segue.
+function triagensSemDestino(agendaHistorico, appointments, customers) {
+  const soDigitos = (t) => String(t || "").replace(/\D/g, "");
+  const finalDe = (t) => soDigitos(t).slice(-9); // últimos 9 = número sem DDI/DDD, o que dá pra comparar
+  // Quem já tem destino: compromisso vivo com o mesmo número, ou cliente cadastrado com ele.
+  const vivos = new Set((appointments || []).map((a) => finalDe(a.local)).filter((n) => n.length === 9));
+  const clientes = new Set((customers || []).map((c) => finalDe(c.telefone)).filter((n) => n.length === 9));
+  const vistos = new Set();
+  return (agendaHistorico || [])
+    .filter((a) => RE_TRIAGEM_TEL.test(String(a.local || "").trim()) || /TRIAGEM TEMPOR/i.test(a.titulo || ""))
+    .filter((a) => !a.servico_id)
+    // `numero` (últimos 9) serve só pra COMPARAR; `bruto` é o que tem DDD e pode virar link. Se o número
+    // só existe no título, `bruto` fica vazio e o card não oferece conversa — inventar DDD é mandar
+    // mensagem pra estranho, e o número certo não vale o risco do errado.
+    .map((a) => ({ ...a, numero: finalDe(a.local) || finalDe(a.titulo), bruto: soDigitos(a.local) }))
+    .filter((a) => a.numero.length === 9 && !vivos.has(a.numero) && !clientes.has(a.numero))
+    // O mesmo número pode ter dois envelopes encerrados (foi o caso do 986464773). Uma linha por pessoa.
+    .filter((a) => (vistos.has(a.numero) ? false : (vistos.add(a.numero), true)));
+}
 const PESO_AVISO = { alta: 3, media: 2, baixa: 1 };
 // Comparação de texto sem acento e sem caixa. Era uma const LOCAL do CompromissoCard até 03/09; subiu pra
 // cá quando a Caixa de Avisos precisou comparar cidade — dois normalizadores diferentes para a mesma
@@ -2661,7 +2715,10 @@ function Home() {
         // causa. Item PAINEL DE SERVIÇOS FECHADOS SEM AVANÇO, caso Fabrício.
         // Cinco colunas, não `*`: isto é contexto de explicação, não fonte de operação, e não pode virar
         // uma segunda lista de compromissos que alguém confunda com a de verdade.
-        db.from("agenda").select("id,servico_id,status,titulo,data").neq("status", "planejado").order("data", { ascending: false }),
+        // `local` entrou em 04/09: é ele que carrega o número (`whatsapp:<dígitos>`) de uma conversa que
+        // virou envelope. Sem ele o app não consegue perceber triagem encerrada sem destino — ver
+        // triagensSemDestino(). Continua sendo contexto de explicação, não uma segunda lista de agenda.
+        db.from("agenda").select("id,servico_id,status,titulo,data,local").neq("status", "planejado").order("data", { ascending: false }),
         // ESTOQUE — para o card de Compras poder perguntar "isso você já tem?". A view é security_invoker,
         // então respeita a mesma trava de RLS do resto; sem autorização ela volta VAZIA em vez de dar erro,
         // e o app simplesmente deixa de sugerir — que é o comportamento de antes, não uma tela quebrada.
@@ -4793,6 +4850,26 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, finances, r
     <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} onOpenFicha={onOpenFicha} />
     <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
     <CaixaCard inbox={inbox} today={today} />
+    {/* CONVERSA ENCERRADA SEM DESTINO — ver triagensSemDestino(). Fica recolhido e só existe quando há
+        caso: se o Classic estiver encerrando tudo com destino, este card não aparece nunca, que é o
+        estado desejado. */}
+    {(() => {
+      const perdidas = triagensSemDestino(agendaHistorico, appointments, customers);
+      if (!perdidas.length) return null;
+      return <CardRecolhivel className="warning-card"
+        cabecalho={<><p className="kicker">CONVERSA SEM DESTINO</p>
+          <h3>{perdidas.length} conversa(s) encerrada(s) sem virar nada</h3>
+          <span className="ficha-note" style={{ margin: 0 }}>Sem cliente, sem serviço e sem compromisso vivo com esse número</span></>}>
+        {perdidas.slice(0, 8).map((a) => {
+          const tel = telefoneWhatsapp(a.bruto);
+          return <span key={a.id}>
+            {compactDate(a.data)} · {(a.titulo || "").replace(/^(RECUPERAÇÃO — )?TRIAGEM TEMPORÁRIA — /i, "").slice(0, 52)}
+            {tel ? <> · <a href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">abrir conversa</a></> : ""}
+          </span>;
+        })}
+        {perdidas.length > 8 && <span>e mais {perdidas.length - 8}</span>}
+      </CardRecolhivel>;
+    })()}
     {/* PESSOAIS mora na mesma home por conveniência dele, mas é outro domínio — e fica DEPOIS do trabalho,
         porque a primeira olhada do dia é a rota. Só sobe pra cara dele quando tem atrasado. */}
     <PessoaisCard pessoais={pessoais} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
