@@ -1,0 +1,17 @@
+-- SINCRONIZACAO EM TEMPO REAL DA AGENDA — recado de 04/09/2026 ("agenda nao atualiza").
+--
+-- A CAUSA MEDIDA, e ela e simples: a publicacao `supabase_realtime` existia e estava VAZIA -- zero
+-- tabelas publicadas. Nenhum evento `postgres_changes` chegava ao app, de nenhuma tabela. O app tambem
+-- nao assinava nada, entao a unica forma de ver algo escrito pelo Classic era o botao Atualizar.
+--
+-- Publica so `public.agenda`, que e o que o recado pede. As outras tabelas ficam fora de proposito:
+-- cada tabela publicada e trafego no WAL e no socket do celular, e a agenda e a que o Classic mexe
+-- enquanto o Diego esta com o app aberto.
+--
+-- REPLICA IDENTITY fica no DEFAULT (chave primaria), NAO FULL: o app usa o evento apenas como gatilho
+-- para reler a carga inteira, entao nao precisa do valor antigo das colunas. FULL dobraria o WAL de
+-- cada UPDATE sem entregar nada em troca.
+--
+-- RLS continua valendo: o Realtime respeita a politica `usuario_autorizado()` da tabela, entao so quem
+-- ja pode ler a agenda recebe evento dela.
+alter publication supabase_realtime add table public.agenda;

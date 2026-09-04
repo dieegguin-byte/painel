@@ -651,6 +651,11 @@ const demoAppointments = [
   //      Ana Paula, o telefone dela e o botão de WhatsApp — o buraco que o Jackson revelou em 30/08.
   { id: "a5", titulo: "Compromisso pessoal", data: hojeISO(), hora: "19:00", cidade: "Luziânia", local: null, tipo: "operacional", status: "planejado", servico_id: null, pessoal_id: "p2" },
   { id: "a6", titulo: "PROVISÓRIO — Retirada Ana Paula — Valparaíso", data: hojeISO(), hora: "10:30", cidade: "Valparaíso", local: "Quadra 108, Lote 3", tipo: "presencial", status: "planejado", servico_id: null, cliente_id: "c3" },
+  // a7 = REMOTO SEM HORA, o caso que estava invisível no app inteiro até 04/09. `ehCobranca()` o tira da
+  // aba Agenda, o Painel tira o mesmo da rota, e o bloco que o mostrava saiu em 23/08 — some dos dois.
+  // Em produção eram 26 assim, todos cliente esperando resposta. Sem este fixture a demo não exercita o
+  // bloco "sem hora" e a correção volta a quebrar sem ninguém ver.
+  { id: "a7", titulo: "Aguardar retorno da Mariana — orçamento enviado", data: somarDias(hojeISO(), -2), hora: null, cidade: null, local: null, tipo: "remoto", status: "planejado", servico_id: "s1" },
 ];
 const demoFinance = [
   { id: "f1", tipo: "entrada", valor: 675, descricao: "Entrada 50% — Carlos", status: "pago", data: "2026-07-09" },
@@ -2691,6 +2696,44 @@ function Home() {
   }, [db, demo, notify, session, aplicarPacote]);
 
   useEffect(() => { if (demo || session) loadAll(); }, [demo, session, loadAll]);
+
+  // AGENDA EM TEMPO REAL (recado de 04/09: "compromisso gravado na fonte oficial e ainda assim não
+  // aparece"). O Classic grava direto no Supabase; até aqui o app só via isso se o Diego lembrasse de
+  // apertar Atualizar — e apertar Atualizar num app que já mostra a tela errada não devolve confiança.
+  //
+  // ⚠ MEDIDO ANTES: a publicação `supabase_realtime` existia e estava VAZIA (zero tabelas), então nenhum
+  // evento chegava. A migração `realtime_agenda` publicou `public.agenda`.
+  //
+  // O EVENTO É GATILHO, NÃO PATCH. Recebido o `postgres_changes`, o app RECARREGA pelo mesmo `loadAll`
+  // de sempre em vez de aplicar o INSERT/UPDATE/DELETE no estado React. Isso é de propósito e é o que
+  // atende "sem duplicar cards nem manter compromisso fantasma": a carga não é um `select` cru — ela
+  // passa por `comTituloVisivel`, pelo filtro de pendência de remarcação e pelo cache offline. Um merge
+  // manual teria que repetir essas três coisas e divergiria delas no primeiro ajuste. Recarregar tem uma
+  // fonte só de verdade; o preço é uma carga a mais, e o Classic grava poucas vezes por minuto.
+  //
+  // Debounce porque uma correção do Classic costuma vir em rajada (cancela um, cria o sucessor): sem ele
+  // seriam três cargas seguidas para um efeito só.
+  useEffect(() => {
+    if (!db || !session || demo) return;
+    let timer = null;
+    const recarregarLogo = () => { clearTimeout(timer); timer = setTimeout(() => loadAll(), 700); };
+    const canal = db.channel("agenda-viva")
+      .on("postgres_changes", { event: "*", schema: "public", table: "agenda" }, recarregarLogo)
+      .subscribe();
+    // RECONCILIAÇÃO CONTRA EVENTO PERDIDO (item 6 do recado). Socket cai no elevador, no metrô e quando o
+    // Android congela a aba em segundo plano — e evento perdido não volta sozinho. Então, ao voltar pro
+    // primeiro plano e ao recuperar rede, o app relê do zero em vez de confiar que não perdeu nada.
+    const aoVoltar = () => { if (document.visibilityState === "visible") recarregarLogo(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("online", recarregarLogo);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("online", recarregarLogo);
+      db.removeChannel(canal);
+    };
+  }, [db, session, demo, loadAll]);
+
   useEffect(() => { window.localStorage.setItem("tb-novo-modo", mode); }, [mode]);
   // Claude usa a MESMA conexão autenticada que o app já mantém. Isso evita criar clientes supabase-js em
   // sequência no console (a causa do congelamento observado) e, principalmente, impede que ele replique
@@ -4881,13 +4924,21 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
   // aparece com 16 linhas e deixa de servir pra planejar deslocamento. Ver ehCobranca() e o bloco
   // "Cobranças" do Dashboard. Decisão do Diego em 28/07/2026.
   const daRota = (appointments || []).filter((a) => !ehCobranca(a));
-  const qtdCobrancas = (appointments || []).length - daRota.length;
+  // ⚠ ESTES 26 ESTAVAM INVISÍVEIS NO APP INTEIRO (medido em 04/09, item "agenda não atualiza").
+  // A conta: a aba Agenda filtra `ehCobranca` pra fora (decisão certa de 28/07 — remoto sem hora não é
+  // rota e enchia o dia de linhas), o Painel tira os mesmos da lista de rota, e o bloco "Cobranças" que
+  // os mostrava SAIU do Painel em 23/08. Três decisões boas isoladas, e o resultado somado é compromisso
+  // gravado na fonte oficial que não aparece em lugar nenhum — exatamente a queixa do recado.
+  // São clientes reais esperando resposta: Francisco, Cristiane, Thaísa, Dani, Bruno, Ivone, Rosinha...
+  //
+  // Voltam AQUI, e não no Painel: a decisão do Diego em 23/08 foi tirar isso da primeira olhada do dia,
+  // e ela continua valendo. A aba Agenda é onde ele vem procurar compromisso — some da rota, mas existe.
+  const semHora = (appointments || []).filter((a) => ehCobranca(a));
   const groups = daRota.reduce((acc, item) => { (acc[item.data] ||= []).push(item); return acc; }, {});
   const dias = Object.keys(groups).sort();
   return <section className="content-card full">
     <div className="card-head"><div><p className="kicker">ROTINA E DESLOCAMENTO</p><h3>Agenda planejada</h3></div><button className="primary" onClick={onAdd}>+ Adicionar</button></div>
-    {qtdCobrancas > 0 && <p className="ficha-note">Só rota aqui. {qtdCobrancas} cobrança(s) sem hora ficam no Painel, em “Cobranças”.</p>}
-    {!dias.length && <div className="empty-state"><b>Sem compromissos planejados.</b><span>Toque em “+ Adicionar” para criar.</span></div>}
+    {!dias.length && !semHora.length && <div className="empty-state"><b>Sem compromissos planejados.</b><span>Toque em “+ Adicionar” para criar.</span></div>}
     <div className="agenda-dias">{dias.map((date) => {
       const items = groups[date];
       const cor = corCompromisso(date, hoje);
@@ -4913,7 +4964,21 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
         </button>
         {aberto && <div className="agenda-dia-corpo"><AvisoRota compromissos={items} />{[...items].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
       </div>;
-    })}</div>
+    })}
+    {/* SEM HORA — recolhido por padrão, como os dias. 26 linhas abertas seriam a parede de texto que ele
+        já disse não ler. Fica DEPOIS dos dias porque a primeira olhada continua sendo a rota. */}
+    {semHora.length > 0 && (() => {
+      const aberto = diaAberto === "__sem_hora";
+      return <div className="agenda-dia-card">
+        <button className="agenda-dia-head" onClick={() => setDiaAberto(aberto ? null : "__sem_hora")}>
+          <div className="agenda-dia-data"><b>{semHora.length}</b><span>sem</span><em>hora</em></div>
+          <div className="agenda-dia-badges"><span className="badge-remoto">◌ Não ocupa rota</span></div>
+          <div className="agenda-dia-meta"><b>{semHora.length}</b><span>esperando contato</span></div>
+          <i className="agenda-dia-seta">{aberto ? "▲" : "▼"}</i>
+        </button>
+        {aberto && <div className="agenda-dia-corpo">{[...semHora].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
+      </div>;
+    })()}</div>
   </section>;
 }
 
