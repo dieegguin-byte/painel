@@ -4248,7 +4248,9 @@ function contextoDeFluxo({ appointments, agendaHistorico, inbox, services }) {
     if (!canceladoPorServico.has(a.servico_id)) canceladoPorServico.set(a.servico_id, a); // o mais recente
   });
   const esperandoMaterial = new Set((services || [])
-    .filter((s) => (s.materiais_necessarios || []).some((m) => !m.arquivado && classificarMaterial(m).faixa !== "em_maos"))
+    // `em_maos` E `com_profissional` contam como resolvido: o material chegou nos dois casos. A diferença
+    // entre eles é AVISO na tela de Compras, não trava aqui — ver classificarMaterial().
+    .filter((s) => (s.materiais_necessarios || []).some((m) => !m.arquivado && !MATERIAL_CHEGOU.includes(classificarMaterial(m).faixa)))
     .map((s) => s.id));
   return { comCompromisso, emRemarcacao, canceladoPorServico, esperandoMaterial };
 }
@@ -4421,7 +4423,7 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
   // dos 67 itens reais — vinha `undefined`, falsy, e a Capacidade dizia "esperando material" para serviço
   // cujo material já estava com o profissional. Era o mesmo defeito de leitura da aba Compras, na terceira
   // tela. Agora as duas perguntam a mesma coisa à mesma função: o que ainda não está EM MÃOS.
-  const materiaisAnotadosPendentes = (s) => (s.materiais_necessarios || []).filter((m) => !m.arquivado && classificarMaterial(m).faixa !== "em_maos").length;
+  const materiaisAnotadosPendentes = (s) => (s.materiais_necessarios || []).filter((m) => !m.arquivado && !MATERIAL_CHEGOU.includes(classificarMaterial(m).faixa)).length;
   const esperandoMaterial = (s) => {
     if (!["agendado", "producao"].includes(s.status)) return false;
     if (materiaisAnotadosPendentes(s)) return true;
@@ -6553,6 +6555,10 @@ function assinaturaDaLista(servico) {
 // derivar de novo na semana que vem. É o app ACEITAR o que chega e classificar pelo vocabulário que o
 // próprio dado usa. Por isso a varredura é sobre TODOS os valores de texto do item, não sobre um campo
 // combinado — campo combinado é exatamente o que não sobreviveu até aqui.
+// As duas faixas em que o material JÁ CHEGOU. Quem pergunta "ainda falta comprar?" usa esta lista, não
+// uma faixa só — senão o material entregue ao profissional voltaria a contar como pendente e a Capacidade
+// acusaria falta de material que está na bancada.
+const MATERIAL_CHEGOU = ["em_maos", "com_profissional"];
 const MAT_EM_MAOS = /\b(em[_ ]?maos|entregue|recebid)/i;
 const MAT_A_CAMINHO = /\b(a[_ ]caminho|em[_ ]transito|pedido[_ ](feito|enviado))/i;
 // Vocabulário de "ainda não dá pra comprar", tirado do banco (não inventado): PENDENTE_DE_DEFINICAO,
@@ -6585,9 +6591,25 @@ function rotuloDoMaterial(m) {
 // Precedência: o que já está na mão vence o que está planejado. Um item pode ter `comprado: true` E
 // `quantidade_status: PENDENTE_MEDIDAS` ao mesmo tempo (acontece em 3 registros reais) — ali a nota de
 // planejamento ficou velha, e o fato físico é que o material chegou.
+// CHEGOU ≠ ESTÁ COM QUEM VAI TRABALHAR (recado de 05/09, Gate/Compras). Até aqui "EM MÃOS" era uma faixa
+// só, e ela é a que destrava produção. Mas material que chegou na casa da mãe do Diego não faz o Marcão
+// costurar nada — e o Diego perde a viagem se for à oficina achando que o tecido está lá.
+//
+// MEDIDO EM 06/09 antes de mexer, e o número justifica: dos 11 itens que o app chamava de EM MÃOS,
+// só 5 (os da Mirla) dizem `material_entregue_ao_profissional` com data de entrega. Os outros 6
+// (Ivoneide ×3, Léo ×2, Dulce) dizem apenas `comprado`/`material_comprado` — chegaram, e não há prova
+// de que estejam com o profissional.
+//
+// ⚠ AVISA, NÃO TRAVA. A faixa nova é informação, e de propósito NÃO entra na conta que segura produção
+// (ver `materiaisAnotadosPendentes`): a prova de entrega depende de o Classic gravar o estado, e travar
+// a oficina por dado que às vezes não vem seria o app pedindo que o Diego conserte o que ele não errou.
+// Ele vê e decide — é a mesma regra do aviso de rota e do casamento com o estoque.
+const MAT_COM_PROFISSIONAL = /(entregue[_ ]ao[_ ]profissional|com[_ ]o[_ ]profissional|entregue[_ ]para[_ ]o[_ ](profissional|tapeceiro))/i;
 function classificarMaterial(m) {
   const alvo = textoDoMaterial(m);
-  if (m?.comprado === true || MAT_EM_MAOS.test(alvo)) return { faixa: "em_maos", motivo: "" };
+  // A prova mais forte primeiro: dito explicitamente, ou com data de entrega registrada.
+  if (MAT_COM_PROFISSIONAL.test(alvo) || (m && m.entregue_em)) return { faixa: "com_profissional", motivo: "" };
+  if (m?.comprado === true || MAT_EM_MAOS.test(alvo)) return { faixa: "em_maos", motivo: "chegou — sem registro de entrega ao profissional" };
   if (m?.pedido === true || MAT_A_CAMINHO.test(alvo)) return { faixa: "a_caminho", motivo: "pedido feito, ainda não chegou" };
   if (MAT_INDEFINIDO.test(alvo)) {
     // Devolve o TRECHO que barrou, não um rótulo genérico: o Diego precisa saber o que falta pra
@@ -6606,7 +6628,8 @@ const FAIXAS_MATERIAL = [
   { id: "comprar", titulo: "COMPRAR AGORA", nota: "Especificação suficiente pra sair e comprar." },
   { id: "indefinido", titulo: "AGUARDANDO MEDIDA / DEFINIÇÃO", nota: "Falta medida, quantidade, preço ou avaliação. Comprar aqui é chutar." },
   { id: "a_caminho", titulo: "PEDIDO / A CAMINHO", nota: "Já pedido ao fornecedor. Não é material em mãos e não libera produção." },
-  { id: "em_maos", titulo: "EM MÃOS", nota: "Chegou. Se ainda falta pagar, a pendência é financeira — está no Financeiro, não aqui." },
+  { id: "em_maos", titulo: "CHEGOU — AINDA NÃO CONSTA COM O PROFISSIONAL", nota: "Comprado e recebido, mas sem registro de entrega a quem vai executar. Se já entregou, é isso que falta anotar." },
+  { id: "com_profissional", titulo: "COM O PROFISSIONAL", nota: "Está fisicamente com quem vai trabalhar. É o único estado que destrava a bancada." },
 ];
 function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   const [busy, setBusy] = useState(null);
@@ -6639,7 +6662,9 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
   const faixaDe = (m) => classificarMaterial(m).faixa;
   const faltam = ativos.reduce((n, s) => n + visiveisDe(s).filter((m) => faixaDe(m) === "comprar").length, 0);
   const travados = ativos.reduce((n, s) => n + visiveisDe(s).filter((m) => faixaDe(m) === "indefinido").length, 0);
-  const emMaosTotal = ativos.reduce((n, s) => n + visiveisDe(s).filter((m) => faixaDe(m) === "em_maos").length, 0);
+  // "Já chegou" soma as DUAS faixas de chegada: o material existe fisicamente nos dois casos, e essa
+  // métrica responde "quanto já está resolvido", não "está com quem". A distinção aparece nas faixas.
+  const emMaosTotal = ativos.reduce((n, s) => n + visiveisDe(s).filter((m) => MATERIAL_CHEGOU.includes(faixaDe(m))).length, 0);
   // Quantos itens pendentes rendem cada loja — o que decide se a viagem vale a pena.
   // Só entra o que é COMPRÁVEL: mandar ele à Ellis por causa de um item cuja medida ninguém tirou é
   // fazer a viagem render menos do que o chip prometeu.
