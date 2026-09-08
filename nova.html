@@ -596,6 +596,10 @@ const demoCustomers = [
   // demo precisa mostrar como o botão de rota se comporta quando só há cidade.
   { id: "c2", nome: "Carlos Eduardo", telefone: "61994037524", cidade: "Luziânia" },
   { id: "c3", nome: "Ana Paula", telefone: "61988991122", cidade: "Valparaíso", endereco: "Quadra 108, Lote 3", obs: "Portão azul, tocar no interfone 2. Cachorro solto no quintal." },
+  // c4 É O CASO DO ENCAIXE DE ROTA — copiado da base real (Maria / Seu Santana), inclusive o nome longo,
+  // que é o que aperta o cartão no celular. Cidade fora de Luziânia de propósito: o encaixe só faz sentido
+  // quando a ida isolada não se paga.
+  { id: "c4", nome: "Maria — esposa do Seu Santana", telefone: "61991234567", cidade: "Sudoeste — DF" },
 ];
 const demoServices = [
   { id: "s1", cliente_id: "c1", titulo: "Reforma de sofá retrátil", status: "orcamento", prioridade: "alta", proxima_acao: "Confirmar visita", prazo: "2026-07-10", valor_orcamento: 2400, clientes: demoCustomers[0] },
@@ -630,6 +634,11 @@ const demoServices = [
   { id: "s6", cliente_id: "c2", titulo: "Sofá retrátil — reforma completa", status: "agendado", prioridade: "alta", proxima_acao: "Combinar horário e retirar o sofá até 04-09-2026", prazo: "2026-09-04", valor_orcamento: 2800, clientes: demoCustomers[1], responsavel: "Gaspar", materiais_necessarios: [
     { item: "Espuma D40", comprado: true, arquivado: false },
   ] },
+  // s7 = ENCAIXE DE ROTA. Serviço VIVO (agendado) com próxima ação escrita e NENHUM compromisso planejado
+  // — o compromisso que existia foi cancelado (ver ah4). É a combinação exata que sumia da tela: sem data,
+  // ele não entra em Atrasados nem em Hoje, e o único lugar que o mostrava era a aba Leads.
+  { id: "s7", cliente_id: "c4", titulo: "Retorno pós-serviço — verificar sofá", status: "agendado", prioridade: "media", clientes: demoCustomers[3],
+    proxima_acao: "Encaixar a visita técnica de Maria / Seu Santana em uma próxima rota compatível para o Sudoeste/DF. Não criar data isolada agora; antes do deslocamento, confirmar endereço/localização exata." },
 ];
 // As duas primeiras usam data RELATIVA ao dia em que a demo é aberta. Com data fixa, a
 // demonstração abria sempre com "nada marcado para hoje" — que é justamente o bloco mais
@@ -689,6 +698,16 @@ const demoPessoais = [
 const demoAvisos = [
   { id: "av1", dominio: "agenda", prioridade: "alta", ativo: true, expira_em: null, referencia_id: "a6",
     aviso: "Retirada ainda PROVISÓRIA, não confirmada com a cliente. Exige desmontagem do sofá — protege a janela da tarde: só encaixar outro presencial se for pequeno e couber com folga." },
+  // av2 = O ENCAIXE. Domínio próprio (`encaixe_rota`), e `referencia_id` apontando pro compromisso
+  // CANCELADO (ah4) e não pro serviço — que é a forma como o caso real chegou. Se um dia o Classic passar
+  // a referenciar o serviço direto, encaixesDeRota() aceita as duas; esta linha existe pra garantir que a
+  // forma DIFÍCIL (a que depende de pular pela agenda cancelada) seja a exercitada na demo.
+  { id: "av2", dominio: "encaixe_rota", prioridade: "media", ativo: true, expira_em: null, referencia_id: "ah4",
+    aviso: "Sudoeste/DF — Maria / Seu Santana: não dá para ir em data isolada. Encaixar a visita técnica em uma próxima rota compatível para o Sudoeste/DF. Confirmar endereço/localização exata antes de sair." },
+  // av3 = o encaixe ÓRFÃO (ver ah5). Existe pra demo provar o caminho em que NÃO há serviço nem cliente
+  // pra consultar — o cartão tem que se virar com a linha da agenda e continuar útil.
+  { id: "av3", dominio: "encaixe_rota", prioridade: "media", ativo: true, expira_em: null, referencia_id: "ah5",
+    aviso: "Elizabeth: entrega não ocorreu. O encosto está com Diego em casa. Encaixar a entrega em uma próxima rota compatível para Valparaíso; não prometer horário ao cliente antes de definir a rota." },
 ];
 // AGENDA QUE NÃO ESTÁ MAIS PLANEJADA — só o que explica por que um serviço parou. Aqui mora o caso
 // FABRÍCIO do item "painel de serviços fechados sem avanço": a retirada foi CANCELADA e ninguém
@@ -703,6 +722,14 @@ const demoAgendaHistorico = [
   // ah3 = mesmo formato, MAS o número é o da Ana Paula (c3), que já é cliente. NÃO pode aparecer no card:
   // é o teste de que "encerrada" não significa "perdida" quando a conversa virou gente cadastrada.
   { id: "ah3", servico_id: null, status: "cancelado", titulo: "TRIAGEM TEMPORÁRIA — WhatsApp +55 61 98899-1122 — revisar conversa", data: "2026-08-30", local: "whatsapp:61988991122" },
+  // ah4 = a data que NÃO deu (encaixe de rota, s7). O compromisso existiu, foi cancelado porque a viagem
+  // não se pagava sozinha, e o serviço continuou vivo. É por este id que o aviso av2 acha o serviço.
+  { id: "ah4", servico_id: "s7", status: "cancelado", titulo: "Rota Ivoneide → Maria / Seu Santana — verificar sofá", data: "2026-09-09" },
+  // ah5 = ENCAIXE ÓRFÃO (caso Elizabeth, medido na base real em 08/09). Compromisso cancelado SEM
+  // servico_id e SEM cliente_id — existe de verdade, não é hipótese. É o fixture que prova que o cartão
+  // ainda diz quem é e PRA ONDE é usando só a própria linha da agenda. Título longo de propósito.
+  { id: "ah5", servico_id: null, status: "cancelado", cidade: "Valparaíso", data: "2026-09-05",
+    titulo: "Elizabeth — passar no Marlom Júnior para grampear embaixo os encostos e depois entregar" },
 ];
 const demoRotinas = [
   { id: "r1", titulo: "Calibrar pneu do carro", intervalo_dias: 3, hora: null, observacao: null, ultima_execucao: null, ativo: true },
@@ -2521,6 +2548,12 @@ function triagensSemDestino(agendaHistorico, appointments, customers) {
     .filter((a) => (vistos.has(a.numero) ? false : (vistos.add(a.numero), true)));
 }
 const PESO_AVISO = { alta: 3, media: 2, baixa: 1 };
+// ENCAIXE DE ROTA — CLASSIFICAÇÃO ESTRUTURADA, NÃO TEXTO (item ENCAIXES-ROTA-20260908).
+// `dominio` já era campo livre com dois valores em uso na base ('agenda' e 'compras'), então marcar o
+// encaixe é um valor novo, não uma coluna nova: zero migração e os 11 avisos existentes continuam
+// valendo exatamente como estão. Procurar "encaixe"/"rota" DENTRO do texto de `aviso` seria a heurística
+// frágil que o recado proíbe — o Classic escreve o aviso em português livre e a frase muda toda vez.
+const DOMINIO_ENCAIXE = "encaixe_rota";
 // Comparação de texto sem acento e sem caixa. Era uma const LOCAL do CompromissoCard até 03/09; subiu pra
 // cá quando a Caixa de Avisos precisou comparar cidade — dois normalizadores diferentes para a mesma
 // pergunta ("é a mesma cidade?") é como se cria divergência silenciosa entre telas.
@@ -2528,7 +2561,11 @@ function soTexto(t) { return String(t || "").normalize("NFD").replace(/[̀-ͯ]/g
 function avisosDaAgenda(avisos, appointments, hojeISO_, cidadeAlvo) {
   const hoje = hojeISO_ || hojeISO();
   return (avisos || [])
-    .filter((av) => av.dominio === "agenda" && av.ativo !== false)
+    // O encaixe de rota entra AQUI TAMBÉM, de propósito. Ele ganhou domínio próprio pra ter bloco no
+    // Painel, mas continua sendo exatamente o que esta função existe pra mostrar: condição que quem vai
+    // marcar um presencial precisa ver ANTES de marcar. Tirá-lo daqui seria trocar uma tela por outra —
+    // e o aviso da Maria já aparecia neste modal antes do bloco existir.
+    .filter((av) => (av.dominio === "agenda" || av.dominio === DOMINIO_ENCAIXE) && av.ativo !== false)
     .filter((av) => !av.expira_em || String(av.expira_em) >= hoje)
     .map((av) => {
       const ref = av.referencia_id ? (appointments || []).find((a) => a.id === av.referencia_id) : null;
@@ -2541,6 +2578,48 @@ function avisosDaAgenda(avisos, appointments, hojeISO_, cidadeAlvo) {
     })
     // Encaixe de rota primeiro, depois prioridade: o que muda a decisão de HOJE sobe.
     .sort((a, b) => (Number(b.encaixe) - Number(a.encaixe)) || (PESO_AVISO[b.prioridade] || 0) - (PESO_AVISO[a.prioridade] || 0));
+}
+// ENCAIXES DE ROTA — serviço vivo que precisa de uma ida, mas cuja ida ISOLADA não compensa: ele espera
+// uma rota compatível aparecer. Não tem data, e é justamente por isso que sumia do campo de visão. A
+// agenda continua contendo só ação temporal real (nada de data falsa pra fazer o item aparecer); isto é
+// uma VISÃO montada sobre `avisos_operacionais`, não uma segunda fonte de verdade e não uma segunda agenda.
+//
+// Caso que originou: Maria / Seu Santana, Sudoeste — DF. O compromisso de 09/09 foi CANCELADO porque a
+// viagem não se pagava sozinha; o serviço seguiu vivo com próxima ação escrita e o aviso ativo. O app já
+// sabia disso (ver classificarServico/canceladoPorServico), mas só mostrava na aba Leads — que é a aba
+// que o Diego não abre. O problema nunca foi de dado, foi de onde o dado aparecia.
+function encaixesDeRota(avisos, appointments, agendaHistorico, services, customers, hojeISO_) {
+  const hoje = hojeISO_ || hojeISO();
+  // REGRA 7 DO RECADO (não duplicar): serviço que já ganhou compromisso VIVO saiu da espera — quem tem
+  // data real é compromisso, não encaixe. Some daqui sozinho, sem ninguém precisar desativar o aviso na
+  // mão; e quando o compromisso for cancelado de novo, ele volta. É a trava automática, não a disciplina.
+  const comCompromisso = new Set((appointments || []).map((a) => a.servico_id).filter(Boolean));
+  return (avisos || [])
+    .filter((av) => av.dominio === DOMINIO_ENCAIXE && av.ativo !== false)
+    .filter((av) => !av.expira_em || String(av.expira_em) >= hoje)
+    .map((av) => {
+      // `referencia_id` aponta pro COMPROMISSO CANCELADO no caso da Maria — o rastro de "tinha data, não
+      // deu" — mas pode perfeitamente apontar pro serviço. Aceitar as duas formas evita que o bloco
+      // dependa de o Classic escolher uma convenção que ele ainda não tem.
+      const ref = av.referencia_id || null;
+      const viaAgenda = ref ? [...(appointments || []), ...(agendaHistorico || [])].find((a) => a.id === ref) : null;
+      const servicoId = ref && (services || []).some((s) => s.id === ref) ? ref : viaAgenda?.servico_id || null;
+      const svc = servicoId ? (services || []).find((s) => s.id === servicoId) : null;
+      const cli = svc ? svc.clientes || (customers || []).find((c) => c.id === svc.cliente_id) : null;
+      // A região sai do CLIENTE, não do texto do aviso: dado duplicado diverge, e o aviso é escrito à mão.
+      // A CADEIA DE FALLBACK NÃO É ENFEITE — ela foi desenhada em cima do segundo caso real (Elizabeth,
+      // 08/09), cujo compromisso cancelado é ÓRFÃO: servico_id e cliente_id nulos. Sem cair no título e na
+      // cidade da própria linha da agenda, aquele cartão diria "caso sem cliente vinculado" e nenhuma
+      // região — inútil justo pra decidir rota. Perder o caso porque o vínculo quebrou seria reproduzir o
+      // defeito que este bloco existe pra corrigir, então ele aparece com o melhor nome disponível.
+      const tituloAgenda = String(viaAgenda?.titulo || "").replace(/^PROVIS[ÓO]RIO\s*—\s*/i, "").trim();
+      return { ...av, svc, servicoId, cliente: cli,
+        nome: cli?.nome || svc?.titulo || tituloAgenda || "Caso sem cliente vinculado",
+        regiao: cli?.cidade || viaAgenda?.cidade || "",
+        acao: String(svc?.proxima_acao || av.aviso || "").trim() };
+    })
+    .filter((e) => !(e.servicoId && comCompromisso.has(e.servicoId)))
+    .sort((a, b) => (PESO_AVISO[b.prioridade] || 0) - (PESO_AVISO[a.prioridade] || 0));
 }
 function analisarRotaDoDia(compromissos) {
   const paradas = (compromissos || [])
@@ -2718,7 +2797,11 @@ function Home() {
         // `local` entrou em 04/09: é ele que carrega o número (`whatsapp:<dígitos>`) de uma conversa que
         // virou envelope. Sem ele o app não consegue perceber triagem encerrada sem destino — ver
         // triagensSemDestino(). Continua sendo contexto de explicação, não uma segunda lista de agenda.
-        db.from("agenda").select("id,servico_id,status,titulo,data,local").neq("status", "planejado").order("data", { ascending: false }),
+        // `cidade` entrou em 08/09 pelo ENCAIXE DE ROTA: o caso da Elizabeth é um compromisso cancelado
+        // ÓRFÃO — servico_id e cliente_id nulos — então não há por onde chegar na região a não ser pela
+        // própria linha da agenda. Sem esta coluna o cartão apareceria sem dizer PRA ONDE é a viagem, que
+        // é a única informação que decide se o encaixe cabe na rota. Continua sendo contexto, não agenda.
+        db.from("agenda").select("id,servico_id,status,titulo,data,local,cidade").neq("status", "planejado").order("data", { ascending: false }),
         // ESTOQUE — para o card de Compras poder perguntar "isso você já tem?". A view é security_invoker,
         // então respeita a mesma trava de RLS do resto; sem autorização ela volta VAZIA em vez de dar erro,
         // e o app simplesmente deixa de sugerir — que é o comportamento de antes, não uma tela quebrada.
@@ -3395,7 +3478,7 @@ function Home() {
           A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
           e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
@@ -4270,16 +4353,20 @@ function contextoDeFluxo({ appointments, agendaHistorico, inbox, services }) {
 // trazer os ~20 pra cá afogaria os 8 que têm móvel parado esperando alguém.
 //
 // Serviço com remarcação aberta fica de fora: ele não está esquecido, está na fila da caixa esperando data.
-function ServicosSemProximoPassoCard({ services, appointments, agendaHistorico, inbox, onOpenFicha }) {
+function ServicosSemProximoPassoCard({ services, appointments, agendaHistorico, inbox, idsEncaixe, onOpenFicha }) {
   const parados = useMemo(() => {
     const ctx = contextoDeFluxo({ appointments, agendaHistorico, inbox, services });
     return (services || [])
       .map((s) => ({ s, fluxo: classificarFluxoServico(s, ctx) }))
       .filter((x) => x.fluxo.estado === "precisa_avancar")
+      // Serviço que está esperando ROTA não está parado — está numa espera decidida, com bloco próprio
+      // logo abaixo. Sem esta linha ele aparece aqui como "compromisso cancelado, precisa combinar nova
+      // data", que é a leitura errada do caso. Ver encaixesDeRota().
+      .filter((x) => !(idsEncaixe && idsEncaixe.has(x.s.id)))
       // Produção primeiro (peça na bancada, prazo correndo), depois agendado; dentro de cada um, prazo mais
       // apertado na frente. Mesma ordem da Capacidade, pra não ensinar duas leituras diferentes.
       .sort((a, b) => (a.s.status === "agendado") - (b.s.status === "agendado") || String(a.s.prazo || "9999").localeCompare(String(b.s.prazo || "9999")));
-  }, [services, appointments, agendaHistorico, inbox]);
+  }, [services, appointments, agendaHistorico, inbox, idsEncaixe]);
   if (!parados.length) return null;
   return <CardRecolhivel
     cabecalho={<><p className="kicker">PRECISA AVANÇAR</p>
@@ -4665,10 +4752,23 @@ function MateriaisCard({ services, today, estoque, onVerCompras }) {
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-function Dashboard({ inbox, services, appointments, agendaHistorico, finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
   const profissionais = nomesProfissionais(services);
+  // ENCAIXES DE ROTA calculados UMA vez, aqui, porque servem a dois consumidores: o bloco próprio e a
+  // exclusão no card "precisa avançar". Calcular o mesmo conceito duas vezes é exatamente como as telas
+  // divergem em silêncio — foi o motivo de soTexto() ter subido pro topo do arquivo em 03/09.
+  // Memoizado porque o `idsEncaixe` que sai dele entra na lista de dependências do card "precisa avançar":
+  // um Set recriado a cada render invalidaria aquele useMemo toda vez, e uma referência que nunca muda
+  // deixaria o card STALE quando um aviso fosse desativado. Memo aqui resolve os dois.
+  const encaixes = useMemo(() => encaixesDeRota(avisos, appointments, agendaHistorico, services, customers, today),
+    [avisos, appointments, agendaHistorico, services, customers, today]);
+  // POR QUE EXCLUIR DO "PRECISA AVANÇAR": o caso da Maria caía nos dois cards, e o de cima afirmava algo
+  // FALSO — "precisa combinar nova data". Não precisa: a data foi cancelada de propósito e o que falta é
+  // uma rota que passe por lá. Dois cards com a mesma cliente dando conselhos opostos é pior que o
+  // problema original; quem tem a leitura certa do caso é o bloco de encaixes, então ele fica com ele.
+  const idsEncaixe = useMemo(() => new Set(encaixes.map((e) => e.servicoId).filter(Boolean)), [encaixes]);
   // `appointments` já chega filtrado pela coleção central (compromissosOperacionais, calculada uma vez na
   // raiz) — compromisso com pendência de remarcação aberta nunca chega até aqui. Só resta separar por data.
   // ROTA × COBRANÇA (28/07/2026): a agenda só mostra o que tem hora/deslocamento. Cobrança sai daqui e vai
@@ -4849,7 +4949,7 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, finances, r
 <section className="metric-grid"><Metric label="Atrasados" value={atrasadosAll.length} detail="De dias anteriores, sem desfecho" tone="yellow" onClick={atrasadosAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
-    <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} onOpenFicha={onOpenFicha} />
+    <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
     <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
     <CaixaCard inbox={inbox} today={today} />
     {/* CONVERSA ENCERRADA SEM DESTINO — ver triagensSemDestino(). Fica recolhido e só existe quando há
@@ -4880,6 +4980,40 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, finances, r
         pela caixa, e o item já conta no badge da aba Caixa — o card só repetia isso ocupando o topo da tela
         que ele usa pra decidir o dia. A pendência continua protegida no banco (não pode ser excluída aberta,
         ver recusaSeForPendenciaAberta) e visível na fila; o que saiu foi só o aviso duplicado. */}
+    {/* ===== ENCAIXES DE ROTA (item ENCAIXES-ROTA-20260908) ===== */}
+    {/* FICA ANTES DO FILTRO presencial/remoto, DE PROPÓSITO: encaixe não tem tipo nem data, então ele não
+        pertence ao conjunto que aquele filtro governa — dentro dele, o Diego clicaria "⌖ Presencial" e o
+        bloco continuaria igual, que é como se ensina alguém a desconfiar do filtro. Fica colado no grupo
+        da agenda (é ali que ele bate o olho) sem fingir que é agenda.
+        E NÃO é recolhível: o recado pede explicitamente "sem ficar escondido por padrão", e item sem data
+        atrás de um "▸ abrir" é o mesmo esquecimento de antes com outra roupa. */}
+    {(() => {
+      if (!encaixes.length) return null;
+      // A próxima ação do serviço é escrita pelo Classic e vem em parágrafo; no Painel, no meio da rota,
+      // isso vira parede de texto. Mesmo critério do card de contas: corta e deixa a ficha contar o resto.
+      // O nome também corta: quando o vínculo é órfão ele vem do TÍTULO do compromisso, que é uma frase
+      // inteira ("Elizabeth — passar no Marlom Júnior para grampear embaixo os encostos e depois
+      // entregar"). Em negrito, no celular, isso ocupa três linhas antes de a região aparecer.
+      const curta = (t, n = 96) => (t.length > n ? t.slice(0, n - 3).trimEnd() + "…" : t);
+      return <section className="content-card">
+        <p className="kicker">ENCAIXES DE ROTA</p>
+        <h3 style={{ margin: "0 0 5px" }}>📍 {encaixes.length} caso(s) esperando uma rota compatível</h3>
+        <span className="ficha-note" style={{ display: "block", margin: "0 0 12px" }}>Sem data marcada de propósito: a ida isolada não compensa. Quando fechar rota pra região, encaixa.</span>
+        {/* SEM `funil-dir` NESTE CARD, medido no A23 (360px): a `status-pill` "AGUARDANDO ROTA" é uppercase
+            e sobe pra 13px no celular — comia 164px de um cartão de 292 e espremia nome, região e ação em
+            86px. Não havia estouro de página, então o teste de largura sozinho passava; o defeito era a
+            PROPORÇÃO. A informação não se perdeu: ela virou o sufixo da linha da região, que é onde ela
+            responde a pergunta ("por que isso não tem data?") sem disputar espaço com o conteúdo. */}
+        <div className="funil-lista">{encaixes.map((e) => <article className={`funil-item${e.svc ? ` st-${e.svc.status}` : ""}`} key={e.id}
+          onClick={e.cliente?.id && onOpenFicha ? () => onOpenFicha(e.cliente.id) : undefined}>
+          <div className="funil-esq">
+            <strong>{curta(e.nome, 48)}</strong>
+            <span>{e.regiao || "Região não informada"} · aguardando rota</span>
+            <em>→ {curta(e.acao) || "Encaixar em próxima rota compatível"}</em>
+          </div>
+        </article>)}</div>
+      </section>;
+    })()}
     {(atrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}</div>}
     {(() => {
       // CONTA CHEGANDO: entra sozinho no Painel na véspera do vencimento (e fica enquanto estiver vencida),
