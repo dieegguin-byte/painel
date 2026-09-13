@@ -639,6 +639,10 @@ const demoServices = [
   // ele não entra em Atrasados nem em Hoje, e o único lugar que o mostrava era a aba Leads.
   { id: "s7", cliente_id: "c4", titulo: "Retorno pós-serviço — verificar sofá", status: "agendado", prioridade: "media", clientes: demoCustomers[3],
     proxima_acao: "Encaixar a visita técnica de Maria / Seu Santana em uma próxima rota compatível para o Sudoeste/DF. Não criar data isolada agora; antes do deslocamento, confirmar endereço/localização exata." },
+  // s8 = O CASO DA DULCE (13/09/2026): em produção com prazo vencido há mais de um mês e nada acontecendo — o
+  // sofá já tinha sido entregue e ninguém fechou. Sem compromisso nem lançamento de propósito: é o silêncio
+  // que a Capacidade tem que apontar como "parado, talvez já entregue". Data relativa pra nunca envelhecer.
+  { id: "s8", cliente_id: "c2", titulo: "Reforma de sofá", status: "producao", prioridade: "media", responsavel: "Marlom Júnior", proxima_acao: "Confirmar tecido/metragem comprados", prazo: somarDias(hojeISO(), -34), valor_orcamento: 2160, clientes: demoCustomers[1] },
 ];
 // As duas primeiras usam data RELATIVA ao dia em que a demo é aberta. Com data fixa, a
 // demonstração abria sempre com "nada marcado para hoje" — que é justamente o bloco mais
@@ -685,6 +689,12 @@ const demoFinance = [
   { id: "f6", tipo: "saida", escopo: "empresa", categoria: "Mão de obra", valor: 200, descricao: "Mão de obra - Marcão · Entregou o móvel", status: "a_pagar", data: "2026-07-14", servico_id: null },
   { id: "f7", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 150, descricao: "Vale - Marcão · adiantamento pedido no sábado, abater no próximo acerto", status: "pago", data: "2026-07-13", servico_id: null },
   { id: "f8", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 80, descricao: "[ABATIDO] Vale - Marcão · conserto do compressor", status: "pago", data: "2026-07-05", servico_id: null },
+  // PRÓ-LABORE NO FORMATO REAL (13/09): cada retirada é um PAR — saída da empresa + entrada pessoal — e o dízimo
+  // sai do pessoal. Data de hoje porque o Financeiro abre no mês corrente. Sem estas linhas a demo não prova
+  // nem a aba Pró-labore nem que "Em caixa hoje (empresa)" ignora o dinheiro pessoal.
+  { id: "f9", tipo: "saida", escopo: "empresa", categoria: "Retirada de pró-labore", valor: 300, descricao: "Retirada de pró-labore via Pix", status: "pago", data: hojeISO(), servico_id: null },
+  { id: "f10", tipo: "entrada", escopo: "pessoal", categoria: "Pró-labore", valor: 300, descricao: "Pró-labore recebido via Pix", status: "pago", data: hojeISO(), servico_id: null },
+  { id: "f11", tipo: "saida", escopo: "pessoal", categoria: "Dízimo", valor: 30, descricao: "Dízimo de 10% sobre o pró-labore", status: "pago", data: hojeISO(), servico_id: null },
 ];
 // DÍVIDAS — o caso real da Raquel (86a1e367) na forma: aberta com parte paga. A quitada está aqui DE
 // PROPÓSITO: a demo tem que provar que dívida quitada não aparece como aberta (critério 5 do recado de 13/09).
@@ -892,8 +902,10 @@ function comTituloVisivel(appointments, pessoais) {
     if (!p) return a; // sem vínculo pessoal o card mostra o que sempre mostrou. Nada de inventar.
     const titulo = (p.titulo || "").trim();
     const detalhe = (p.descricao || "").trim();
-    if (!titulo && !detalhe) return a;
-    return { ...a, titulo_visivel: titulo && titulo !== a.titulo ? titulo : undefined, detalhe_visivel: detalhe || undefined };
+    // `pessoal` (13/09): o registro inteiro vai junto, derivado como os outros dois — o card de compromisso mostra
+    // tudo sem ir buscar em outro lugar. Nunca é gravado: quem grava lê `titulo`, não o objeto.
+    if (!titulo && !detalhe) return { ...a, pessoal: p };
+    return { ...a, titulo_visivel: titulo && titulo !== a.titulo ? titulo : undefined, detalhe_visivel: detalhe || undefined, pessoal: p };
   });
 }
 // LEMBRETE PESSOAL SEM HORA NÃO VIRA BLOQUEIO — E SUMIA DO DIA (adendo de 02/09 ao recado de 29/08).
@@ -919,7 +931,7 @@ function pessoaisNaFila(pessoais, appointments) {
       // item não dispara aviso de rota nem conta como parada. O preço é sair do filtro ⌖/◌ do Painel, que
       // é o certo: aqueles dois botões filtram rota de trabalho.
       tipo: "pessoal", impacto_operacao: p.impacto_operacao,
-      detalhe_visivel: (p.descricao || "").trim() || undefined,
+      detalhe_visivel: (p.descricao || "").trim() || undefined, pessoal: p,
     }));
 }
 function parseInbox(raw = "") {
@@ -3859,6 +3871,30 @@ async function compartilharGPT(texto, aviso) {
   }
 }
 
+// O REGISTRO PESSOAL INTEIRO DENTRO DO COMPROMISSO (recado de 08/09/2026, caso "Ligar para clínica — exame da
+// minha mãe"). O card mostrava só a descrição e mandava ir ao card Pessoais pro resto; sem descrição, abria
+// vazio de sentido. Mesmos rótulos do card Pessoais, pra não ensinar duas leituras. Só leitura: concluir e
+// remarcar continuam no card Pessoais, que é o dono do fato.
+const IMPACTO_PESSOAL_ROTULO = { BLOQUEIA_DISPONIBILIDADE: "⛔ Bloqueia a agenda", A_CONFIRMAR: "? Impacto a confirmar", SEM_IMPACTO: "Não bloqueia a agenda" };
+function PessoalDetalhe({ p, a, today }) {
+  if (!p) return null;
+  const quando = [p.data_alvo ? compactDate(p.data_alvo) : "sem data", p.hora ? String(p.hora).slice(0, 5) : "sem horário", p.cidade].filter(Boolean).join(" · ");
+  const linhas = [];
+  if (p.titulo) linhas.push(["O QUE É", p.titulo]);
+  if (p.descricao) linhas.push(["DETALHES", p.descricao]);
+  linhas.push(["QUANDO", quando]);
+  // Bloqueio da agenda em outra data que o registro pessoal: acontece quando alguém remarca um lado só. Dizer
+  // aqui é o único jeito de ele perceber — o card mostra a data da agenda no cabeçalho.
+  if (a && !a.pessoal_virtual && p.data_alvo && a.data !== p.data_alvo) linhas.push(["⚠ DATA DIFERENTE", `a agenda está em ${compactDate(a.data)}, o registro pessoal em ${compactDate(p.data_alvo)}`]);
+  linhas.push(["SITUAÇÃO", pessoalAtrasado(p, today) ? "⚠ ATRASADO" : (p.status || "—")]);
+  linhas.push(["IMPACTO", IMPACTO_PESSOAL_ROTULO[p.impacto_operacao] || p.impacto_operacao || "não informado"]);
+  if (Number(p.remarcacoes) > 0) linhas.push(["REMARCADO", `${p.remarcacoes}x${p.remarcado_de ? " · antes era " + compactDate(p.remarcado_de) : ""}`]);
+  if (p.referencia_origem) linhas.push(["DE ONDE VEIO", p.referencia_origem]);
+  return <div className="compromisso-info">{linhas.map(([rotulo, texto]) => <React.Fragment key={rotulo}>
+    <span className="ci-label">{rotulo}</span><strong>{texto}</strong>
+  </React.Fragment>)}</div>;
+}
+
 function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais }) {
   const [aberto, setAberto] = useState(false);
   // Sem `notify` aqui (o card não recebe a prop) — o aviso da cópia vive no próprio card.
@@ -3868,7 +3904,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   // escrever; um botão que não tem o que gravar é pior que botão nenhum. Quem encerra ou remarca é o card
   // Pessoais, que é o dono do fato. Este card existe pra ele enxergar o dia inteiro num lugar só.
   if (a.pessoal_virtual) return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}`}>
-    <div className="compromisso-cab" style={{ cursor: "default" }}>
+    <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
         <span>{compactDate(a.data)}</span>
@@ -3878,8 +3914,12 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         <strong>{a.titulo || "Compromisso pessoal"}</strong>
         <span>{a.cidade || "pessoal"}</span>
       </span>
-    </div>
-    <p className="compromisso-material">⛔ Pessoal{a.detalhe_visivel ? ` · ${a.detalhe_visivel}` : ""}{a.hora ? "" : " · sem hora marcada, por isso não bloqueia horário na agenda"}. Concluir ou remarcar é no card Pessoais.</p>
+      <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
+    </button>
+    <p className="compromisso-material">⛔ Pessoal{a.hora ? "" : " · sem hora marcada, por isso não bloqueia horário na agenda"}. Concluir ou remarcar é no card Pessoais.</p>
+    {aberto && <div className="compromisso-corpo">{a.pessoal
+      ? <PessoalDetalhe p={a.pessoal} a={a} today={today} />
+      : a.detalhe_visivel && <p className="compromisso-material">{a.detalhe_visivel}</p>}</div>}
   </article>;
   // A sugestão GRAVADA vence sempre: ela nasce da conversa real, com julgamento comercial.
   // Só quando ela falta é que o app escreve — e apenas se provar que o interlocutor é o cliente.
@@ -3998,7 +4038,8 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   // Só entra o que existe — linha vazia com rótulo bonito é ruído, e ele lê isso dirigindo.
   const materialPendente = (svc?.materiais_necessarios || []).filter((m) => !m.arquivado && !m.comprado);
   const instrucoes = [];
-  if (oQueFazer) instrucoes.push(["O QUE FAZER", oQueFazer]);
+  // Pessoal já diz "O QUE É" no bloco do registro (PessoalDetalhe); repetir o título aqui é ruído lido dirigindo.
+  if (oQueFazer && !a.pessoal) instrucoes.push(["O QUE FAZER", oQueFazer]);
   if (svc?.titulo && svc.titulo !== oQueFazer && svc.titulo !== a.titulo) instrucoes.push(["SERVIÇO", svc.titulo]);
   if (materialPendente.length) instrucoes.push(["MATERIAL QUE FALTA",
     materialPendente.map((m) => m.item + (m.pedido ? " (já pedido)" : "")).join(" · ")
@@ -4027,7 +4068,9 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
           propósito — "a operação só precisa saber que o horário não está livre". Só que quem lê a agenda é
           o próprio Diego, e ele estava vendo "Compromisso pessoal" às 14h sem saber que era o parafuso do
           banco do carro. Decisão dele: pessoal tem que ser legível em todo lugar do app. */}
-      {a.pessoal_id && <p className="compromisso-material">⛔ Pessoal — você está indisponível neste horário{a.detalhe_visivel ? ` · ${a.detalhe_visivel}` : ""}. O registro completo está no card Pessoais.</p>}
+      {/* MUDOU DE NOVO EM 13/09 (recado de 08/09): o registro completo vem aqui dentro, não "no card Pessoais". */}
+      {a.pessoal_id && <p className="compromisso-material">⛔ Pessoal — você está indisponível neste horário{!a.pessoal && a.detalhe_visivel ? ` · ${a.detalhe_visivel}` : ""}. Concluir ou remarcar é no card Pessoais.</p>}
+      {a.pessoal && <PessoalDetalhe p={a.pessoal} a={a} today={today} />}
       {!!(materiais || []).length && <p className="compromisso-material">⚑ Aproveitar para o material: {(materiais || []).map((m) => m.descricao || "material").join(" · ")}</p>}
       {/* CONTATO IMPOSSÍVEL: o app mandava "tentar contato de novo" sem existir telefone na ficha, e o Diego
           ficou perguntando "cadê o WhatsApp" desde 16/07 sem resposta (caso real; havia até cliente com ENTREGA marcada e
@@ -4551,7 +4594,14 @@ function RetornosVencidosCard({ services, today, onVerLeads, onOpenFicha, notify
 
 const SEM_PROFISSIONAL = "Sem profissional atribuído";
 // PAINEL: capacidade por profissional - clica no nome pra ver os servicos dele (mesmo padrao da Agenda: colapsado, expande no clique)
-function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, onChanged }) {
+// SERVIÇO FANTASMA NA CAPACIDADE (13/09/2026). O Diego viu a Dulce aqui "já entregue" — e o banco concordava com a
+// tela: `producao`, prazo 10/08, último movimento 26/08. Não era a tela atrasada (o realtime funciona), era a
+// entrega que ninguém fechou. O app não tem como saber que o sofá saiu da oficina, mas percebe o SILÊNCIO: prazo
+// vencido há 10+ dias E nenhum compromisso (planejado, feito ou cancelado) nem lançamento há 10+ dias. Medido em
+// 13/09: pega Dulce, Carla, Dona Neide, Tais, Léo e Henrique, e deixa de fora quem tem coisa acontecendo (Maria
+// do Seu Santana, cancelado há 4 dias). Só AVISA: fechar entrega pede valor e recebimento, e isso não se deduz.
+const DIAS_SEM_MOVIMENTO_CAPACIDADE = 10;
+function CapacidadeCard({ services, finances, fornecedores, appointments, agendaHistorico, db, demo, notify, onChanged }) {
   const [aberto, setAberto] = useState(null);
   const [entregando, setEntregando] = useState(null);
   const [valorDraft, setValorDraft] = useState("");
@@ -4652,15 +4702,31 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
     (services || []).forEach((s) => { if (["agendado", "producao"].includes(s.status)) { const k = s.responsavel?.trim() || SEM_PROFISSIONAL; (map[k] ||= []).push(s); } });
     return map;
   }, [services]);
+  const ultimaAtividade = useMemo(() => {
+    const m = {};
+    const marca = (id, d) => { if (id && d && (!m[id] || d > m[id])) m[id] = d; };
+    (appointments || []).forEach((a) => marca(a.servico_id, a.data));
+    (agendaHistorico || []).forEach((a) => marca(a.servico_id, a.data));
+    (finances || []).forEach((f) => marca(f.servico_id, f.data));
+    return m;
+  }, [appointments, agendaHistorico, finances]);
+  const limiteSilencio = somarDias(hojeISO(), -DIAS_SEM_MOVIMENTO_CAPACIDADE);
+  const parado = (s) => {
+    if (!s.prazo || s.prazo >= limiteSilencio) return null;
+    const ult = ultimaAtividade[s.id] || null;
+    return ult && ult >= limiteSilencio ? null : { ult };
+  };
   // "Sem profissional" fica sempre por último, mesmo sendo o maior grupo - é pendência, não capacidade.
   const nomes = Object.entries(porProfissional).sort((a, b) => (a[0] === SEM_PROFISSIONAL) - (b[0] === SEM_PROFISSIONAL) || b[1].length - a[1].length);
   if (!nomes.length) return null;
   // FECHADO ELE AINDA RESPONDE "QUEM ESTÁ COM O QUÊ": a linha de resumo leva nome e quantidade de cada um,
   // que é a pergunta que traz ele a este card. Abrir é pra ver QUAIS serviços.
   const ativosTotal = nomes.reduce((n, [, lista]) => n + lista.length, 0);
+  // Fechado, o card também tem que dizer que há fantasma — foi fechado que o Diego "nem viu direito".
+  const paradosTotal = nomes.reduce((n, [, lista]) => n + lista.filter(parado).length, 0);
   return <CardRecolhivel
     cabecalho={<><p className="kicker">CAPACIDADE</p><h3>{ativosTotal} serviço(s) com profissional</h3>
-      <span className="ficha-note" style={{ margin: 0 }}>{nomes.map(([nome, lista]) => `${nome === SEM_PROFISSIONAL ? "⚠ sem dono" : nome} ${lista.length}`).join(" · ")}</span></>}>
+      <span className="ficha-note" style={{ margin: 0 }}>{nomes.map(([nome, lista]) => `${nome === SEM_PROFISSIONAL ? "⚠ sem dono" : nome} ${lista.length}`).join(" · ")}{paradosTotal ? ` · ⚠ ${paradosTotal} parado(s), talvez já entregue(s)` : ""}</span></>}>
     <div className="capacidade-profissionais">{nomes.map(([nome, lista]) => { const isAberto = aberto === nome; return <div className={`capacidade-item${isAberto ? " active" : ""}`} key={nome}>
       <button type="button" className="capacidade-item-head" onClick={() => setAberto(isAberto ? null : nome)}>
         <span>{nome === SEM_PROFISSIONAL ? "⚠ " + nome : nome}</span><b>{lista.length} ativo{lista.length > 1 ? "s" : ""}</b><i>{isAberto ? "▲" : "▼"}</i>
@@ -4670,6 +4736,7 @@ function CapacidadeCard({ services, finances, fornecedores, db, demo, notify, on
           não começou. Dentro de cada grupo, prazo mais apertado primeiro. */}
       {isAberto && <div className="capacidade-item-corpo">{[...lista].sort((a, b) => (a.status === "agendado") - (b.status === "agendado") || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999"))).map((s) => <div className="capacidade-servico" key={s.id}>
         <strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span><em>{situacaoNaOficina(s)}{s.prazo ? " · " + prazoComRotulo(s) : ""}</em>
+        {parado(s) && <em>⚠ {parado(s).ult ? `Nada se mexe desde ${compactDate(parado(s).ult)}` : "Nenhum compromisso nem lançamento registrado"} e o prazo venceu — pode já ter sido entregue sem fechar.</em>}
         {esperandoMaterial(s) && <div className="material-pendente">
           <em>⏳ Esperando material{s.loja_material ? " · " + s.loja_material : ""} — o profissional não começa sem ele.</em>
           {/* Dizer O QUE falta economiza uma ida à aba Compras só pra lembrar. */}
@@ -5016,7 +5083,7 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, fin
     com a tela dela. Contador que leva pra uma tela que não existe mais só quebraria no toque. */}
 <section className="metric-grid"><Metric label="Atrasados" value={atrasadosAll.length} detail="De dias anteriores, sem desfecho" tone="yellow" onClick={atrasadosAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
-    <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
+    <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} appointments={appointments} agendaHistorico={agendaHistorico} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
     <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
     <CaixaCard inbox={inbox} today={today} />
@@ -5762,7 +5829,15 @@ function FinanceView({ finances, dividas, services, db, demo, mode, notify, onCh
   const totalAReceber = resumo.aReceber.reduce((s, f) => s + Number(f.valor), 0);
   // A lista de baixo obedece o card selecionado. Só o "A receber" troca o componente inteiro (tem botão de
   // dar baixa); entrada/saída são o mesmo formato de linha, só filtrado.
-  const noFoco = foco === "entrada" ? visiveis.filter((i) => i.tipo === "entrada") : foco === "saida" ? visiveis.filter((i) => i.tipo === "saida") : visiveis;
+  // ABA PRÓ-LABORE NÃO É CARTEIRA (recado de 13/09/2026). Ela reaproveitava os quatro cards genéricos e mostrava
+  // números sem sentido: Saídas R$ 0,00, A receber R$ 7.748 (dinheiro de CLIENTE) e um "Em caixa hoje" somado
+  // do histórico da categoria — mas parte do pró-labore sai em dinheiro, parte em Pix, e nada disso é uma conta.
+  // Pró-labore é um fluxo empresa → sócio: a aba responde só "quanto eu tirei neste mês". Gastos pessoais e
+  // dízimo continuam na aba Pessoal; caixa real continua na Empresa. Foco preso em Saídas ou A receber, vindo
+  // de outra aba, cai pra lista normal aqui, senão a lista de baixo mostraria o que o card de cima não mostra.
+  const ehProLabore = aba === "pro_labore";
+  const focoAtivo = ehProLabore && (foco === "saida" || foco === "receber") ? "todos" : foco;
+  const noFoco = focoAtivo === "entrada" ? visiveis.filter((i) => i.tipo === "entrada") : focoAtivo === "saida" ? visiveis.filter((i) => i.tipo === "saida") : visiveis;
   return <div className="page-grid"><div className="funil-filtros">{FINANCE_ABAS.map((a) => <button key={a.id} className={aba === a.id ? "active" : ""} onClick={() => setAba(a.id)}>{a.label}</button>)}</div>
     <div className="mes-nav">
       <button type="button" className="ghost" onClick={() => andarMes(-1)} disabled={!mesSel} title="Mês anterior">‹</button>
@@ -5778,15 +5853,17 @@ function FinanceView({ finances, dividas, services, db, demo, mode, notify, onCh
     {!!dividasAbertas.length && <p className="ficha-note">{money(totalDividas)} em {dividasAbertas.length} dívida(s) em aberto, sem vencimento
       {onVerAPagar && <> · <button type="button" className="ficha-link" onClick={onVerAPagar}>ver em A pagar</button></>}</p>}
     {/* 4 CARDS CLICÁVEIS. O de "A receber" é amarelo de propósito: é o único que NÃO é dinheiro no caixa. */}
-    <section className="metric-grid finance-metrics">
+    {ehProLabore ? <section className="metric-grid finance-metrics">
+      <Metric label={mesSel ? "Pró-labore do mês" : "Pró-labore — todo o histórico"} value={money(paidIn)} detail={`${visiveis.length} retirada(s) · gastos pessoais e dízimo ficam na aba Pessoal`} tone="green" />
+    </section> : <section className="metric-grid finance-metrics">
       <Metric label="Entradas" value={money(paidIn)} detail={foco === "entrada" ? "▾ mostrando só estas" : "Confirmadas · toque para ver"} tone="green" onClick={() => setFoco(foco === "entrada" ? "todos" : "entrada")} />
       <Metric label="Saídas" value={money(paidOut)} detail={foco === "saida" ? "▾ mostrando só estas" : "Confirmadas · toque para ver"} tone="red" onClick={() => setFoco(foco === "saida" ? "todos" : "saida")} />
       <Metric label={mesSel ? "Resultado do mês" : "Saldo"} value={money(paidIn - paidOut)} detail={mesSel ? `Em caixa hoje (empresa): ${money(caixaEmpresa)}` : (foco === "todos" ? "▾ tudo que já aconteceu" : "Toque para ver tudo")} tone="orange" onClick={() => setFoco("todos")} />
       <Metric label="A receber" value={money(totalAReceber)} detail={foco === "receber" ? "▾ ainda fora do caixa" : `${resumo.aReceber.length} saldo(s) · toque para ver`} tone="yellow" onClick={() => setFoco(foco === "receber" ? "todos" : "receber")} />
-    </section>
-    {foco === "receber"
+    </section>}
+    {focoAtivo === "receber"
       ? <AReceberBloco finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={onChanged} />
-      : <section className="content-card"><div className="card-head"><div><p className="kicker">DIEGO E CLAUDE · MESMA OPERAÇÃO TIPADA</p><h3>{foco === "entrada" ? "Entradas confirmadas" : foco === "saida" ? "Saídas confirmadas" : "Lançamentos realizados"}</h3></div></div>{noFoco.map((item) => <div className="finance-row" key={item.id}><div><strong>{descricaoFinanceiraVisivel(item.descricao) || item.categoria || "Lançamento"}</strong><span>{compactDate(item.data)} · {item.status || "pago"}</span></div><b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b></div>)}{!noFoco.length && <div className="empty-state"><b>{mesSel ? `Nenhum lançamento em ${mesLabel(mesSel)}.` : "Nada por aqui ainda."}</b>{mesSel && <span>Use as setas pra ver outro mês, ou “Ver tudo”.</span>}</div>}</section>}</div>;
+      : <section className="content-card"><div className="card-head"><div><p className="kicker">DIEGO E CLAUDE · MESMA OPERAÇÃO TIPADA</p><h3>{ehProLabore ? "Retiradas de pró-labore" : focoAtivo === "entrada" ? "Entradas confirmadas" : focoAtivo === "saida" ? "Saídas confirmadas" : "Lançamentos realizados"}</h3></div></div>{noFoco.map((item) => <div className="finance-row" key={item.id}><div><strong>{descricaoFinanceiraVisivel(item.descricao) || item.categoria || "Lançamento"}</strong><span>{compactDate(item.data)} · {item.status || "pago"}</span></div><b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b></div>)}{!noFoco.length && <div className="empty-state"><b>{mesSel ? `Nenhum lançamento em ${mesLabel(mesSel)}.` : "Nada por aqui ainda."}</b>{mesSel && <span>Use as setas pra ver outro mês, ou “Ver tudo”.</span>}</div>}</section>}</div>;
 }
 
 function nomeFornecedorVale(descricao) {
