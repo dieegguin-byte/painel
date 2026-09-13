@@ -686,6 +686,13 @@ const demoFinance = [
   { id: "f7", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 150, descricao: "Vale - Marcão · adiantamento pedido no sábado, abater no próximo acerto", status: "pago", data: "2026-07-13", servico_id: null },
   { id: "f8", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 80, descricao: "[ABATIDO] Vale - Marcão · conserto do compressor", status: "pago", data: "2026-07-05", servico_id: null },
 ];
+// DÍVIDAS — o caso real da Raquel (86a1e367) na forma: aberta com parte paga. A quitada está aqui DE
+// PROPÓSITO: a demo tem que provar que dívida quitada não aparece como aberta (critério 5 do recado de 13/09).
+const demoDividas = [
+  { id: "d1", credor: "Raquel", valor_original: 1672.89, valor_pago: 183, descricao: "Saldo consolidado a devolver", status: "aberta", criado_em: "2026-09-11T16:14:58Z" },
+  { id: "d2", credor: "Plástico e Tal", valor_original: 2000, valor_pago: 0, descricao: "Dívida com fornecedor", status: "aberta", criado_em: "2026-08-20T10:00:00Z" },
+  { id: "d3", credor: "Fornecedor antigo", valor_original: 500, valor_pago: 500, descricao: "Já paga — não pode aparecer", status: "quitada", criado_em: "2026-07-01T10:00:00Z" },
+];
 // Três casos de propósito: um pendente no futuro, um que a data já passou (tem que virar ATRASADO sozinho,
 // sem ninguém escrever nada) e um concluído, que prova que Concluir não apaga.
 const demoPessoais = [
@@ -2453,12 +2460,22 @@ function urlWaze(destino) {
 // Tirar a linha do `package` faz o Android perguntar qual app usar quando os dois estiverem instalados;
 // é o plano B se o Business não for o certo.
 const WHATSAPP_PACOTE = "com.whatsapp.w4b";
+// EXCEÇÃO POR NÚMERO (recado de 08/09/2026). A conversa da Sabrina (+55 61 99603-1000) começou no OUTRO
+// WhatsApp do Diego, o comum — forçar o Business nela abre conversa vazia no app errado. É uma lista de
+// números, não uma configuração: o padrão continua Business pra todo o resto, que é o que o recado pede.
+// Número no formato de `telefoneWhatsapp` (DDD + 9 dígitos, sem o 55); a comparação tira o 55 se vier.
+const WHATSAPP_COMUM_POR_NUMERO = new Set(["61996031000"]);
+function pacoteWhatsapp(tel) {
+  const d = String(tel || "").replace(/\D/g, "");
+  const semPais = d.length > 11 && d.startsWith("55") ? d.slice(2) : d;
+  return WHATSAPP_COMUM_POR_NUMERO.has(semPais) ? "com.whatsapp" : WHATSAPP_PACOTE;
+}
 function urlWhatsapp(tel, texto) {
   const numero = `55${tel}`;
   const web = `https://wa.me/${numero}${texto ? "?text=" + encodeURIComponent(texto) : ""}`;
   if (!ehAndroid()) return web;
   const qs = `phone=${numero}${texto ? "&text=" + encodeURIComponent(texto) : ""}`;
-  return `intent://send?${qs}#Intent;scheme=whatsapp;package=${WHATSAPP_PACOTE};S.browser_fallback_url=${encodeURIComponent(web)};end`;
+  return `intent://send?${qs}#Intent;scheme=whatsapp;package=${pacoteWhatsapp(tel)};S.browser_fallback_url=${encodeURIComponent(web)};end`;
 }
 function horarioApertado(h, outros, cidadeNova) { return (outros || []).some((a) => Math.abs(minutosDoHorario(h) - minutosDoHorario(a.hora)) < tempoEstradaMin(cidadeNova, a.cidade) + DURACAO_SERVICO_MIN); }
 // IGREJA É COMPROMISSO, NÃO "HORÁRIO VAZIO". Seg/qua/sex às 18h30. O que trava não é a hora do serviço, é a
@@ -2727,6 +2744,9 @@ function Home() {
   const [fornecedores, setFornecedores] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [avisos, setAvisos] = useState([]);
+  // DÍVIDAS (recado de 13/09/2026, caso Raquel R$ 1.489,89). Obrigação viva sem vencimento — não é linha de
+  // financeiro. Até aqui o app nunca lia a tabela: a dívida existia certa no banco e invisível na tela.
+  const [dividas, setDividas] = useState([]);
   // DOMÍNIO PESSOAIS (item APP-PESSOAIS-CARD-20260824-2145) — vive na mesma tela por conveniência dele,
   // mas é outro domínio: não entra em cliente, serviço, financeiro nem em nenhum indicador da Tapeçaria.
   const [pessoais, setPessoais] = useState([]);
@@ -2792,6 +2812,8 @@ function Home() {
     // Avisos entram no pacote (e no cache offline) pelo mesmo motivo do estoque: a decisão de encaixar um
     // compromisso na rota acontece na estrada, muitas vezes sem sinal.
     setAvisos(p.avisos || []);
+    // Dívidas entram no pacote (e no cache offline): sem sinal, a dívida não pode sumir e parecer quitada.
+    setDividas(p.dividas || []);
     // Distâncias não são estado de tela — alimentam tempoEstradaMin, que é função pura. Entram no pacote
     // pra virem junto no cache offline: sem sinal a trava de rota continua com os tempos aprendidos.
     aplicarDistanciasDoBanco(p.distancias);
@@ -2799,13 +2821,13 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setDividas(demoDividas); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
-    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, firstError;
+    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, firstError;
     try {
-      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av] = await Promise.all([
+      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
@@ -2842,13 +2864,20 @@ function Home() {
         // marcar compromisso precisa ver ANTES de marcar. Só os ativos e só os que ainda não expiraram —
         // aviso vencido é ruído, e ruído faz ele parar de ler o aviso que importa.
         db.from("avisos_operacionais").select("id,dominio,aviso,prioridade,expira_em,referencia_id").eq("ativo", true),
+        // DÍVIDAS: tudo que não está quitado. Filtro por EXCLUSÃO, não por igualdade com "aberta" — um status
+        // que alguém invente amanhã (ou nulo) tem que APARECER com o nome dele, não sumir como os tipos de
+        // agenda sumiam do filtro Presencial/Remoto. Volume minúsculo: 6 linhas em 13/09.
+        db.from("dividas").select("id,credor,valor_original,valor_pago,descricao,status,criado_em,atualizado_em").or("status.is.null,status.neq.quitada").order("criado_em", { ascending: true }),
       ]);
       // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
       // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
       // sozinha, o certo é o app abrir normal — e não cair na tela de offline por causa de tabela acessória.
       // `av` entra na mesma categoria de `ds`/`es`: aviso é camada de apoio. Se a Caixa falhar sozinha o
       // app abre normal e deixa de avisar — nunca cai em tela de offline por causa dela.
-      firstError = [cx, cl, sv, ag, fn, rt, fo, ps].find((result) => result.error)?.error;
+      // `dv` ENTRA na conta, ao contrário de `ds`/`es`/`av`: dívida não é camada de apoio. Se a consulta falhasse
+      // sozinha e o app abrisse normal com a lista vazia, a tela voltaria a dizer "você não deve nada" — o
+      // defeito de 13/09. Melhor cair no cache offline, que pelo menos avisa a idade dos dados.
+      firstError = [cx, cl, sv, ag, fn, rt, fo, ps, dv].find((result) => result.error)?.error;
     } catch (e) { firstError = e; }
     // SEM SINAL: em vez de tela vazia, abre com a última carga guardada e avisa a idade dela.
     if (firstError) {
@@ -2857,7 +2886,7 @@ function Home() {
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
     setOfflineDesde(null);
-    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [] };
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [] };
     aplicarPacote(pacote);
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
@@ -2881,6 +2910,10 @@ function Home() {
   // Ficaram DE FORA `fornecedores` (1), `rotinas` (0), `estoque_movimentos` (0), `distancias`,
   // `profissionais` e `dividas`: publicar tabela parada não deixa o app mais vivo, só põe mais uma
   // inscrição no socket de um celular que trabalha no 4G. Elas continuam vindo no Atualizar.
+  // ⚠ CORRIGIDO EM 13/09: para `dividas` a frase acima era FALSA — o loadAll nem consultava a tabela, então
+  // "vir no Atualizar" nunca aconteceu (caso Raquel). Agora consulta, e segue fora do socket de propósito:
+  // pagar ou abater uma dívida grava linha em `financeiro`, que está no socket e dispara o mesmo loadAll.
+  // Dívida NOVA sem movimento aparece na próxima recarga (Atualizar, voltar ao app, evento de outra tabela).
   //
   // O EVENTO É GATILHO, NÃO PATCH. Recebido o `postgres_changes`, o app RECARREGA pelo mesmo `loadAll`
   // de sempre em vez de aplicar o INSERT/UPDATE/DELETE no estado React. Isso é de propósito e é o que
@@ -3516,9 +3549,9 @@ function Home() {
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
       {tab === "leads" && <LeadsView services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} inbox={inbox} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
-      {tab === "financeiro" && <FinanceView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
+      {tab === "financeiro" && <FinanceView finances={finances} dividas={dividas} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
-      {tab === "futuro" && <FuturoView finances={finances} services={activeServices} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
+      {tab === "futuro" && <FuturoView finances={finances} dividas={dividas} services={activeServices} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "vales" && <ProfissionaisView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
@@ -5681,7 +5714,7 @@ function AgendaPicker({ appointments, appt, onClose, onPicked }) {
 }
 
 const FINANCE_ABAS = [{ id: "todos", label: "Todos" }, { id: "empresa", label: "Empresa" }, { id: "pro_labore", label: "Pró-labore" }, { id: "pessoal", label: "Pessoal" }];
-function FinanceView({ finances, services, db, demo, mode, notify, onChanged, onVerAPagar }) {
+function FinanceView({ finances, dividas, services, db, demo, mode, notify, onChanged, onVerAPagar }) {
   const [aba, setAba] = useState("todos");
   // FOCO = qual card do topo está selecionado. Diego (29/07): "entradas saídas e saldo ali dá pra fazer
   // outro card como a receber, e todos clicáveis levando a eles". O número parado não servia pra nada —
@@ -5714,7 +5747,13 @@ function FinanceView({ finances, services, db, demo, mode, notify, onChanged, on
   const visiveis = mesSel ? daAba.filter((item) => mesISO(item.data) === mesSel) : daAba;
   // O saldo em CAIXA nunca é do mês — é o acumulado. Mostrar só o resultado do mês no card grande faria ele
   // achar que tem menos dinheiro do que tem. Os dois números convivem: resultado do mês em cima, caixa embaixo.
-  const caixaAcumulado = daAba.reduce((soma, i) => soma + (i.tipo === "entrada" ? Number(i.valor) : -Number(i.valor)), 0);
+  // E NUNCA É DA ABA (recado de 13/09/2026). Era `daAba.reduce`: em "Todos" o número somava a empresa com o
+  // dinheiro pessoal e com o escopo legado `pro_labore` — o Classic mediu R$ 390,24 na tela contra R$ 595,63 de
+  // caixa conciliado. Caixa é uma coisa só, o dinheiro da Tapeçaria, e não pode mudar de valor porque ele
+  // trocou de aba. Entradas, Saídas e Resultado continuam obedecendo a aba: esses sim são recortes.
+  const caixaEmpresa = realizados.filter((i) => (i.escopo || "empresa") === "empresa").reduce((soma, i) => soma + (i.tipo === "entrada" ? Number(i.valor) : -Number(i.valor)), 0);
+  const dividasAbertas = dividasEmAberto(dividas);
+  const totalDividas = dividasAbertas.reduce((s, d) => s + Math.max(0, saldoDivida(d)), 0);
   // O alerta de vencimento mora no Painel (é lá que ele olha todo dia). Aqui fica só uma linha de resumo,
   // pra tela não virar uma parede de cards.
   const hoje = hojeISO();
@@ -5734,11 +5773,15 @@ function FinanceView({ finances, services, db, demo, mode, notify, onChanged, on
     {resumo.aPagar.length > 0 && <p className="ficha-note">{money(resumo.totalAPagar)} em {resumo.aPagar.length} conta(s) ainda por pagar
       {resumo.vencidas.length ? ` · ${resumo.vencidas.length} já vencida(s)` : ""}
       {onVerAPagar && <> · <button type="button" className="ficha-link" onClick={onVerAPagar}>ver em A pagar</button></>}</p>}
+    {/* Dívida sem vencimento não entra na linha de cima (que é conta com data), mas não pode morar só na outra
+        aba: foi olhando o Financeiro que o Diego concluiu que não devia nada à Raquel (13/09). */}
+    {!!dividasAbertas.length && <p className="ficha-note">{money(totalDividas)} em {dividasAbertas.length} dívida(s) em aberto, sem vencimento
+      {onVerAPagar && <> · <button type="button" className="ficha-link" onClick={onVerAPagar}>ver em A pagar</button></>}</p>}
     {/* 4 CARDS CLICÁVEIS. O de "A receber" é amarelo de propósito: é o único que NÃO é dinheiro no caixa. */}
     <section className="metric-grid finance-metrics">
       <Metric label="Entradas" value={money(paidIn)} detail={foco === "entrada" ? "▾ mostrando só estas" : "Confirmadas · toque para ver"} tone="green" onClick={() => setFoco(foco === "entrada" ? "todos" : "entrada")} />
       <Metric label="Saídas" value={money(paidOut)} detail={foco === "saida" ? "▾ mostrando só estas" : "Confirmadas · toque para ver"} tone="red" onClick={() => setFoco(foco === "saida" ? "todos" : "saida")} />
-      <Metric label={mesSel ? "Resultado do mês" : "Saldo"} value={money(paidIn - paidOut)} detail={mesSel ? `Em caixa hoje: ${money(caixaAcumulado)}` : (foco === "todos" ? "▾ tudo que já aconteceu" : "Toque para ver tudo")} tone="orange" onClick={() => setFoco("todos")} />
+      <Metric label={mesSel ? "Resultado do mês" : "Saldo"} value={money(paidIn - paidOut)} detail={mesSel ? `Em caixa hoje (empresa): ${money(caixaEmpresa)}` : (foco === "todos" ? "▾ tudo que já aconteceu" : "Toque para ver tudo")} tone="orange" onClick={() => setFoco("todos")} />
       <Metric label="A receber" value={money(totalAReceber)} detail={foco === "receber" ? "▾ ainda fora do caixa" : `${resumo.aReceber.length} saldo(s) · toque para ver`} tone="yellow" onClick={() => setFoco(foco === "receber" ? "todos" : "receber")} />
     </section>
     {foco === "receber"
@@ -7084,6 +7127,31 @@ function ListaDeCompras({ services, db, demo, mode, notify, onChanged }) {
 // entrasse aqui, "A pagar" mostraria o valor cheio dos trabalhos ignorando o que já foi adiantado — número
 // maior que a dívida real, justamente na tela que ele usa pra decidir de onde tirar dinheiro.
 function ehSaidaFutura(item) { return item.tipo === "saida" && item.status === "a_pagar" && item.categoria !== "Vale" && item.categoria !== CATEGORIA_MATERIAL && item.categoria !== CATEGORIA_MAO_DE_OBRA; }
+// DÍVIDA NÃO É CONTA A PAGAR (recado de 13/09/2026). `dividas` guarda a OBRIGAÇÃO viva — quanto devo e a quem,
+// sem vencimento; `financeiro` guarda o MOVIMENTO — cada abatimento que já saiu. Criar um `a_pagar` artificial
+// pra dívida aparecer aqui duplicaria a contabilidade: o abatimento sairia do caixa E do saldo da conta. Por
+// isso as dívidas têm bloco próprio e ficam fora do plano de 15 dias e dos cards do topo.
+function dividasEmAberto(dividas) { return (dividas || []).filter((d) => d.status !== "quitada"); }
+function saldoDivida(d) { return Math.round((Number(d.valor_original || 0) - Number(d.valor_pago || 0)) * 100) / 100; }
+function DividasBloco({ dividas }) {
+  const abertas = dividasEmAberto(dividas).slice().sort((a, b) => saldoDivida(b) - saldoDivida(a));
+  if (!abertas.length) return null;
+  const total = abertas.reduce((s, d) => s + Math.max(0, saldoDivida(d)), 0);
+  return <section className="content-card">
+    <div className="card-head"><div><p className="kicker">DÍVIDAS EM ABERTO · SEM VENCIMENTO</p><h3>{money(total)} em {abertas.length} dívida(s)</h3></div></div>
+    {abertas.map((d) => {
+      const saldo = saldoDivida(d);
+      const pago = Number(d.valor_pago || 0);
+      const desc = (d.descricao || "").trim();
+      return <div className="finance-row" key={d.id}>
+        <div><strong>{d.credor || "Credor não informado"}</strong>
+          <span>{money(d.valor_original)} original · {pago > 0 ? `${money(pago)} já pago` : "nada pago ainda"}{d.status && d.status !== "aberta" ? ` · ${d.status}` : ""}{saldo <= 0 ? " · saldo zerado, falta marcar quitada" : ""}{desc ? ` · ${desc.length > 60 ? desc.slice(0, 60) + "…" : desc}` : ""}</span></div>
+        <b className="saida">{money(Math.max(0, saldo))}</b>
+      </div>;
+    })}
+    <p className="ficha-note">Saldo = valor original − o que já foi pago. Nada aqui mexe no caixa nem entra no plano de 15 dias: cada pagamento vira um lançamento no Financeiro, e o saldo cai quando o abatimento é registrado.</p>
+  </section>;
+}
 function somaDiaMes(dataISO, meses) {
   const [a, m, d] = dataISO.split("-").map(Number);
   const base = new Date(a, m - 1 + meses, 1);
@@ -7209,7 +7277,7 @@ function PlanoDeCaixa({ finances, services, escopo }) {
     </div>}
   </section>;
 }
-function FuturoView({ finances, services, db, demo, mode, notify, onChanged }) {
+function FuturoView({ finances, dividas, services, db, demo, mode, notify, onChanged }) {
   const [formOpen, setFormOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const novoDraft = () => ({ descricao: "", valor: "", parcelas: "1", primeiroVenc: somaDiaMes(hojeISO(), 1), escopo: "empresa", categoria: "Conta fixa", eventoId: novoIdLocal() });
@@ -7303,6 +7371,8 @@ function FuturoView({ finances, services, db, demo, mode, notify, onChanged }) {
       <Metric label="Atrasadas" value={money(atrasadas.reduce((s, c) => s + Number(c.valor), 0))} detail={atrasadas.length ? `${atrasadas.length} vencida(s)` : "Nada vencido"} tone="red" />
       <Metric label="Próximos 60 dias" value={money(noHorizonte.reduce((s, c) => s + Number(c.valor), 0))} detail={`De ${contas.length} conta(s) no total`} tone="green" />
     </section>
+
+    <DividasBloco dividas={dividas} />
 
     <section className="content-card">
       <div className="card-head"><div><p className="kicker">SAÍDAS FUTURAS</p><h3>Agendar conta ou parcelamento</h3></div>
