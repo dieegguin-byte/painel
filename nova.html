@@ -665,6 +665,13 @@ const demoAppointments = [
   // Em produção eram 26 assim, todos cliente esperando resposta. Sem este fixture a demo não exercita o
   // bloco "sem hora" e a correção volta a quebrar sem ninguém ver.
   { id: "a7", titulo: "Aguardar retorno da Mariana — orçamento enviado", data: somarDias(hojeISO(), -2), hora: null, cidade: null, local: null, tipo: "remoto", status: "planejado", servico_id: "s1" },
+  // a8 = O CASO DA DONA EDILAINE (08/09/2026), copiado do registro real 212156a6 na forma, não no
+  // conteúdo: `tipo` recebeu a AÇÃO ("retirada") em vez da modalidade. Antes da correção este cartão
+  // sumia ao clicar em Presencial E ao clicar em Remoto, aparecendo só em "Todos".
+  // O VALOR ERRADO FICA AQUI DE PROPÓSITO — a demo tem que provar que nenhum tipo desconhecido
+  // esconde compromisso, não que o dado está limpo. Se alguém "arrumar" para "presencial", o
+  // fixture para de testar o que existe pra testar. Ver ehRemoto().
+  { id: "a8", titulo: "Retirar sofá — Dona Edilaine", data: hojeISO(), hora: "13:30", cidade: "Luziânia", local: "Luziânia", tipo: "retirada", status: "planejado", servico_id: null, cliente_id: "c2" },
 ];
 const demoFinance = [
   { id: "f1", tipo: "entrada", valor: 675, descricao: "Entrada 50% — Carlos", status: "pago", data: "2026-07-09" },
@@ -1173,7 +1180,28 @@ const COBRANCA_TETO_TENTATIVAS = 3;
 // compromisso de verdade tem HORA (você marca 14h e desloca até lá); remoto SEM hora é cobrança
 // ("algum dia eu ligo"). Antes os dois viviam juntos: a agenda de 29/07 tinha 16 itens, sendo 11
 // cobranças sem hora empilhadas junto das 3 idas reais — por isso o dia parecia impossível.
-function ehCobranca(a) { return (a.tipo === "remoto") && !a.hora; }
+// ============ MODALIDADE — a única pergunta que `agenda.tipo` responde ============
+// `tipo` responde "ISSO ME TIRA DO LUGAR?", e mais nada. Retirada, entrega e visita são AÇÃO, não
+// modalidade: moram no título. Em 08/09/2026 dois compromissos foram gravados com tipo='retirada'
+// (Dona Edilaine 13:30 e Cintia 18:30) e SUMIRAM do Painel quando o Diego clicava em Presencial ou
+// Remoto — apareciam só em "Todos". Não casavam com nenhum dos dois lados.
+//
+// A CAUSA NÃO FOI O VALOR ERRADO, FOI O FILTRO NÃO SER UMA PARTIÇÃO. Enquanto "presencial" e
+// "remoto" forem testados por igualdade de string, sempre existe um terceiro valor que cai fora dos
+// dois e some da tela sem erro nenhum. Agora só existe UMA pergunta — é remoto? — e o outro lado é
+// o complemento dela. Presencial ∪ Remoto = Todos, por construção: nenhum valor futuro de `tipo`,
+// certo ou errado, consegue esconder um compromisso.
+//
+// ⚠ ANTES DISTO, O CÓDIGO PERGUNTAVA "É PRESENCIAL?" DE TRÊS JEITOS: `=== "presencial"`,
+// `(tipo || "presencial") === "presencial"` e `=== "remoto"` negado. Três respostas possíveis pra
+// mesma pergunta é como duas telas divergem em silêncio — o mesmo motivo que fez soTexto() subir
+// pro topo do arquivo em 03/09. Quem precisa saber de modalidade usa ESTAS duas funções.
+function ehRemoto(a) { return (a && a.tipo) === "remoto"; }
+// Parada que consome estrada: não é remota, e tem para onde ir e quando. Bloqueio pessoal e item
+// operacional entram aqui de propósito — "arrumar o parafuso do banco do carro" às 11:30 em Luziânia
+// ocupa a rota igual a uma retirada, e ficava invisível pra conta de deslocamento.
+function paradaFisica(a) { return !!a && !ehRemoto(a) && !!a.cidade && !!a.hora; }
+function ehCobranca(a) { return ehRemoto(a) && !a.hora; }
 // Quem está esperando: o cliente (cobrança pura, entra no ciclo) ou o Diego (trabalho dele, precisa de
 // dia). Derivado por palavra-chave em vez de campo novo pra ele não ter que configurar nada — mesma
 // técnica do sugerirPendente. Se errar não é grave: as duas listas ficam uma embaixo da outra na tela.
@@ -2096,7 +2124,11 @@ async function aplicarCompromissoConcluidoOperacional(db, eventoId, dados) {
     // comprado, ele continua esperando; se não falta, é produzir.
     const servico = await lerRegistro(db, "servicos", servicoId);
     const ehEntrega = /\b(entrega|entregar|entregue)\b/i.test(agenda.titulo || "");
-    const movelChegouNaOficina = servico && servico.status === "agendado" && agenda.tipo === "presencial" && !ehEntrega;
+    // `!ehRemoto` em vez de `=== "presencial"` (08/09): o comentário acima sempre disse "remoto fica de
+    // fora", e igualdade de string dizia outra coisa — uma retirada gravada com tipo='retirada' não
+    // movia o serviço pra produção ao ser concluída. O defeito do filtro do Painel tinha esta segunda
+    // cara, silenciosa: o móvel chegava na oficina e o serviço continuava "agendado".
+    const movelChegouNaOficina = servico && servico.status === "agendado" && !ehRemoto(agenda) && !ehEntrega;
     let proximaAcao = dados.proximaAcao ?? null;
     let novoStatus = null;
     const patchExtra = {};
@@ -2459,7 +2491,7 @@ function conflitaComIgreja(dataISO, hora, tipo, cidade) {
 // então ocupa a estrada como qualquer outro compromisso.
 function apertaARota(h, tipo, cidade, outrosDoDia) {
   if (tipo === "remoto" || !cidade) return false; // remoto não desloca ninguém
-  const outros = (outrosDoDia || []).filter((a) => (a.tipo || "presencial") === "presencial" && a.cidade && a.hora && cidadeChave(a.cidade) !== cidadeChave(cidade));
+  const outros = (outrosDoDia || []).filter((a) => paradaFisica(a) && cidadeChave(a.cidade) !== cidadeChave(cidade));
   return outros.length > 0 && horarioApertado(h, outros, cidade);
 }
 function horariosSugeridos(dataISO, tipo, ocupados, cidade, outrosDoDia) {
@@ -2623,7 +2655,7 @@ function encaixesDeRota(avisos, appointments, agendaHistorico, services, custome
 }
 function analisarRotaDoDia(compromissos) {
   const paradas = (compromissos || [])
-    .filter((a) => a.tipo === "presencial" && a.cidade && a.hora)
+    .filter(paradaFisica)
     .sort((a, b) => minutosDoHorario(a.hora) - minutosDoHorario(b.hora));
   if (paradas.length < 2) return null;
   const melhor = paradas.slice().sort((a, b) => distanciaDaBase(a.cidade) - distanciaDaBase(b.cidade));
@@ -3094,7 +3126,7 @@ function Home() {
         fechamentoSemValor = fechado.resultado.fechamentoCompleto === false;
       }
       if (form.addAgenda) {
-        const doDia = agendaVisivel.filter((entry) => entry.data === form.due && entry.tipo === "presencial");
+        const doDia = agendaVisivel.filter((entry) => entry.data === form.due && !ehRemoto(entry));
         const occupied = doDia.map((entry) => entry.hora?.slice(0, 5));
         // O QUE O APP ESCOLHE SOZINHO SEGUE A ROTINA DELE (14/08): antes era o primeiro slot livre — sempre
         // 08:00 — e, sem slot, um 18:00 que cai em cima da igreja de seg/qua/sex. Ver horaSugerida.
@@ -3125,7 +3157,7 @@ function Home() {
     if (demo) { await resolveInbox(item, "Compromisso criado na demonstração"); notify("Compromisso registrado.", "ok"); return; }
     setBusy(true);
     try {
-      const doDia = agendaVisivel.filter((entry) => entry.data === form.due && entry.tipo === "presencial");
+      const doDia = agendaVisivel.filter((entry) => entry.data === form.due && !ehRemoto(entry));
       const occupied = doDia.map((entry) => entry.hora?.slice(0, 5));
       const fallback = horaSugerida(form.due, form.agendaType, occupied, form.city, doDia);
       const payload = { titulo: form.service.trim(), data: form.due, hora: form.time || fallback, cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType, status: "planejado" };
@@ -3583,7 +3615,7 @@ function TriagePanel(props) {
   const [profissionalAberto, setProfissionalAberto] = useState(null);
   useEffect(() => { setEditText(parsed.text); setEditing(false); setConfirmDelete(false); }, [item.id]);
   const relatedServices = form.customerId ? services.filter((entry) => entry.cliente_id === form.customerId && STATUS_VIVOS.includes(entry.status)) : [];
-  const cityConflicts = form.due && form.agendaType === "presencial" ? appointments.filter((entry) => entry.data === form.due && entry.tipo === "presencial" && entry.cidade && form.city && entry.cidade.toLowerCase() !== form.city.toLowerCase()) : [];
+  const cityConflicts = form.due && form.agendaType === "presencial" ? appointments.filter((entry) => entry.data === form.due && !ehRemoto(entry) && entry.cidade && form.city && entry.cidade.toLowerCase() !== form.city.toLowerCase()) : [];
   const porProfissional = useMemo(() => {
     const map = {};
     services.forEach((s) => { if (s.responsavel && ["lead", "orcamento", "agendado", "producao"].includes(s.status)) { const k = s.responsavel.trim(); (map[k] ||= []).push(s); } });
@@ -3665,7 +3697,7 @@ function textoRotina(st) {
 function corCompromisso(data, hoje) { const amanha = new Date(hoje + "T12:00:00"); amanha.setDate(amanha.getDate() + 1); const amanhaISO = amanha.toISOString().slice(0, 10); return data <= hoje ? "alta" : data === amanhaISO ? "media" : "baixa"; }
 
 // Presencial antes de remoto no mesmo dia, depois por hora.
-function ordenarCompromisso(a, b) { return (a.data + (a.tipo === "remoto" ? "1" : "0") + (a.hora || "99")).localeCompare(b.data + (b.tipo === "remoto" ? "1" : "0") + (b.hora || "99")); }
+function ordenarCompromisso(a, b) { return (a.data + (ehRemoto(a) ? "1" : "0") + (a.hora || "99")).localeCompare(b.data + (ehRemoto(b) ? "1" : "0") + (b.hora || "99")); }
 
 function horaFalada(hora) {
   if (!hora) return "";
@@ -3925,7 +3957,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   const linkMaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinoRota)}`;
   const selo = soCidade ? " (só cidade)" : "";
   const nomeCliente = cli?.nome || tituloCard;
-  const cidadeCard = a.tipo === "remoto" ? "◌ Remoto" : `⌖ ${cli?.cidade || a.cidade || "Cidade não informada"}`;
+  const cidadeCard = ehRemoto(a) ? "◌ Remoto" : `⌖ ${cli?.cidade || a.cidade || "Cidade não informada"}`;
   // INSTRUÇÕES DO ATENDIMENTO (Diego, 23/08/2026: "cada cliente com instruções do que precisa
   // ser feito"). Reúne aqui tudo que ele precisa saber ANTES de bater na porta, sem ter que
   // abrir a ficha do cliente: o que fazer, qual é o serviço, o que ainda falta comprar e onde,
@@ -4935,7 +4967,10 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, fin
   // esconde a porta. Abre já no item, porque selecionar não assume a triagem (isso é o botão Assumir).
   const paraClaude = inbox.filter((entry) => ["novo", "respondido"].includes(statusDaCaixa(entry)));
   const aguardandoVoce = inbox.filter((entry) => entry.status === "aguardando_voce");
-  const porTipo = (list) => filtroTipo === "todos" ? list : list.filter((entry) => (entry.tipo || "presencial") === filtroTipo);
+  // PARTIÇÃO, NÃO IGUALDADE (ver ehRemoto). Era `(entry.tipo || "presencial") === filtroTipo`, e foi
+  // exatamente isso que sumiu com a Edilaine e a Cintia: tipo='retirada' não era igual a "presencial"
+  // nem a "remoto", então o compromisso desaparecia dos DOIS filtros e só voltava em "Todos".
+  const porTipo = (list) => filtroTipo === "todos" ? list : list.filter((entry) => ehRemoto(entry) === (filtroTipo === "remoto"));
   const atrasados = porTipo(atrasadosAll); const hoje = porTipo(hojeAll); const futuros = porTipo(futurosAll);
   // A HORA NÃO SUMIU, MUDOU DE LUGAR: dentro do card de hoje ela diz o que ainda dá pra fazer e o que já
   // estourou. Compromisso sem hora marcada não conta como estourado — ainda cabe no dia.
@@ -5166,7 +5201,7 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
     <div className="agenda-dias">{dias.map((date) => {
       const items = groups[date];
       const cor = corCompromisso(date, hoje);
-      const presenciais = items.filter((a) => (a.tipo || "presencial") === "presencial" && a.cidade);
+      const presenciais = items.filter((a) => !ehRemoto(a) && a.cidade);
       const cidadesUnicas = [...new Map(presenciais.map((a) => [cidadeChave(a.cidade), a.cidade])).values()];
       const temRemoto = items.some((a) => a.tipo === "remoto");
       const aberto = diaAberto === date;
@@ -5278,7 +5313,9 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, servic
   // mas não tinha onde dizer: por isso Gabriela, José Ângelo e Andriele estavam sem profissional.
   // Este caminho junta as três coisas num toque: conclui a busca, põe o serviço em produção e grava quem
   // ficou com ela.
-  const ehBuscaDeServico = !ehCompra && !ehEntrega && svc && svc.status === "agendado" && appt.tipo === "presencial";
+  // `!ehRemoto` em vez de `=== "presencial"` (13/09): mesma troca do movelChegouNaOficina — uma retirada
+  // gravada com tipo='retirada' não oferecia o caminho "busquei e deixei com o profissional".
+  const ehBuscaDeServico = !ehCompra && !ehEntrega && svc && svc.status === "agendado" && !ehRemoto(appt);
   const openParcial = () => { setPendente(sugerirPendente(appt.titulo)); setStep("parcial"); };
   // Compra pergunta o valor; entrega pergunta se o serviço acabou. O resto conclui direto como sempre.
   const concluirTotal = () => ehCompra ? setStep("compra") : ehEntrega ? setStep("entrega") : doTotal();
@@ -5586,7 +5623,8 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
 // fisicamente impossível sem nem perguntar. Agora: sugestão primeiro (13h30 pra cima, igreja fora), o resto
 // atrás de um botão, e horário arriscado exige um segundo clique de confirmação.
 function AgendaPicker({ appointments, appt, onClose, onPicked }) {
-  const tipo = appt.tipo || "presencial";
+  // MODALIDADE, não o valor cru de `tipo` (13/09): 'operacional' ou 'retirada' desloca igual a presencial.
+  const tipo = ehRemoto(appt) ? "remoto" : "presencial";
   const cidade = tipo === "presencial" ? (appt.cidade || "") : null;
   const [mostrarTudo, setMostrarTudo] = useState(false);
   const [confirmando, setConfirmando] = useState(null);
@@ -5599,14 +5637,14 @@ function AgendaPicker({ appointments, appt, onClose, onPicked }) {
     const d = new Date(hoje); d.setDate(d.getDate() + i);
     const dataISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const doDia = porDia[dataISO] || [];
-    const ocupados = tipo === "presencial" ? doDia.filter((a) => (a.tipo || "presencial") === "presencial" && cidadeChave(a.cidade) === cidadeChave(cidade)).map((a) => a.hora) : [];
+    const ocupados = tipo === "presencial" ? doDia.filter((a) => !ehRemoto(a) && cidadeChave(a.cidade) === cidadeChave(cidade)).map((a) => a.hora) : [];
     const todos = horariosParaTipo(dataISO, tipo, ocupados);
     const sugeridos = horariosSugeridos(dataISO, tipo, ocupados, cidade);
     escondidos += todos.length - sugeridos.length;
     const livres = mostrarTudo ? [...new Set([...sugeridos, ...todos])].sort() : sugeridos;
     if (!livres.length) continue;
-    const cidadesDoDia = [...new Set(doDia.filter((a) => (a.tipo || "presencial") === "presencial" && a.cidade).map((a) => a.cidade))];
-    const outrasCidades = tipo === "presencial" && cidade ? doDia.filter((a) => (a.tipo || "presencial") === "presencial" && a.cidade && a.hora && cidadeChave(a.cidade) !== cidadeChave(cidade)) : [];
+    const cidadesDoDia = [...new Set(doDia.filter((a) => !ehRemoto(a) && a.cidade).map((a) => a.cidade))];
+    const outrasCidades = tipo === "presencial" && cidade ? doDia.filter((a) => paradaFisica(a) && cidadeChave(a.cidade) !== cidadeChave(cidade)) : [];
     dias.push({ dataISO, doDia, livres, cidadesDoDia, outrasCidades, conflito: outrasCidades.length > 0, igreja: ehDiaDeIgreja(dataISO) && tipo === "presencial" });
   }
   const escolher = (dataISO, h, travado) => {
@@ -6026,7 +6064,7 @@ async function planoDeCompraComHorario(db, fornecedor, dataForcada) {
   const { data: doDia, error } = await db.from("agenda").select("id,data,hora,tipo,cidade,status").eq("data", data).eq("status", "planejado");
   if (error) throw error;
   // Mesmo recorte do seletor manual (ver finishTriage): só presencial ocupa slot e só presencial desloca.
-  const presenciais = (doDia || []).filter((a) => (a.tipo || "presencial") === "presencial");
+  const presenciais = (doDia || []).filter((a) => !ehRemoto(a));
   const ocupados = presenciais.map((a) => a.hora?.slice(0, 5)).filter(Boolean);
   return { ...plano, data, hora: horaSugerida(data, "presencial", ocupados, fornecedor.cidade, presenciais) };
 }
