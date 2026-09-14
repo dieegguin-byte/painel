@@ -278,6 +278,27 @@ async function carregarApp() {
   checar("tarefa remota nunca conflita com a igreja", !conflitaComIgreja("2026-08-17", "19:00", "remoto", null), null);
   checar("horaSugerida pega o primeiro horário seguro (sem preferência de tarde)", horaSugerida("2026-08-17", "presencial", [], "Brasília") === "08:00", horaSugerida("2026-08-17", "presencial", [], "Brasília"));
 
+  // =========================================================================
+  grupo("Contas a pagar — entram no Painel 3 dias antes (recado de 14/09)");
+  // =========================================================================
+  const contaT = (id, data, extra) => ({ id, tipo: "saida", status: "a_pagar", escopo: "empresa", categoria: "Cartão", valor: 30, descricao: "Conta " + id, data, ...extra });
+  const hojeT = "2026-09-14";
+  const rc = resumoContas([
+    contaT("d4", "2026-09-18"), contaT("d3", "2026-09-17"), contaT("d2", "2026-09-16"), contaT("d1", "2026-09-15"),
+    contaT("d0", "2026-09-14"), contaT("venc2", "2026-09-12"), contaT("venc5", "2026-09-09"),
+    contaT("vale", "2026-09-15", { categoria: "Vale" }), contaT("mao", "2026-09-15", { categoria: CATEGORIA_MAO_DE_OBRA }),
+    contaT("paga", "2026-09-15", { status: "pago" }), contaT("semprazo", "2026-09-14", { descricao: "Pagar assim que houver saldo" }),
+  ], [], hojeT);
+  checar("D-3, D-2, D-1 e D0 entram no alerta, em ordem de vencimento", igual(rc.urgentes.map((f) => f.id), ["d0", "d1", "d2", "d3"]), rc.urgentes.map((f) => f.id));
+  checar("D+4 não entra no alerta", ![...rc.vencidas, ...rc.urgentes].some((f) => f.id === "d4"), null);
+  checar("vencidas ficam no alerta, a mais antiga primeiro", igual(rc.vencidas.map((f) => f.id), ["venc5", "venc2"]), rc.vencidas.map((f) => f.id));
+  checar("Vale, Mão de obra e conta paga não entram", ![...rc.vencidas, ...rc.urgentes].some((f) => ["vale", "mao", "paga"].includes(f.id)), null);
+  checar("conta sem prazo não vira urgente nem vencida", rc.semVencimento.some((f) => f.id === "semprazo") && ![...rc.vencidas, ...rc.urgentes].some((f) => f.id === "semprazo"), null);
+  const rotT = (id) => rotuloVencimento([...rc.vencidas, ...rc.urgentes].find((f) => f.id === id), hojeT).texto;
+  checar("rótulos: vencida, hoje, amanhã, 2 e 3 dias", igual(["venc2", "d0", "d1", "d2", "d3"].map(rotT), ["VENCIDA HÁ 2 DIAS", "VENCE HOJE", "VENCE AMANHÃ", "VENCE EM 2 DIAS", "VENCE EM 3 DIAS"]), ["venc2", "d0", "d1", "d2", "d3"].map(rotT));
+  checar("depois de paga, a conta sai do alerta", resumoContas([contaT("x", "2026-09-15", { status: "pago" })], [], hojeT).urgentes.length === 0, null);
+  checar("total do alerta soma só o intervalo (vencidas + D0..D3)", rc.totalVencidas + rc.totalUrgentes === 180, rc.totalVencidas + rc.totalUrgentes);
+
   placar.textContent = `${passou} passaram · ${falhou} falharam`;
   placar.style.color = falhou ? "#e8776a" : "#7fbf8f";
 })();

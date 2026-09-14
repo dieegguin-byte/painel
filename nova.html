@@ -153,7 +153,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
    cartao; dois cartoes davam pagina de 399px numa tela de 320. Ver [[reference-painel-texto-cortado-layout]]. */
 .metric-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.metric-card{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:15px;min-height:112px;min-width:0}.metric-card>span{font-size:8px;text-transform:uppercase;color:var(--dim);letter-spacing:.7px}.metric-card>b{display:block;font-size:26px;margin:11px 0 4px}.metric-card small{color:var(--muted);font-size:9px}.metric-card.orange>b{color:var(--orange2)}.metric-card.red>b{color:#e88477}.metric-card.yellow>b{color:#e4bd72}.metric-card.green>b{color:#9bc7a7}.metric-card.clickable{cursor:pointer;transition:border-color .15s,transform .15s}.metric-card.clickable:hover{border-color:var(--dim);transform:translateY(-1px)}.metric-card.clickable:active{transform:translateY(0)}.content-card{background:linear-gradient(145deg,#1b1613,#15110f);border:1px solid var(--line);border-radius:18px;padding:18px}.content-card.full{min-height:560px}.card-head{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:14px}.card-head h3{font:500 22px Georgia,serif;margin:0}
 .card-toggle{width:100%;display:flex;justify-content:space-between;gap:15px;align-items:center;background:transparent;border:0;color:inherit;text-align:left;padding:0;margin:0}.card-toggle>div{min-width:0}.card-toggle h3{font:500 22px Georgia,serif;margin:0}.card-toggle>i{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);flex:none;white-space:nowrap}.card-toggle:hover>i{color:#e0cbb8}.card-toggle[aria-expanded="true"]>i{color:var(--orange2)}.card-corpo{margin-top:14px}
-.search{width:min(300px,45%);margin:0}.priority-row{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:11px;padding:11px 3px;border-bottom:1px solid var(--line)}.priority-row:last-child{border-bottom:0}.priority{width:8px;height:8px;border-radius:50%;background:var(--yellow)}.priority.alta{background:var(--red)}.priority.baixa{background:var(--green)}.priority-row strong,.priority-row span{display:block}.priority-row strong{font-size:11px;margin-bottom:3px}.priority-row span,.priority-row time{font-size:9px;color:var(--dim)}.warning-card{padding:15px 18px;border-radius:14px;background:#df6a5d12;border:1px solid #df6a5d3f}.warning-card b,.warning-card span{display:block}.warning-card b{font-size:12px}.warning-card span{font-size:9px;color:var(--muted);margin-top:3px}/* PAINEL: cards de acao grandes (o que fazer + mensagem pronta + WhatsApp) */
+.search{width:min(300px,45%);margin:0}.priority-row{display:grid;grid-template-columns:10px 1fr auto;align-items:center;gap:11px;padding:11px 3px;border-bottom:1px solid var(--line)}.priority-row:last-child{border-bottom:0}.priority{width:8px;height:8px;border-radius:50%;background:var(--yellow)}.priority.alta{background:var(--red)}.priority.baixa{background:var(--green)}.priority-row strong,.priority-row span{display:block}.priority-row strong{font-size:11px;margin-bottom:3px}.priority-row span,.priority-row time{font-size:9px;color:var(--dim)}.warning-card{padding:15px 18px;border-radius:14px;background:#df6a5d12;border:1px solid #df6a5d3f}.warning-card b,.warning-card span{display:block}.warning-card b{font-size:12px}.warning-card span{font-size:9px;color:var(--muted);margin-top:3px}.contas-card{border:2px solid #df6a5d8c;background:#df6a5d1f}.contas-card b{font-size:17px;color:var(--text)}.contas-card span{font-size:13px;margin-top:6px}.contas-card .conta-linha{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;font-size:15px;color:var(--text);margin-top:10px;padding:10px 12px;border-radius:10px;background:#00000030;text-align:left}.contas-card .conta-linha strong{flex:1 1 140px;min-width:0;font-weight:600;overflow-wrap:anywhere}.contas-card .conta-linha b{display:inline;font-size:16px;white-space:nowrap}.contas-card .conta-prazo{font-style:normal;font-size:12px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:999px;white-space:nowrap}.contas-card .conta-prazo.vencida{background:var(--red);color:#fff}.contas-card .conta-prazo.hoje{background:var(--orange);color:#fff}.contas-card .conta-prazo.amanha{background:var(--yellow);color:#1a120c}.contas-card .conta-prazo.breve{background:#d4a64e2e;color:var(--yellow);border:1px solid #d4a64e80}.contas-card .card-corpo .ghost{margin-top:12px}/* PAINEL: cards de acao grandes (o que fazer + mensagem pronta + WhatsApp) */
 .compromisso-card{display:block;background:linear-gradient(150deg,#1d1714,#171310);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:16px;padding:14px;margin-bottom:12px}
 /* CABEÇALHO CLICÁVEL: é o card fechado. Hora à esquerda, nome + cidade no meio, seta à direita.
    `min-width:0` no meio é o que impede um nome comprido de empurrar a seta pra fora e alargar
@@ -695,6 +695,12 @@ const demoFinance = [
   { id: "f9", tipo: "saida", escopo: "empresa", categoria: "Retirada de pró-labore", valor: 300, descricao: "Retirada de pró-labore via Pix", status: "pago", data: hojeISO(), servico_id: null },
   { id: "f10", tipo: "entrada", escopo: "pessoal", categoria: "Pró-labore", valor: 300, descricao: "Pró-labore recebido via Pix", status: "pago", data: hojeISO(), servico_id: null },
   { id: "f11", tipo: "saida", escopo: "pessoal", categoria: "Dízimo", valor: 30, descricao: "Dízimo de 10% sobre o pró-labore", status: "pago", data: hojeISO(), servico_id: null },
+  // CONTAS A PAGAR RELATIVAS A HOJE (14/09): uma vencida há 3 dias (o caso Havan), uma em 2 dias, uma em 3 (tem
+  // que aparecer no Painel) e uma em 4 (não pode entrar no alerta). Data relativa pra demo nunca envelhecer.
+  { id: "f12", tipo: "saida", escopo: "pessoal", categoria: "Cartão", valor: 30, descricao: "Cartão Havan — parcela 1/10", status: "a_pagar", data: somarDias(hojeISO(), -3), servico_id: null },
+  { id: "f13", tipo: "saida", escopo: "empresa", categoria: "Conta fixa", valor: 191.23, descricao: "Energia — Equatorial", status: "a_pagar", data: somarDias(hojeISO(), 2), servico_id: null },
+  { id: "f14", tipo: "saida", escopo: "empresa", categoria: "Conta fixa", valor: 95.99, descricao: "Assinatura ChatGPT", status: "a_pagar", data: somarDias(hojeISO(), 3), servico_id: null },
+  { id: "f15", tipo: "saida", escopo: "empresa", categoria: "Conta fixa", valor: 120, descricao: "Contabilidade — mensalidade", status: "a_pagar", data: somarDias(hojeISO(), 4), servico_id: null },
 ];
 // DÍVIDAS — o caso real da Raquel (86a1e367) na forma: aberta com parte paga. A quitada está aqui DE
 // PROPÓSITO: a demo tem que provar que dívida quitada não aparece como aberta (critério 5 do recado de 13/09).
@@ -3548,7 +3554,7 @@ function Home() {
           A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
           e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
@@ -4877,7 +4883,7 @@ function MateriaisCard({ services, today, estoque, onVerCompras }) {
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
   const profissionais = nomesProfissionais(services);
@@ -5144,7 +5150,7 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, fin
     })()}
     {(atrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}</div>}
     {(() => {
-      // CONTA CHEGANDO: entra sozinho no Painel na véspera do vencimento (e fica enquanto estiver vencida),
+      // CONTA CHEGANDO: entra sozinho no Painel 3 dias antes do vencimento (e fica enquanto estiver vencida),
       // com o caixa possível do lado — porque a pergunta que ele faz é "tenho de onde tirar?".
       const r = resumoContas(finances, services, today);
       const temPrazo = r.vencidas.length > 0 || r.urgentes.length > 0;
@@ -5152,18 +5158,27 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, fin
       // Descrição de lançamento pode ser um parágrafo inteiro — o Classic escreve o contexto nela. No Painel
       // isso vira parede de texto no meio da rota; aqui ele só precisa reconhecer a conta, então corta.
       const curto = (f) => { const t = (descricaoFinanceiraVisivel(f.descricao) || f.categoria || "").trim(); return t.length > 64 ? t.slice(0, 61).trimEnd() + "…" : t; };
-      const linha = (f) => `${curto(f)} · ${money(f.valor)} · ${(f.data || "") < today ? "venceu " + compactDate(f.data) : (f.data === today ? "vence HOJE" : "vence amanhã")}`;
       // O PAR "QUANTO DEVO / DE ONDE TIRO" FICA FORA DO RECOLHÍVEL, porque é ele que responde a pergunta que
-      // traz o Diego a este card. O que recolhe é a lista de QUAIS contas — isso ele só quer ver quando vai
-      // pagar, não toda vez que abre o app.
-      return <CardRecolhivel className="warning-card"
+      // traz o Diego a este card.
+      // GRANDE E LEGÍVEL FECHADO (recado de 14/09/2026). O card tinha título de 12px e linhas de 9px, e QUAL conta
+      // vencia só aparecia depois de abrir — foi assim que a Havan passou. Agora a conta que vence primeiro fica
+      // no cabeçalho, com o prazo em palavra e em cor; abrir mostra todas. Classe própria (`contas-card`) porque
+      // `warning-card` também veste o card Pessoais, e aumentar a letra lá não foi pedido.
+      const alerta = [...r.vencidas, ...r.urgentes];
+      const linhaConta = (f) => { const rv = rotuloVencimento(f, today); return <span className="conta-linha" key={f.id}>
+        <em className={`conta-prazo ${rv.nivel}`}>{rv.texto}</em><strong>{curto(f)}</strong><b>{money(f.valor)}</b>
+      </span>; };
+      return <CardRecolhivel className="warning-card contas-card"
         cabecalho={temPrazo
-          ? <b>{money(r.totalVencidas + r.totalUrgentes)} a pagar {r.vencidas.length ? "— tem conta vencida" : "nas próximas 24h"}</b>
+          ? <><b>{money(r.totalVencidas + r.totalUrgentes)} a pagar {r.vencidas.length ? "— tem conta vencida" : `nos próximos ${DIAS_ANTECEDENCIA_CONTAS} dias`}</b>
+              {linhaConta(alerta[0])}
+              {alerta.length > 1 && <span>e mais {alerta.length - 1} conta(s) — toque em abrir</span>}</>
           : <b>{money(r.totalSemVencimento)} a pagar quando houver saldo</b>}
         resumo={r.potencialCaixa > 0
           ? <span>💰 Dá pra levantar {money(r.potencialCaixa)}{r.prontosSemCobranca.length ? ` — ${r.prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")} sem pagamento registrado` : ""}</span>
           : <span>Nenhum serviço pronto pra cobrar no momento.</span>}>
-        {[...r.vencidas, ...r.urgentes].slice(0, 5).map((f) => <span key={f.id}>{linha(f)}</span>)}
+        {alerta.map(linhaConta)}
+        {onVerAPagar && <button type="button" className="ghost" onClick={onVerAPagar}>Ver todas em A pagar</button>}
         {/* SEM PRAZO fica no Painel de propósito: foi assim que a dívida do Ozair saiu da rotina — o lembrete
             irmão não nasceu e só o Financeiro guardou. Aqui ela não vence, não cobra e não some. */}
         {r.semVencimento.slice(0, 3).map((f) => <span key={f.id}>{curto(f)} · {money(f.valor)} · sem prazo, pagar quando houver saldo</span>)}
@@ -6069,7 +6084,7 @@ const COMPRA_CONFERIDA_TAG = "[CONFERIDO] ";
 // está na observação dos fornecedores). Fornecedor sem dia fixo não entrega: aí é viagem presencial e precisa
 // de cidade e hora, senão quebra a Regra Nº 4. Ver [[feedback-operacao-drive-direto-sem-caixa]].
 // Conta a pagar e caixa possível num lugar só, porque a decisão é sempre a mesma: "vou ter que pagar isso,
-// tenho de onde tirar?". Usado no Painel (alerta com 1 dia de antecedência) e no Financeiro (linha de resumo).
+// tenho de onde tirar?". Usado no Painel (alerta com 3 dias de antecedência desde 14/09) e no Financeiro (linha de resumo).
 // COMO O APP SABE QUE NÃO TEM PRAZO: pela descrição, que é onde o Classic já diz isso hoje, com estas
 // palavras. Não inventei campo novo no banco nem convenção nova que dependa de alguém lembrar de usar —
 // funciona no lançamento que JÁ está lá. Se um dia nascer um campo de vencimento de verdade, ele vence
@@ -6081,6 +6096,16 @@ const COMPRA_CONFERIDA_TAG = "[CONFERIDO] ";
 // A palavra "vencimento" sozinha NÃO basta: a mensalidade da contabilidade diz "vencimento todo dia 20" e
 // tem prazo de verdade. Só conta quando ela vem NEGADA na mesma frase.
 const SEM_VENCIMENTO = /(vencimento|data (exata )?de pagamento|data exata)[^.;]{0,60}n[ãa]o (informad|confirmad|definid)|sem vencimento|(assim que|quando)[^.;]{0,40}(houver|tiver) saldo|assim que poss[íi]vel|a pagar (ap[óo]s|depois d)|pagar (ap[óo]s|depois d)[^.;]{0,50}(servi[çc]o|entrega|receb)|quando (eu )?(tiver|receber) dinheiro/i;
+const DIAS_ANTECEDENCIA_CONTAS = 3;
+// Quanto falta pro vencimento, dito em palavra: "vence em 2 dias" se lê de relance; "16/09" obriga a fazer conta.
+function diasAteVencer(f, hoje) { return Math.round((new Date((f.data || hoje) + "T12:00:00") - new Date(hoje + "T12:00:00")) / 86400000); }
+function rotuloVencimento(f, hoje) {
+  const d = diasAteVencer(f, hoje);
+  if (d < 0) return { texto: d === -1 ? "VENCIDA ONTEM" : `VENCIDA HÁ ${-d} DIAS`, nivel: "vencida" };
+  if (d === 0) return { texto: "VENCE HOJE", nivel: "hoje" };
+  if (d === 1) return { texto: "VENCE AMANHÃ", nivel: "amanha" };
+  return { texto: `VENCE EM ${d} DIAS`, nivel: "breve" };
+}
 function resumoContas(finances, services, hoje) {
   const amanha = (() => { const d = new Date(hoje + "T12:00:00"); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
   // TRABALHO DE PROFISSIONAL NÃO É CONTA A PAGAR (Diego, 06/08: "não gostei do alerta no painel, aparece que
@@ -6098,14 +6123,20 @@ function resumoContas(finances, services, hoje) {
   const semVencimento = aPagar.filter(semPrazoMarcado);
   const comPrazo = aPagar.filter((f) => !semPrazoMarcado(f));
   const vencidas = comPrazo.filter((f) => (f.data || "") < hoje);
-  // 1 dia de antecedência: entra no Painel na véspera, não no dia, pra dar tempo de correr atrás do dinheiro.
-  const urgentes = comPrazo.filter((f) => (f.data || "") === hoje || (f.data || "") === amanha);
+  // 3 DIAS DE ANTECEDÊNCIA (recado de 14/09/2026). Era 1 dia — entrava na véspera — e a parcela da Havan de
+  // 10/09 foi paga dia 13, três dias atrasada: o aviso de véspera, miúdo, não deu tempo de ver nem de juntar o
+  // dinheiro. Agora entra em D-3 e fica até ser paga. Ordem: vencidas primeiro (a mais antiga na frente),
+  // depois a que vence antes.
+  const limite = somarDias(hoje, DIAS_ANTECEDENCIA_CONTAS);
+  const porData = (a, b) => (a.data || "").localeCompare(b.data || "");
+  vencidas.sort(porData);
+  const urgentes = comPrazo.filter((f) => (f.data || "") >= hoje && (f.data || "") <= limite).sort(porData);
   const aReceber = (finances || []).filter((f) => f.tipo === "entrada" && f.status === "a_receber");
   const comEntrada = new Set((finances || []).filter((f) => f.tipo === "entrada" && f.servico_id).map((f) => f.servico_id));
   const prontosSemCobranca = (services || []).filter((s) => ["entregue", "producao"].includes(s.status) && Number(s.valor_orcamento) > 0 && !comEntrada.has(s.id));
   const soma = (l, campo) => l.reduce((s, i) => s + Number(campo ? i[campo] : i.valor), 0);
   return {
-    amanha, aPagar, vencidas, urgentes, semVencimento, aReceber, prontosSemCobranca,
+    amanha, limite, aPagar, vencidas, urgentes, semVencimento, aReceber, prontosSemCobranca,
     totalVencidas: soma(vencidas), totalUrgentes: soma(urgentes), totalAPagar: soma(aPagar),
     totalSemVencimento: soma(semVencimento),
     potencialCaixa: soma(aReceber) + soma(prontosSemCobranca, "valor_orcamento"),
