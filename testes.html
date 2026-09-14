@@ -255,22 +255,25 @@ async function carregarApp() {
   checar("entrega normal não vira exceção no histórico", db11.dados.servicos[0].status === "entregue" && !/MATERIAL PENDENTE/.test(hist11), hist11);
 
   // =========================================================================
-  grupo("Horário — rotina real do Diego");
+  grupo("Horário — sem rotina (retirada em 14/09); igreja e estrada continuam");
   // =========================================================================
   // 2026-08-17 segunda (igreja) · 18 terça · 19 quarta (igreja) · 20 quinta · 21 sexta (igreja) · 22 sábado · 23 domingo
-  checar("segunda em Luziânia começa 13:30", horariosSugeridos("2026-08-17", "presencial", [], "Luziânia")[0] === "13:30", horariosSugeridos("2026-08-17", "presencial", [], "Luziânia"));
-  checar("segunda em Brasília para às 15h (estrada de volta antes da igreja)", igual(horariosSugeridos("2026-08-17", "presencial", [], "Brasília"), ["13:30", "14:00", "15:00"]), horariosSugeridos("2026-08-17", "presencial", [], "Brasília"));
+  // Diego, 14/09: "não estou usando mais rotina". Estes testes provam que a rotina antiga NÃO volta escondida.
+  checar("segunda em Luziânia sugere desde 08:00", horariosSugeridos("2026-08-17", "presencial", [], "Luziânia")[0] === "08:00", horariosSugeridos("2026-08-17", "presencial", [], "Luziânia"));
+  checar("quarta ao meio-dia é sugerido (a pausa 11–13 saiu)", horariosSugeridos("2026-08-19", "presencial", [], "Luziânia").includes("12:00"), horariosSugeridos("2026-08-19", "presencial", [], "Luziânia"));
+  checar("segunda em Brasília para às 15h (estrada de volta antes da igreja)", igual(horariosSugeridos("2026-08-17", "presencial", [], "Brasília"), ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00"]), horariosSugeridos("2026-08-17", "presencial", [], "Brasília"));
   checar("terça vai até 20h", horariosSugeridos("2026-08-18", "presencial", [], "Luziânia").includes("20:00"), horariosSugeridos("2026-08-18", "presencial", [], "Luziânia"));
   checar("sábado vai até 20h", horariosSugeridos("2026-08-22", "presencial", [], "Luziânia").includes("20:00"), horariosSugeridos("2026-08-22", "presencial", [], "Luziânia"));
-  checar("quinta NÃO tem noite (alinhado em 15/08)", !horariosSugeridos("2026-08-20", "presencial", [], "Luziânia").includes("19:00") && !horariosParaTipo("2026-08-20", "presencial", []).includes("19:00"), horariosParaTipo("2026-08-20", "presencial", []));
-  checar("domingo não sugere nada", horariosSugeridos("2026-08-23", "presencial", [], "Luziânia").length === 0, horariosSugeridos("2026-08-23", "presencial", [], "Luziânia"));
-  checar("nenhuma sugestão automática de manhã", ["2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22"].every((d) => !horariosSugeridos(d, "presencial", [], "Luziânia").some((h) => h < "13:30")), null);
-  checar("a manhã continua existindo na escolha manual", horariosParaTipo("2026-08-17", "presencial", []).includes("08:00"), null);
+  checar("quinta também vai até 20h (sem rotina)", horariosSugeridos("2026-08-20", "presencial", [], "Luziânia").includes("20:00"), horariosSugeridos("2026-08-20", "presencial", [], "Luziânia"));
+  checar("domingo também sugere (sem rotina)", horariosSugeridos("2026-08-23", "presencial", [], "Luziânia").length > 0, horariosSugeridos("2026-08-23", "presencial", [], "Luziânia"));
+  checar("nada de madrugada: presencial vai de 08:00 a 20:00", igual([horariosParaTipo("2026-08-17", "presencial", [])[0], horariosParaTipo("2026-08-17", "presencial", []).slice(-1)[0]], ["08:00", "20:00"]), horariosParaTipo("2026-08-17", "presencial", []));
+  const agoraMinTeste = new Date().getHours() * 60 + new Date().getMinutes();
+  checar("hoje não sugere horário que já passou", horariosSugeridos(hojeISO(), "presencial", [], "Luziânia").every((h) => minutosDoHorario(h) > agoraMinTeste), horariosSugeridos(hojeISO(), "presencial", [], "Luziânia"));
   checar("horário ocupado sai da lista", !horariosSugeridos("2026-08-17", "presencial", ["14:00"], "Luziânia").includes("14:00"), horariosSugeridos("2026-08-17", "presencial", ["14:00"], "Luziânia"));
   checar("17h em Brasília numa segunda conflita com a igreja", conflitaComIgreja("2026-08-17", "17:00", "presencial", "Brasília"), null);
   checar("17h em Luziânia numa segunda não conflita", !conflitaComIgreja("2026-08-17", "17:00", "presencial", "Luziânia"), null);
   checar("tarefa remota nunca conflita com a igreja", !conflitaComIgreja("2026-08-17", "19:00", "remoto", null), null);
-  checar("horaSugerida nunca devolve manhã", horaSugerida("2026-08-17", "presencial", [], "Brasília") >= "13:30", horaSugerida("2026-08-17", "presencial", [], "Brasília"));
+  checar("horaSugerida pega o primeiro horário seguro (sem preferência de tarde)", horaSugerida("2026-08-17", "presencial", [], "Brasília") === "08:00", horaSugerida("2026-08-17", "presencial", [], "Brasília"));
 
   placar.textContent = `${passou} passaram · ${falhou} falharam`;
   placar.style.color = falhou ? "#e8776a" : "#7fbf8f";

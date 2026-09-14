@@ -1151,23 +1151,19 @@ const PROTOCOLO_CLAUDE_OPERACAO = [
 // bucket fotos-servicos continuam de fora e precisam de dump próprio.
 const TABELAS_BACKUP = ["clientes", "servicos", "fotos", "agenda", "financeiro", "estoque", "caixa_entrada", "historico", "guia_ia", "config", "fornecedores", "rotinas"];
 
-// ===== Cérebro de rota/agenda (portado do app v1, definido pelo Diego 08-09/07/2026) =====
-// Rotina semanal: seg/qua/sex 08-11h e 13-18h; ter/sáb 08-21h; quinta como os demais; domingo sem expediente.
-// QUINTA VOLTOU A ACABAR ÀS 18H (15/08/2026). A janela até 21h na quinta vinha de julho e não batia mais com
-// a rotina que o Diego descreveu no Mapa da Operação — noite é terça e sábado. Ele confirmou.
-const JANELAS_SEMANA = { 0: [], 1: [["08:00", "11:00"], ["13:00", "18:00"]], 2: [["08:00", "21:00"]], 3: [["08:00", "11:00"], ["13:00", "18:00"]], 4: [["08:00", "11:00"], ["13:00", "18:00"]], 5: [["08:00", "11:00"], ["13:00", "18:00"]], 6: [["08:00", "21:00"]] };
+// ===== Cérebro de rota/agenda =====
+// A ROTINA SEMANAL SAIU (14/09/2026). Até aqui o app guardava a rotina que o Diego definiu em 08-09/07 —
+// seg/qua/qui/sex 08–11h e 13–18h, ter/sáb até 21h, domingo sem expediente, sugestão automática só a partir
+// das 13h30 — e sugeria horário por ela. Diego, 14/09: "não estou usando mais rotina". Constante de julho
+// virou regra fantasma: o seletor escondia manhã e meio-dia de quem não tem mais esse horário, e a pausa
+// 11–13 chegou a ser citada como "prova" no caso Renata sem valer mais. Não existe mais janela de preferência.
+//
+// O que FICA é o que não é rotina: a faixa ampla do dia (não se oferece compromisso de madrugada), a igreja de
+// seg/qua/sex, a estrada entre as cidades e o horário já ocupado. Se a disponibilidade dele voltar a ter regra,
+// ela precisa morar numa fonte que o Classic também leia — não só aqui dentro, senão os dois divergem de novo.
+const JANELA_PRESENCIAL = ["08:00", "21:00"];
 // Tarefa remota (ligar, mandar mensagem) não disputa horário: janela ampla, todo dia, nunca bloqueia horário ocupado.
 const JANELA_REMOTO = ["07:00", "22:00"];
-// ===== DISPONIBILIDADE ≠ PREFERÊNCIA (auditoria de 14/08/2026, item P0 nº 4) =====
-// JANELAS_SEMANA acima diz o que é POSSÍVEL — ele PODE marcar 08h se quiser, e às vezes quer. O que estava
-// errado era o app ESCOLHER 08h sozinho: a triagem pegava o primeiro slot livre do dia (sempre 08:00), o
-// plano de compra nascia fixo às 08:00 e, quando não sobrava slot, caía em 18:00 — bem em cima da igreja de
-// segunda, quarta e sexta. Rotina real confirmada por Diego: sugestão automática a partir das 13h30; manhã
-// só quando ELE pedir; terça e sábado podem ir até 21h; seg/qua/sex tem igreja às 18h30.
-const HORA_MIN_SUGESTAO = "13:30";
-const HORA_MAX_SUGESTAO_PADRAO = "18:00";
-const HORA_MAX_SUGESTAO_NOITE = "21:00";
-const DIAS_NOITE_LIBERADA = [2, 6]; // terça e sábado
 const IGREJA_DIAS = [1, 3, 5];
 const IGREJA_HORA = "18:30";
 // Margem pra trocar de roupa e sair — chegar em cima da hora é chegar atrasado.
@@ -2382,7 +2378,7 @@ function proximaEntregaFornecedor(diasEntrega) {
   return null;
 }
 function gerarSlots(ini, fim) { const slots = []; let [h, m] = ini.split(":").map(Number); const [hf, mf] = fim.split(":").map(Number); while (h < hf || (h === hf && m < mf)) { slots.push(String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0")); m += 60; if (m >= 60) { m -= 60; h += 1; } } return slots; }
-function horariosParaTipo(dataISO, tipo, ocupados) { if (tipo === "remoto") return gerarSlots(JANELA_REMOTO[0], JANELA_REMOTO[1]); const dia = new Date(dataISO + "T00:00:00").getDay(); const occ = new Set((ocupados || []).filter(Boolean).map((h) => h.slice(0, 5))); const livres = []; for (const [ini, fim] of (JANELAS_SEMANA[dia] || [])) gerarSlots(ini, fim).forEach((h) => { if (!occ.has(h)) livres.push(h); }); return livres; }
+function horariosParaTipo(dataISO, tipo, ocupados) { if (tipo === "remoto") return gerarSlots(JANELA_REMOTO[0], JANELA_REMOTO[1]); const occ = new Set((ocupados || []).filter(Boolean).map((h) => h.slice(0, 5))); return gerarSlots(JANELA_PRESENCIAL[0], JANELA_PRESENCIAL[1]).filter((h) => !occ.has(h)); }
 function minutosDoHorario(h) { const [hh, mm] = String(h || "").split(":").map(Number); return (hh || 0) * 60 + (mm || 0); }
 // O MESMO LUGAR ESCRITO DE DUAS FORMAS VIRAVA DUAS CIDADES. O fornecedor Seu Andrade está cadastrado como
 // "Jardim do Ingá" (é o nome certo do lugar) e a tabela de estrada usa "jardim inga" — sem casar, o par não
@@ -2499,10 +2495,9 @@ function conflitaComIgreja(dataISO, hora, tipo, cidade) {
   const volta = minutosDoHorario(hora) + DURACAO_SERVICO_MIN + tempoEstradaMin(cidade, CIDADE_BASE);
   return volta > minutosDoHorario(IGREJA_HORA) - IGREJA_MARGEM_MIN;
 }
-// O QUE O APP PODE ESCOLHER SOZINHO. horariosParaTipo continua devolvendo tudo que é possível (a escolha
-// manual do Diego não muda); esta lista é a de sugestão — 13h30 pra cima, noite só terça e sábado, nada que
-// faça ele chegar atrasado na igreja. O 13:30 não existe na grade de hora cheia, então entra na frente
-// quando a janela da tarde daquele dia começa 13:00 ou antes e ninguém ocupou o horário.
+// O QUE O APP PODE ESCOLHER SOZINHO. horariosParaTipo devolve tudo que cabe no dia; esta lista tira o que é
+// arriscado — horário que faz ele chegar atrasado na igreja, que não dá tempo de estrada até outra cidade do dia
+// e, se for hoje, o que já passou. Sem preferência de manhã ou tarde desde 14/09: a rotina saiu.
 // PREFLIGHT DE ROTA NA SUGESTÃO AUTOMÁTICA (item AGENDA-PREFLIGHT-SOLUCAO-20260824-1557).
 //
 // O seletor manual já pinta de vermelho o horário que não dá tempo de serviço + estrada — a checagem
@@ -2524,22 +2519,16 @@ function apertaARota(h, tipo, cidade, outrosDoDia) {
   return outros.length > 0 && horarioApertado(h, outros, cidade);
 }
 function horariosSugeridos(dataISO, tipo, ocupados, cidade, outrosDoDia) {
-  const dia = new Date(dataISO + "T00:00:00").getDay();
-  const teto = tipo === "remoto" ? JANELA_REMOTO[1] : (DIAS_NOITE_LIBERADA.includes(dia) ? HORA_MAX_SUGESTAO_NOITE : HORA_MAX_SUGESTAO_PADRAO);
-  const min = minutosDoHorario(HORA_MIN_SUGESTAO), max = minutosDoHorario(teto);
-  const cabe = (h) => minutosDoHorario(h) >= min && minutosDoHorario(h) <= max && !conflitaComIgreja(dataISO, h, tipo, cidade)
-    && !apertaARota(h, tipo, cidade, outrosDoDia);
-  const lista = horariosParaTipo(dataISO, tipo, ocupados).filter(cabe);
-  const occ = new Set((ocupados || []).filter(Boolean).map((h) => h.slice(0, 5)));
-  const janelaDaTarde = tipo === "remoto"
-    ? [JANELA_REMOTO]
-    : (JANELAS_SEMANA[dia] || []).filter(([ini, fim]) => minutosDoHorario(ini) <= min && minutosDoHorario(fim) > min);
-  if (janelaDaTarde.length && !occ.has(HORA_MIN_SUGESTAO) && cabe(HORA_MIN_SUGESTAO)) lista.unshift(HORA_MIN_SUGESTAO);
-  return lista;
+  // Hoje, horário que já passou não é sugestão (antes o 13:30 mascarava isso de manhã). Dia futuro vale inteiro.
+  const agora = new Date();
+  const minAgora = dataISO === hojeISO() ? agora.getHours() * 60 + agora.getMinutes() : -1;
+  return horariosParaTipo(dataISO, tipo, ocupados).filter((h) => minutosDoHorario(h) > minAgora
+    && !conflitaComIgreja(dataISO, h, tipo, cidade) && !apertaARota(h, tipo, cidade, outrosDoDia));
 }
-// Uma sugestão só, pra quem precisa de um horário e não de uma lista (triagem, plano de compra). Nunca
-// devolve manhã por conta própria; se o dia não tem nada sugerível, prefere o horário mais tarde possível
-// que ainda não atropela a igreja, e só em último caso um 14:00 honesto.
+// Uma sugestão só, pra quem precisa de um horário e não de uma lista (triagem, plano de compra): o primeiro
+// horário livre e seguro do dia. Sem preferência de tarde desde 14/09 (a rotina saiu), então pode cair às 08:00.
+// Se o dia não tem nada seguro, prefere o mais tarde que ainda não atropela a igreja, e só em último caso um
+// 14:00 honesto.
 function horaSugerida(dataISO, tipo, ocupados, cidade, outrosDoDia) {
   const sugeridos = horariosSugeridos(dataISO, tipo, ocupados, cidade, outrosDoDia);
   if (sugeridos.length) return sugeridos[0];
@@ -3173,8 +3162,8 @@ function Home() {
       if (form.addAgenda) {
         const doDia = agendaVisivel.filter((entry) => entry.data === form.due && !ehRemoto(entry));
         const occupied = doDia.map((entry) => entry.hora?.slice(0, 5));
-        // O QUE O APP ESCOLHE SOZINHO SEGUE A ROTINA DELE (14/08): antes era o primeiro slot livre — sempre
-        // 08:00 — e, sem slot, um 18:00 que cai em cima da igreja de seg/qua/sex. Ver horaSugerida.
+        // Sem hora informada, o app pega o primeiro horário livre que não aperta estrada nem igreja. A preferência
+        // de tarde da rotina (14/08) saiu em 14/09. Ver horaSugerida.
         const fallback = horaSugerida(form.due, form.agendaType, occupied, form.city, doDia);
         const appointment = { titulo: `${customer.nome} — ${form.service.trim()}`, data: form.due, hora: form.time || fallback, cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType, status: "planejado", servico_id: service.id };
         const { data: linked } = await db.from("agenda").select("id").eq("servico_id", service.id).eq("status", "planejado").limit(1);
@@ -5718,10 +5707,9 @@ function ExplicarModal({ db, demo, notify, item, kind, onClose, onDone }) {
   </div>;
 }
 
-// O SELETOR MOSTRA O QUE O APP RECOMENDA, NÃO TUDO QUE CABE (14/08). A lista antiga começava às 08:00 todo
-// dia — manhã é exatamente o que ele não quer que apareça por padrão — e deixava clicar num horário
-// fisicamente impossível sem nem perguntar. Agora: sugestão primeiro (13h30 pra cima, igreja fora), o resto
-// atrás de um botão, e horário arriscado exige um segundo clique de confirmação.
+// O SELETOR MOSTRA O SEGURO PRIMEIRO (14/08; rotina retirada em 14/09). Sugestão = horário livre que não aperta
+// a estrada nem a igreja; o resto fica atrás de um botão, e horário arriscado exige um segundo clique de
+// confirmação. Até 14/09 a sugestão também escondia manhã e meio-dia pela rotina antiga — não esconde mais.
 function AgendaPicker({ appointments, appt, onClose, onPicked }) {
   // MODALIDADE, não o valor cru de `tipo` (13/09): 'operacional' ou 'retirada' desloca igual a presencial.
   const tipo = ehRemoto(appt) ? "remoto" : "presencial";
@@ -5756,8 +5744,8 @@ function AgendaPicker({ appointments, appt, onClose, onPicked }) {
     <div className="modal-card small">
       <div className="modal-head"><div><p className="kicker">ESCOLHER DIA E HORÁRIO</p><h2>{appt.titulo || "Compromisso"}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
       <p className="modal-intro">{tipo === "remoto"
-        ? "Tarefa remota — sugestão a partir das 13h30; o resto fica atrás do botão abaixo."
-        : `Presencial${cidade ? " em " + cidade : ""} — sugestão a partir das 13h30, terça e sábado até 21h, igreja de 18h30 preservada.`}</p>
+        ? "Tarefa remota — não disputa horário nem estrada."
+        : `Presencial${cidade ? " em " + cidade : ""} — horários livres que não apertam a estrada nem a igreja de 18h30; os arriscados ficam atrás do botão abaixo.`}</p>
       {!dias.length ? <div className="empty-state"><b>Sem horário sugerido nos próximos 14 dias.</b><span>Use "ver todos os horários" pra escolher manualmente.</span></div> : dias.map((dia) => <div className="picker-day" key={dia.dataISO}>
         <div className={`picker-day-label${dia.conflito ? " conflito" : ""}`}>{compactDate(dia.dataISO)}{dia.doDia.length ? ` · ${dia.doDia.length} compromisso(s)` : " · dia livre"}{dia.cidadesDoDia.length ? ` · 🏙 ${dia.cidadesDoDia.join(", ")}` : ""}{dia.igreja ? " · ⛪ 18h30" : ""}</div>
         {dia.conflito && <div className="picker-aviso">⚠️ Já tem {dia.outrasCidades.map((a) => `${(a.hora || "").slice(0, 5)} em ${a.cidade}`).join(", ")} — horários em vermelho não dão tempo de serviço + estrada.</div>}
@@ -5774,7 +5762,7 @@ function AgendaPicker({ appointments, appt, onClose, onPicked }) {
       </div>)}
       {confirmando && <p className="picker-aviso">Esse horário está marcado como arriscado — clique de novo pra assumir mesmo assim.</p>}
       <div className="ficha-actions"><button type="button" className="ghost" onClick={() => { setMostrarTudo(!mostrarTudo); setConfirmando(null); }}>
-        {mostrarTudo ? "Mostrar só os horários sugeridos" : `Ver todos os horários${escondidos ? ` (+${escondidos} fora da sugestão, inclusive manhã)` : ""}`}
+        {mostrarTudo ? "Mostrar só os horários sugeridos" : `Ver todos os horários${escondidos ? ` (+${escondidos} fora da sugestão)` : ""}`}
       </button></div>
     </div>
   </div>;
