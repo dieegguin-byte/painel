@@ -1165,7 +1165,11 @@ const JANELA_PRESENCIAL = ["08:00", "21:00"];
 // Tarefa remota (ligar, mandar mensagem) não disputa horário: janela ampla, todo dia, nunca bloqueia horário ocupado.
 const JANELA_REMOTO = ["07:00", "22:00"];
 const IGREJA_DIAS = [1, 3, 5];
-const IGREJA_HORA = "18:30";
+// 20h desde 14/09/2026 (Diego: "igreja às 20 horas agora"). Era 18h30.
+const IGREJA_HORA = "20:00";
+// O rótulo de tela sai da constante: com o texto escrito à mão em três lugares, a hora mudava aqui e a tela
+// continuava dizendo 18h30.
+const IGREJA_ROTULO = IGREJA_HORA.endsWith(":00") ? String(Number(IGREJA_HORA.slice(0, 2))) + "h" : IGREJA_HORA.replace(":", "h");
 // Margem pra trocar de roupa e sair — chegar em cima da hora é chegar atrasado.
 const IGREJA_MARGEM_MIN = 20;
 // Tempo típico de estrada entre as praças do Diego, em minutos (par de cidadeChave em ordem alfabética). Estimativa pro ALERTA, não pra bloquear.
@@ -2486,7 +2490,7 @@ function urlWhatsapp(tel, texto) {
   return `intent://send?${qs}#Intent;scheme=whatsapp;package=${pacoteWhatsapp(tel)};S.browser_fallback_url=${encodeURIComponent(web)};end`;
 }
 function horarioApertado(h, outros, cidadeNova) { return (outros || []).some((a) => Math.abs(minutosDoHorario(h) - minutosDoHorario(a.hora)) < tempoEstradaMin(cidadeNova, a.cidade) + DURACAO_SERVICO_MIN); }
-// IGREJA É COMPROMISSO, NÃO "HORÁRIO VAZIO". Seg/qua/sex às 18h30. O que trava não é a hora do serviço, é a
+// IGREJA É COMPROMISSO, NÃO "HORÁRIO VAZIO". Seg/qua/sex às 20h desde 14/09 (era 18h30 — o exemplo abaixo é dessa época). O que trava não é a hora do serviço, é a
 // hora em que ele consegue voltar: serviço + estrada de volta pra base. Um 17h em Brasília termina 18h e
 // chega em Luziânia 19h15 — o app oferecia esse slot sem dizer nada. Remoto não desloca, então não conflita.
 function ehDiaDeIgreja(dataISO) { return IGREJA_DIAS.includes(new Date(dataISO + "T00:00:00").getDay()); }
@@ -5745,16 +5749,16 @@ function AgendaPicker({ appointments, appt, onClose, onPicked }) {
       <div className="modal-head"><div><p className="kicker">ESCOLHER DIA E HORÁRIO</p><h2>{appt.titulo || "Compromisso"}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
       <p className="modal-intro">{tipo === "remoto"
         ? "Tarefa remota — não disputa horário nem estrada."
-        : `Presencial${cidade ? " em " + cidade : ""} — horários livres que não apertam a estrada nem a igreja de 18h30; os arriscados ficam atrás do botão abaixo.`}</p>
+        : `Presencial${cidade ? " em " + cidade : ""} — horários livres que não apertam a estrada nem a igreja de ${IGREJA_ROTULO}; os arriscados ficam atrás do botão abaixo.`}</p>
       {!dias.length ? <div className="empty-state"><b>Sem horário sugerido nos próximos 14 dias.</b><span>Use "ver todos os horários" pra escolher manualmente.</span></div> : dias.map((dia) => <div className="picker-day" key={dia.dataISO}>
-        <div className={`picker-day-label${dia.conflito ? " conflito" : ""}`}>{compactDate(dia.dataISO)}{dia.doDia.length ? ` · ${dia.doDia.length} compromisso(s)` : " · dia livre"}{dia.cidadesDoDia.length ? ` · 🏙 ${dia.cidadesDoDia.join(", ")}` : ""}{dia.igreja ? " · ⛪ 18h30" : ""}</div>
+        <div className={`picker-day-label${dia.conflito ? " conflito" : ""}`}>{compactDate(dia.dataISO)}{dia.doDia.length ? ` · ${dia.doDia.length} compromisso(s)` : " · dia livre"}{dia.cidadesDoDia.length ? ` · 🏙 ${dia.cidadesDoDia.join(", ")}` : ""}{dia.igreja ? ` · ⛪ ${IGREJA_ROTULO}` : ""}</div>
         {dia.conflito && <div className="picker-aviso">⚠️ Já tem {dia.outrasCidades.map((a) => `${(a.hora || "").slice(0, 5)} em ${a.cidade}`).join(", ")} — horários em vermelho não dão tempo de serviço + estrada.</div>}
         <div className="picker-slots">{dia.livres.map((h) => {
           const rota = horarioApertado(h, dia.outrasCidades, cidade);
           const igreja = conflitaComIgreja(dia.dataISO, h, tipo, cidade);
           const travado = rota || igreja;
           const chave = dia.dataISO + " " + h;
-          const motivo = igreja ? "Serviço + estrada de volta não fecha antes da igreja de 18h30." : "Muito perto do compromisso em outra cidade — serviço + estrada não fecha.";
+          const motivo = igreja ? `Serviço + estrada de volta não fecha antes da igreja de ${IGREJA_ROTULO}.` : "Muito perto do compromisso em outra cidade — serviço + estrada não fecha.";
           return <button key={h} className={`picker-slot${travado ? " risky" : ""}${confirmando === chave ? " confirmando" : ""}`} title={travado ? motivo : ""} onClick={() => escolher(dia.dataISO, h, travado)}>
             {confirmando === chave ? "Confirmar " + h + "?" : h}{igreja && confirmando !== chave ? " ⛪" : ""}
           </button>;
