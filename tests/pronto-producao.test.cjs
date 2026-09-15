@@ -6,7 +6,7 @@ const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, '../nova.html'), 'utf8');
 const source = html.match(/<script type="text\/plain" id="app-source">([\s\S]*?)<\/script>/)[1];
 const helpers = source.slice(source.indexOf('function servicoPronto('), source.indexOf('function ProntidaoButton('));
-const ctx = vm.createContext({});
+const ctx = vm.createContext({SEM_PROFISSIONAL:'Sem profissional atribuído'});
 vm.runInContext(helpers, ctx);
 
 test('prontidão depende do estado físico estruturado, não de texto, material ou valor', () => {
@@ -19,6 +19,27 @@ test('dois prontos saem da carga e o terceiro continua em produção', () => {
   assert.equal(services.filter(ctx.servicoPronto).length, 2);
   assert.equal(services.filter(ctx.ocupaCapacidade).length, 1);
   assert.equal(ctx.ocupaCapacidade({status:'agendado'}), true);
+});
+test('capacidade reúne atribuição oficial, texto e legado sem confundir operador', () => {
+  const nome = 'Profissional A';
+  const services = [
+    {id:'oficial',status:'agendado',profissional_cadastro:{nome},profissional:'Nome antigo',responsavel:null},
+    {id:'texto',status:'agendado',profissional:nome,responsavel:null},
+    {id:'operador',status:'agendado',profissional_cadastro:{nome},profissional:nome,responsavel:'Diego'},
+    {id:'quarto',status:'agendado',profissional_cadastro:{nome},responsavel:null},
+    {id:'controle',status:'producao',responsavel:nome},
+    {id:'pronto1',status:'pronto',profissional:nome},
+    {id:'pronto2',status:'pronto',profissional_cadastro:{nome}},
+    {id:'lead',status:'lead',profissional:nome},
+    {id:'orcamento',status:'orcamento',profissional:nome},
+    {id:'sem',status:'agendado'},
+  ];
+  const antes = JSON.stringify(services);
+  const grupos = ctx.agruparCapacidade(services);
+  assert.deepEqual(Array.from(grupos[nome], s=>s.id), ['oficial','texto','operador','quarto','controle']);
+  assert.equal(grupos.Diego, undefined);
+  assert.deepEqual(Array.from(grupos['Sem profissional atribuído'],s=>s.id), ['sem']);
+  assert.equal(JSON.stringify(services), antes, 'Agrupamento não modifica dados ou status');
 });
 function database(response) {
   const calls = [];

@@ -611,6 +611,19 @@ const STATUS_VIVOS = ["lead", "orcamento", "agendado", "producao", "pronto"];
 // Prontidão é fato físico confirmado; material e texto livre não provam conclusão.
 function servicoPronto(s) { return s?.status === "pronto"; }
 function ocupaCapacidade(s) { return ["agendado", "producao"].includes(s?.status); }
+function profissionalDaCapacidade(s) {
+  // O vínculo oficial prevalece. `responsavel` pode ser o operador do atendimento;
+  // só serve de fallback para serviços antigos sem atribuição de profissional.
+  return s?.profissional_cadastro?.nome?.trim() || s?.profissional?.trim()
+    || s?.responsavel?.trim() || SEM_PROFISSIONAL;
+}
+function agruparCapacidade(services) {
+  const grupos = Object.create(null);
+  (services || []).filter(ocupaCapacidade).forEach((s) => {
+    (grupos[profissionalDaCapacidade(s)] ||= []).push(s);
+  });
+  return grupos;
+}
 
 async function marcarServicoPronto(db, s) {
   if (s.status !== "producao") throw new Error("Somente serviço em produção pode ser marcado como pronto.");
@@ -2914,7 +2927,7 @@ function Home() {
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
         // cidade, e "Luziânia" não leva ninguém à casa do cliente.
-        db.from("servicos").select("*,clientes(id,nome,telefone,cidade,endereco,obs,latitude,longitude,localizacao_confianca)").order("criado_em", { ascending: false }),
+        db.from("servicos").select("*,clientes(id,nome,telefone,cidade,endereco,obs,latitude,longitude,localizacao_confianca),profissional_cadastro:profissionais!servicos_profissional_id_fkey(id,nome)").order("criado_em", { ascending: false }),
         db.from("agenda").select("*").eq("status", "planejado").order("data", { ascending: true }).order("hora", { ascending: true }),
         db.from("financeiro").select("*").order("data", { ascending: false }),
         db.from("rotinas").select("*").eq("ativo", true).order("criado_em", { ascending: true }),
@@ -4012,11 +4025,7 @@ function TriagePanel(props) {
   useEffect(() => { setEditText(parsed.text); setEditing(false); setConfirmDelete(false); }, [item.id]);
   const relatedServices = form.customerId ? services.filter((entry) => entry.cliente_id === form.customerId && STATUS_VIVOS.includes(entry.status)) : [];
   const cityConflicts = form.due && form.agendaType === "presencial" ? appointments.filter((entry) => entry.data === form.due && !ehRemoto(entry) && entry.cidade && form.city && entry.cidade.toLowerCase() !== form.city.toLowerCase()) : [];
-  const porProfissional = useMemo(() => {
-    const map = {};
-    services.forEach((s) => { if (s.responsavel && ["lead", "orcamento", "agendado", "producao"].includes(s.status)) { const k = s.responsavel.trim(); (map[k] ||= []).push(s); } });
-    return map;
-  }, [services]);
+  const porProfissional = useMemo(() => agruparCapacidade(services), [services]);
   return <div className="triage-panel">
     <div className="triage-head"><div><span className={`status-pill status-${status}`}>{statusLabel[status]}</span><h2>Entrada #{String(item.id).slice(0, 8)}</h2></div>
       <div className="triage-head-actions">
@@ -5043,14 +5052,8 @@ function CapacidadeCard({ services, finances, fornecedores, appointments, agenda
     if (s.status === "agendado") return "📦 Aguardando retirada da peça";
     return statusLabel[s.status] || s.status;
   };
-  const porProfissional = useMemo(() => {
-    const map = {};
-    // Capacidade é só trabalho FECHADO que ocupa alguém: agendado e produção. Lead e orçamento são funil
-    // comercial - ninguém está trabalhando neles, e contá-los inflava o card (52 itens onde havia 1 real).
-    // Sem responsável entra num grupo próprio: é carga de verdade sem dono definido, não pode sumir do radar.
-    (services || []).forEach((s) => { if (ocupaCapacidade(s)) { const k = s.responsavel?.trim() || SEM_PROFISSIONAL; (map[k] ||= []).push(s); } });
-    return map;
-  }, [services]);
+  // Mesma fonte e regra da capacidade exibida durante a atribuição de um serviço.
+  const porProfissional = useMemo(() => agruparCapacidade(services), [services]);
   const ultimaAtividade = useMemo(() => {
     const m = {};
     const marca = (id, d) => { if (id && d && (!m[id] || d > m[id])) m[id] = d; };
