@@ -581,9 +581,53 @@ const emptyForm = {
 
 const statusLabel = {
   novo: "Novo", em_processamento: "Claude trabalhando", aguardando_voce: "Aguardando você", respondido: "Respondido",
-  lead: "Novo lead", orcamento: "Orçamento", agendado: "Agendado", producao: "Em produção", entregue: "Entregue", pago: "Pago", perdido: "Perdido",
+  lead: "Novo lead", orcamento: "Orçamento", agendado: "Agendado", producao: "Em produção", pronto: "Pronto para entregar", entregue: "Entregue", pago: "Pago", perdido: "Perdido",
 };
-const STATUS_VIVOS = ["lead", "orcamento", "agendado", "producao"];
+const STATUS_VIVOS = ["lead", "orcamento", "agendado", "producao", "pronto"];
+// Prontidão é fato físico confirmado; material e texto livre não provam conclusão.
+function servicoPronto(s) { return s?.status === "pronto"; }
+function ocupaCapacidade(s) { return ["agendado", "producao"].includes(s?.status); }
+
+async function marcarServicoPronto(db, s) {
+  if (s.status !== "producao") throw new Error("Somente serviço em produção pode ser marcado como pronto.");
+  const { data, error } = await db.from("servicos").update({ status: "pronto", atualizado_em: new Date().toISOString() })
+    .eq("id", s.id).eq("status", "producao").eq("atualizado_em", s.atualizado_em).select("id,status").single();
+  if (error) throw error;
+  if (data?.status !== "pronto") throw new Error("Prontidão não confirmada. Atualize o painel e confira o serviço.");
+  return data;
+}
+
+function ProntidaoButton({ service, db, demo, notify, onChanged }) {
+  const [confirmando, setConfirmando] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (service.status !== "producao") return null;
+  const salvar = async () => {
+    if (demo) { notify("Na demonstração não salva.", "info"); setConfirmando(false); return; }
+    setBusy(true);
+    try { await marcarServicoPronto(db, service); notify("Pronto para entregar. Saiu da capacidade de produção.", "ok"); await onChanged?.(); }
+    catch (e) { notify("Não foi possível confirmar a prontidão: " + e.message, "error"); }
+    finally { setBusy(false); setConfirmando(false); }
+  };
+  return <div className="prontidao-acao">{confirmando ? <>
+    <p>A produção deste serviço está concluída? A entrega e o financeiro continuam separados.</p>
+    <button className="ghost" disabled={busy} onClick={salvar}>{busy ? "Salvando…" : "Confirmar que está pronto"}</button>
+    <button className="ghost" disabled={busy} onClick={() => setConfirmando(false)}>Cancelar</button>
+  </> : <button className="ghost" onClick={() => setConfirmando(true)}>✓ Marcar como pronto</button>}</div>;
+}
+
+function ProntosParaEntregarCard({ services, onOpenFicha }) {
+  const prontos = (services || []).filter(servicoPronto);
+  return <section className="content-card" aria-label="Prontos para entregar">
+    <p className="kicker">PRODUÇÃO CONCLUÍDA</p><h3>Prontos para entregar · {prontos.length}</h3>
+    {!prontos.length && <p>Nenhum serviço aguardando entrega.</p>}
+    {prontos.map((s) => <article className="capacidade-servico" key={s.id}>
+      <strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span>
+      <em>{s.profissional || s.responsavel || "Sem profissional"} · Pronto para entregar</em>
+      {s.proxima_acao && <p>{s.proxima_acao}</p>}
+      <button className="ghost" onClick={() => onOpenFicha(s.cliente_id)}>Abrir serviço / entrega</button>
+    </article>)}
+  </section>;
+}
 
 const demoInbox = [
   { id: "cx-101", texto: "Oi, quero reformar meu sofá retrátil. Sou Mariana, moro no Jardim Ingá. Pode fazer orçamento? Meu WhatsApp é (61) 90000-0000.", status: "respondido", conversa: [{ de: "ia", texto: "Você prefere visita presencial ou enviar as medidas?", em: new Date().toISOString() }, { de: "diego", texto: "Ela quer visita presencial amanhã à tarde.", em: new Date().toISOString() }], criado_em: "2026-07-10T10:20:00Z", processado: false },
@@ -2211,7 +2255,7 @@ async function aplicarEntregaConcluidaOperacional(db, eventoId, dados) {
   if (agenda?.servico_id && dados.servicoId && agenda.servico_id !== dados.servicoId) throw new Error("A agenda pertence a outro serviço.");
   const servico = await lerRegistro(db, "servicos", servicoId);
   if (!servico) throw new Error("Serviço não encontrado.");
-  if (!["agendado", "producao", "entregue"].includes(servico.status)) throw new Error("Serviço em " + servico.status + " não pode ser entregue.");
+  if (!["agendado", "producao", "pronto", "entregue"].includes(servico.status)) throw new Error("Serviço em " + servico.status + " não pode ser entregue.");
   // ENTREGAR COM MATERIAL PENDENTE VIROU EXCEÇÃO REGISTRADA (auditoria de 14/08, P0 nº 2). O botão
   // "Entregar mesmo assim" existia no fluxo normal, do lado do aviso de material faltando, e fechava o
   // serviço em silêncio — ninguém nunca soube quantas vezes isso aconteceu. Continua sendo possível (às
@@ -4390,7 +4434,7 @@ function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
 // Uma função só, consumida por Painel, Funil e Capacidade — o recado pede isso explicitamente, e é a
 // razão de existir: três telas com três critérios divergentes foi como a Nurimar "sumiu" em agosto.
 const FLUXO_TERMINAIS = ["entregue", "pago", "perdido"];
-const FLUXO_FECHADOS = ["agendado", "producao"];
+const FLUXO_FECHADOS = ["agendado", "producao", "pronto"];
 // `ctx` traz o estado vivo já indexado: quem monta é `contextoDeFluxo`, uma vez por render, e não cada
 // tela do seu jeito.
 function classificarFluxoServico(servico, ctx) {
@@ -4684,9 +4728,7 @@ function CapacidadeCard({ services, finances, fornecedores, appointments, agenda
   };
   // "AGENDADO" NÃO DIZ NADA PRA QUEM OLHA A OFICINA (auditoria de 14/08). O card mostrava o status cru do
   // banco, e agendado tanto pode ser "a peça nem foi buscada" quanto "está aqui parada esperando espuma".
-  // São filas diferentes e pedem ações diferentes. O que o app NÃO sabe dizer ainda é "pronto para entrega":
-  // não existe marca de fim de produção — só a entrega, que é o próximo passo. Enquanto não existir, é
-  // melhor não inventar um rótulo que pode estar mentindo.
+  // São filas diferentes e pedem ações diferentes. Prontos têm status próprio e aparecem no bloco de entrega.
   const situacaoNaOficina = (s) => {
     if (esperandoMaterial(s)) return s.status === "producao" ? "⏳ Em produção, mas falta material" : "⏳ Esperando material";
     if (s.status === "producao") return "🔨 Em produção";
@@ -4698,7 +4740,7 @@ function CapacidadeCard({ services, finances, fornecedores, appointments, agenda
     // Capacidade é só trabalho FECHADO que ocupa alguém: agendado e produção. Lead e orçamento são funil
     // comercial - ninguém está trabalhando neles, e contá-los inflava o card (52 itens onde havia 1 real).
     // Sem responsável entra num grupo próprio: é carga de verdade sem dono definido, não pode sumir do radar.
-    (services || []).forEach((s) => { if (["agendado", "producao"].includes(s.status)) { const k = s.responsavel?.trim() || SEM_PROFISSIONAL; (map[k] ||= []).push(s); } });
+    (services || []).forEach((s) => { if (ocupaCapacidade(s)) { const k = s.responsavel?.trim() || SEM_PROFISSIONAL; (map[k] ||= []).push(s); } });
     return map;
   }, [services]);
   const ultimaAtividade = useMemo(() => {
@@ -4742,6 +4784,7 @@ function CapacidadeCard({ services, finances, fornecedores, appointments, agenda
           {!!materiaisAnotadosPendentes(s) && <span className="material-itens">{(s.materiais_necessarios || []).filter((m) => !m.arquivado && !m.comprado).map((m) => m.item + (m.pedido ? " 🚚" : "")).join(" · ")}</span>}
           <button type="button" className="ghost" disabled={busyMaterial === s.id} onClick={(e) => { e.stopPropagation(); marcarMaterialEmMaos(s); }}>{busyMaterial === s.id ? "..." : "📦 Já comprei, está em mãos"}</button>
         </div>}
+        <ProntidaoButton service={s} db={db} demo={demo} notify={notify} onChanged={onChanged} />
         {entregando === s.id
           ? <div className="entrega-form">
               <label>Valor total do serviço<input value={valorDraft} onChange={(e) => setValorDraft(e.target.value)} placeholder="R$" autoFocus /></label>
@@ -5082,6 +5125,7 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, fin
     com a tela dela. Contador que leva pra uma tela que não existe mais só quebraria no toque. */}
 <section className="metric-grid"><Metric label="Atrasados" value={atrasadosAll.length} detail="De dias anteriores, sem desfecho" tone="yellow" onClick={atrasadosAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
+    <ProntosParaEntregarCard services={services} onOpenFicha={onOpenFicha} />
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} appointments={appointments} agendaHistorico={agendaHistorico} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
     <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
@@ -5245,7 +5289,7 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, fin
 }
 function Metric({ label, value, detail, tone, onClick }) { return <article className={`metric-card ${tone}${onClick ? " clickable" : ""}`} onClick={onClick || undefined}><span>{label}</span><b>{value}</b><small>{detail}</small></article>; }
 
-const FUNIL_FILTROS = [{ id: "todos", label: "Todos" }, { id: "sem_acao", label: "Sem ação" }, { id: "precisa_avancar", label: "Precisa avançar" }, { id: "retorno_vencido", label: "Retorno vencido" }, { id: "lead", label: "Lead" }, { id: "orcamento", label: "Orçamento" }, { id: "agendado", label: "Agendado" }, { id: "producao", label: "Em produção" }, { id: "entregue", label: "Entregue" }];
+const FUNIL_FILTROS = [{ id: "todos", label: "Todos" }, { id: "sem_acao", label: "Sem ação" }, { id: "precisa_avancar", label: "Precisa avançar" }, { id: "retorno_vencido", label: "Retorno vencido" }, { id: "lead", label: "Lead" }, { id: "orcamento", label: "Orçamento" }, { id: "agendado", label: "Agendado" }, { id: "producao", label: "Em produção" }, { id: "pronto", label: "Prontos para entregar" }, { id: "entregue", label: "Entregue" }];
 function LeadsView({ services, appointments, agendaHistorico, inbox, search, setSearch, onOpenFicha, initialFiltro, onConsumedInitialFiltro }) {
   const [filtroStatus, setFiltroStatus] = useState(initialFiltro || "todos");
   useEffect(() => { if (onConsumedInitialFiltro) onConsumedInitialFiltro(); }, []);
@@ -5256,7 +5300,7 @@ function LeadsView({ services, appointments, agendaHistorico, inbox, search, set
   const fluxoDe = (s) => classificarFluxoServico(s, ctxFluxo);
   // Mesma fila do card de Capacidade: produção primeiro (peça na bancada, prazo correndo), agendado no
   // final (fechado mas nem começou), e dentro de cada faixa o prazo mais apertado na frente.
-  const ORDEM_FILA = { producao: 0, lead: 1, orcamento: 1, agendado: 2, entregue: 3, pago: 4, perdido: 5 };
+  const ORDEM_FILA = { pronto: 0, producao: 0, lead: 1, orcamento: 1, agendado: 2, entregue: 3, pago: 4, perdido: 5 };
   const visible = services.filter((service) => `${service.clientes?.nome} ${service.titulo}`.toLowerCase().includes(search.toLowerCase())).filter((service) => filtroStatus === "todos"
       || (filtroStatus === "sem_acao" ? fluxoDe(service).estado === "sem_acao"
         : filtroStatus === "precisa_avancar" ? fluxoDe(service).estado === "precisa_avancar"
@@ -5614,7 +5658,7 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, servic
         {filePicker}
         {ehBuscaDeServico && <button className="primary wide" onClick={() => setStep("buscou")} disabled={busy}>📦 Busquei — deixei com o profissional</button>}
         <button className={ehBuscaDeServico ? "ghost wide" : "primary wide"} onClick={concluirTotal} disabled={busy}>✔ Concluído total — acabou</button>
-        {!ehCompra && !ehEntrega && svc && ["agendado", "producao"].includes(svc.status) && <button className="ghost wide" onClick={() => setStep("entrega")} disabled={busy}>Foi a entrega final — fechar o serviço</button>}
+        {!ehCompra && !ehEntrega && svc && ["agendado", "producao", "pronto"].includes(svc.status) && <button className="ghost wide" onClick={() => setStep("entrega")} disabled={busy}>Foi a entrega final — fechar o serviço</button>}
         <button className="secondary wide" onClick={openParcial} disabled={busy}>🟡 Parcial — falta algo, o Claude reagenda</button>
       </div> : step === "buscou" ? <div className="form-grid">
         <p className="modal-intro">A peça de {svc?.clientes?.nome || "esse cliente"} veio pra oficina. O serviço entra em produção agora — com quem ela ficou?</p>
@@ -6133,7 +6177,7 @@ function resumoContas(finances, services, hoje) {
   const urgentes = comPrazo.filter((f) => (f.data || "") >= hoje && (f.data || "") <= limite).sort(porData);
   const aReceber = (finances || []).filter((f) => f.tipo === "entrada" && f.status === "a_receber");
   const comEntrada = new Set((finances || []).filter((f) => f.tipo === "entrada" && f.servico_id).map((f) => f.servico_id));
-  const prontosSemCobranca = (services || []).filter((s) => ["entregue", "producao"].includes(s.status) && Number(s.valor_orcamento) > 0 && !comEntrada.has(s.id));
+  const prontosSemCobranca = (services || []).filter((s) => ["entregue", "producao", "pronto"].includes(s.status) && Number(s.valor_orcamento) > 0 && !comEntrada.has(s.id));
   const soma = (l, campo) => l.reduce((s, i) => s + Number(campo ? i[campo] : i.valor), 0);
   return {
     amanha, limite, aPagar, vencidas, urgentes, semVencimento, aReceber, prontosSemCobranca,
@@ -6235,7 +6279,7 @@ function compraPrecisaRevisao(item) { return !item.fornecedor_id && !(item.descr
 // lançamentos seria transformar oferta em aceite, que a própria Skill proíbe. Os cartões financeiros saem
 // dos lançamentos reais do serviço, e sem valor de orçamento o documento nem é gerado.
 const CS_ESC = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-function ehServicoFechado(s) { return ["agendado", "producao", "entregue", "pago"].includes(s?.status); }
+function ehServicoFechado(s) { return ["agendado", "producao", "pronto", "entregue", "pago"].includes(s?.status); }
 // RETORNO VENCIDO — a data existe e não faz nada (item ATIVOS-COM-DATA-20260827-1805-001).
 //
 // RETORNO VENCIDO — a data existe e não faz nada (item ATIVOS-COM-DATA-20260827-1805-001).
@@ -6502,7 +6546,7 @@ async function gerarConfirmacaoServico({ db, demo, cliente, servico, servicosDoC
 // (produção). São compromissos de natureza distinta — um é lembrete interno, o outro é promessa ao cliente.
 // Mostrar a data sem dizer do que ela é obriga ele a lembrar de cabeça em que fase cada serviço está.
 function rotuloPrazo(status) {
-  if (status === "producao") return "entregar até";
+  if (["producao", "pronto"].includes(status)) return "entregar até";
   if (status === "agendado") return "buscar em";
   if (status === "entregue" || status === "pago") return "entregue em";
   return "retomar em";
@@ -7350,15 +7394,14 @@ function PlanoDeCaixa({ finances, services, escopo }) {
   const projetado = caixa + totalReceber - totalVence;
   const atrasadas = vencendo.filter((f) => (f.data || "") < hoje);
   // Dinheiro parado em trabalho, por ordem de quão perto está de virar caixa.
-  const prontos = (services || []).filter((s) => s.status === "producao" && Number(s.valor_orcamento) > 0
-    && !(s.materiais_necessarios || []).some((m) => !m.comprado));
+  const prontos = (services || []).filter((s) => servicoPronto(s) && Number(s.valor_orcamento) > 0);
   const receberVencido = receber.filter((f) => (f.data || "") < hoje);
   const emProducao = (services || []).filter((s) => s.status === "producao" && Number(s.valor_orcamento) > 0 && !prontos.includes(s));
   const valorDe = (lista) => lista.reduce((s, x) => s + Number(x.valor_orcamento || x.valor || 0), 0);
   if (!vencendo.length && !receber.length) return null;
   const apertado = projetado < 0;
   const sugestoes = [];
-  if (prontos.length) sugestoes.push({ tom: "verde", titulo: `${prontos.length} serviço(s) pronto(s) pra entregar`, valor: valorDe(prontos), nomes: prontos.map((s) => s.clientes?.nome || "cliente"), como: "Material resolvido — entregar já vira dinheiro no caixa." });
+  if (prontos.length) sugestoes.push({ tom: "verde", titulo: `${prontos.length} serviço(s) pronto(s) pra entregar`, valor: valorDe(prontos), nomes: prontos.map((s) => s.clientes?.nome || "cliente"), como: "Produção concluída. Entrega e recebimento dependem de confirmação própria." });
   if (receberVencido.length) sugestoes.push({ tom: "amarelo", titulo: `${receberVencido.length} saldo(s) a receber já vencido(s)`, valor: valorDe(receberVencido), nomes: receberVencido.map((f) => descricaoFinanceiraVisivel(f.descricao).slice(0, 28)), como: "Cliente já recebeu ou combinou pagar — é só cobrar." });
   if (emProducao.length) sugestoes.push({ tom: "cinza", titulo: `${emProducao.length} em produção`, valor: valorDe(emProducao), nomes: emProducao.map((s) => s.clientes?.nome || "cliente"), como: "Ainda depende de material ou do profissional." });
   return <section className={`content-card plano-caixa${apertado ? " apertado" : ""}`}>
@@ -7854,7 +7897,8 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
                 {!!(fornecedores || []).length && <div className="fornecedor-chips">{fornecedores.map((f) => <button type="button" key={f.id} className={materialDraft.loja.trim() === f.nome ? "active" : ""} onClick={() => setMaterialDraft({ loja: f.nome, data: proximaEntregaFornecedor(f.dias_entrega) || materialDraft.data })}>{f.nome}</button>)}</div>}
               </div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEditandoMaterial(s.id); setMaterialDraft({ loja: s.loja_material || "", data: s.data_entrega_material || "" }); }}>{s.loja_material ? `🧵 ${s.loja_material}${s.data_entrega_material ? " · entrega " + compactDate(s.data_entrega_material) : ""}` : "+ Registrar loja/entrega do material"}</button>)}
-          {["agendado", "producao"].includes(s.status) && (entregando === s.id
+          <ProntidaoButton service={s} db={db} demo={demo} notify={notify} onChanged={async () => { await load(); onChanged?.(); }} />
+          {["agendado", "producao", "pronto"].includes(s.status) && (entregando === s.id
             ? <div className="entrega-form">
                 <label>Valor total do serviço<input value={valorEntregaDraft} onChange={(e) => setValorEntregaDraft(e.target.value)} placeholder="R$" autoFocus /></label>
                 <label>Recebeu quanto agora?<input value={recebidoFichaDraft} onChange={(e) => setRecebidoFichaDraft(e.target.value)} placeholder="R$ (vazio = não recebeu nada)" /></label>
