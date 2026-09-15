@@ -169,6 +169,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-quando b{display:block;font:700 19px Georgia,serif;color:var(--orange2)}
 .compromisso-quando span{display:block;font-size:10px;color:var(--dim);margin-top:3px}
 .compromisso-quando em{display:block;font-style:normal;font-size:9px;color:#e88477;margin-top:5px;font-weight:700}
+.compromisso-quando .idade-atraso{font-size:11px;line-height:1.4}.compromisso-quando .idade-atraso.antigo{color:#e4bd72}.compromisso-quando .idade-atraso small{display:block;font-size:10px;margin-top:4px}.atrasados-recentes{border-color:#d4a64e80}.revisao-antiga>.card-toggle h3{font-family:inherit;font-size:18px}.revisao-antiga .compromisso-card{border-left-color:var(--line2)}.revisao-data{padding:8px 12px;font-size:12px;color:var(--muted);border-left:2px solid var(--yellow);margin:12px 0 5px}
 .compromisso-corpo h4{margin:0 0 3px;font-size:15px;font-weight:650}
 .compromisso-local{margin:0 0 11px;font-size:11px;color:var(--dim)}
 .compromisso-info{background:#0f0d0c;border:1px solid var(--line);border-radius:12px;padding:12px}
@@ -3639,7 +3640,7 @@ function Home() {
           e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
       {tab === "painel" && <ConferenciaMonitorResumo monitor={monitorConferencia} demo={demo} onOpen={() => setTab("agente")} />}
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
@@ -4255,8 +4256,10 @@ function PessoalDetalhe({ p, a, today }) {
   </React.Fragment>)}</div>;
 }
 
-function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais }) {
+function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais, revisaoData = false }) {
   const [aberto, setAberto] = useState(false);
+  const diasAtraso = diasDeAtraso(a.data, today);
+  const idadeAtraso = diasAtraso > 0 && <em className={`idade-atraso${diasAtraso > 30 ? " antigo" : ""}`}>{diasAtraso} {diasAtraso === 1 ? "dia de atraso" : "dias de atraso"}{diasAtraso > 30 && <small>Mais de 30 dias</small>}</em>;
   // Sem `notify` aqui (o card não recebe a prop) — o aviso da cópia vive no próprio card.
   const [avisoGPT, setAvisoGPT] = useState("");
   // ITEM PESSOAL PROJETADO (ver pessoaisNaFila): não existe linha de agenda por trás dele. Este card não
@@ -4268,7 +4271,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
         <span>{compactDate(a.data)}</span>
-        {a.data < today && <em>atrasado</em>}
+        {idadeAtraso}
       </span>
       <span className="compromisso-idc">
         <strong>{a.titulo || "Compromisso pessoal"}</strong>
@@ -4412,7 +4415,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
         <span>{compactDate(a.data)}</span>
-        {a.data < today && <em>atrasado</em>}
+        {idadeAtraso}
       </span>
       <span className="compromisso-idc">
         <strong>{nomeCliente}</strong>
@@ -4420,6 +4423,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       </span>
       <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
     </button>
+    {revisaoData && <p className="revisao-data">Remarcação pendente · idade calculada pela data original. A data precisa de revisão.</p>}
     {aberto && <div className="compromisso-corpo">
       <h4>{tituloCard}</h4>
       {/* BLOQUEIO PESSOAL: a linha da agenda existe pra dizer que ele está indisponível, e o registro
@@ -4471,6 +4475,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
             ["nome", cli?.nome],
             ["cidade", cli?.cidade || a.cidade],
             ["compromisso", a.titulo],
+            ["situacao_data", revisaoData ? "Remarcação pendente: a data exibida é a original e precisa de revisão." : null],
           ]), (msg) => setAvisoGPT(msg))}>💬 ChatGPT</button>
         </div>
         {avisoGPT && <p className="compromisso-material">{avisoGPT}</p>}
@@ -5237,7 +5242,28 @@ function MateriaisCard({ services, today, estoque, onVerCompras }) {
 }
 
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
-function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+// Dias civis da agenda: UTC apenas para subtrair datas, sem depender de horário de verão.
+function diasDeAtraso(data, hoje) {
+  const dia = (valor) => {
+    if (typeof valor !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return NaN;
+    const ms = Date.parse(valor + "T00:00:00Z");
+    return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === valor ? ms : NaN;
+  };
+  const dias = (dia(hoje) - dia(data)) / 86400000;
+  return Number.isFinite(dias) && dias > 0 ? dias : 0;
+}
+function separarAtrasadosPorIdade(appointments, hoje) {
+  const recentes = [], antigos = [], acima30 = [];
+  (appointments || []).forEach((a) => {
+    if (!a || a.status !== "planejado" || a.pessoal_virtual) return;
+    const dias = diasDeAtraso(a.data, hoje);
+    if (!dias) return;
+    (dias <= 14 ? recentes : antigos).push(a);
+    if (dias > 30) acima30.push(a);
+  });
+  return { recentes, antigos, acima30 };
+}
+function Dashboard({ inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   const today = hojeISO();
   const profissionais = nomesProfissionais(services);
@@ -5283,7 +5309,12 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, fin
   // Agora quem decide o bloco é a DATA: dia anterior = atrasado, hoje = hoje, depois = próximo. A hora não
   // sumiu — ela vira o subtítulo do card de hoje ("N já passaram da hora"), que é onde a informação serve.
   // `today` vem de hojeISO(), que lê o relógio local do aparelho: a virada de dia é a dele, não a do UTC.
-  const atrasadosAll = rotaAll.filter((entry) => entry.data < today);
+  // Revisão visual de TODA a agenda planejada, inclusive follow-ups sem hora.
+  // Origens com remarcação continuam fora da rota; aqui aparecem com aviso da data original.
+  const atrasos = separarAtrasadosPorIdade(agendaPlanejada, today);
+  const atrasadosAll = [...atrasos.recentes, ...atrasos.antigos];
+  const idsRemarcacao = new Set(pendenciasRemarcacaoAbertas(inbox).map(({ meta }) => meta.agenda_origem_id).filter(Boolean));
+  const pessoaisAtrasadosAll = rotaAll.filter((entry) => entry.pessoal_virtual && diasDeAtraso(entry.data, today) > 0);
   const hojeAll = rotaAll.filter((entry) => entry.data === today);
   const futurosAll = rotaAll.filter((entry) => entry.data > today);
   // Mesma função do card e do Funil — a métrica não pode ter critério próprio, foi assim que as três
@@ -5424,17 +5455,21 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, fin
   // exatamente isso que sumiu com a Edilaine e a Cintia: tipo='retirada' não era igual a "presencial"
   // nem a "remoto", então o compromisso desaparecia dos DOIS filtros e só voltava em "Todos".
   const porTipo = (list) => filtroTipo === "todos" ? list : list.filter((entry) => ehRemoto(entry) === (filtroTipo === "remoto"));
-  const atrasados = porTipo(atrasadosAll); const hoje = porTipo(hojeAll); const futuros = porTipo(futurosAll);
+  const atrasados = porTipo(atrasos.recentes); const antigos = porTipo(atrasos.antigos);
+  const antigosAcima30 = porTipo(atrasos.acima30);
+  const pessoaisAtrasados = porTipo(pessoaisAtrasadosAll);
+  const hoje = porTipo(hojeAll); const futuros = porTipo(futurosAll);
   // A HORA NÃO SUMIU, MUDOU DE LUGAR: dentro do card de hoje ela diz o que ainda dá pra fazer e o que já
   // estourou. Compromisso sem hora marcada não conta como estourado — ainda cabe no dia.
   const hojePassouDaHora = hoje.filter((entry) => !!entry.hora && String(entry.hora).slice(0, 5) < agoraHHMM).length;
-  const irParaVencendo = () => { if (atrasadosAll.length === 0) return; setFiltroTipo("todos"); document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  const irParaVencendo = () => { if (!atrasos.recentes.length) return; setFiltroTipo("todos"); requestAnimationFrame(() => document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" })); };
+  const cardAtrasado = (a) => <CompromissoCard key={a.id} a={a} svc={svcDe(a)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} revisaoData={idsRemarcacao.has(a.id)} />;
   return <div className="page-grid">
     {addInbox && <CardRecolhivel cabecalho={<><p className="kicker">ANOTAR AGORA</p><h3>O que aconteceu?</h3></>}>
       <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />
     </CardRecolhivel>}{/* Os dois cartões da Caixa ("Para Claude" e "Aguardando você") saíram em 23/08/2026 junto
     com a tela dela. Contador que leva pra uma tela que não existe mais só quebraria no toque. */}
-<section className="metric-grid"><Metric label="Atrasados" value={atrasadosAll.length} detail="De dias anteriores, sem desfecho" tone="yellow" onClick={atrasadosAll.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
+<section className="metric-grid"><Metric label="Atrasados recentes" value={atrasos.recentes.length} detail={`Até 14 dias · ${atrasos.antigos.length} em revisão antiga abaixo`} tone="yellow" onClick={atrasos.recentes.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
     <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <ProntosParaEntregarCard services={services} onOpenFicha={onOpenFicha} />
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} appointments={appointments} agendaHistorico={agendaHistorico} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
@@ -5503,7 +5538,7 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, fin
         </article>)}</div>
       </section>;
     })()}
-    {(atrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}</div>}
+    {(atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}</div>}
     {(() => {
       // CONTA CHEGANDO: entra sozinho no Painel 3 dias antes do vencimento (e fica enquanto estiver vencida),
       // com o caixa possível do lado — porque a pergunta que ele faz é "tenho de onde tirar?".
@@ -5564,10 +5599,10 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, fin
       // continua valendo (agendado = fechado); o que saiu foi o card diário.
       return null;
     })()}
-    {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo"
-      cabecalho={<><p className="kicker">AGENDA</p><h3>{atrasados.length} compromisso(s) atrasado(s)</h3>
-      <span className="ficha-note" style={{ margin: 0 }}>De dias anteriores, ainda sem desfecho</span></>}>
-      {[...atrasados].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
+    {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes"
+      cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
+      <span className="ficha-note" style={{ margin: 0 }}>De 1 a 14 dias de atraso</span></>}>
+      {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
     {/* O aviso de rota vai no `resumo`, ou seja, FORA do recolhível: rota que volta é erro que ele precisa
@@ -5590,7 +5625,13 @@ function Dashboard({ inbox, services, appointments, agendaHistorico, avisos, fin
     {futuros.length > 0 && <CardRecolhivel
       cabecalho={<><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
       {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
-    {filtroTipo !== "todos" && atrasados.length === 0 && hoje.length === 0 && futuros.length === 0 && (atrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
+    {pessoaisAtrasados.length > 0 && <CardRecolhivel cabecalho={<><p className="kicker">PESSOAIS</p><h3>{pessoaisAtrasados.length} item(ns) com data vencida</h3><span className="ficha-note" style={{ margin: 0 }}>Concluir ou remarcar no card Pessoais</span></>}>
+      {[...pessoaisAtrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
+    {antigos.length > 0 && <CardRecolhivel id="secao-revisao-antiga" className="content-card revisao-antiga"
+      cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
+      <span className="ficha-note" style={{ margin: 0 }}>{antigosAcima30.length} com mais de 30 dias · histórico preservado para revisão</span></>}>
+      {[...antigos].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
+    {filtroTipo !== "todos" && atrasados.length === 0 && antigos.length === 0 && pessoaisAtrasados.length === 0 && hoje.length === 0 && futuros.length === 0 && (atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
     {/* DEPOIS DOS COMPROMISSOS, DE PROPÓSITO (Diego, 24/08: "um card lá embaixo de compromissos"). Comprar
         material é consequência da rota do dia, não concorrente dela: ele decide onde vai, e aí olha o que
         aproveita comprar no caminho. Se subisse pro topo, competiria com a agenda pela primeira olhada. */}
