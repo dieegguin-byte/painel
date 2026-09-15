@@ -1,0 +1,11 @@
+{
+  "name": "tapecaria-bahia-local-checks",
+  "private": true,
+  "scripts": {
+    "test:monitor": "node --test tests/conferencia-monitor.test.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  },
+  "packageManager": "pnpm@11.19.0"
+}

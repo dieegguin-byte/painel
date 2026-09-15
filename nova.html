@@ -476,7 +476,7 @@ button.sutil{opacity:.55;font-size:12px}
 .agente-result-section{padding-top:18px;margin-top:18px;border-top:1px solid var(--line)}
 .agente-list{display:grid;gap:9px;margin:0;padding-left:21px;color:var(--muted);font-size:14px;line-height:1.6}.agente-list li,.agente-card p,.agente-source{white-space:pre-wrap;overflow-wrap:anywhere}
 .agente-appointments{display:grid;gap:10px}.agente-appointment{padding:14px;border:1px solid var(--line);border-radius:12px;background:#171210}.agente-appointment strong{font-size:14px;display:block;overflow-wrap:anywhere}.agente-appointment span{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin-top:6px}
-.agente-ia{background:linear-gradient(145deg,#211912,#171310)}.agente-count{display:block;text-align:right;font-size:11px;color:var(--dim);margin-top:5px}
+.conferencia-resumo{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 18px;margin-bottom:18px;border:1px solid var(--line2);border-radius:14px;background:var(--surface2)}.conferencia-resumo h2{font-size:16px;margin:0 0 6px;color:var(--cream)}.conferencia-resumo p{font-size:13px;line-height:1.5;color:var(--muted);margin:3px 0}.conferencia-resumo .ghost{min-height:44px}.conferencia-monitor-lista{display:grid;gap:12px;margin-top:18px}.conferencia-ocorrencia{padding:16px;border:1px solid var(--line);border-radius:12px;background:#171210}.conferencia-ocorrencia h4{margin:0 0 8px;font-size:16px;overflow-wrap:anywhere}.conferencia-ocorrencia .ghost{margin-top:10px;min-height:44px}.conferencia-situacao{display:inline-flex;font-size:12px;font-weight:700;border:1px solid #75a98755;background:#75a98712;color:#bce0c6;border-radius:8px;padding:7px 9px}.conferencia-monitor-note{font-size:12px!important;line-height:1.55}.conferencia-regra{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
 .agente-ficha-action{min-height:44px;padding:8px 12px;font-size:12px;margin:8px 0}
 @media(max-width:640px){.agente-card{padding:18px 16px;border-radius:16px}.agente-card h2{font-size:26px}.agente-selector,.agente-fields{grid-template-columns:minmax(0,1fr)}.agente-actions>.primary{width:100%}.agente-result-head .ghost{width:100%}}
 </style>
@@ -672,10 +672,10 @@ const demoCustomers = [
 const demoServices = [
   { id: "s1", cliente_id: "c1", titulo: "Reforma de sofá retrátil", status: "orcamento", prioridade: "alta", proxima_acao: "Confirmar visita", prazo: "2026-07-10", valor_orcamento: 2400, clientes: demoCustomers[0] },
   { id: "s2", cliente_id: "c2", titulo: "6 cadeiras de jantar", status: "agendado", prioridade: "media", proxima_acao: "Buscar cadeiras", prazo: "2026-07-11", valor_orcamento: 1350, clientes: demoCustomers[1], loja_material: "Ellis Tecidos", materiais_necessarios: [{ item: "Tecido para 6 assentos", comprado: false }, { item: "Espuma D33", comprado: true }] },
-  { id: "s3", cliente_id: "c3", titulo: "Cabeceira sob medida", status: "lead", prioridade: "baixa", proxima_acao: "Pedir medidas", prazo: "2026-07-12", clientes: demoCustomers[2] },
+  { id: "s3", cliente_id: "c3", titulo: "Cabeceira sob medida", status: "pronto", prioridade: "baixa", proxima_acao: "Pedir medidas", prazo: "2026-07-12", clientes: demoCustomers[2] },
   // s4 existe pra demo exercitar o aviso de compra repetida: mesma loja que o s2. Sem dois
   // serviços na mesma loja, o bloco de material nunca mostra a dica de juntar o frete.
-  { id: "s4", cliente_id: "c3", titulo: "Poltrona reclinável", status: "producao", prioridade: "media", proxima_acao: "Comprar tecido", prazo: "2026-07-20", valor_orcamento: 780, clientes: demoCustomers[2], loja_material: "Ellis Tecidos", materiais_necessarios: [{ item: "Veludo grafite", comprado: false, pedido: true }] },
+  { id: "s4", cliente_id: "c3", titulo: "Poltrona reclinável", status: "pronto", prioridade: "media", proxima_acao: "Comprar tecido", prazo: "2026-07-20", valor_orcamento: 780, clientes: demoCustomers[2], loja_material: "Ellis Tecidos", materiais_necessarios: [{ item: "Veludo grafite", comprado: false, pedido: true }] },
   // s5 É O TESTE DE REGRESSÃO DAS FAIXAS DE MATERIAL (02/09/2026). Os cinco formatos aqui são os que
   // existem DE VERDADE em `servicos.materiais_necessarios` — copiados da forma, não do conteúdo:
   //   1. formato do app ............................ tem que cair em COMPRAR AGORA
@@ -2843,6 +2843,7 @@ function Home() {
   const [loading, setLoading] = useState(false);
   // Quando não é null, a tela está mostrando a última carga guardada no aparelho (sem sinal).
   const [offlineDesde, setOfflineDesde] = useState(null);
+  const monitorConferencia = useConferenciaMonitor({ db, demo, session, offlineDesde });
   const [notice, setNotice] = useState(null);
   const [search, setSearch] = useState("");
   const [pinState, setPinState] = useState("checking");
@@ -3588,7 +3589,7 @@ function Home() {
   // O código da Caixa continua no arquivo, intacto: se ele voltar a operar pelo app, é só
   // devolver a linha aqui. Nada foi apagado.
   const nav = [
-    { id: "painel", label: "Painel", icon: "⌂" }, { id: "agente", label: "Agente", icon: "✧" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
+    { id: "painel", label: "Painel", icon: "⌂" }, { id: "agente", label: "Conferência", icon: "✧" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
     { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "compras", label: "Compras", icon: "▣" }, { id: "futuro", label: "A pagar", icon: "◷", count: contasFuturas }, { id: "vales", label: "Profissionais", icon: "✎", count: contaProfissionais },
     { id: "clientes", label: "Clientes", icon: "○" }, { id: "fornecedores", label: "Fornecedores", icon: "▤" },
     // ESTOQUE É PÁGINA PRÓPRIA, NÃO ABA (item ESTOQUE-V2-APP-20260827-2338-001). O backend do Estoque V2 já
@@ -3624,11 +3625,12 @@ function Home() {
           A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
           e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
+      {tab === "painel" && <ConferenciaMonitorResumo monitor={monitorConferencia} demo={demo} onOpen={() => setTab("agente")} />}
       {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
-      {tab === "agente" && <AgenteConferenciaView key={agenteAbertura} db={db} demo={demo} services={services} offlineDesde={offlineDesde} servicoInicial={agenteServicoInicial} onOpenFicha={setFichaId} />}
+      {tab === "agente" && <AgenteConferenciaView key={agenteAbertura} db={db} demo={demo} services={services} offlineDesde={offlineDesde} servicoInicial={agenteServicoInicial} onOpenFicha={setFichaId} monitor={monitorConferencia} />}
       {tab === "leads" && <LeadsView services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} inbox={inbox} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} dividas={dividas} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
@@ -3660,6 +3662,139 @@ function agenteHorarioConsulta(valor) {
   const data = new Date(valor);
   return valor && !Number.isNaN(data.getTime()) ? data.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) + " (Brasília)" : "Horário não informado";
 }
+// The browser only reads the monitor. The scheduled worker runs in the cloud.
+function conferenciaMonitorDemo() {
+  const agora = new Date().toISOString();
+  const exemplos = demoServices.filter((s) => s.status === "pronto");
+  return { ok: true, consultado_em: agora, ultima_conclusao_em: agora, intervalo_segundos: 300,
+    regra: { id: "SERVICO_PRONTO", versao: 1, titulo: "Serviço com status pronto", descricao: "Pronto — entrega ainda não registrada no status", fonte: "Demonstração fictícia da regra SERVICO_PRONTO" },
+    ocorrencias: exemplos.map((s) => ({ servico_id: s.id, cliente_id: s.cliente_id, titulo: s.titulo, status: "pronto", detectada_em: agora, confirmada_em: agora })),
+    total: exemplos.length, completo: true };
+}
+
+function estadoConferenciaMonitor({ dados, erro, online, offlineDesde, agora = Date.now(), carregando }) {
+  const naoAtual = (titulo, mensagem, parcial = false) => ({ atual: false, titulo, mensagem, parcial });
+  if (online === false || offlineDesde) return naoAtual("Sem conexão · resultado não atual", "Conecte à internet para consultar a última execução na nuvem.");
+  if (erro) return naoAtual("Resultado não atual", erro);
+  if (!dados) return naoAtual(carregando ? "Consultando o monitor…" : "Monitor ainda não consultado", "A quantidade de ocorrências ainda não foi confirmada.");
+  if (!dados.ultima_conclusao_em) return naoAtual("Monitor ainda não iniciado", "Ainda não há uma execução concluída para esta regra.");
+  const ultima = Date.parse(dados.ultima_conclusao_em);
+  if (!Number.isFinite(ultima) || ultima > agora + 60000) return naoAtual("Horário da execução não confirmado", "Não foi possível verificar se este resultado é atual.");
+  if (agora - ultima > 15 * 60 * 1000) return naoAtual("Monitor sem atualização recente", "A última execução concluída tem mais de 15 minutos. O resultado não confirma a situação atual.");
+  if (dados.completo !== true) return naoAtual("Conferência parcial", "A consulta está incompleta. Os itens exibidos não representam todas as ocorrências.", true);
+  return { atual: true, parcial: false, titulo: "Monitor atualizado", mensagem: "Última execução concluída na nuvem disponível para consulta." };
+}
+
+function useConferenciaMonitor({ db, demo, session, offlineDesde }) {
+  const [leitura, setLeitura] = useState(null);
+  const [erro, setErro] = useState("");
+  const [carregando, setCarregando] = useState(false);
+  const [online, setOnline] = useState(() => navigator.onLine !== false);
+  const [agora, setAgora] = useState(() => Date.now());
+  const offlineAtual = React.useRef(false);
+  offlineAtual.current = Boolean(offlineDesde);
+  const recarregar = React.useRef(null);
+  const contexto = demo ? "demo" : session?.user?.id || "sem-sessao";
+  const dados = leitura?.contexto === contexto ? leitura.dados : null;
+
+  useEffect(() => {
+    let cancelado = false;
+    let pendente = false;
+    let controle = null;
+    let timeout = null;
+    setLeitura(null); setErro(""); setCarregando(false);
+    const ler = async () => {
+      setOnline(navigator.onLine !== false); setAgora(Date.now());
+      if (pendente || document.visibilityState === "hidden" || navigator.onLine === false || offlineAtual.current) return;
+      if (!demo && (!db?.rpc || !session)) return;
+      pendente = true; setCarregando(true);
+      try {
+        let pacote;
+        if (demo) pacote = conferenciaMonitorDemo();
+        else {
+          controle = new AbortController();
+          timeout = window.setTimeout(() => controle?.abort(), 20000);
+          const consulta = db.rpc("conferencia_monitor");
+          const resposta = await (consulta.abortSignal ? consulta.abortSignal(controle.signal) : consulta);
+          if (resposta.error) throw new Error("consulta_indisponivel");
+          pacote = resposta.data;
+        }
+        if (cancelado || navigator.onLine === false || offlineAtual.current) return;
+        if (pacote?.ok !== true || !Array.isArray(pacote.ocorrencias) || !Number.isInteger(pacote.total) || pacote.total < pacote.ocorrencias.length ||
+            typeof pacote.completo !== "boolean" || (pacote.completo && pacote.total !== pacote.ocorrencias.length) || pacote.regra?.id !== "SERVICO_PRONTO" ||
+            pacote.ocorrencias.some((o) => !o || typeof o.servico_id !== "string" || o.status !== "pronto")) throw new Error("resposta_inesperada");
+        setLeitura({ contexto, dados: pacote }); setErro(""); setAgora(Date.now());
+      } catch (_) {
+        if (!cancelado) setErro("Não foi possível consultar a última execução. A quantidade de ocorrências não está confirmada; tente atualizar a consulta.");
+      } finally {
+        clearTimeout(timeout); pendente = false; controle = null;
+        if (!cancelado) setCarregando(false);
+      }
+    };
+    const mudou = () => {
+      setOnline(navigator.onLine !== false); setAgora(Date.now());
+      if (navigator.onLine === false) controle?.abort();
+      else ler();
+    };
+    recarregar.current = ler;
+    ler();
+    const timer = window.setInterval(() => { if (document.visibilityState !== "hidden") ler(); }, 60000);
+    document.addEventListener("visibilitychange", mudou);
+    window.addEventListener("online", mudou); window.addEventListener("offline", mudou);
+    return () => {
+      cancelado = true; controle?.abort(); clearTimeout(timeout); clearInterval(timer);
+      if (recarregar.current === ler) recarregar.current = null;
+      document.removeEventListener("visibilitychange", mudou);
+      window.removeEventListener("online", mudou); window.removeEventListener("offline", mudou);
+    };
+  }, [db, demo, contexto]);
+
+  const estado = estadoConferenciaMonitor({ dados, erro, online, offlineDesde, agora, carregando });
+  return { dados, estado, carregando, online, atualizar: () => recarregar.current?.() };
+}
+
+function ConferenciaMonitorResumo({ monitor, demo, onOpen }) {
+  const { dados, estado, carregando } = monitor;
+  const contagem = estado.atual ? `${dados.total} ocorrência(s) · serviço com status pronto` : estado.titulo;
+  return <section className="conferencia-resumo" aria-label="Resumo da conferência automática">
+    <div><h2>Conferência automática {demo ? "· demonstração" : "· nuvem"}</h2>
+      <p>{contagem}</p><p>{dados?.ultima_conclusao_em ? `Última execução: ${agenteHorarioConsulta(dados.ultima_conclusao_em)}` : estado.mensagem}</p>
+      {!estado.atual && dados?.ultima_conclusao_em && <p>{estado.mensagem}</p>}
+    </div><button type="button" className="ghost" onClick={onOpen}>{carregando ? "Ver conferência · consultando…" : "Abrir Conferência"}</button>
+  </section>;
+}
+
+function ConferenciaMonitorCard({ monitor, demo, onOpenFicha }) {
+  const { dados, estado, carregando, atualizar, online } = monitor;
+  const ocorrencias = dados?.ocorrencias || [];
+  return <section className="agente-card" aria-labelledby="conferencia-monitor-titulo" aria-busy={carregando}>
+    <div className="agente-result-head"><div><span className={`agente-badge ${demo ? "demo" : ""}`}>{demo ? "Demonstração · situações fictícias" : "Acompanhamento na nuvem"}</span>
+      <h2 id="conferencia-monitor-titulo">Ocorrências automáticas</h2></div>
+      <button type="button" className="ghost" onClick={atualizar} disabled={carregando || online === false}>{carregando ? "Consultando…" : "Atualizar consulta"}</button>
+    </div>
+    <p>A nuvem confere os registros a cada 5 minutos. Esta tela consulta o último resultado disponível.</p>
+    <p><strong>{estado.titulo}</strong></p>
+    {!estado.atual && <div className="agente-inline-notice info" role="status">{estado.mensagem}</div>}
+    <div className="agente-source">Última execução concluída: {dados?.ultima_conclusao_em ? agenteHorarioConsulta(dados.ultima_conclusao_em) : "ainda não registrada"}</div>
+    {dados?.consultado_em && <div className="agente-source">Consulta do monitor: {agenteHorarioConsulta(dados.consultado_em)}</div>}
+    {demo && <p className="conferencia-monitor-note">Exemplos fictícios de serviços com status pronto, os mesmos usados na ficha e na consulta da demonstração. Não são ocorrências da empresa.</p>}
+    {dados && <div className="conferencia-regra"><span className="conferencia-situacao">Pronto — entrega ainda não registrada no status</span>
+      <p className="conferencia-monitor-note">O fato observado é <strong>status pronto</strong>. É uma situação informativa: este registro não confirma se a entrega física ocorreu.</p>
+      <div className="agente-source">Regra: {agenteTexto(dados.regra?.id)} · versão {agenteTexto(dados.regra?.versao)} · Fonte: {agenteTexto(dados.regra?.fonte, "regra do monitor")}</div>
+    </div>}
+    {dados?.completo === false && <p className="conferencia-monitor-note"><strong>Resultado parcial:</strong> {ocorrencias.length} item(ns) exibido(s) de {dados.total} informado(s). A consulta não permite concluir que os demais serviços estão sem ocorrências.</p>}
+    {ocorrencias.length > 0 && <>
+      <p>{estado.atual ? `${dados.total} ocorrência(s) nesta execução.` : "Itens da última leitura disponível; não representam uma confirmação atual."}</p>
+      <div className="conferencia-monitor-lista">{ocorrencias.map((o) => <article className="conferencia-ocorrencia" key={o.servico_id}>
+        <h4>{agenteTexto(o.titulo, "Serviço sem título")}</h4><span className="status-pill">Status registrado: pronto</span>
+        <p className="conferencia-monitor-note">Detectada: {agenteHorarioConsulta(o.detectada_em)}<br />Confirmada pelo monitor: {agenteHorarioConsulta(o.confirmada_em)}</p>
+        {o.cliente_id && onOpenFicha && <button type="button" className="ghost" onClick={() => onOpenFicha(o.cliente_id)}>Abrir ficha</button>}
+      </article>)}</div>
+    </>}
+    {estado.atual && dados.total === 0 && <p>Nenhuma ocorrência da regra SERVICO_PRONTO na última execução concluída. Isso não é uma conferência das outras situações da empresa.</p>}
+  </section>;
+}
+
 function agenteConferenciaDemo(servicoId) {
   const s = demoServices.find((item) => item.id === servicoId);
   if (!s) return { ok: false, erro: { codigo: "DEMO_NAO_ENCONTRADA", mensagem: "Escolha um dos serviços fictícios desta prévia." } };
@@ -3671,17 +3806,15 @@ function agenteConferenciaDemo(servicoId) {
     ok: true, modo: "regras", consultado_em: new Date().toISOString(), servico, compromissos,
     resumo: `Status registrado: ${statusLabel[s.status] || agenteTexto(s.status)}. Próxima ação registrada: ${agenteTexto(s.proxima_acao)}.`,
     observacoes: [!s.proxima_acao && "A próxima ação não está preenchida neste exemplo.", !s.prazo && "O prazo não está preenchido neste exemplo.", !compromissos.length && "Este exemplo não tem compromisso vinculado com status planejado."].filter(Boolean),
-    limites: ["Prévia com dados fictícios, sem consulta aos registros reais.", "O prazo registrado não confirma entrega do serviço.", "A conferência não altera registros nem cria compromissos.", "IA não conectada nesta prévia."],
+    limites: ["Prévia com dados fictícios, sem consulta aos registros reais.", "O prazo registrado não confirma entrega do serviço.", "A conferência não altera registros nem cria compromissos."],
   };
 }
 
-function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicial, onOpenFicha }) {
+function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicial, onOpenFicha, monitor }) {
   const [servicoId, setServicoId] = useState(servicoInicial || "");
   const [busca, setBusca] = useState("");
-  const [pergunta, setPergunta] = useState("");
   const [ocupado, setOcupado] = useState("");
   const [erro, setErro] = useState("");
-  const [avisoIA, setAvisoIA] = useState("");
   const [resultado, setResultado] = useState(null);
   const [online, setOnline] = useState(() => navigator.onLine !== false);
   // Cada troca invalida a requisição anterior, inclusive durante um await ou a desmontagem.
@@ -3694,7 +3827,7 @@ function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicia
 
   const trocarServico = (id) => {
     requisicao.current += 1;
-    setServicoId(id); setResultado(null); setErro(""); setAvisoIA(""); setPergunta(""); setOcupado("");
+    setServicoId(id); setResultado(null); setErro(""); setOcupado("");
   };
   useEffect(() => { trocarServico(servicoInicial || ""); }, [servicoInicial]);
   useEffect(() => {
@@ -3703,48 +3836,38 @@ function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicia
     return () => { requisicao.current += 1; window.removeEventListener("online", mudouRede); window.removeEventListener("offline", mudouRede); };
   }, []);
   useEffect(() => {
-    requisicao.current += 1; setOcupado(""); setResultado(null); setErro(""); setAvisoIA("");
+    requisicao.current += 1; setOcupado(""); setResultado(null); setErro("");
   }, [semConexao, demo, db]);
 
-  const conferir = async (comIA = false) => {
+  const conferir = async () => {
     if (ocupado || semConexao || !servicoId) return;
-    setErro(""); setAvisoIA("");
-    if (comIA && demo) {
-      setAvisoIA("IA não conectada nesta prévia. Para responder à pergunta, é preciso conectar a IA ao piloto real.");
-      return;
-    }
-    const perguntaEnviada = pergunta.trim();
-    if (comIA && (!resultado || !perguntaEnviada || perguntaEnviada.length > 500)) return;
-    // Os identificadores s1/s2 da demonstração nunca podem chegar à função real.
+    setErro("");
     if (!demo && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(servicoId)) {
       setErro("Este serviço não tem um identificador válido para consulta. Atualize os dados e selecione o serviço novamente."); return;
     }
-    if (!demo && !db?.functions?.invoke) { setErro("A conexão de consulta ainda não está disponível. Tente atualizar a página."); return; }
+    if (!demo && !db?.rpc) { setErro("A conexão de consulta ainda não está disponível. Tente atualizar a página."); return; }
     const numero = ++requisicao.current;
     const idConsultado = servicoId;
-    setOcupado(comIA ? "ia" : "regras");
-    if (!comIA) setResultado(null);
+    const controle = new AbortController();
+    const timeout = window.setTimeout(() => controle.abort(), 20000);
+    setOcupado("regras"); setResultado(null);
     try {
       let pacote;
-      if (demo) {
-        pacote = agenteConferenciaDemo(idConsultado);
-      } else {
-        const body = { servico_id: idConsultado, ...(comIA ? { pergunta: perguntaEnviada } : {}) };
-        const resposta = await db.functions.invoke("agente-conferencia", { body });
+      if (demo) pacote = agenteConferenciaDemo(idConsultado);
+      else {
+        const consulta = db.rpc("conferencia_consultar_servico", { p_servico_id: idConsultado });
+        const resposta = await (consulta.abortSignal ? consulta.abortSignal(controle.signal) : consulta);
+        if (resposta.error) throw new Error("Não foi possível consultar os registros. Verifique a conexão e tente novamente.");
         pacote = resposta.data;
-        if (resposta.error && !pacote?.erro && resposta.error.context?.clone) {
-          try { pacote = await resposta.error.context.clone().json(); } catch (_) { /* Resposta sem JSON: usar mensagem de consulta abaixo. */ }
-        }
-        if (resposta.error && !pacote?.erro) throw new Error("Não foi possível consultar os registros. Verifique a conexão e tente novamente.");
       }
       if (numero !== requisicao.current) return;
       if (!pacote?.ok) throw new Error(agenteTexto(pacote?.erro?.mensagem, "A conferência não foi concluída. Tente novamente."));
-      if (pacote.servico?.id !== idConsultado || !["regras", "ia"].includes(pacote.modo)) throw new Error("A consulta retornou uma resposta inesperada. Confira o serviço selecionado e tente novamente.");
-      setResultado({ ...pacote, perguntaRespondida: comIA && pacote.modo === "ia" ? perguntaEnviada : "" });
-      if (comIA && pacote.modo !== "ia") setAvisoIA("A IA não respondeu à pergunta. Abaixo está somente a conferência dos registros, sem análise por IA.");
+      if (pacote.servico?.id !== idConsultado || pacote.modo !== "regras") throw new Error("A consulta retornou uma resposta inesperada. Confira o serviço selecionado e tente novamente.");
+      setResultado(pacote);
     } catch (e) {
       if (numero === requisicao.current) setErro(e?.message || "Não foi possível concluir a consulta. Tente novamente.");
     } finally {
+      clearTimeout(timeout);
       if (numero === requisicao.current) setOcupado("");
     }
   };
@@ -3756,8 +3879,9 @@ function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicia
   const materiais = Array.isArray(registro?.materiais_necessarios) ? registro.materiais_necessarios : [];
 
   return <div className="agente-view">
+    <ConferenciaMonitorCard monitor={monitor} demo={demo} onOpenFicha={onOpenFicha} />
     <section className="agente-card agente-intro" aria-labelledby="agente-titulo">
-      <span className={`agente-badge ${demo ? "demo" : ""}`}>{demo ? "Prévia · dados fictícios · IA não conectada" : "Piloto · conferência de um serviço"}</span>
+      <span className={`agente-badge ${demo ? "demo" : ""}`}>{demo ? "Prévia · dados fictícios" : "Consulta de um serviço"}</span>
       <h2 id="agente-titulo">O que está registrado neste serviço?</h2>
       <p className="agente-copy">Escolha um serviço para conferir o status, a próxima ação e os compromissos registrados. A consulta mostra a fonte e o horário da leitura.</p>
       <div className="agente-selector">
@@ -3770,19 +3894,17 @@ function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicia
       </div>
       {!lista.length && <p>Nenhum serviço disponível. Atualize os dados para consultar.</p>}
       {!!lista.length && !opcoes.length && <p>Nenhum serviço encontrado para esta busca.</p>}
-      <div className="agente-actions"><button type="button" className="primary" onClick={() => conferir(false)} disabled={Boolean(ocupado) || semConexao || !servicoId}>{ocupado === "regras" ? "Conferindo registros…" : "Conferir registros"}</button><small>Uma consulta por vez, a partir do serviço escolhido.</small></div>
+      <div className="agente-actions"><button type="button" className="primary" onClick={conferir} disabled={Boolean(ocupado) || semConexao || !servicoId}>{ocupado === "regras" ? "Conferindo registros…" : "Conferir registros"}</button><small>Uma consulta por vez, a partir do serviço escolhido.</small></div>
     </section>
 
     {semConexao && <div className="agente-inline-notice" role="status">Sem conexão. A conferência está desabilitada: os dados guardados no aparelho não permitem confirmar o estado atual. Conecte à internet e atualize os dados.</div>}
     {erro && <div className="agente-inline-notice" role="alert">{erro}</div>}
-    {avisoIA && <div className="agente-inline-notice info" role="status">{avisoIA}</div>}
-    {ocupado && <div className="agente-source" role="status" aria-live="polite">{ocupado === "ia" ? "Consultando os registros para explicar com IA…" : "Preparando a conferência do serviço selecionado…"}</div>}
+    {ocupado && <div className="agente-source" role="status" aria-live="polite">Preparando a conferência do serviço selecionado…</div>}
 
     {resultado && registro && <>
       <section className="agente-card" aria-label="Resultado da conferência" aria-busy={Boolean(ocupado)}>
         <div className="agente-result-head"><div>
-          <span className={`agente-badge ${demo ? "demo" : ""}`}>{demo ? "Prévia · dados fictícios · IA não conectada" : resultado.modo === "ia" ? "Explicação com IA · baseada nos registros consultados" : "Conferência dos registros · sem análise por IA"}</span>
-          {demo && <p>Conferência dos registros · sem análise por IA</p>}
+          <span className={`agente-badge ${demo ? "demo" : ""}`}>{demo ? "Prévia · dados fictícios" : "Conferência dos registros"}</span>
           <h2>{agenteTexto(registro.titulo, "Serviço sem título")}</h2>
           <div className="agente-source">{demo ? "Fonte: exemplos fictícios da demonstração. Prévia gerada em " : "Fonte: registros do serviço e da agenda. Consultado em "}{agenteHorarioConsulta(resultado.consultado_em)}</div>
         </div>{servicoLocal?.cliente_id && onOpenFicha && <button type="button" className="ghost" onClick={() => onOpenFicha(servicoLocal.cliente_id)}>Abrir ficha do cliente</button>}</div>
@@ -3795,16 +3917,13 @@ function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicia
           <div><dt>Loja de material registrada</dt><dd>{agenteTexto(registro.loja_material)}</dd></div>
           <div><dt>Data de entrega do material registrada</dt><dd>{agenteData(registro.data_entrega_material)}</dd></div>
         </dl>
-        <div className="agente-result-section"><h3>{resultado.modo === "ia" ? "Explicação com IA" : "Resumo dos registros"}</h3>{resultado.perguntaRespondida && <p><strong>Pergunta respondida:</strong> {resultado.perguntaRespondida}</p>}<p>{agenteTexto(resultado.resumo, "Sem resumo informado.")}</p></div>
+        <div className="agente-result-section"><h3>Resumo dos registros</h3><p>{agenteTexto(resultado.resumo, "Sem resumo informado.")}</p></div>
         <div className="agente-result-section"><h3>Compromissos com status planejado</h3>{compromissos.length ? <div className="agente-appointments">{compromissos.map((a, i) => <article className="agente-appointment" key={a.id || i}><strong>{agenteTexto(a.titulo, "Compromisso sem título")}</strong><span>{agenteData(a.data)} · {agenteTexto(a.hora, "Horário não registrado")} · Status: planejado</span></article>)}</div> : <p>Nenhum compromisso vinculado com status planejado foi encontrado nesta consulta.</p>}</div>
         <div className="agente-result-section"><h3>Materiais registrados</h3>{materiais.length ? <ul className="agente-list">{materiais.map((m, i) => <li key={i}>{typeof m === "string" ? m : agenteTexto(m?.item || m?.material || m?.descricao, "Material sem nome registrado")}</li>)}</ul> : <p>Nenhum material listado nesta consulta.</p>}</div>
         {!!observacoes.length && <div className="agente-result-section"><h3>Observações da conferência</h3><ul className="agente-list">{observacoes.map((item, i) => <li key={i}>{item}</li>)}</ul></div>}
         <div className="agente-result-section"><h3>Limites desta leitura</h3><ul className="agente-list">{(limites.length ? limites : ["A consulta reflete os registros no horário indicado.", "O prazo registrado não confirma entrega do serviço.", "A conferência não altera registros nem cria compromissos."]).map((item, i) => <li key={i}>{item}</li>)}</ul></div>
       </section>
-      <section className="agente-card agente-ia" aria-labelledby="agente-ia-titulo"><p className="kicker">Opcional</p><h3 id="agente-ia-titulo">Entender os registros com IA</h3><p>{demo ? "A prévia mostra a conferência. Para explicar uma pergunta, a IA precisa estar conectada ao piloto real." : "Faça uma pergunta sobre este serviço. A explicação usa os registros consultados e informa quando não há dados suficientes."}</p>
-        <label htmlFor="agente-pergunta">Sua pergunta<textarea id="agente-pergunta" value={pergunta} maxLength={500} disabled={Boolean(ocupado)} onChange={(e) => setPergunta(e.target.value)} placeholder="Ex.: qual próxima ação está registrada?" /></label><small className="agente-count">{pergunta.length}/500 caracteres</small>
-        <div className="agente-actions"><button type="button" className="secondary" onClick={() => conferir(true)} disabled={Boolean(ocupado) || semConexao || (!demo && !pergunta.trim())}>{ocupado === "ia" ? "Preparando explicação…" : "Explicar com IA"}</button>{demo && <small>IA não conectada · nenhuma resposta será simulada</small>}</div>
-      </section>
+
     </>}
   </div>;
 }

@@ -1,2 +1,4 @@
 dados_atendimento.json
 .claude/
+node_modules/
+supabase/.temp/
