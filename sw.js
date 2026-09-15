@@ -66,6 +66,8 @@ const SHELL = [
   './',
   './index.html',
   './nova.html',
+  // Proteção compartilhada de identidade na triagem, carregada antes dos dois HTML.
+  './agenda-caixa.js',
   // Estoque e pagina propria, fora do nova.html. Sem estar aqui ela abriria a tela de offline no
   // celular sem sinal, que e justamente onde o Diego confere material antes de sair pra loja.
   './estoque.html',

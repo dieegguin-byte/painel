@@ -478,6 +478,8 @@ button.sutil{opacity:.55;font-size:12px}
 .agente-list{display:grid;gap:9px;margin:0;padding-left:21px;color:var(--muted);font-size:14px;line-height:1.6}.agente-list li,.agente-card p,.agente-source{white-space:pre-wrap;overflow-wrap:anywhere}
 .agente-appointments{display:grid;gap:10px}.agente-appointment{padding:14px;border:1px solid var(--line);border-radius:12px;background:#171210}.agente-appointment strong{font-size:14px;display:block;overflow-wrap:anywhere}.agente-appointment span{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin-top:6px}
 .conferencia-resumo{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:16px 18px;margin-bottom:18px;border:1px solid var(--line2);border-radius:14px;background:var(--surface2)}.conferencia-resumo h2{font-size:16px;margin:0 0 6px;color:var(--cream)}.conferencia-resumo p{font-size:13px;line-height:1.5;color:var(--muted);margin:3px 0}.conferencia-resumo .ghost{min-height:44px}.conferencia-monitor-lista{display:grid;gap:12px;margin-top:18px}.conferencia-ocorrencia{padding:16px;border:1px solid var(--line);border-radius:12px;background:#171210}.conferencia-ocorrencia h4{margin:0 0 8px;font-size:16px;overflow-wrap:anywhere}.conferencia-ocorrencia .ghost{margin-top:10px;min-height:44px}.conferencia-situacao{display:inline-flex;font-size:12px;font-weight:700;border:1px solid #75a98755;background:#75a98712;color:#bce0c6;border-radius:8px;padding:7px 9px}.conferencia-monitor-note{font-size:12px!important;line-height:1.55}.conferencia-regra{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.cronograma-tecnico{border-color:#75573e}.cronograma-tecnico h2{font-size:23px}.cronograma-tecnico .cronograma-subtitulo{font-size:13px;margin-top:0}.cronograma-fases{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}.cronograma-fases>div{min-width:0;padding:13px;border:1px solid var(--line);border-radius:12px;background:#0e0c0a44}.cronograma-fases small{display:block;font-size:11px;color:var(--dim);margin-bottom:6px}.cronograma-fases strong{display:block;font-size:15px;line-height:1.5;overflow-wrap:anywhere}.cronograma-fases span{display:block;color:var(--muted);font-size:12px;margin-top:5px}.cronograma-contadores{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:15px 0}.cronograma-contadores>div{min-width:0;border:1px solid var(--line);border-radius:10px;padding:11px}.cronograma-contadores b{display:block;font-size:22px;color:var(--cream)}.cronograma-contadores span{display:block;font-size:11px;line-height:1.4;color:var(--muted);margin-top:4px}.cronograma-tecnico details{min-width:0}.cronograma-tecnico summary{cursor:pointer;min-height:44px;padding:12px 0;font-size:13px;line-height:1.5;overflow-wrap:anywhere}.cronograma-tecnico summary:focus-visible{outline:2px solid var(--orange);outline-offset:3px}.cronograma-etapas{margin:6px 0 14px;padding-left:20px;font-size:12px;line-height:1.7;color:var(--muted)}.cronograma-etapas li{padding:3px 0}.cronograma-etapas [aria-current="step"]{color:var(--cream);font-weight:700}.cronograma-marcos{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0 14px}.cronograma-marcos span{padding:7px 9px;border:1px solid var(--line2);border-radius:8px;font-size:11px;line-height:1.5;color:var(--muted)}.cronograma-itens{border-top:1px solid var(--line);margin-top:10px}.cronograma-item{border:1px solid var(--line);border-radius:11px;margin:8px 0;padding:0 12px}.cronograma-item summary strong{font-size:13px}.cronograma-item-estado{display:block;font-size:11px;color:#ffc6a0;margin:4px 0 0 16px}.cronograma-item-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0 14px}.cronograma-item-meta>div{min-width:0}.cronograma-item-meta dt{font-size:10px;color:var(--dim);margin-bottom:4px}.cronograma-item-meta dd{margin:0;font-size:12px;line-height:1.5;overflow-wrap:anywhere}.cronograma-links{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:12px;margin:12px 0}.cronograma-links a{color:#ffc6a0;overflow-wrap:anywhere}.cronograma-tecnico .cronograma-aviso{font-size:12px;line-height:1.5}.cronograma-tecnico .agente-source{font-size:11px}
+@media(max-width:640px){.cronograma-fases{grid-template-columns:minmax(0,1fr)}.cronograma-contadores{grid-template-columns:repeat(2,minmax(0,1fr))}.cronograma-item-meta{grid-template-columns:minmax(0,1fr)}.cronograma-tecnico h2{font-size:23px}}
 .agente-ficha-action{min-height:44px;padding:8px 12px;font-size:12px;margin:8px 0}
 @media(max-width:640px){.agente-card{padding:18px 16px;border-radius:16px}.agente-card h2{font-size:26px}.agente-selector,.agente-fields{grid-template-columns:minmax(0,1fr)}.agente-actions>.primary{width:100%}.agente-result-head .ghost{width:100%}}
 </style>
@@ -487,6 +489,8 @@ button.sutil{opacity:.55;font-size:12px}
 <!-- Este "Carregando" é de propósito HTML puro, sem depender de nada: é a primeira coisa que aparece,
      mesmo que todo o resto falhe. O React limpa a #root quando desenha, então ele some sozinho. -->
 <div id="root"><div class="loading-screen" id="tb-carregando"><div><div class="brand-seal">TB</div><p>Carregando o painel…</p></div></div></div>
+<p id="agenda-caixa-erro" role="alert" hidden>Não foi possível carregar a proteção da Caixa. Recarregue o app antes de concluir uma triagem.</p>
+<script src="agenda-caixa.js" onerror="document.getElementById('agenda-caixa-erro').hidden=false"></script>
 <script type="text/plain" id="app-source">
 const { useCallback, useEffect, useMemo, useState } = React;
 
@@ -600,7 +604,7 @@ const emptyForm = {
   kind: "cliente", customerId: "", name: "", phone: "", city: "", address: "", service: "", responsavel: "",
   serviceStatus: "lead", priority: "media", nextAction: "Responder o cliente e confirmar os detalhes", due: "", value: "",
   precisaMaterial: true, fornecedorId: "",
-  addAgenda: false, agendaType: "remoto", time: "", financeType: "saida", financeStatus: "a_pagar", financeScope: "empresa",
+  addAgenda: false, agendaType: "remoto", agendaNatureza: "", agendaClienteId: "", agendaServicoId: "", time: "", financeType: "saida", financeStatus: "a_pagar", financeScope: "empresa",
   question: "", checkedCustomers: false, checkedAgenda: false, checkedFinance: false,
 };
 
@@ -655,8 +659,7 @@ function ProntidaoButton({ service, db, demo, notify, onChanged }) {
 
 function ProntosParaEntregarCard({ services, onOpenFicha }) {
   const prontos = (services || []).filter(servicoPronto);
-  return <section className="content-card" aria-label="Prontos para entregar">
-    <p className="kicker">PRODUÇÃO CONCLUÍDA</p><h3>Prontos para entregar · {prontos.length}</h3>
+  return <CardRecolhivel cabecalho={<><p className="kicker">PRODUÇÃO CONCLUÍDA</p><h3>Prontos para entregar · {prontos.length}</h3></>}>
     {!prontos.length && <p>Nenhum serviço aguardando entrega.</p>}
     {prontos.map((s) => <article className="capacidade-servico" key={s.id}>
       <strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span>
@@ -664,7 +667,7 @@ function ProntosParaEntregarCard({ services, onOpenFicha }) {
       {s.proxima_acao && <p>{s.proxima_acao}</p>}
       <button className="ghost" onClick={() => onOpenFicha(s.cliente_id)}>Abrir serviço / entrega</button>
     </article>)}
-  </section>;
+  </CardRecolhivel>;
 }
 
 const demoInbox = [
@@ -3210,8 +3213,9 @@ function Home() {
     const temPrint = parseInbox(item.texto || "").images.length > 0;
     const conversa = eventMessage(item.conversa, `Resultado: ${result}`, mode);
     if (temPrint) conversa.push({ de: mode === "claude" ? "ia" : "diego", tipo: "sistema", em: new Date().toISOString(), texto: "Print aberto na tela de triagem antes de confirmar.", meta: { print_lido: true } });
-    const { error } = await db.from("caixa_entrada").update({ processado: true, status: "resolvido", conversa }).eq("id", item.id).eq("status", "em_processamento");
+    const { data: resolvida, error } = await db.from("caixa_entrada").update({ processado: true, status: "resolvido", conversa }).eq("id", item.id).eq("status", "em_processamento").select("id,processado,status").maybeSingle();
     if (error) throw error;
+    if (resolvida?.id !== item.id || !resolvida.processado || resolvida.status !== "resolvido") throw new Error("A resolução da Caixa não foi confirmada. Atualize a entrada para retomar.");
   }
 
   function updateForm(key, value) { setForm((current) => ({ ...current, [key]: value })); }
@@ -3220,17 +3224,26 @@ function Home() {
     if (!form.name.trim() || !form.service.trim() || !form.nextAction.trim() || !form.due) { notify("Nome, serviço, próxima ação e data são obrigatórios.", "error"); return; }
     if (form.addAgenda && form.agendaType === "presencial" && !form.city.trim()) { notify("Compromisso presencial precisa de cidade.", "error"); return; }
     if (form.serviceStatus === "agendado" && form.precisaMaterial && !form.fornecedorId) { notify("Trabalho fechado precisa do fornecedor para o app planejar a compra. Se ainda não sabe, mande a pergunta ao Diego.", "error"); return; }
-    const telefone = corrigirTelefone(form.phone);
-    if (telefone === null) { notify("Telefone incompleto — celular precisa de DDD + 8 ou 9 dígitos.", "error"); return; }
+    if (!window.BahiaAgendaCaixa) { notify("A proteção da Caixa não carregou. Recarregue o app.", "error"); return; }
+    if (BahiaAgendaCaixa.cadastroBloqueado(item)) { notify("Confirme a identidade e resolva o bloqueio de cadastro na Caixa antes de prosseguir.", "error"); return; }
+    const telefone = BahiaAgendaCaixa.telefoneCadastroEstrito(form.phone);
+    if (!telefone) { notify("WhatsApp inválido. Confirme o número completo; nenhum dígito será acrescentado.", "error"); return; }
     if (demo) { await resolveInbox(item, "Ficha e lead criados na demonstração"); notify("Triagem concluída na demonstração.", "ok"); return; }
     setBusy(true);
     let fechamentoSemValor = false;
     try {
-      let customer = customers.find((entry) => entry.id === form.customerId) || duplicateCustomers[0] || null;
+      // Nome serve para procurar na tela; a gravação só aceita seleção explícita ou telefone completo único.
+      const mesmosTelefones = customers.filter((entry) => BahiaAgendaCaixa.telefoneCadastroEstrito(entry.telefone) === telefone);
+      if (!form.customerId && mesmosTelefones.length > 1) throw new Error("Mais de uma ficha usa esse telefone. Escolha a ficha correta.");
+      let customer = form.customerId ? customers.find((entry) => entry.id === form.customerId) : mesmosTelefones[0] || null;
+      if (form.customerId && !customer) throw new Error("Cliente escolhido não encontrado. Atualize a tela antes de prosseguir.");
+      if (customer && !BahiaAgendaCaixa.telefoneCadastroEstrito(customer.telefone)) throw new Error("A ficha escolhida ainda não tem WhatsApp válido.");
       if (!customer) {
+        BahiaAgendaCaixa.validarConfirmacaoCadastro(item, "cliente", null);
         const { data, error } = await db.from("clientes").insert({ nome: form.name.trim(), telefone: telefone || null, cidade: form.city.trim() || null, endereco: form.address.trim() || null, obs: parsedSelected.text || null }).select("*").single();
         if (error) throw error; customer = data;
       }
+      BahiaAgendaCaixa.validarConfirmacaoCadastro(item, "cliente", customer);
       const { data: sameServices, error: serviceSearchError } = await db.from("servicos").select("*").eq("cliente_id", customer.id).ilike("titulo", form.service.trim()).limit(1);
       if (serviceSearchError) throw serviceSearchError;
       let service = sameServices?.[0] || null;
@@ -3260,7 +3273,7 @@ function Home() {
         // Sem hora informada, o app pega o primeiro horário livre que não aperta estrada nem igreja. A preferência
         // de tarde da rotina (14/08) saiu em 14/09. Ver horaSugerida.
         const fallback = horaSugerida(form.due, form.agendaType, occupied, form.city, doDia);
-        const appointment = { titulo: `${customer.nome} — ${form.service.trim()}`, data: form.due, hora: form.time || fallback, cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType, status: "planejado", servico_id: service.id };
+        const appointment = { titulo: `${customer.nome} — ${form.service.trim()}`, data: form.due, hora: form.time || fallback, cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType, status: "planejado", servico_id: service.id, cliente_id: customer.id };
         const { data: linked } = await db.from("agenda").select("id").eq("servico_id", service.id).eq("status", "planejado").limit(1);
         if (linked?.length) { const { error } = await db.from("agenda").update(appointment).eq("id", linked[0].id); if (error) throw error; }
         else { const { error } = await db.from("agenda").insert(appointment); if (error) throw error; }
@@ -3283,18 +3296,26 @@ function Home() {
 
   async function finishAgenda(item) {
     if (!form.service.trim() || !form.due || (form.agendaType === "presencial" && !form.city.trim())) { notify("Título, data e cidade presencial são obrigatórios.", "error"); return; }
+    if (!window.BahiaAgendaCaixa) { notify("A proteção da Caixa não carregou. Recarregue o app.", "error"); return; }
+    if (!form.agendaNatureza) { notify("Escolha a natureza do compromisso antes de confirmar.", "error"); return; }
+    if (BahiaAgendaCaixa.cadastroBloqueado(item)) { notify("Cadastro bloqueado. Confirme a identidade e resolva o bloqueio na Caixa antes de agendar.", "error"); return; }
     if (demo) { await resolveInbox(item, "Compromisso criado na demonstração"); notify("Compromisso registrado.", "ok"); return; }
     setBusy(true);
+    let compromissoSalvo = false;
     try {
       const doDia = agendaVisivel.filter((entry) => entry.data === form.due && !ehRemoto(entry));
       const occupied = doDia.map((entry) => entry.hora?.slice(0, 5));
       const fallback = horaSugerida(form.due, form.agendaType, occupied, form.city, doDia);
-      const payload = { titulo: form.service.trim(), data: form.due, hora: form.time || fallback, cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType, status: "planejado" };
-      const { data: same } = await db.from("agenda").select("id").eq("titulo", payload.titulo).eq("data", payload.data).eq("status", "planejado").limit(1);
-      let id = same?.[0]?.id;
-      if (!id) { const { data, error } = await db.from("agenda").insert(payload).select("id").single(); if (error) throw error; id = data.id; }
-      await resolveInbox(item, `compromisso #${id}`); await loadAll(); notify("Compromisso salvo sem duplicar.", "ok");
-    } catch (error) { notify(`Nada foi encerrado: ${error.message}`, "error"); }
+      const compromisso = await BahiaAgendaCaixa.criarDaCaixa(db, item, {
+        natureza: form.agendaNatureza,
+        clienteId: form.agendaNatureza === "cliente" ? form.agendaClienteId : null,
+        servicoId: form.agendaNatureza === "cliente" ? form.agendaServicoId : null,
+        titulo: form.service.trim(), data: form.due, hora: form.time || fallback, horaAutomatica: !form.time,
+        cidade: form.agendaType === "presencial" ? form.city.trim() : null, tipo: form.agendaType,
+      });
+      compromissoSalvo = true;
+      await resolveInbox(item, `compromisso #${compromisso.id}`); await loadAll(); notify("Compromisso salvo e vínculo conferido.", "ok");
+    } catch (error) { notify(compromissoSalvo ? `Compromisso salvo; a Caixa continua pendente. ${error.message}` : `Nada foi encerrado: ${error.message}`, "error"); }
     finally { setBusy(false); }
   }
 
@@ -3894,6 +3915,7 @@ function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicia
 
   return <div className="agente-view">
     <ConferenciaMonitorCard monitor={monitor} demo={demo} onOpenFicha={onOpenFicha} />
+    <CronogramaTecnico db={db} demo={demo} offlineDesde={offlineDesde} />
     <section className="agente-card agente-intro" aria-labelledby="agente-titulo">
       <span className={`agente-badge ${demo ? "demo" : ""}`}>{demo ? "Prévia · dados fictícios" : "Consulta de um serviço"}</span>
       <h2 id="agente-titulo">O que está registrado neste serviço?</h2>
@@ -3940,6 +3962,172 @@ function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicia
 
     </>}
   </div>;
+}
+
+// Cronograma aprovado: as datas orientam a visualização, nunca a conclusão de itens.
+const CRONOGRAMA_FASES = Object.freeze([
+  Object.freeze({ id: "monitor", titulo: "Estabilização do monitor", inicio: "2026-09-15", fim: "2026-09-17", intervalo: "15–17/09/2026" }),
+  Object.freeze({ id: "financeiro", titulo: "Financeiro / contas a pagar", inicio: "2026-09-18", fim: "2026-09-21", intervalo: "18–21/09/2026" }),
+  Object.freeze({ id: "prazos", titulo: "Prazos operacionais", inicio: "2026-09-22", fim: "2026-09-24", intervalo: "22–24/09/2026" }),
+  Object.freeze({ id: "materiais", titulo: "Materiais / produção", inicio: "2026-09-25", fim: "2026-09-26", intervalo: "25–26/09/2026" }),
+  Object.freeze({ id: "handoff", titulo: "Segurança e entrega técnica final", inicio: "2026-09-27", fim: "2026-09-30", intervalo: "27–30/09/2026" }),
+]);
+const CRONOGRAMA_ESTADOS = Object.freeze({
+  a_fazer: "A fazer", enviado_codex: "Enviado ao Codex", em_execucao: "Em execução",
+  retorno_recebido: "Retorno recebido", aguardando_validacao_classic: "Aguardando validação do Classic",
+  concluido: "Concluído", bloqueado: "Bloqueado", decisao_negocio_pendente: "Decisão de negócio pendente",
+});
+function cronogramaDiaLocal(agora = Date.now()) {
+  const data = new Date(agora);
+  if (!Number.isFinite(data.getTime())) return null;
+  const partes = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(data);
+  const valor = (tipo) => partes.find((p) => p.type === tipo)?.value;
+  return `${valor("year")}-${valor("month")}-${valor("day")}`;
+}
+function cronogramaFaseAtual(agora = Date.now()) {
+  const dia = cronogramaDiaLocal(agora);
+  return { dia, atual: dia ? CRONOGRAMA_FASES.find((f) => dia >= f.inicio && dia <= f.fim) || null : null,
+    proxima: dia ? CRONOGRAMA_FASES.find((f) => dia < f.inicio) || null : null,
+    encerrado: Boolean(dia && dia > "2026-09-30") };
+}
+function cronogramaLinkSeguro(valor) {
+  if (typeof valor !== "string" || !valor.trim() || /[\u0000-\u001f\u007f]/.test(valor)) return null;
+  try { const url = new URL(valor.trim()); return url.protocol === "https:" && !url.username && !url.password ? url.href : null; }
+  catch (_) { return null; }
+}
+function cronogramaHorario(valor) {
+  if (typeof valor !== "string" || !valor.trim() || !Number.isFinite(Date.parse(valor))) return "Não registrado";
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }).format(new Date(valor));
+}
+function cronogramaConclusaoEvidenciada(item) {
+  return Boolean(item && cronogramaLinkSeguro(item.retorno_url) && cronogramaLinkSeguro(item.validacao_classic_url) &&
+    cronogramaHorario(item.readback_tecnico_em) !== "Não registrado" && cronogramaHorario(item.validacao_classic_em) !== "Não registrado");
+}
+function cronogramaResumo(itens) {
+  return itens.reduce((resumo, item) => {
+    if (item.estado !== "concluido") resumo.abertos += 1;
+    if (["enviado_codex", "em_execucao"].includes(item.estado)) resumo.aguardandoRetorno += 1;
+    if (["retorno_recebido", "aguardando_validacao_classic"].includes(item.estado)) resumo.aguardandoClassic += 1;
+    if (["bloqueado", "decisao_negocio_pendente"].includes(item.estado)) resumo.bloqueados += 1;
+    return resumo;
+  }, { abertos: 0, aguardandoRetorno: 0, aguardandoClassic: 0, bloqueados: 0 });
+}
+function cronogramaValidarLeitura(resposta) {
+  if (resposta?.error) throw new Error("consulta_indisponivel");
+  const itens = resposta?.data;
+  if (!Array.isArray(itens) || !Number.isInteger(resposta.count) || resposta.count < 0) throw new Error("resposta_inesperada");
+  if (resposta.count !== itens.length || resposta.count > 500) throw new Error("resultado_parcial");
+  const ids = new Set();
+  for (const item of itens) {
+    if (!item || typeof item.item_id !== "string" || !item.item_id.trim() || ids.has(item.item_id) ||
+        typeof item.descricao !== "string" || !item.descricao.trim() || !Object.hasOwn(CRONOGRAMA_ESTADOS, item.estado) ||
+        (item.estado === "concluido" && !cronogramaConclusaoEvidenciada(item))) throw new Error("resposta_inesperada");
+    ids.add(item.item_id);
+  }
+  return { itens, total: resposta.count, resumo: cronogramaResumo(itens) };
+}
+function useCronogramaTecnico({ db, demo, offlineDesde }) {
+  const [agora, setAgora] = useState(() => Date.now());
+  const [leitura, setLeitura] = useState({ tipo: "carregando", dados: null });
+  const recarregar = React.useRef(null);
+  useEffect(() => {
+    // Só atualiza a data da fase; não consulta o banco nem executa o cronograma.
+    const relogio = window.setInterval(() => setAgora(Date.now()), 60000);
+    return () => clearInterval(relogio);
+  }, []);
+  useEffect(() => {
+    let cancelado = false, numero = 0, controle = null, timeout = null;
+    const carregar = async () => {
+      const atual = ++numero;
+      controle?.abort(); clearTimeout(timeout); setAgora(Date.now());
+      if (demo) { setLeitura({ tipo: "demo", dados: null }); return; }
+      if (navigator.onLine === false || offlineDesde) { setLeitura({ tipo: "offline", dados: null }); return; }
+      if (!db?.from) { setLeitura({ tipo: "indisponivel", dados: null }); return; }
+      if (document.visibilityState === "hidden") { setLeitura({ tipo: "aguardando", dados: null }); return; }
+      const abortador = new AbortController(); controle = abortador;
+      setLeitura({ tipo: "carregando", dados: null });
+      let aoAbortar;
+      try {
+        const consulta = db.from("engenharia_itens")
+          .select("item_id,descricao,prioridade,fase_id,criado_em,enviado_em,estado,recado_url,retorno_url,commit_hash,deploy_url,readback_tecnico_em,validacao_classic_em,validacao_classic_url,motivo_bloqueio,atualizado_em", { count: "exact" })
+          .order("criado_em", { ascending: false }).order("item_id", { ascending: true }).limit(500);
+        const abortada = new Promise((_, rejeitar) => {
+          aoAbortar = () => rejeitar(new Error("consulta_interrompida"));
+          abortador.signal.addEventListener("abort", aoAbortar, { once: true });
+        });
+        timeout = window.setTimeout(() => abortador.abort(), 20000);
+        const resposta = await Promise.race([consulta.abortSignal(abortador.signal), abortada]);
+        if (cancelado || atual !== numero || navigator.onLine === false) return;
+        const dados = cronogramaValidarLeitura(resposta);
+        setLeitura({ tipo: "ok", dados, origemDb: db, consultadoEm: new Date().toISOString() });
+      } catch (erro) {
+        if (!cancelado && atual === numero) setLeitura({ tipo: navigator.onLine === false ? "offline" : erro?.message === "resultado_parcial" ? "parcial" : "erro", dados: null });
+      } finally {
+        if (aoAbortar) abortador.signal.removeEventListener("abort", aoAbortar);
+        if (atual === numero) { clearTimeout(timeout); controle = null; }
+      }
+    };
+    const mudou = () => {
+      if (document.visibilityState === "hidden") { ++numero; controle?.abort(); clearTimeout(timeout); setLeitura({ tipo: "aguardando", dados: null }); }
+      else carregar();
+    };
+    recarregar.current = carregar; carregar();
+    document.addEventListener("visibilitychange", mudou);
+    window.addEventListener("online", mudou); window.addEventListener("offline", mudou);
+    return () => {
+      cancelado = true; ++numero; controle?.abort(); clearTimeout(timeout);
+      if (recarregar.current === carregar) recarregar.current = null;
+      document.removeEventListener("visibilitychange", mudou);
+      window.removeEventListener("online", mudou); window.removeEventListener("offline", mudou);
+    };
+  }, [db, demo, offlineDesde]);
+  return { agora, leitura, atualizar: () => recarregar.current?.() };
+}
+function CronogramaTecnico({ db, demo, offlineDesde }) {
+  const { agora, leitura, atualizar } = useCronogramaTecnico({ db, demo, offlineDesde });
+  const fase = cronogramaFaseAtual(agora);
+  const mensagens = {
+    demo: "Demonstração do cronograma aprovado. Os itens técnicos reais não são consultados neste modo.",
+    offline: "Sem conexão. Os estados e as quantidades dos itens técnicos não estão confirmados.",
+    indisponivel: "A consulta dos itens técnicos ainda não está disponível. Atualize após restabelecer a conexão do app.",
+    aguardando: "Os estados serão consultados ao voltar para esta tela.",
+    carregando: "Consultando os estados dos itens técnicos…",
+    parcial: "A consulta ficou parcial. As quantidades e os estados não estão confirmados; é necessário revisar a leitura técnica.",
+    erro: "Não foi possível consultar os itens técnicos. As quantidades e os estados não estão confirmados. Tente atualizar.",
+  };
+  const atual = leitura.tipo === "ok" && leitura.origemDb === db && Boolean(db?.from) && !demo && !offlineDesde && navigator.onLine !== false;
+  const dados = atual ? leitura.dados : null;
+  const link = (valor, texto) => { const href = cronogramaLinkSeguro(valor); return href ? <a href={href} target="_blank" rel="noopener noreferrer">{texto}</a> : null; };
+  return <section className="agente-card cronograma-tecnico" aria-labelledby="cronograma-tecnico-titulo" aria-busy={leitura.tipo === "carregando"}>
+    <div className="agente-result-head"><div><span className={`agente-badge ${demo ? "demo" : ""}`}>{demo ? "Demonstração" : "Engenharia · acompanhamento"}</span>
+      <h2 id="cronograma-tecnico-titulo">Cronograma técnico</h2><p className="cronograma-subtitulo">Plano aprovado até 30/09/2026 · horário de Brasília</p></div>
+      <button type="button" className="ghost" onClick={atualizar} disabled={demo || leitura.tipo === "carregando" || Boolean(offlineDesde) || navigator.onLine === false}>{leitura.tipo === "carregando" ? "Consultando…" : "Atualizar itens"}</button>
+    </div>
+    <div className="cronograma-fases"><div><small>Fase prevista para hoje</small><strong>{fase.atual?.titulo || (fase.encerrado ? "Período previsto encerrado" : fase.dia ? "Período ainda não iniciado" : "Data indisponível")}</strong><span>{fase.atual?.intervalo || "15–30/09/2026"}</span></div>
+      <div><small>Próxima fase</small><strong>{fase.proxima?.titulo || "Nenhuma fase posterior prevista"}</strong><span>{fase.proxima ? `Início em ${fase.proxima.inicio.slice(8, 10)}/${fase.proxima.inicio.slice(5, 7)}/2026` : "A conclusão dos itens depende das evidências registradas."}</span></div></div>
+    <details><summary>Ver etapas e marcos do plano</summary><ol className="cronograma-etapas">{CRONOGRAMA_FASES.map((etapa) => <li key={etapa.id} aria-current={fase.atual?.id === etapa.id ? "step" : undefined}><strong>{etapa.intervalo}</strong> · {etapa.titulo}</li>)}</ol>
+      <div className="cronograma-marcos"><span>27/09 · congelamento de features não críticas</span><span>Até 29/09 · teste sem Codex</span><span>30/09 · entrega final e backlog</span></div>
+      <p className="cronograma-aviso">Cada nova regra depende de fonte confiável, testes e validação da etapa anterior. As datas mostram o planejamento; os estados abaixo registram o andamento.</p>
+    </details>
+    {!dados && <p className="cronograma-aviso" role={leitura.tipo === "erro" || leitura.tipo === "parcial" ? "alert" : "status"}>{mensagens[leitura.tipo] || (demo ? mensagens.demo : offlineDesde || navigator.onLine === false ? mensagens.offline : mensagens.indisponivel)}</p>}
+    <div className="cronograma-contadores" aria-label="Resumo dos itens técnicos">
+      {[['abertos', 'Em aberto'], ['aguardandoRetorno', 'Aguardando retorno'], ['aguardandoClassic', 'Validação do Classic'], ['bloqueados', 'Bloqueio ou decisão pendente']].map(([chave, titulo]) => <div key={chave}><b>{dados ? dados.resumo[chave] : "—"}</b><span>{titulo}</span></div>)}
+    </div>
+    {dados && <><div className="agente-source">Estados consultados em {cronogramaHorario(leitura.consultadoEm)}. Os grupos de acompanhamento podem incluir os mesmos itens em aberto.</div>
+      {dados.total === 0 ? <p className="cronograma-aviso">Nenhum item técnico cadastrado nesta consulta.</p> : <details className="cronograma-itens"><summary>Ver {dados.total} item(ns) e evidências</summary>
+        {dados.itens.map((item) => <details className="cronograma-item" key={item.item_id}><summary><strong>{item.descricao}</strong><span className="cronograma-item-estado">{CRONOGRAMA_ESTADOS[item.estado]}</span></summary>
+          <dl className="cronograma-item-meta"><div><dt>Identificador</dt><dd>{item.item_id}</dd></div><div><dt>Prioridade · fase</dt><dd>{/^P[0-3]$/.test(item.prioridade || "") ? item.prioridade : "Prioridade não definida"} · {CRONOGRAMA_FASES.find((f) => f.id === item.fase_id)?.titulo || "Fase não definida"}</dd></div>
+            <div><dt>Criado · enviado ao Codex</dt><dd>{cronogramaHorario(item.criado_em)} · {cronogramaHorario(item.enviado_em)}</dd></div><div><dt>Última atualização registrada</dt><dd>{cronogramaHorario(item.atualizado_em)}</dd></div>
+            <div><dt>Readback técnico</dt><dd>{cronogramaHorario(item.readback_tecnico_em)}</dd></div><div><dt>Validação do Classic</dt><dd>{cronogramaHorario(item.validacao_classic_em)}</dd></div>
+            {item.commit_hash && <div><dt>Commit registrado</dt><dd>{item.commit_hash}</dd></div>}
+          </dl>
+          {item.motivo_bloqueio && <p className="cronograma-aviso"><strong>Bloqueio / decisão:</strong> {item.motivo_bloqueio}</p>}
+          <div className="cronograma-links">{link(item.recado_url, "Recado no Drive")}{link(item.retorno_url, "Retorno técnico")}{link(item.validacao_classic_url, "Validação do Classic")}{link(item.deploy_url, "Deploy registrado")}</div>
+        </details>)}
+      </details>}
+    </>}
+    <div className="cronograma-links">{link("https://docs.google.com/document/d/1I1nS3sD1YwVp6BbXwOV4h5ZRwWC3vL09rgtSeczA9qM/edit", "Plano aprovado no Drive")}</div>
+  </section>;
 }
 
 function PinScreen({ mode, onDefine, onEnter }) {
@@ -4042,7 +4230,7 @@ function TriagePanel(props) {
     {status === "aguardando_voce" && <div className="answer-box"><label>Sua resposta para o Claude<textarea value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Responda aqui; a entrada voltará automaticamente para a fila do Claude." /></label><button className="primary" onClick={props.onAnswer} disabled={!reply.trim()}>Enviar resposta</button></div>}
     {["novo", "respondido"].includes(status) && <div className="claim-box"><h3>Esta entrada ainda não está travada.</h3><p>Assuma antes de alterar dados. Se outra sessão já pegou, esta operação será recusada.</p><button className="primary" onClick={props.onClaim} disabled={busy}>Iniciar triagem segura</button></div>}
     {status === "em_processamento" && <>
-      <div className="classify"><p className="kicker">1 · CLASSIFICAR RESULTADO</p>{[['cliente','Cliente e serviço'],['agenda','Compromisso avulso'],['financeiro','Financeiro avulso']].map(([id, label]) => <button key={id} className={form.kind === id ? "active" : ""} onClick={() => updateForm("kind", id)}>{label}</button>)}</div>
+      <div className="classify"><p className="kicker">1 · CLASSIFICAR RESULTADO</p>{[['cliente','Cliente e serviço'],['agenda','Compromisso'],['financeiro','Financeiro avulso']].map(([id, label]) => <button key={id} className={form.kind === id ? "active" : ""} onClick={() => updateForm("kind", id)}>{label}</button>)}</div>
       {form.kind === "cliente" && <div className="form-grid">
         <p className="form-title">2 · Cliente e serviço</p>
         <label>Cliente existente<select value={form.customerId} onChange={(event) => { const customer = customers.find((entry) => entry.id === event.target.value); updateForm("customerId", event.target.value); if (customer) { updateForm("name", customer.nome); updateForm("phone", customer.telefone || ""); updateForm("city", customer.cidade || ""); updateForm("address", customer.endereco || ""); } }}><option value="">Criar ou localizar pelos dados</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.nome}{customer.telefone ? ` · ${customer.telefone}` : ""}</option>)}</select></label>
@@ -4077,7 +4265,14 @@ function TriagePanel(props) {
         {!!parsed.images.length && <span className="triage-print-aviso">📷 Este item tem {parsed.images.length > 1 ? `${parsed.images.length} prints` : "print"}. Leu antes de confirmar? O material e as medidas costumam estar na imagem, não na anotação.</span>}
         <button className="primary wide" onClick={props.onCustomer} disabled={busy}>Confirmar triagem</button>
       </div>}
-      {form.kind === "agenda" && <div className="form-grid"><p className="form-title">2 · Compromisso avulso</p><label>Compromisso*<input value={form.service} onChange={(event) => updateForm("service", event.target.value)} /></label><div className="row"><label>Data*<input type="date" value={form.due} onChange={(event) => updateForm("due", event.target.value)} /></label><label>Hora<input type="time" value={form.time} onChange={(event) => updateForm("time", event.target.value)} /></label></div><div className="row"><label>Tipo<select value={form.agendaType} onChange={(event) => updateForm("agendaType", event.target.value)}><option value="remoto">Remoto</option><option value="presencial">Presencial</option></select></label><label>Cidade presencial<input value={form.city} onChange={(event) => updateForm("city", event.target.value)} disabled={form.agendaType === "remoto"} /></label></div><ReviewBox lines={[form.service || "Sem título", `${form.due || "sem data"} · ${form.time || "primeiro horário livre"}`, `${form.agendaType}${form.city ? ` · ${form.city}` : ""}`]} /><button className="primary wide" onClick={props.onAgenda} disabled={busy}>Confirmar compromisso</button></div>}
+      {form.kind === "agenda" && <div className="form-grid"><p className="form-title">2 · Compromisso</p>
+        <label>Natureza do compromisso*<select value={form.agendaNatureza} onChange={(event) => { updateForm("agendaNatureza", event.target.value); updateForm("agendaClienteId", ""); updateForm("agendaServicoId", ""); }}><option value="">Escolha…</option><option value="cliente">Cliente — retorno, follow-up ou cobrança</option><option value="avulso">Avulso — sem relação com cliente</option><option value="pessoal">Pessoal</option><option value="operacional">Operacional</option></select></label>
+        {form.agendaNatureza === "cliente" && <>
+          <label>Cliente cadastrado*<select value={form.agendaClienteId} onChange={(event) => { updateForm("agendaClienteId", event.target.value); updateForm("agendaServicoId", ""); }}><option value="">Escolha o cliente…</option>{customers.map((cliente) => <option key={cliente.id} value={cliente.id}>{cliente.nome} · {cliente.telefone || "sem WhatsApp"}</option>)}</select></label>
+          <label>Serviço relacionado<select value={form.agendaServicoId} onChange={(event) => updateForm("agendaServicoId", event.target.value)} disabled={!form.agendaClienteId}><option value="">Sem serviço relacionado a este compromisso</option>{services.filter((servico) => servico.cliente_id === form.agendaClienteId).map((servico) => <option key={servico.id} value={servico.id}>{servico.titulo} · {statusLabel[servico.status] || servico.status}</option>)}</select></label>
+          <p className="muted">Sem cadastro e WhatsApp válidos, mantenha a pendência na Caixa.</p>
+        </>}
+        <label>Compromisso*<input value={form.service} onChange={(event) => updateForm("service", event.target.value)} /></label><div className="row"><label>Data*<input type="date" value={form.due} onChange={(event) => updateForm("due", event.target.value)} /></label><label>Hora<input type="time" value={form.time} onChange={(event) => updateForm("time", event.target.value)} /></label></div><div className="row"><label>Tipo<select value={form.agendaType} onChange={(event) => updateForm("agendaType", event.target.value)}><option value="remoto">Remoto</option><option value="presencial">Presencial</option></select></label><label>Cidade presencial<input value={form.city} onChange={(event) => updateForm("city", event.target.value)} disabled={form.agendaType === "remoto"} /></label></div><ReviewBox lines={[form.service || "Sem título", `${form.due || "sem data"} · ${form.time || "primeiro horário livre"}`, `${form.agendaType}${form.city ? ` · ${form.city}` : ""}`]} /><button className="primary wide" onClick={props.onAgenda} disabled={busy}>Confirmar compromisso</button></div>}
       {form.kind === "financeiro" && <div className="form-grid"><p className="form-title">2 · Financeiro avulso</p><label>Descrição*<input value={form.service} onChange={(event) => updateForm("service", event.target.value)} /></label><div className="row three"><label>Valor R$*<input value={form.value} onChange={(event) => updateForm("value", event.target.value)} /></label><label>Tipo<select value={form.financeType} onChange={(event) => updateForm("financeType", event.target.value)}><option value="saida">Saída</option><option value="entrada">Entrada</option></select></label><label>Status<select value={form.financeStatus} onChange={(event) => updateForm("financeStatus", event.target.value)}><option value="a_pagar">A pagar</option><option value="a_receber">A receber</option><option value="pago">Pago</option></select></label></div><label>Aba<select value={form.financeScope} onChange={(event) => updateForm("financeScope", event.target.value)}><option value="empresa">Empresa</option><option value="pessoal">Pessoal</option></select></label><label>Data*<input type="date" value={form.due} onChange={(event) => updateForm("due", event.target.value)} /></label><p className="ficha-note">Use isto só para fato realmente avulso. Material, Vale, Pró-labore e recebimento de serviço têm operação própria.</p><ReviewBox lines={[form.service || "Sem descrição", `${form.financeType} · ${form.financeStatus}`, `${money(form.value)} · ${form.due || "sem data"}`]} /><button className="primary wide" onClick={props.onFinance} disabled={busy}>Confirmar lançamento</button></div>}
       <div className="ask-panel"><p className="kicker">OU · PEDIR INFORMAÇÃO</p><p>Antes de perguntar, confirme que a resposta não está no próprio sistema.</p><div className="audit-checks"><label><input type="checkbox" checked={form.checkedCustomers} onChange={(event) => updateForm("checkedCustomers", event.target.checked)} />Clientes e serviços</label><label><input type="checkbox" checked={form.checkedAgenda} onChange={(event) => updateForm("checkedAgenda", event.target.checked)} />Agenda</label><label><input type="checkbox" checked={form.checkedFinance} onChange={(event) => updateForm("checkedFinance", event.target.checked)} />Financeiro</label></div><textarea value={form.question} onChange={(event) => updateForm("question", event.target.value)} placeholder="Qual dado crítico falta para decidir?" /><button className="secondary" onClick={props.onAsk} disabled={busy}>Perguntar ao Diego e pausar</button></div>
     </>}

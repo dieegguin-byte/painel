@@ -484,6 +484,8 @@
   </div>
 </div>
 
+<p id="agenda-caixa-erro" role="alert" hidden>Não foi possível carregar a proteção da Caixa. Recarregue o app antes de concluir uma triagem.</p>
+<script src="agenda-caixa.js" onerror="document.getElementById('agenda-caixa-erro').hidden=false"></script>
 <script>
 /* =========================================================================
    CONFIG
@@ -578,6 +580,54 @@ function askConfirm(mensagem){
     document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ fechar(false); document.removeEventListener('keydown',esc);} }, {once:true});
     setTimeout(()=>{ bOk.focus(); }, 0);
   });
+}
+
+function askSelect(mensagem, opcoes){
+  return new Promise(resolve=>{
+    const {fundo,caixa}=_modalBase();
+    const label=el('label',null,mensagem);
+    const select=el('select','campo'); select.style.cssText='width:100%;margin:12px 0';
+    select.appendChild(new Option('Escolha…',''));
+    opcoes.forEach(op=>select.appendChild(new Option(op.label,op.value)));
+    label.appendChild(select); caixa.appendChild(label);
+    const cancelar=el('button','botao b-rm','Cancelar');
+    const confirmar=el('button','botao b-ok','Continuar'); confirmar.disabled=true;
+    const fechar=valor=>{fundo.remove();resolve(valor);};
+    select.addEventListener('change',()=>{confirmar.disabled=!select.value;});
+    cancelar.addEventListener('click',()=>fechar(null));
+    confirmar.addEventListener('click',()=>fechar(select.value));
+    caixa.appendChild(cancelar); caixa.appendChild(confirmar); select.focus();
+  });
+}
+
+async function escolherVinculoAgendaCaixa(item){
+  if(BahiaAgendaCaixa.cadastroBloqueado(item)) throw new Error('Cadastro bloqueado. Confirme a identidade e resolva o bloqueio na Caixa antes de agendar.');
+  const natureza=await askSelect('Este compromisso é de que natureza?',[
+    {value:'cliente',label:'Cliente — retorno, follow-up ou cobrança'},
+    {value:'avulso',label:'Avulso — sem relação com cliente'},
+    {value:'pessoal',label:'Pessoal'}, {value:'operacional',label:'Operacional'},
+  ]);
+  if(!natureza) return null;
+  if(natureza!=='cliente') return {natureza,clienteId:null,servicoId:null};
+  const {data:clientes,error}=await sb.from('clientes').select('id,nome,telefone').order('nome');
+  if(error) throw error;
+  const clienteId=await askSelect('Escolha o cliente cadastrado. Sem cadastro válido, mantenha a entrada na Caixa.',
+    (clientes||[]).map(c=>({value:c.id,label:`${c.nome} · ${c.telefone||'sem WhatsApp'}`})));
+  if(!clienteId) return null;
+  const cliente=(clientes||[]).find(c=>c.id===clienteId);
+  BahiaAgendaCaixa.validarVinculo('cliente',cliente,null);
+  const {data:servicos,error:erroServico}=await sb.from('servicos').select('id,cliente_id,titulo,status').eq('cliente_id',clienteId).order('criado_em',{ascending:false});
+  if(erroServico) throw erroServico;
+  let servicoId=null;
+  if(servicos?.length){
+    const escolha=await askSelect('Este compromisso se refere a qual serviço?',[
+      {value:'sem_servico',label:'Cliente sem serviço relacionado a este compromisso'},
+      ...servicos.map(s=>({value:s.id,label:`${s.titulo} · ${s.status}`})),
+    ]);
+    if(!escolha) return null;
+    servicoId=escolha==='sem_servico'?null:escolha;
+  }
+  return {natureza,clienteId,servicoId};
 }
 
 function montarTextoCaixa(payload={}){
@@ -1463,7 +1513,7 @@ async function sincronizarAgendaServico(servico, cliente, tipo){
   if(!horario) return;
   const { error } = await sb.from('agenda').insert({
     titulo: novoTitulo, data: servico.prazo, hora: horario, tipo,
-    status:'planejado', servico_id: servico.id, cidade: cidadeNova
+    status:'planejado', servico_id: servico.id, cliente_id: servico.cliente_id, cidade: cidadeNova
   });
   if(error){ toast('Erro ao lançar na Agenda: '+error.message); return; }
   toast('📅 Compromisso lançado na Agenda'); renderAgenda();
@@ -2041,9 +2091,14 @@ async function renderInicio(){
       const acoes = el('div','acoes');
       const btnCriarFicha = el('button',null,'Criar ficha/orçamento');
       btnCriarFicha.addEventListener('click', async ()=>{
+        if(!window.BahiaAgendaCaixa){toast('A proteção da Caixa não carregou. Recarregue o app.');return;}
         const nome = await askText('Nome do cliente:');
         if(!nome || !nome.trim()) return;
-        const telefone = await askText('Telefone/WhatsApp do cliente (opcional):', '') || '';
+        const telefoneInformado = await askText('WhatsApp completo do cliente (DDD + número):', '');
+        if(telefoneInformado===null) return;
+        const telefone = BahiaAgendaCaixa.telefoneCadastroEstrito(telefoneInformado);
+        if(!telefone){toast('WhatsApp inválido. Confirme o número completo; a entrada permanece na Caixa.');return;}
+        if(BahiaAgendaCaixa.cadastroBloqueado(item)){toast('Resolva o bloqueio de cadastro na Caixa antes de criar ficha ou agenda.');return;}
         const cidade = await askText('Cidade do cliente (opcional):', '') || '';
         const endereco = await askText('Endereço do cliente (opcional):', '') || '';
         const tituloSugerido = (registro.texto || '').split('\n').find(l=>l.trim()) || 'Atendimento recebido';
@@ -2069,11 +2124,14 @@ async function renderInicio(){
         try{
           let cliente = null;
           if(telefone.trim()){
-            const { data: existentes, error: erroBusca } = await sb.from('clientes').select('id,nome').eq('telefone', telefone.trim()).limit(1);
+            const { data: cadastrados, error: erroBusca } = await sb.from('clientes').select('id,nome,telefone');
             if(erroBusca) throw erroBusca;
+            const existentes=(cadastrados||[]).filter(c=>BahiaAgendaCaixa.telefoneCadastroEstrito(c.telefone)===telefone);
+            if(existentes.length>1) throw new Error('Mais de uma ficha usa esse telefone. Confirme a ficha correta antes de prosseguir.');
             cliente = existentes?.[0] || null;
           }
           if(!cliente){
+            BahiaAgendaCaixa.validarConfirmacaoCadastro(item,'cliente',null);
             const { data: novoCliente, error: erroCliente } = await sb.from('clientes').insert({
               nome: nome.trim(), telefone: telefone.trim() || null, cidade: cidade.trim() || null,
               endereco: endereco.trim() || null, obs: registro.texto || null
@@ -2081,6 +2139,7 @@ async function renderInicio(){
             if(erroCliente) throw erroCliente;
             cliente = novoCliente;
           }
+          BahiaAgendaCaixa.validarConfirmacaoCadastro(item,'cliente',{...cliente,telefone});
           const { data: servicoCriado, error: erroServico } = await sb.from('servicos').insert({
             cliente_id: cliente.id, titulo: titulo.trim(), status, prioridade,
             proxima_acao: proximaAcao.trim() || null, prazo, valor_orcamento:valorOrcamento
@@ -2115,6 +2174,10 @@ async function renderInicio(){
          Agenda ou no Financeiro sem precisar inventar uma ficha pra isso. */
       const btnLancarCompromisso = el('button',null,'📅 Lançar compromisso');
       btnLancarCompromisso.addEventListener('click', async ()=>{
+        try{
+        if(!window.BahiaAgendaCaixa) throw new Error('A proteção da Caixa não carregou. Recarregue o app.');
+        const vinculo=await escolherVinculoAgendaCaixa(item);
+        if(!vinculo) return;
         const tituloSugerido = (registro.texto || '').split('\n').find(l=>l.trim()) || 'Compromisso';
         const titulo = await askText('O que é o compromisso?', tituloSugerido.slice(0,80));
         if(!titulo || !titulo.trim()) return;
@@ -2140,10 +2203,12 @@ async function renderInicio(){
         const disponiveis = horariosParaTipo(data, tipo, ocupados);
         const horario = await confirmarComDiaVisivel(data, doDia||[], titulo.trim(), cidade, disponiveis[0]||null, tipo, disponiveis);
         if(!horario) return;
-        const { error } = await sb.from('agenda').insert({ titulo: titulo.trim(), data, hora: horario, tipo, cidade, status:'planejado' });
-        if(error){ toast('Erro: '+error.message); return; }
-        await sb.from('caixa_entrada').update({ processado:true, status:'resolvido' }).eq('id', item.id);
+        await BahiaAgendaCaixa.criarDaCaixa(sb,item,{...vinculo,titulo:titulo.trim(),data,hora:horario,tipo,cidade});
+        const {data:caixaResolvida,error:erroCaixa}=await sb.from('caixa_entrada').update({ processado:true, status:'resolvido' }).eq('id', item.id).select('id,processado,status').single();
+        if(erroCaixa) throw new Error('Compromisso salvo; a Caixa permanece aberta: '+erroCaixa.message);
+        if(caixaResolvida?.id!==item.id || !caixaResolvida.processado || caixaResolvida.status!=='resolvido') throw new Error('Compromisso salvo; a resolução da Caixa não foi confirmada. Repita a mesma ação para retomar.');
         toast('📅 Compromisso lançado'); carregarCaixaEntrada(); renderInicio();
+        }catch(err){toast('Não foi possível concluir: '+err.message);}
       });
       acoes.appendChild(btnLancarCompromisso);
       const btnLancarFinanceiro = el('button',null,'💰 Lançar financeiro');
