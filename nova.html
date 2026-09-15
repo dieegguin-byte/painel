@@ -455,6 +455,30 @@ button.sutil{opacity:.55;font-size:12px}
 @media(max-width:850px){
   .agenda-dia-head{grid-template-columns:60px minmax(0,1fr) minmax(0,auto) 16px}
 }
+/* Piloto de conferência: leitura dos registros de um serviço, sem alterar a operação. */
+.agente-view{display:grid;gap:16px;max-width:1080px;margin:0 auto;min-width:0}
+.agente-card{min-width:0;padding:24px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(145deg,#201813,#14110f)}
+.agente-intro{border-color:#895136;background:radial-gradient(circle at 100% 0,#66301655,transparent 50%),linear-gradient(145deg,#241a14,#161210)}
+.agente-card h2{font:500 29px Georgia,serif;margin:8px 0 10px}.agente-card h3{font-size:16px;margin:0 0 12px;color:var(--cream)}
+.agente-card p{font-size:14px;line-height:1.6;color:var(--muted);margin:8px 0}.agente-card p.agente-copy{max-width:680px}
+.agente-badge{display:inline-flex;max-width:100%;padding:7px 10px;border:1px solid #bd794b66;border-radius:9px;background:#d86d3617;color:#ffc6a0;font-size:12px;font-weight:700;line-height:1.5}
+.agente-badge.demo{border-color:#d4a64e80;background:#d4a64e19;color:#ffe0a0}
+.agente-selector{display:grid;grid-template-columns:minmax(180px,1fr) minmax(0,2fr);gap:12px;margin-top:22px}
+.agente-view label{display:block;font-size:12px;font-weight:650;color:var(--muted)}
+.agente-view input,.agente-view select,.agente-view textarea{display:block;width:100%;max-width:100%;min-width:0;margin-top:7px;padding:13px 12px;background:#0f0d0c;color:var(--text);border:1px solid var(--line2);border-radius:11px;font:inherit;font-size:14px;outline:0;color-scheme:dark}
+.agente-view input:focus,.agente-view select:focus,.agente-view textarea:focus{border-color:#d37742;box-shadow:0 0 0 3px #d86d3622}.agente-view textarea{resize:vertical;min-height:100px;line-height:1.5}
+.agente-view button{min-height:44px}.agente-view button:disabled{opacity:.45;cursor:not-allowed}
+.agente-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:15px}.agente-actions small,.agente-source{font-size:12px;color:var(--dim);line-height:1.6}
+.agente-inline-notice{padding:13px 15px;border:1px solid #8f4d44;border-radius:12px;background:#48221e55;color:#ffd8d2;font-size:14px;line-height:1.5}.agente-inline-notice.info{background:#d4a64e12;border-color:#d4a64e55;color:#edcc90}
+.agente-result-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}.agente-result-head h2{font-size:25px}
+.agente-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0}
+.agente-fields>div{min-width:0;border:1px solid var(--line);border-radius:12px;padding:15px;background:#0e0c0a66}.agente-fields dt{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--dim);margin-bottom:8px}.agente-fields dd{margin:0;font-size:15px;line-height:1.5;color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere}.agente-fields .status-pill{font-size:11px}
+.agente-result-section{padding-top:18px;margin-top:18px;border-top:1px solid var(--line)}
+.agente-list{display:grid;gap:9px;margin:0;padding-left:21px;color:var(--muted);font-size:14px;line-height:1.6}.agente-list li,.agente-card p,.agente-source{white-space:pre-wrap;overflow-wrap:anywhere}
+.agente-appointments{display:grid;gap:10px}.agente-appointment{padding:14px;border:1px solid var(--line);border-radius:12px;background:#171210}.agente-appointment strong{font-size:14px;display:block;overflow-wrap:anywhere}.agente-appointment span{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin-top:6px}
+.agente-ia{background:linear-gradient(145deg,#211912,#171310)}.agente-count{display:block;text-align:right;font-size:11px;color:var(--dim);margin-top:5px}
+.agente-ficha-action{min-height:44px;padding:8px 12px;font-size:12px;margin:8px 0}
+@media(max-width:640px){.agente-card{padding:18px 16px;border-radius:16px}.agente-card h2{font-size:26px}.agente-selector,.agente-fields{grid-template-columns:minmax(0,1fr)}.agente-actions>.primary{width:100%}.agente-result-head .ghost{width:100%}}
 </style>
 </head>
 <body>
@@ -2744,6 +2768,8 @@ function Home() {
   // que o app perdeu (a carga está guardada, mas quem não vê não sabe).
   const [compartilhamentoGuardado, setCompartilhamentoGuardado] = useState(false);
   const [tab, setTab] = useState("painel");
+  const [agenteServicoInicial, setAgenteServicoInicial] = useState("");
+  const [agenteAbertura, setAgenteAbertura] = useState(0);
   const [leadsFiltroInicial, setLeadsFiltroInicial] = useState("todos");
   const [mode, setMode] = useState("diego");
   const [inbox, setInbox] = useState([]);
@@ -3518,7 +3544,7 @@ function Home() {
   // O código da Caixa continua no arquivo, intacto: se ele voltar a operar pelo app, é só
   // devolver a linha aqui. Nada foi apagado.
   const nav = [
-    { id: "painel", label: "Painel", icon: "⌂" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
+    { id: "painel", label: "Painel", icon: "⌂" }, { id: "agente", label: "Agente", icon: "✧" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
     { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "compras", label: "Compras", icon: "▣" }, { id: "futuro", label: "A pagar", icon: "◷", count: contasFuturas }, { id: "vales", label: "Profissionais", icon: "✎", count: contaProfissionais },
     { id: "clientes", label: "Clientes", icon: "○" }, { id: "fornecedores", label: "Fornecedores", icon: "▤" },
     // ESTOQUE É PÁGINA PRÓPRIA, NÃO ABA (item ESTOQUE-V2-APP-20260827-2338-001). O backend do Estoque V2 já
@@ -3558,6 +3584,7 @@ function Home() {
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
+      {tab === "agente" && <AgenteConferenciaView key={agenteAbertura} db={db} demo={demo} services={services} offlineDesde={offlineDesde} servicoInicial={agenteServicoInicial} onOpenFicha={setFichaId} />}
       {tab === "leads" && <LeadsView services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} inbox={inbox} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} dividas={dividas} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
@@ -3569,10 +3596,172 @@ function Home() {
     </main>
     <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => irParaAba(item)}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
     {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
-    {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} />}
+    {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} onConferir={(servicoId) => { setFichaId(null); setAgenteServicoInicial(servicoId); setAgenteAbertura((n) => n + 1); setTab("agente"); }} />}
     {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} services={services} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {addAgendaOpen && <AddAgendaModal appointments={agendaVisivel} avisos={avisos} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
+  </div>;
+}
+
+function agenteTexto(valor, vazio = "Não registrado") {
+  return (typeof valor === "string" && valor.trim()) || (typeof valor === "number" ? String(valor) : vazio);
+}
+function agenteData(valor) {
+  if (!valor) return "Não registrado";
+  const texto = String(valor);
+  const partes = /^(\d{4})-(\d{2})-(\d{2})(?:$|T)/.exec(texto);
+  return partes ? `${partes[3]}/${partes[2]}/${partes[1]}` : texto;
+}
+function agenteHorarioConsulta(valor) {
+  const data = new Date(valor);
+  return valor && !Number.isNaN(data.getTime()) ? data.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) + " (Brasília)" : "Horário não informado";
+}
+function agenteConferenciaDemo(servicoId) {
+  const s = demoServices.find((item) => item.id === servicoId);
+  if (!s) return { ok: false, erro: { codigo: "DEMO_NAO_ENCONTRADA", mensagem: "Escolha um dos serviços fictícios desta prévia." } };
+  const compromissos = demoAppointments.filter((a) => a.servico_id === s.id && a.status === "planejado")
+    .map(({ id, titulo, data, hora, status }) => ({ id, titulo, data, hora, status }));
+  const campos = ["id", "titulo", "status", "proxima_acao", "prazo", "profissional", "responsavel", "loja_material", "data_entrega_material", "materiais_necessarios"];
+  const servico = Object.fromEntries(campos.map((campo) => [campo, s[campo] ?? null]));
+  return {
+    ok: true, modo: "regras", consultado_em: new Date().toISOString(), servico, compromissos,
+    resumo: `Status registrado: ${statusLabel[s.status] || agenteTexto(s.status)}. Próxima ação registrada: ${agenteTexto(s.proxima_acao)}.`,
+    observacoes: [!s.proxima_acao && "A próxima ação não está preenchida neste exemplo.", !s.prazo && "O prazo não está preenchido neste exemplo.", !compromissos.length && "Este exemplo não tem compromisso vinculado com status planejado."].filter(Boolean),
+    limites: ["Prévia com dados fictícios, sem consulta aos registros reais.", "O prazo registrado não confirma entrega do serviço.", "A conferência não altera registros nem cria compromissos.", "IA não conectada nesta prévia."],
+  };
+}
+
+function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicial, onOpenFicha }) {
+  const [servicoId, setServicoId] = useState(servicoInicial || "");
+  const [busca, setBusca] = useState("");
+  const [pergunta, setPergunta] = useState("");
+  const [ocupado, setOcupado] = useState("");
+  const [erro, setErro] = useState("");
+  const [avisoIA, setAvisoIA] = useState("");
+  const [resultado, setResultado] = useState(null);
+  const [online, setOnline] = useState(() => navigator.onLine !== false);
+  // Cada troca invalida a requisição anterior, inclusive durante um await ou a desmontagem.
+  const requisicao = React.useRef(0);
+  const semConexao = Boolean(offlineDesde) || !online;
+  const lista = demo ? demoServices : (services || []);
+  const servicoLocal = lista.find((s) => s.id === servicoId);
+  const termo = busca.trim().toLocaleLowerCase("pt-BR");
+  const opcoes = lista.filter((s) => s.id && (s.id === servicoId || !termo || `${s.clientes?.nome || ""} ${s.titulo || ""}`.toLocaleLowerCase("pt-BR").includes(termo)));
+
+  const trocarServico = (id) => {
+    requisicao.current += 1;
+    setServicoId(id); setResultado(null); setErro(""); setAvisoIA(""); setPergunta(""); setOcupado("");
+  };
+  useEffect(() => { trocarServico(servicoInicial || ""); }, [servicoInicial]);
+  useEffect(() => {
+    const mudouRede = () => setOnline(navigator.onLine !== false);
+    window.addEventListener("online", mudouRede); window.addEventListener("offline", mudouRede);
+    return () => { requisicao.current += 1; window.removeEventListener("online", mudouRede); window.removeEventListener("offline", mudouRede); };
+  }, []);
+  useEffect(() => {
+    requisicao.current += 1; setOcupado(""); setResultado(null); setErro(""); setAvisoIA("");
+  }, [semConexao, demo, db]);
+
+  const conferir = async (comIA = false) => {
+    if (ocupado || semConexao || !servicoId) return;
+    setErro(""); setAvisoIA("");
+    if (comIA && demo) {
+      setAvisoIA("IA não conectada nesta prévia. Para responder à pergunta, é preciso conectar a IA ao piloto real.");
+      return;
+    }
+    const perguntaEnviada = pergunta.trim();
+    if (comIA && (!resultado || !perguntaEnviada || perguntaEnviada.length > 500)) return;
+    // Os identificadores s1/s2 da demonstração nunca podem chegar à função real.
+    if (!demo && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(servicoId)) {
+      setErro("Este serviço não tem um identificador válido para consulta. Atualize os dados e selecione o serviço novamente."); return;
+    }
+    if (!demo && !db?.functions?.invoke) { setErro("A conexão de consulta ainda não está disponível. Tente atualizar a página."); return; }
+    const numero = ++requisicao.current;
+    const idConsultado = servicoId;
+    setOcupado(comIA ? "ia" : "regras");
+    if (!comIA) setResultado(null);
+    try {
+      let pacote;
+      if (demo) {
+        pacote = agenteConferenciaDemo(idConsultado);
+      } else {
+        const body = { servico_id: idConsultado, ...(comIA ? { pergunta: perguntaEnviada } : {}) };
+        const resposta = await db.functions.invoke("agente-conferencia", { body });
+        pacote = resposta.data;
+        if (resposta.error && !pacote?.erro && resposta.error.context?.clone) {
+          try { pacote = await resposta.error.context.clone().json(); } catch (_) { /* Resposta sem JSON: usar mensagem de consulta abaixo. */ }
+        }
+        if (resposta.error && !pacote?.erro) throw new Error("Não foi possível consultar os registros. Verifique a conexão e tente novamente.");
+      }
+      if (numero !== requisicao.current) return;
+      if (!pacote?.ok) throw new Error(agenteTexto(pacote?.erro?.mensagem, "A conferência não foi concluída. Tente novamente."));
+      if (pacote.servico?.id !== idConsultado || !["regras", "ia"].includes(pacote.modo)) throw new Error("A consulta retornou uma resposta inesperada. Confira o serviço selecionado e tente novamente.");
+      setResultado({ ...pacote, perguntaRespondida: comIA && pacote.modo === "ia" ? perguntaEnviada : "" });
+      if (comIA && pacote.modo !== "ia") setAvisoIA("A IA não respondeu à pergunta. Abaixo está somente a conferência dos registros, sem análise por IA.");
+    } catch (e) {
+      if (numero === requisicao.current) setErro(e?.message || "Não foi possível concluir a consulta. Tente novamente.");
+    } finally {
+      if (numero === requisicao.current) setOcupado("");
+    }
+  };
+
+  const registro = resultado?.servico;
+  const compromissos = (Array.isArray(resultado?.compromissos) ? resultado.compromissos : []).filter((a) => a && a.status === "planejado");
+  const observacoes = (Array.isArray(resultado?.observacoes) ? resultado.observacoes : []).filter((item) => typeof item === "string" && item.trim());
+  const limites = (Array.isArray(resultado?.limites) ? resultado.limites : []).filter((item) => typeof item === "string" && item.trim());
+  const materiais = Array.isArray(registro?.materiais_necessarios) ? registro.materiais_necessarios : [];
+
+  return <div className="agente-view">
+    <section className="agente-card agente-intro" aria-labelledby="agente-titulo">
+      <span className={`agente-badge ${demo ? "demo" : ""}`}>{demo ? "Prévia · dados fictícios · IA não conectada" : "Piloto · conferência de um serviço"}</span>
+      <h2 id="agente-titulo">O que está registrado neste serviço?</h2>
+      <p className="agente-copy">Escolha um serviço para conferir o status, a próxima ação e os compromissos registrados. A consulta mostra a fonte e o horário da leitura.</p>
+      <div className="agente-selector">
+        <label htmlFor="agente-busca">Buscar cliente ou serviço<input id="agente-busca" type="search" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Nome ou título (opcional)" /></label>
+        <label htmlFor="agente-servico">Serviço<select id="agente-servico" value={servicoId} onChange={(e) => trocarServico(e.target.value)}>
+          <option value="">Selecione um serviço</option>
+          {servicoId && !lista.some((s) => s.id === servicoId) && <option value={servicoId}>Serviço selecionado pela ficha</option>}
+          {opcoes.map((s) => <option key={s.id} value={s.id}>{s.clientes?.nome || "Cliente sem nome"} · {s.titulo || "Serviço sem título"}</option>)}
+        </select></label>
+      </div>
+      {!lista.length && <p>Nenhum serviço disponível. Atualize os dados para consultar.</p>}
+      {!!lista.length && !opcoes.length && <p>Nenhum serviço encontrado para esta busca.</p>}
+      <div className="agente-actions"><button type="button" className="primary" onClick={() => conferir(false)} disabled={Boolean(ocupado) || semConexao || !servicoId}>{ocupado === "regras" ? "Conferindo registros…" : "Conferir registros"}</button><small>Uma consulta por vez, a partir do serviço escolhido.</small></div>
+    </section>
+
+    {semConexao && <div className="agente-inline-notice" role="status">Sem conexão. A conferência está desabilitada: os dados guardados no aparelho não permitem confirmar o estado atual. Conecte à internet e atualize os dados.</div>}
+    {erro && <div className="agente-inline-notice" role="alert">{erro}</div>}
+    {avisoIA && <div className="agente-inline-notice info" role="status">{avisoIA}</div>}
+    {ocupado && <div className="agente-source" role="status" aria-live="polite">{ocupado === "ia" ? "Consultando os registros para explicar com IA…" : "Preparando a conferência do serviço selecionado…"}</div>}
+
+    {resultado && registro && <>
+      <section className="agente-card" aria-label="Resultado da conferência" aria-busy={Boolean(ocupado)}>
+        <div className="agente-result-head"><div>
+          <span className={`agente-badge ${demo ? "demo" : ""}`}>{demo ? "Prévia · dados fictícios · IA não conectada" : resultado.modo === "ia" ? "Explicação com IA · baseada nos registros consultados" : "Conferência dos registros · sem análise por IA"}</span>
+          {demo && <p>Conferência dos registros · sem análise por IA</p>}
+          <h2>{agenteTexto(registro.titulo, "Serviço sem título")}</h2>
+          <div className="agente-source">{demo ? "Fonte: exemplos fictícios da demonstração. Prévia gerada em " : "Fonte: registros do serviço e da agenda. Consultado em "}{agenteHorarioConsulta(resultado.consultado_em)}</div>
+        </div>{servicoLocal?.cliente_id && onOpenFicha && <button type="button" className="ghost" onClick={() => onOpenFicha(servicoLocal.cliente_id)}>Abrir ficha do cliente</button>}</div>
+        <dl className="agente-fields">
+          <div><dt>Status registrado</dt><dd><span className="status-pill">{statusLabel[registro.status] || agenteTexto(registro.status)}</span></dd></div>
+          <div><dt>Próxima ação registrada</dt><dd>{agenteTexto(registro.proxima_acao)}</dd></div>
+          <div><dt>Prazo registrado</dt><dd>{agenteData(registro.prazo)}</dd></div>
+          <div><dt>Profissional registrado</dt><dd>{agenteTexto(registro.profissional)}</dd></div>
+          <div><dt>Responsável registrado</dt><dd>{agenteTexto(registro.responsavel)}</dd></div>
+          <div><dt>Loja de material registrada</dt><dd>{agenteTexto(registro.loja_material)}</dd></div>
+          <div><dt>Data de entrega do material registrada</dt><dd>{agenteData(registro.data_entrega_material)}</dd></div>
+        </dl>
+        <div className="agente-result-section"><h3>{resultado.modo === "ia" ? "Explicação com IA" : "Resumo dos registros"}</h3>{resultado.perguntaRespondida && <p><strong>Pergunta respondida:</strong> {resultado.perguntaRespondida}</p>}<p>{agenteTexto(resultado.resumo, "Sem resumo informado.")}</p></div>
+        <div className="agente-result-section"><h3>Compromissos com status planejado</h3>{compromissos.length ? <div className="agente-appointments">{compromissos.map((a, i) => <article className="agente-appointment" key={a.id || i}><strong>{agenteTexto(a.titulo, "Compromisso sem título")}</strong><span>{agenteData(a.data)} · {agenteTexto(a.hora, "Horário não registrado")} · Status: planejado</span></article>)}</div> : <p>Nenhum compromisso vinculado com status planejado foi encontrado nesta consulta.</p>}</div>
+        <div className="agente-result-section"><h3>Materiais registrados</h3>{materiais.length ? <ul className="agente-list">{materiais.map((m, i) => <li key={i}>{typeof m === "string" ? m : agenteTexto(m?.item || m?.material || m?.descricao, "Material sem nome registrado")}</li>)}</ul> : <p>Nenhum material listado nesta consulta.</p>}</div>
+        {!!observacoes.length && <div className="agente-result-section"><h3>Observações da conferência</h3><ul className="agente-list">{observacoes.map((item, i) => <li key={i}>{item}</li>)}</ul></div>}
+        <div className="agente-result-section"><h3>Limites desta leitura</h3><ul className="agente-list">{(limites.length ? limites : ["A consulta reflete os registros no horário indicado.", "O prazo registrado não confirma entrega do serviço.", "A conferência não altera registros nem cria compromissos."]).map((item, i) => <li key={i}>{item}</li>)}</ul></div>
+      </section>
+      <section className="agente-card agente-ia" aria-labelledby="agente-ia-titulo"><p className="kicker">Opcional</p><h3 id="agente-ia-titulo">Entender os registros com IA</h3><p>{demo ? "A prévia mostra a conferência. Para explicar uma pergunta, a IA precisa estar conectada ao piloto real." : "Faça uma pergunta sobre este serviço. A explicação usa os registros consultados e informa quando não há dados suficientes."}</p>
+        <label htmlFor="agente-pergunta">Sua pergunta<textarea id="agente-pergunta" value={pergunta} maxLength={500} disabled={Boolean(ocupado)} onChange={(e) => setPergunta(e.target.value)} placeholder="Ex.: qual próxima ação está registrada?" /></label><small className="agente-count">{pergunta.length}/500 caracteres</small>
+        <div className="agente-actions"><button type="button" className="secondary" onClick={() => conferir(true)} disabled={Boolean(ocupado) || semConexao || (!demo && !pergunta.trim())}>{ocupado === "ia" ? "Preparando explicação…" : "Explicar com IA"}</button>{demo && <small>IA não conectada · nenhuma resposta será simulada</small>}</div>
+      </section>
+    </>}
   </div>;
 }
 
@@ -7613,7 +7802,7 @@ function origemLocalizacaoLabel(origem) {
   return origem ? String(origem).toLowerCase().replace(/_/g, " ") : "origem não registrada";
 }
 
-function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChanged }) {
+function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChanged, onConferir }) {
   const [cliente, setCliente] = useState(null);
   const [servicos, setServicos] = useState([]);
   const [fotos, setFotos] = useState([]);
@@ -7843,6 +8032,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
               detalhe do que foi combinado (espuma, catraca, tecido) ia parar quando eu processava a ficha,
               e o Diego dizia com razão "está na ficha dele". Estava — num campo que ninguém mostrava.
               Campo que só recebe e nunca devolve não é registro, é perda de informação com passo extra. */}
+          {onConferir && <button type="button" className="responsavel-badge agente-ficha-action" onClick={() => onConferir(s.id)}>✧ Conferir serviço</button>}
           {!!(s.descricao || "").trim() && <p className="ficha-servico-desc">{s.descricao}</p>}
           {!!(s.materiais_necessarios || []).length && <p className="ficha-servico-desc">🧵 {(s.materiais_necessarios || []).map((m) => (m.comprado ? "✓ " : "☐ ") + m.item).join(" · ")}</p>}
           {editandoResp === s.id
