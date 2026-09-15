@@ -2860,7 +2860,12 @@ function Home() {
   const [loading, setLoading] = useState(false);
   // Quando não é null, a tela está mostrando a última carga guardada no aparelho (sem sinal).
   const [offlineDesde, setOfflineDesde] = useState(null);
-  const monitorConferencia = useConferenciaMonitor({ db, demo, session, offlineDesde });
+  // CONFERÊNCIA AUTOMÁTICA PAUSADA EM 15/09/2026 (Diego, após a análise do Claude). A única regra do monitor
+  // (SERVICO_PRONTO v1) lista exatamente o que o card "Prontos para entregar" do Painel já mostra. O job
+  // `bahia-conferencia-pronto-v1` foi pausado no banco e a leitura saiu daqui, para o app não consultar a cada
+  // minuto uma lista que ele já tem. Componentes, tabelas e RPCs continuam no lugar. Para voltar: devolver
+  // esta linha — `const monitorConferencia = useConferenciaMonitor({ db, demo, session, offlineDesde });` —,
+  // a aba "Conferência" no `nav`, o resumo do Painel, a renderização da aba e o `onConferir` da ficha.
   const [notice, setNotice] = useState(null);
   const [search, setSearch] = useState("");
   const [pinState, setPinState] = useState("checking");
@@ -3624,7 +3629,7 @@ function Home() {
   // O código da Caixa continua no arquivo, intacto: se ele voltar a operar pelo app, é só
   // devolver a linha aqui. Nada foi apagado.
   const nav = [
-    { id: "painel", label: "Painel", icon: "⌂" }, { id: "agente", label: "Conferência", icon: "✧" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
+    { id: "painel", label: "Painel", icon: "⌂" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
     { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "compras", label: "Compras", icon: "▣" }, { id: "futuro", label: "A pagar", icon: "◷", count: contasFuturas }, { id: "vales", label: "Profissionais", icon: "✎", count: contaProfissionais },
     { id: "clientes", label: "Clientes", icon: "○" }, { id: "fornecedores", label: "Fornecedores", icon: "▤" },
     // ESTOQUE É PÁGINA PRÓPRIA, NÃO ABA (item ESTOQUE-V2-APP-20260827-2338-001). O backend do Estoque V2 já
@@ -3660,12 +3665,10 @@ function Home() {
           A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
           e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
-      {tab === "painel" && <ConferenciaMonitorResumo monitor={monitorConferencia} demo={demo} onOpen={() => setTab("agente")} />}
       {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
-      {tab === "agente" && <AgenteConferenciaView key={agenteAbertura} db={db} demo={demo} services={services} offlineDesde={offlineDesde} servicoInicial={agenteServicoInicial} onOpenFicha={setFichaId} monitor={monitorConferencia} />}
       {tab === "leads" && <LeadsView services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} inbox={inbox} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
       {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
       {tab === "financeiro" && <FinanceView finances={finances} dividas={dividas} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
@@ -3677,7 +3680,7 @@ function Home() {
     </main>
     <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => irParaAba(item)}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
     {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
-    {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} onConferir={(servicoId) => { setFichaId(null); setAgenteServicoInicial(servicoId); setAgenteAbertura((n) => n + 1); setTab("agente"); }} />}
+    {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} />}
     {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} services={services} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
     {addAgendaOpen && <AddAgendaModal appointments={agendaVisivel} avisos={avisos} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}

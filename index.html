@@ -663,9 +663,11 @@ async function subirPrintCaixa(file){
   if(urlErr) throw urlErr;
   return { url: urlData.signedUrl, nomeArquivo: nomeSeguro };
 }
-const STATUS_LABEL = {lead:'Novo lead', orcamento:'Orçamento', agendado:'Agendado', producao:'Em produção', entregue:'Entregue', pago:'Pago', perdido:'Perdido'};
-const STATUS_ORDEM = ['lead','orcamento','agendado','producao','entregue','pago','perdido'];
-const STATUS_FLUXO = ['lead','orcamento','agendado','producao','entregue','pago'];
+// `pronto` entrou no banco em 15/09/2026 (produção concluída, ainda não entregue). Sem ele aqui, um serviço
+// pronto aparecia com o status cru e sumia do seletor e dos botões de fluxo deste app antigo.
+const STATUS_LABEL = {lead:'Novo lead', orcamento:'Orçamento', agendado:'Agendado', producao:'Em produção', pronto:'Pronto para entregar', entregue:'Entregue', pago:'Pago', perdido:'Perdido'};
+const STATUS_ORDEM = ['lead','orcamento','agendado','producao','pronto','entregue','pago','perdido'];
+const STATUS_FLUXO = ['lead','orcamento','agendado','producao','pronto','entregue','pago'];
 
 /* Canal único de pergunta/resposta entre a IA e o Diego: cada item da Caixa de
    Entrada tem um status e uma conversa (array de {de:'ia'|'diego', texto, em}).
@@ -1542,7 +1544,7 @@ async function sincronizarFinanceiroServico(servico, cliente){
     existentes.length=0;
   }
   if(!existentes?.length){
-    if(!['producao','entregue','pago'].includes(servico.status)) return;
+    if(!['producao','pronto','entregue','pago'].includes(servico.status)) return;
     let plano='entrega';
     if(servico.status==='producao'){
       const opcao=await askText('O serviço entrou em produção. Como foi combinado o pagamento?\n1 = 50% agora + 50% na entrega\n2 = Tudo na entrega\n3 = Tudo pago agora','1');
@@ -1667,7 +1669,7 @@ async function abrirFicha(clienteId){
       /* Não deixa virar Em produção (ou além) sem valor do orçamento — mesmo
          quando o pagamento é só na entrega, o valor precisa estar definido
          desde já, senão o Financeiro não tem o que lançar depois. */
-      if(['producao','entregue','pago'].includes(status.value) && !(Number(s.valor_orcamento)>0)){
+      if(['producao','pronto','entregue','pago'].includes(status.value) && !(Number(s.valor_orcamento)>0)){
         const valorTexto = await askText(`"${s.titulo}" não tem valor de orçamento. Qual o valor (R$)? (obrigatório pra virar ${STATUS_LABEL[status.value]})`, '');
         const valor = Number(String(valorTexto||'').replace(',','.'));
         if(!valorTexto || !(valor>0)){ toast('Sem valor, status não foi alterado.'); status.value=s.status; return; }
@@ -2423,7 +2425,7 @@ async function renderLeads(){
     STATUS_ORDEM.forEach(st=>{ const o=document.createElement('option'); o.value=st; o.textContent=STATUS_LABEL[st]; if(st===s.status) o.selected=true; sel.appendChild(o); });
     sel.addEventListener('change', async ()=>{
       const alterado = {status:sel.value, atualizado_em:new Date().toISOString()};
-      if(['producao','entregue','pago'].includes(sel.value) && !(Number(s.valor_orcamento)>0)){
+      if(['producao','pronto','entregue','pago'].includes(sel.value) && !(Number(s.valor_orcamento)>0)){
         const valorTexto = await askText(`"${s.titulo}" não tem valor de orçamento. Qual o valor (R$)? (obrigatório pra virar ${STATUS_LABEL[sel.value]})`, '');
         const valor = Number(String(valorTexto||'').replace(',','.'));
         if(!valorTexto || !(valor>0)){ toast('Sem valor, status não foi alterado.'); sel.value=s.status; return; }

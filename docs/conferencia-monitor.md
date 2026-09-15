@@ -66,3 +66,14 @@ O monitor observa o estado a cada varredura; uma mudança que começa e termina 
 ## Histórico do piloto
 
 O piloto anterior, com explicação opcional por IA, foi preservado no commit `8226680` e nos anexos enviados ao Drive. Seu código experimental e seus testes específicos foram retirados da versão ativa. A leitura passou a usar a API de banco com a sessão/RLS existentes.
+
+## Pausa em 15/09/2026
+
+Decisão do Diego, depois da análise do Claude. A regra SERVICO_PRONTO v1 lista exatamente os serviços com `status = 'pronto'`, que o card **Prontos para entregar** do Painel já mostra a partir da mesma fonte. Até existir uma regra que o app não consiga mostrar sozinho (por exemplo, pronto há vários dias sem entrega), o monitor não acrescenta informação e ocupava o topo do Painel e uma aba própria.
+
+- Job `bahia-conferencia-pronto-v1` pausado com o script de rollback `migracoes/rollback/conferencia_monitor.sql` (somente `active = false`).
+- Tabelas, RPCs, histórico técnico e `public.engenharia_itens` preservados.
+- No `nova.html`: saíram a leitura periódica (`useConferenciaMonitor`), a aba **Conferência**, o resumo do Painel e o botão da ficha. Os componentes continuam no arquivo; o comentário junto de `monitorConferencia` diz o que devolver para reativar.
+- O **Cronograma técnico** saiu do app junto com a aba: acompanhamento de engenharia fica no Drive e na tabela `engenharia_itens`, fora da tela da oficina.
+
+Para reativar: aplicar de novo `migracoes/20260915015743_conferencia_monitor_agendamento.sql` e desfazer o commit da interface.
