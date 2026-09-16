@@ -1,4 +1,7 @@
-> **SUPERADO EM 16/09/2026 — ARQUITETURA OPERACIONAL**  \n> Este arquivo permanece como histórico de produto, não como contrato operacional vigente. Na Operação Bahia, as regras atuais vêm da Biblioteca canônica (Bootstrap → MAPA_OPERACAO_BAHIA → Skill de domínio); Supabase/app guarda fatos vivos e public.agenda é a agenda oficial; Google Calendar está desativado; Claude/Engenharia é o executor técnico padrão e Codex só entra por pedido explícito de Diego. Guia/caixa/documentação antiga do app não substituem os canônicos.\n\n# Cronograma técnico do Codex
+> **SUPERADO EM 16/09/2026 — ARQUITETURA OPERACIONAL**  
+> Este arquivo permanece como histórico de produto, não como contrato operacional vigente. Na Operação Bahia, as regras atuais vêm da Biblioteca canônica (Bootstrap → MAPA_OPERACAO_BAHIA → Skill de domínio); Supabase/app guarda fatos vivos e public.agenda é a agenda oficial; Google Calendar está desativado; Claude/Engenharia é o executor técnico padrão e Codex só entra por pedido explícito de Diego. Guia/caixa/documentação antiga do app não substituem os canônicos.
+
+# Cronograma técnico do Codex
 
 ## Onde aparece
 
