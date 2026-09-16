@@ -427,11 +427,11 @@
 <div id="modalGuia" class="modal-overlay oculto">
   <div class="modal-box">
     <div class="modal-cab">
-      <h2>📖 Guia da IA</h2>
+      <h2>📖 Guia histórico do app</h2>
       <button class="modal-fechar" id="btnFecharGuia">✕</button>
     </div>
     <p style="color:var(--fraco); font-size:.82rem; margin:0 0 14px">
-      É o que a IA lê antes de mexer no app: contexto da empresa e como agir. Edite à vontade.
+      Referência histórica/local do app. As regras vigentes da Operação Bahia vêm da Biblioteca canônica (Bootstrap → Mapa → Skill do domínio); edições aqui não governam a operação.
     </p>
     <div id="guiaConteudo"></div>
   </div>
@@ -893,7 +893,7 @@ $$('nav.tabs button').forEach(btn=>{
    GUIA DA IA
    ========================================================================= */
 const SECAO_LABEL = {empresa:'Sobre a empresa', como_agir:'Como a IA deve agir', regras:'Regras invioláveis'};
-const REGRAS_SISTEMA_ATUAIS = `REGRAS OPERACIONAIS ATUAIS DO APP
+const REGRAS_SISTEMA_ATUAIS = `REFERÊNCIA LOCAL DO APP — NÃO CANÔNICA\nAs regras vigentes da Operação Bahia vêm da Biblioteca canônica; este bloco é somente resumo local/histórico e não substitui Bootstrap → Mapa → Skill de domínio.\n\nRESUMO LOCAL DO APP
 - Novo lead, orçamento e agendado não geram lançamento financeiro.
 - O valor informado nesses status é apenas valor de orçamento.
 - Ao entrar em Produção, confirmar forma de pagamento antes de lançar valores.
@@ -942,23 +942,23 @@ async function abrirGuia(){
   cont.innerHTML = '';
   if(error){ cont.appendChild(el('div','vazio','Erro: '+error.message)); return; }
   const regrasAtuais=el('div','guia-bloco');
-  regrasAtuais.appendChild(el('h3',null,'Regras automáticas vigentes'));
+  regrasAtuais.appendChild(el('h3',null,'Referência local — não canônica'));
   const textoRegras=el('div',null,REGRAS_SISTEMA_ATUAIS);
   textoRegras.style.whiteSpace='pre-line'; textoRegras.style.fontSize='.82rem'; textoRegras.style.color='var(--texto2)';
   regrasAtuais.appendChild(textoRegras); cont.appendChild(regrasAtuais);
   ['empresa','como_agir','regras'].forEach(sec=>{
     const item = (data||[]).find(d=>d.secao===sec) || {secao:sec, titulo:SECAO_LABEL[sec], conteudo:sec==='regras'?REGRAS_SISTEMA_ATUAIS:''};
     const bloco = el('div','guia-bloco');
-    bloco.appendChild(el('h3',null, SECAO_LABEL[sec]));
+    bloco.appendChild(el('h3',null, 'Histórico — '+SECAO_LABEL[sec]));
     const ta = document.createElement('textarea');
     ta.value = item.conteudo || '';
     bloco.appendChild(ta);
-    const bSalvar = el('button','botao b-ok','Salvar');
+    const bSalvar = el('button','botao b-ok','Salvar histórico');
     bSalvar.style.marginTop='6px';
     bSalvar.addEventListener('click', async ()=>{
       const { error: err2 } = await sb.from('guia_ia').upsert({ secao: sec, titulo: SECAO_LABEL[sec], conteudo: ta.value, atualizado_em: new Date().toISOString() }, {onConflict:'secao'});
       if(err2){ toast('Erro: '+err2.message); return; }
-      toast('✔ Guia atualizado');
+      toast('✔ Histórico do guia atualizado');
     });
     bloco.appendChild(bSalvar);
     cont.appendChild(bloco);
@@ -2761,7 +2761,7 @@ async function renderEstoque(){
 iniciar();
 
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=17').catch(()=>{}) );
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js?v=18').catch(()=>{}) );
 }
 </script>
 </body>

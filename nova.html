@@ -3918,7 +3918,7 @@ function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicia
 
   return <div className="agente-view">
     <ConferenciaMonitorCard monitor={monitor} demo={demo} onOpenFicha={onOpenFicha} />
-    <CronogramaTecnico db={db} demo={demo} offlineDesde={offlineDesde} />
+    <section className="agente-card cronograma-tecnico" aria-labelledby="cronograma-tecnico-titulo"><div className="agente-result-head"><div><span className="agente-badge">Histórico técnico</span><h2 id="cronograma-tecnico-titulo">Fluxo Codex desativado</h2><p className="cronograma-subtitulo">Desde 16/09/2026, a engenharia vigente da Operação Bahia é Claude/Engenharia com handoff técnico no Drive. Os registros antigos de engenharia_itens permanecem somente como histórico.</p></div></div></section>
     <section className="agente-card agente-intro" aria-labelledby="agente-titulo">
       <span className={`agente-badge ${demo ? "demo" : ""}`}>{demo ? "Prévia · dados fictícios" : "Consulta de um serviço"}</span>
       <h2 id="agente-titulo">O que está registrado neste serviço?</h2>
@@ -3967,7 +3967,7 @@ function AgenteConferenciaView({ db, demo, services, offlineDesde, servicoInicia
   </div>;
 }
 
-// Cronograma aprovado: as datas orientam a visualização, nunca a conclusão de itens.
+// LEGADO DESATIVADO EM 16/09/2026: código preservado apenas como histórico; não é montado na UI nem governa engenharia.\n// Cronograma aprovado: as datas orientam a visualização, nunca a conclusão de itens.
 const CRONOGRAMA_FASES = Object.freeze([
   Object.freeze({ id: "monitor", titulo: "Estabilização do monitor", inicio: "2026-09-15", fim: "2026-09-17", intervalo: "15–17/09/2026" }),
   Object.freeze({ id: "financeiro", titulo: "Financeiro / contas a pagar", inicio: "2026-09-18", fim: "2026-09-21", intervalo: "18–21/09/2026" }),
@@ -8609,7 +8609,7 @@ root.render(<Barreira><Home /></Barreira>);
 if ('serviceWorker' in navigator) {
   // O ?v= acompanha a VERSAO dentro do sw.js. Ficou parado no v=12 enquanto o arquivo já ia no v14: o
   // navegador atualiza pelo conteúdo, então funcionava, mas quem lê o código acha que não subiu.
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=17').catch(() => {}));
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=18').catch(() => {}));
 }
 </script>
 </body>
