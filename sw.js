@@ -45,7 +45,8 @@
    aparelho recebeu na hora e o problema e de EXIBICAO; se o recibo so chegar quando ele abre o app, o
    Android nao acordou o processo e o problema e de ENTREGA. Sao causas diferentes com consertos
    diferentes, e sem esse carimbo as duas parecem iguais de fora. */
-/* v18 (16/09/2026): expulsa do cache a UI anterior que ainda exibia o cronograma Codex como acompanhamento vigente. */\nconst VERSAO = 'tb-atendimento-v18';
+/* v18 (16/09/2026): expulsa do cache a UI anterior que ainda exibia o cronograma Codex como acompanhamento vigente. */
+const VERSAO = 'tb-atendimento-v18';
 // Sem segredo aqui de proposito: este arquivo e publico. O que autentica o recibo e o proprio id, que
 // e um uuid que so existe dentro da carga cifrada - quem nao recebeu a notificacao nao tem como chutar.
 const PUSH_FUNCAO = 'https://iymlzdcloaeyybhefywp.supabase.co/functions/v1/push-enviar';
