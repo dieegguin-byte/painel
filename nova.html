@@ -169,7 +169,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-quando b{display:block;font:700 19px Georgia,serif;color:var(--orange2)}
 .compromisso-quando span{display:block;font-size:10px;color:var(--dim);margin-top:3px}
 .compromisso-quando em{display:block;font-style:normal;font-size:9px;color:#e88477;margin-top:5px;font-weight:700}
-.compromisso-quando .idade-atraso{font-size:11px;line-height:1.4}.compromisso-quando .idade-atraso.antigo{color:#e4bd72}.compromisso-quando .idade-atraso small{display:block;font-size:10px;margin-top:4px}.atrasados-recentes{border-color:#d4a64e80}.revisao-antiga>.card-toggle h3{font-family:inherit;font-size:18px}.revisao-antiga .compromisso-card{border-left-color:var(--line2)}.revisao-data{padding:8px 12px;font-size:12px;color:var(--muted);border-left:2px solid var(--yellow);margin:12px 0 5px}
+.compromisso-quando .idade-atraso{font-size:11px;line-height:1.4}.compromisso-quando .idade-atraso.antigo{color:#e4bd72}.compromisso-quando .idade-atraso small{display:block;font-size:10px;margin-top:4px}.talvez-feito{padding:8px 12px;font-size:12px;line-height:1.4;color:#8fb9c9;border-left:2px solid #8fb9c9;margin:10px 0 5px}.atrasados-recentes{border-color:#d4a64e80}.revisao-antiga>.card-toggle h3{font-family:inherit;font-size:18px}.revisao-antiga .compromisso-card{border-left-color:var(--line2)}.revisao-data{padding:8px 12px;font-size:12px;color:var(--muted);border-left:2px solid var(--yellow);margin:12px 0 5px}
 .compromisso-corpo h4{margin:0 0 3px;font-size:15px;font-weight:650}
 .compromisso-local{margin:0 0 11px;font-size:11px;color:var(--dim)}
 .compromisso-info{background:#0f0d0c;border:1px solid var(--line);border-radius:12px;padding:12px}
@@ -743,7 +743,10 @@ const demoAppointments = [
   { id: "a0", titulo: "Comprar material Ana Paula — Plástico & Tal", data: hojeISO(), hora: "08:00", cidade: "Valparaíso de Goiás", local: "Plástico & Tal - Av. Marginal, Qd. 45, lote 32 B - Jardim Ipanema", tipo: "presencial", status: "planejado", servico_id: null },
   { id: "a1", titulo: "Ana Paula — entregar poltrona", data: hojeISO(), hora: "14:00", cidade: "Valparaíso", local: "Valparaíso", tipo: "presencial", status: "planejado", servico_id: "s4" },
   { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", local: "Remoto / WhatsApp", tipo: "remoto", status: "planejado", servico_id: "s2" },
-  { id: "a3", titulo: "Mariana — visita sofá", data: somarDias(hojeISO(), 1), hora: "09:30", cidade: "Jardim Ingá", local: "Jardim Ingá — endereço/localização pendente", tipo: "presencial", status: "planejado", servico_id: "s1" },
+  // criado_em MAIS NOVO que o do a7 de propósito: os dois são do serviço s1, e é esse par que reproduz o caso
+  // Karol (16/09/2026) — a visita só foi marcada porque o orçamento do a7 já tinha sido enviado, mas o a7
+  // continua planejado e aparece como atrasado. É o que acende o aviso "pode já estar feito".
+  { id: "a3", titulo: "Mariana — visita sofá", data: somarDias(hojeISO(), 1), hora: "09:30", cidade: "Jardim Ingá", local: "Jardim Ingá — endereço/localização pendente", tipo: "presencial", status: "planejado", servico_id: "s1", criado_em: somarDias(hojeISO(), -1) + "T15:00:00Z" },
   { id: "a4", titulo: "Carlos — buscar cadeiras", data: "2026-07-11", hora: "09:00", cidade: "Luziânia", local: "Ozair", tipo: "presencial", status: "planejado", servico_id: "s2" },
   // Dois casos que entraram em 01/09/2026 e que a demo não cobria:
   // a5 = bloqueio pessoal. O card TEM que mostrar "Apresentação na escola do filho", não "Compromisso
@@ -756,7 +759,7 @@ const demoAppointments = [
   // aba Agenda, o Painel tira o mesmo da rota, e o bloco que o mostrava saiu em 23/08 — some dos dois.
   // Em produção eram 26 assim, todos cliente esperando resposta. Sem este fixture a demo não exercita o
   // bloco "sem hora" e a correção volta a quebrar sem ninguém ver.
-  { id: "a7", titulo: "Aguardar retorno da Mariana — orçamento enviado", data: somarDias(hojeISO(), -2), hora: null, cidade: null, local: null, tipo: "remoto", status: "planejado", servico_id: "s1" },
+  { id: "a7", titulo: "Aguardar retorno da Mariana — orçamento enviado", data: somarDias(hojeISO(), -2), hora: null, cidade: null, local: null, tipo: "remoto", status: "planejado", servico_id: "s1", criado_em: somarDias(hojeISO(), -6) + "T09:00:00Z" },
   // a8 = O CASO DA DONA EDILAINE (08/09/2026), copiado do registro real 212156a6 na forma, não no
   // conteúdo: `tipo` recebeu a AÇÃO ("retirada") em vez da modalidade. Antes da correção este cartão
   // sumia ao clicar em Presencial E ao clicar em Remoto, aparecendo só em "Todos".
@@ -4462,7 +4465,7 @@ function PessoalDetalhe({ p, a, today }) {
   </React.Fragment>)}</div>;
 }
 
-function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais, revisaoData = false }) {
+function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais, revisaoData = false, sucessor = null }) {
   const [aberto, setAberto] = useState(false);
   const diasAtraso = diasDeAtraso(a.data, today);
   const idadeAtraso = diasAtraso > 0 && <em className={`idade-atraso${diasAtraso > 30 ? " antigo" : ""}`}>{diasAtraso} {diasAtraso === 1 ? "dia de atraso" : "dias de atraso"}{diasAtraso > 30 && <small>Mais de 30 dias</small>}</em>;
@@ -4630,6 +4633,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
     </button>
     {revisaoData && <p className="revisao-data">Remarcação pendente · idade calculada pela data original. A data precisa de revisão.</p>}
+    {sucessor && diasAtraso > 0 && <p className="talvez-feito">Pode já estar feito: “{sucessor.titulo}” foi criado depois deste, no mesmo serviço. Se a etapa aconteceu, conclua aqui — o app não fecha sozinho.</p>}
     {aberto && <div className="compromisso-corpo">
       <h4>{tituloCard}</h4>
       {/* BLOQUEIO PESSOAL: a linha da agenda existe pra dizer que ele está indisponível, e o registro
@@ -5465,6 +5469,17 @@ function diasDeAtraso(data, hoje) {
   const dias = (dia(hoje) - dia(data)) / 86400000;
   return Number.isFinite(dias) && dias > 0 ? dias : 0;
 }
+// "PODE JÁ TER SIDO FEITO" (16/09/2026, caso Karol). O orçamento dela foi enviado, o serviço foi atualizado e
+// o próximo passo foi criado — mas o compromisso "enviar orçamento" ficou planejado e virou atrasado. O app
+// acertou: leu o estado que estava gravado. O que faltava era um jeito de distinguir esse atraso do atraso de
+// verdade. Quando existe, no MESMO serviço, uma ação criada DEPOIS desta, quase sempre quem criou a próxima
+// etapa estava justamente executando esta.
+// É SÓ DIAGNÓSTICO, de propósito: nem toda ação nova sucede a anterior (podem ser duas coisas em paralelo),
+// então a inferência não é segura o bastante pra fechar compromisso sozinha. Quem fecha é o Diego, no botão.
+function sucessorMaisNovoNoServico(a, agenda) {
+  if (!a || !a.servico_id || !a.criado_em) return null;
+  return (agenda || []).find((b) => b && b.id !== a.id && b.servico_id === a.servico_id && b.criado_em > a.criado_em) || null;
+}
 function separarAtrasadosPorIdade(appointments, hoje) {
   const recentes = [], antigos = [], acima30 = [];
   (appointments || []).forEach((a) => {
@@ -5676,7 +5691,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   // estourou. Compromisso sem hora marcada não conta como estourado — ainda cabe no dia.
   const hojePassouDaHora = hoje.filter((entry) => !!entry.hora && String(entry.hora).slice(0, 5) < agoraHHMM).length;
   const irParaVencendo = () => { if (!atrasos.recentes.length) return; setFiltroTipo("todos"); requestAnimationFrame(() => document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" })); };
-  const cardAtrasado = (a) => <CompromissoCard key={a.id} a={a} svc={svcDe(a)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} revisaoData={idsRemarcacao.has(a.id)} />;
+  const cardAtrasado = (a) => <CompromissoCard key={a.id} a={a} svc={svcDe(a)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} revisaoData={idsRemarcacao.has(a.id)} sucessor={sucessorMaisNovoNoServico(a, agendaPlanejada)} />;
   return <div className="page-grid">
     {addInbox && <CardRecolhivel cabecalho={<><p className="kicker">ANOTAR AGORA</p><h3>O que aconteceu?</h3></>}>
       <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />

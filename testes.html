@@ -299,6 +299,24 @@ async function carregarApp() {
   checar("depois de paga, a conta sai do alerta", resumoContas([contaT("x", "2026-09-15", { status: "pago" })], [], hojeT).urgentes.length === 0, null);
   checar("total do alerta soma só o intervalo (vencidas + D0..D3)", rc.totalVencidas + rc.totalUrgentes === 180, rc.totalVencidas + rc.totalUrgentes);
 
+  // =========================================================================
+  grupo("Compromisso que pode já ter sido feito (caso Karol, 16/09/2026)");
+  // =========================================================================
+  // A regra tem que ser ESTREITA: ela só aponta, mas quem lê o aviso decide fechar um compromisso. Um falso
+  // positivo aqui faz o Diego marcar como feito algo que não aconteceu — pior que não avisar nada.
+  const agK = [
+    { id: "k1", servico_id: "sv1", titulo: "Enviar orçamento — Karol", criado_em: "2026-09-10T10:00:00Z" },
+    { id: "k2", servico_id: "sv1", titulo: "Checar resposta da Karol", criado_em: "2026-09-16T18:00:00Z" },
+    { id: "k3", servico_id: "sv2", titulo: "Outro serviço, mais novo", criado_em: "2026-09-16T19:00:00Z" },
+    { id: "k4", servico_id: null, titulo: "Compromisso sem serviço", criado_em: "2026-09-16T20:00:00Z" },
+  ];
+  checar("ação criada depois, no mesmo serviço, acende o aviso", sucessorMaisNovoNoServico(agK[0], agK)?.id === "k2", sucessorMaisNovoNoServico(agK[0], agK));
+  checar("a ação mais nova não acusa a si mesma nem a anterior", sucessorMaisNovoNoServico(agK[1], agK) === null, sucessorMaisNovoNoServico(agK[1], agK));
+  checar("serviço diferente não conta, mesmo sendo mais novo", sucessorMaisNovoNoServico(agK[2], agK) === null, null);
+  checar("compromisso sem serviço nunca acende", sucessorMaisNovoNoServico(agK[3], agK) === null, null);
+  checar("sem criado_em não dá pra afirmar ordem: não acende", sucessorMaisNovoNoServico({ id: "k5", servico_id: "sv1" }, agK) === null, null);
+  checar("agenda vazia não quebra", sucessorMaisNovoNoServico(agK[0], []) === null, null);
+
   placar.textContent = `${passou} passaram · ${falhou} falharam`;
   placar.style.color = falhou ? "#e8776a" : "#7fbf8f";
 })();
