@@ -351,6 +351,23 @@ async function carregarApp() {
   checar("pessoal virtual (sem linha na agenda) também não se move",
     !trocasDeHorario([pA, { id: "pv", hora: "16:00", cidade: "Luziânia", pessoal_virtual: true }],
                      [{ id: "pv", hora: "16:00", cidade: "Luziânia", pessoal_virtual: true }, pA]).some((t) => t.id === "pv"), null);
+  // NADA SE MOVE SEM O DIEGO LIBERAR (recado de 19/09 sobre rigidez da agenda). A tabela `agenda` não tem
+  // campo de FIXO/JANELA, então o app não pode adivinhar o que foi combinado com cliente: o padrão é
+  // travado e a liberação é dele, item por item.
+  const so = (ids) => (p) => ids.includes(p.id);
+  checar("nada liberado, nada se move",
+    trocasDeHorario([pA, pB, pC], [pB, pA, pC], so([])).length === 0, null);
+  checar("um só liberado não gera troca — ele fica com o próprio horário",
+    trocasDeHorario([pA, pB, pC], [pB, pA, pC], so(["p2"])).length === 0, trocasDeHorario([pA, pB, pC], [pB, pA, pC], so(["p2"])));
+  const doisLiberados = trocasDeHorario([pA, pB, pC], [pB, pA, pC], so(["p1", "p2"]));
+  checar("dois liberados fora de ordem trocam entre si",
+    doisLiberados.length === 2 && doisLiberados.find((t) => t.id === "p2").para === "08:00", doisLiberados);
+  checar("quem ficou travado não aparece na troca nem cede o horário",
+    !doisLiberados.some((t) => t.id === "p3" || t.para === "14:00"), doisLiberados);
+  checar("liberar um compromisso pessoal não o destrava",
+    trocasDeHorario([pA, pessoal], [pessoal, pA], so(["pp", "p1"])).every((t) => t.id !== "pp"),
+    trocasDeHorario([pA, pessoal], [pessoal, pA], so(["pp", "p1"])));
+
   // A economia prometida é a da ordem APLICÁVEL, com os fixos parados — não a da ordem ideal.
   const rotaComFixo = analisarRotaDoDia([
     { id: "f1", tipo: "presencial", cidade: "Valparaíso", hora: "08:00" },

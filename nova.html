@@ -2796,10 +2796,21 @@ function encaixesDeRota(avisos, appointments, agendaHistorico, services, custome
 // estrada é exatamente o tipo de esperteza que faz o Diego parar de confiar no app.
 // Compromisso pessoal ENTRA no cálculo da estrada (ele ocupa a rota de verdade) e FICA no horário dele.
 function ehFixoNaAgenda(a) { return !!(a && (a.pessoal_id || a.pessoal_virtual)); }
-function trocasDeHorario(paradas, melhor) {
+// `podeMover` é opcional e existe por causa do recado de 19/09/2026 (rigidez da agenda). A Skill de Agenda
+// do Classic separa FIXO, JANELA, FLEXÍVEL e PROVISÓRIO — e a tabela `agenda` NÃO TEM nenhuma dessas
+// colunas. Medido no banco no mesmo dia: zero campos de rigidez, e só 2 dos 69 planejados trazem
+// "PROVISÓRIO" no título. Ou seja, o app não tem como saber sozinho o que foi confirmado com o cliente.
+// Em vez de adivinhar (ou de travar tudo e entregar um botão inútil), quem responde é o Diego, uma vez por
+// dia, marcando quem pode se mover. É o que a própria Skill já dizia: "quem decide se compensa é Diego".
+function trocasDeHorario(paradas, melhor, podeMover) {
+  // `ehFixoNaAgenda` vem PRIMEIRO e não é negociável: nem um `podeMover` permissivo destrava um
+  // compromisso pessoal. A primeira versão deixava essa trava só no componente, e o teste
+  // "liberar um compromisso pessoal não o destrava" reprovou — a proteção tem que estar onde o
+  // próximo a mexer nisso vai encostar, não na tela que hoje chama a função.
+  const movel = (p) => !ehFixoNaAgenda(p) && (podeMover ? podeMover(p) : true);
   // Só os móveis disputam horário, e só entre os horários que já eram deles. Os fixos ficam onde estão.
-  const horariosMoveis = (paradas || []).filter((p) => !ehFixoNaAgenda(p)).map((p) => p.hora);
-  return (melhor || []).filter((p) => !ehFixoNaAgenda(p)).map((p, i) => ({
+  const horariosMoveis = (paradas || []).filter(movel).map((p) => p.hora);
+  return (melhor || []).filter(movel).map((p, i) => ({
     id: p.id,
     rotulo: (p.titulo_visivel || p.titulo || "compromisso") + (p.cidade ? ` (${p.cidade})` : ""),
     de: p.hora,
@@ -2846,18 +2857,29 @@ function analisarRotaDoDia(compromissos) {
 function AvisoRota({ compromissos, db, demo, notify, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [avisar, setAvisar] = useState(null);
+  const [escolhendo, setEscolhendo] = useState(false);
+  const [liberados, setLiberados] = useState({});
   const r = analisarRotaDoDia(compromissos);
-  // Só oferece o botão se a troca REALMENTE aplicável valer o incômodo — mesmo corte de 15 min do aviso.
-  const podeAplicar = !!(r && r.trocas.length && r.economiaAplicavel >= 15 && db);
+  // NADA SE MOVE SEM ELE LIBERAR (recado de 19/09/2026 sobre rigidez).
+  // A primeira versão permutava tudo que não fosse pessoal e prometia listar depois "quem avisar". O Classic
+  // apontou o furo e está certo: um horário confirmado com cliente é ÂNCORA, não peça de permutação — mudar
+  // no banco uma promessa já feita e só depois lembrar de avisar inverte a ordem das coisas.
+  // Medido antes de corrigir: a tabela `agenda` NÃO TEM campo de rigidez/confirmação, e só 2 dos 69
+  // planejados trazem "PROVISÓRIO" no título. Não há sinal no dado — nem para liberar, nem para travar.
+  // Então o padrão é TRAVADO e quem libera é o Diego, item por item. São 2 a 4 paradas por dia (média
+  // medida: 2,7), então é um toque em cada, não um formulário.
+  const paradas = (compromissos || []).filter(paradaFisica).sort((a, b) => minutosDoHorario(a.hora) - minutosDoHorario(b.hora));
+  const podeMover = (p) => !!liberados[p.id]; // o pessoal já é barrado dentro de trocasDeHorario
+  const melhorOrdem = paradas.slice().sort((a, b) => distanciaDaBase(a.cidade) - distanciaDaBase(b.cidade));
+  const trocas = trocasDeHorario(paradas, melhorOrdem, podeMover);
+  // A economia é a do dia REAL que vai sair — com os travados parados onde estão.
+  const economiaReal = trocas.length ? estradaTotalMin(paradas) - estradaTotalMin(diaDepoisDasTrocas(paradas, trocas)) : 0;
+  const rotuloDe = (p) => (p.titulo_visivel || p.titulo || "compromisso") + (p.cidade ? ` (${p.cidade})` : "");
   const aplicar = async () => {
-    const trocas = r.trocas;
     const resumo = trocas.map((t) => `• ${t.rotulo}: ${String(t.de).slice(0, 5)} → ${String(t.para).slice(0, 5)}`);
-    if (!window.confirm(["Trocar o horário destes compromissos:", "", ...resumo, "",
-      `Economia estimada: ${r.economiaAplicavel} min de estrada.`,
-      "Os horários do dia continuam os mesmos — muda só quem ocupa cada um.",
-      ...(r.temFixo ? ["Compromisso pessoal não se move e ficou no horário dele."] : []),
-      "Quem já combinou horário com o cliente vai precisar ser avisado; a lista fica na tela depois.",
-      "", "Aplicar?"].join("\n"))) return;
+    if (!window.confirm(["Gravar estas trocas de horário:", "", ...resumo, "",
+      `Economia: ${economiaReal} min de estrada.`,
+      "Só isto muda. O que você não liberou fica onde está.", "", "Confirmar?"].join("\n"))) return;
     setBusy(true);
     if (demo) { setAvisar(trocas); notify && notify("Ordem aplicada (demonstração — nada foi gravado).", "ok"); setBusy(false); return; }
     try {
@@ -2881,9 +2903,10 @@ function AvisoRota({ compromissos, db, demo, notify, onChanged }) {
         feitas.push(t);
       }
       await db.from("historico").insert({ o_que: "Rota do dia reordenada pelo app", por: "diego",
-        detalhe: `Economia estimada de ${r.economiaAplicavel} min de estrada. ${resumo.join(" ")}` });
+        detalhe: `Economia estimada de ${economiaReal} min de estrada. Liberados por Diego: ${trocas.length} de ${paradas.length} parada(s). ${resumo.join(" ")}` });
       setAvisar(trocas);
-      notify && notify("Ordem aplicada. Falta avisar quem já tinha horário combinado.", "ok");
+      setEscolhendo(false);
+      notify && notify("Horários trocados. Falta avisar quem já tinha hora combinada.", "ok");
       onChanged && onChanged();
     } catch (e) { notify && notify("Erro: " + e.message, "error"); }
     finally { setBusy(false); }
@@ -2894,12 +2917,28 @@ function AvisoRota({ compromissos, db, demo, notify, onChanged }) {
     <button className="ghost" onClick={() => setAvisar(null)}>Pronto, avisei</button>
   </div>;
   if (!r) return null;
+  if (escolhendo) return <div className="danger-box"><b>Quem pode mudar de horário?</b>
+    <span>Marque só o que <b>não</b> tem hora combinada com cliente. O que ficar desmarcado não se move.</span>
+    {paradas.map((p) => {
+      const fixo = ehFixoNaAgenda(p);
+      return <label key={p.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "6px 0", cursor: fixo ? "default" : "pointer" }}>
+        <input type="checkbox" checked={!fixo && !!liberados[p.id]} disabled={fixo}
+          onChange={(e) => setLiberados((x) => ({ ...x, [p.id]: e.target.checked }))} style={{ marginTop: 3 }} />
+        <span style={{ flex: 1 }}><b>{String(p.hora).slice(0, 5)}</b> · {rotuloDe(p)}{fixo ? " · 🔒 pessoal, não se move" : ""}</span>
+      </label>;
+    })}
+    <span>{trocas.length
+      ? `Com o que você liberou: ${trocas.length} horário(s) trocam e o dia economiza ${economiaReal} min.`
+      : "Nada liberado ainda — nenhum horário vai mudar."}</span>
+    <button className="primary" onClick={aplicar} disabled={busy || !trocas.length || economiaReal <= 0}>
+      {busy ? "Gravando…" : `Trocar ${trocas.length} horário${trocas.length === 1 ? "" : "s"}`}
+    </button>
+    <button className="ghost" onClick={() => { setEscolhendo(false); setLiberados({}); }}>Deixa pra lá</button>
+  </div>;
   return <div className="danger-box"><b>⚠ Essa rota volta pra trás — cerca de {r.economia} min a mais de estrada.</b>
     <span>Marcado: {r.ordemAtual.join(" → ")}</span>
     <span>Melhor ordem: {r.ordemSugerida.join(" → ")}</span>
-    {podeAplicar && <button className="primary" onClick={aplicar} disabled={busy}>
-      {busy ? "Aplicando…" : `Aplicar essa ordem (troca ${r.trocas.length} horário${r.trocas.length > 1 ? "s" : ""})`}
-    </button>}
+    {!!db && <button className="primary" onClick={() => setEscolhendo(true)}>Reorganizar os horários…</button>}
   </div>;
 }
 // TRAVA DE CONTATO: celular BR válido tem 11 dígitos (DDD + 9 + 8) ou 13 com o 55. Ficha sem o 9 não abre o
