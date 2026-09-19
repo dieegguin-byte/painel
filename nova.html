@@ -5696,6 +5696,20 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   const hojePassouDaHora = hoje.filter((entry) => !!entry.hora && String(entry.hora).slice(0, 5) < agoraHHMM).length;
   const irParaVencendo = () => { if (!atrasos.recentes.length) return; setFiltroTipo("todos"); requestAnimationFrame(() => document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" })); };
   const cardAtrasado = (a) => <CompromissoCard key={a.id} a={a} svc={svcDe(a)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} revisaoData={idsRemarcacao.has(a.id)} sucessor={sucessorMaisNovoNoServico(a, agendaPlanejada)} />;
+  // QUEM ESPERA HÁ MAIS TEMPO, NO CABEÇALHO FECHADO (19/09/2026, caso Cacau). O bloco "PRECISA
+  // RESOLVER" nasce recolhido e dizia só a contagem: "1 compromisso(s) com atraso recente". Em 18/09
+  // o Diego bateu o olho no Painel, viu o número e concluiu que os cartões da Cacau tinham sumido —
+  // o antigo estava lá dentro, fechado. Número não diz DE QUEM é a dívida, e é o nome que decide se
+  // vale abrir agora.
+  // Abrir o card sozinho seria o caminho óbvio e foi recusado em 04/08, nas rotinas ("quero que abra
+  // só depois de eu clicar"). Então o card continua fechado e quem passa a falar é o cabeçalho.
+  // Mesma cadeia de nome do CompromissoCard (cliente do serviço > cliente do compromisso > título):
+  // duas regras de nome divergem no primeiro caso órfão, como o da Elizabeth em 08/09.
+  const quemEspera = (a) => {
+    const cli = svcDe(a)?.clientes || (customers || []).find((c) => c.id === a.cliente_id);
+    return cli?.nome || a.titulo_visivel || a.titulo || "sem nome";
+  };
+  const atrasadoMaisAntigo = atrasados.length ? [...atrasados].sort((x, y) => String(x.data).localeCompare(String(y.data)))[0] : null;
   return <div className="page-grid">
     {addInbox && <CardRecolhivel cabecalho={<><p className="kicker">ANOTAR AGORA</p><h3>O que aconteceu?</h3></>}>
       <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />
@@ -5833,7 +5847,9 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     })()}
     {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes"
       cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
-      <span className="ficha-note" style={{ margin: 0 }}>De 1 a 14 dias de atraso</span></>}>
+      <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
+        ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasDeAtraso(atrasadoMaisAntigo.data, today)} dia(s)`
+        : "De 1 a 14 dias de atraso"}</span></>}>
       {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
