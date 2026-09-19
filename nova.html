@@ -2577,7 +2577,11 @@ const WHATSAPP_PACOTE = "com.whatsapp.w4b";
 // WhatsApp do Diego, o comum — forçar o Business nela abre conversa vazia no app errado. É uma lista de
 // números, não uma configuração: o padrão continua Business pra todo o resto, que é o que o recado pede.
 // Número no formato de `telefoneWhatsapp` (DDD + 9 dígitos, sem o 55); a comparação tira o 55 se vier.
-const WHATSAPP_COMUM_POR_NUMERO = new Set(["61996031000"]);
+// A regra canônica (HANDOFF_TECNICO_WHATSAPP_BUSINESS, 01/09/2026, na Biblioteca) é "sempre Business
+// quando o fluxo nasce no app". Esta lista é a exceção NOMINAL a ela — cada número entra porque o Diego
+// pediu aquele caso, nunca por inferência do app. Segunda entrada: Luana (+55 61 99137-8814), recado de
+// 18/09/2026, mesmo motivo da Sabrina — a conversa dela vive no WhatsApp comum.
+const WHATSAPP_COMUM_POR_NUMERO = new Set(["61996031000", "61991378814"]);
 function pacoteWhatsapp(tel) {
   const d = String(tel || "").replace(/\D/g, "");
   const semPais = d.length > 11 && d.startsWith("55") ? d.slice(2) : d;
