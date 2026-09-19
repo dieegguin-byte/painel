@@ -2780,6 +2780,40 @@ function encaixesDeRota(avisos, appointments, agendaHistorico, services, custome
     .filter((e) => !(e.servicoId && comCompromisso.has(e.servicoId)))
     .sort((a, b) => (PESO_AVISO[b.prioridade] || 0) - (PESO_AVISO[a.prioridade] || 0));
 }
+// APLICAR A ORDEM = TROCAR QUEM OCUPA CADA HORÁRIO, NUNCA INVENTAR HORÁRIO NOVO (fase 2, 19/09/2026).
+//
+// Os horários do dia continuam EXATAMENTE os mesmos — 08:00, 10:30, 14:00 seguem existindo. O que muda é
+// qual compromisso fica em cada um. Essa escolha não é de estilo: inventar horário é o que o Diego rejeitou
+// em 25/07 ("por que você deveria reagendar"), e um horário novo teria que ser combinado com o cliente do
+// zero. Permutando, o dia dele continua com a mesma carga e os mesmos encaixes.
+//
+// `paradas` chega ordenada por HORA e `melhor` pela ordem de rota. O horário da i-ésima parada do dia passa
+// a ser de quem a rota colocou em i-ésimo. Quem não muda de horário fica fora da lista — troca de zero
+// minutos não é troca, e listar isso faria o aviso parecer maior do que é.
+// O QUE NÃO SE MOVE. Descoberto testando na demo, antes de publicar: o bloqueio pessoal ("Apresentação na
+// escola do filho", 19h) é presencial, tem cidade e hora — então entrava na conta como qualquer parada e o
+// botão se oferecia para TROCAR o horário dele. Trocar a hora de uma apresentação de escola para economizar
+// estrada é exatamente o tipo de esperteza que faz o Diego parar de confiar no app.
+// Compromisso pessoal ENTRA no cálculo da estrada (ele ocupa a rota de verdade) e FICA no horário dele.
+function ehFixoNaAgenda(a) { return !!(a && (a.pessoal_id || a.pessoal_virtual)); }
+function trocasDeHorario(paradas, melhor) {
+  // Só os móveis disputam horário, e só entre os horários que já eram deles. Os fixos ficam onde estão.
+  const horariosMoveis = (paradas || []).filter((p) => !ehFixoNaAgenda(p)).map((p) => p.hora);
+  return (melhor || []).filter((p) => !ehFixoNaAgenda(p)).map((p, i) => ({
+    id: p.id,
+    rotulo: (p.titulo_visivel || p.titulo || "compromisso") + (p.cidade ? ` (${p.cidade})` : ""),
+    de: p.hora,
+    para: horariosMoveis[i],
+  })).filter((t) => t.para && String(t.de).slice(0, 5) !== String(t.para).slice(0, 5));
+}
+// O DIA COMO ELE FICARIA. Serve para uma pergunta só, e ela é honesta: com os fixos parados no lugar deles,
+// a troca ainda economiza estrada? Nem sempre — um pessoal no meio da tarde pode comer boa parte do ganho.
+// Sem esta conta o botão prometeria a economia da ordem IDEAL e entregaria outra.
+function diaDepoisDasTrocas(paradas, trocas) {
+  const nova = new Map((trocas || []).map((t) => [t.id, t.para]));
+  return (paradas || []).map((p) => (nova.has(p.id) ? { ...p, hora: nova.get(p.id) } : p))
+    .sort((a, b) => minutosDoHorario(a.hora) - minutosDoHorario(b.hora));
+}
 function analisarRotaDoDia(compromissos) {
   const paradas = (compromissos || [])
     .filter(paradaFisica)
@@ -2789,14 +2823,83 @@ function analisarRotaDoDia(compromissos) {
   const atualMin = estradaTotalMin(paradas), melhorMin = estradaTotalMin(melhor);
   const economia = atualMin - melhorMin;
   if (economia < 15) return null; // diferença pequena não vale incomodar
-  return { economia, atualMin, melhorMin, ordemAtual: paradas.map((p) => p.cidade), ordemSugerida: melhor.map((p) => p.cidade) };
+  // A economia que o BOTÃO promete é a da ordem aplicável (fixos parados), não a da ordem ideal.
+  const trocas = trocasDeHorario(paradas, melhor);
+  const economiaAplicavel = trocas.length ? atualMin - estradaTotalMin(diaDepoisDasTrocas(paradas, trocas)) : 0;
+  return { economia, atualMin, melhorMin, ordemAtual: paradas.map((p) => p.cidade), ordemSugerida: melhor.map((p) => p.cidade),
+    trocas, economiaAplicavel, temFixo: paradas.some(ehFixoNaAgenda) };
 }
-function AvisoRota({ compromissos }) {
+// O BOTÃO QUE APLICA (item pendente desde 27/08/2026, quando a fase 1 subiu).
+//
+// Até aqui o app calculava a melhor ordem e mandava o Diego refazer a agenda na mão, um compromisso por
+// vez, pelo Reagendar. Sugestão que depende de execução manual é justamente o que não acontece num dia
+// corrido — e o aviso vinha aparecendo dia após dia sem ninguém mexer.
+//
+// TRÊS TRAVAS, porque isto escreve na agenda real:
+// 1. RELEITURA ANTES DE ESCREVER. O estado da tela pode ter minutos de idade; se alguma linha já saiu de
+//    `planejado` ou já está com outro horário, aborta ANTES do primeiro update em vez de deixar o dia pela
+//    metade. O update ainda leva `.eq("status","planejado")` como segunda rede.
+// 2. READBACK linha a linha: só conta como aplicado o que o banco devolveu com a hora nova.
+// 3. QUEM COMBINOU HORÁRIO COM O CLIENTE PRECISA SER AVISADO. O app não sabe o que foi prometido no
+//    WhatsApp, então ele NÃO finge que a troca é silenciosa: mostra a lista de quem mudou de horário e
+//    deixa na tela até o Diego dizer que avisou. Avisar é dele; lembrar é do app.
+function AvisoRota({ compromissos, db, demo, notify, onChanged }) {
+  const [busy, setBusy] = useState(false);
+  const [avisar, setAvisar] = useState(null);
   const r = analisarRotaDoDia(compromissos);
+  // Só oferece o botão se a troca REALMENTE aplicável valer o incômodo — mesmo corte de 15 min do aviso.
+  const podeAplicar = !!(r && r.trocas.length && r.economiaAplicavel >= 15 && db);
+  const aplicar = async () => {
+    const trocas = r.trocas;
+    const resumo = trocas.map((t) => `• ${t.rotulo}: ${String(t.de).slice(0, 5)} → ${String(t.para).slice(0, 5)}`);
+    if (!window.confirm(["Trocar o horário destes compromissos:", "", ...resumo, "",
+      `Economia estimada: ${r.economiaAplicavel} min de estrada.`,
+      "Os horários do dia continuam os mesmos — muda só quem ocupa cada um.",
+      ...(r.temFixo ? ["Compromisso pessoal não se move e ficou no horário dele."] : []),
+      "Quem já combinou horário com o cliente vai precisar ser avisado; a lista fica na tela depois.",
+      "", "Aplicar?"].join("\n"))) return;
+    setBusy(true);
+    if (demo) { setAvisar(trocas); notify && notify("Ordem aplicada (demonstração — nada foi gravado).", "ok"); setBusy(false); return; }
+    try {
+      // TRAVA 1 — o dia ainda é o que a tela mostra?
+      const ids = trocas.map((t) => t.id);
+      const { data: atuais, error: leituraErr } = await db.from("agenda").select("id,hora,status").in("id", ids);
+      if (leituraErr) throw leituraErr;
+      for (const t of trocas) {
+        const linha = (atuais || []).find((x) => x.id === t.id);
+        if (!linha) throw new Error(`${t.rotulo} não está mais na agenda — recarregue e tente de novo.`);
+        if (linha.status !== "planejado") throw new Error(`${t.rotulo} já foi concluído ou remarcado — nada foi alterado.`);
+        if (String(linha.hora).slice(0, 5) !== String(t.de).slice(0, 5)) throw new Error(`${t.rotulo} mudou de horário em outro lugar — nada foi alterado.`);
+      }
+      const feitas = [];
+      for (const t of trocas) {
+        const hora = String(t.para).slice(0, 5) + ":00";
+        const { data, error } = await db.from("agenda").update({ hora }).eq("id", t.id).eq("status", "planejado").select("id,hora").single();
+        if (error) throw new Error(`${t.rotulo}: ${error.message}${feitas.length ? ` — ATENÇÃO: ${feitas.length} já tinha(m) mudado` : ""}`);
+        // TRAVA 2 — readback
+        if (!data || String(data.hora).slice(0, 5) !== String(t.para).slice(0, 5)) throw new Error(`${t.rotulo}: o banco não confirmou o horário novo.`);
+        feitas.push(t);
+      }
+      await db.from("historico").insert({ o_que: "Rota do dia reordenada pelo app", por: "diego",
+        detalhe: `Economia estimada de ${r.economiaAplicavel} min de estrada. ${resumo.join(" ")}` });
+      setAvisar(trocas);
+      notify && notify("Ordem aplicada. Falta avisar quem já tinha horário combinado.", "ok");
+      onChanged && onChanged();
+    } catch (e) { notify && notify("Erro: " + e.message, "error"); }
+    finally { setBusy(false); }
+  };
+  if (avisar) return <div className="danger-box"><b>✓ Ordem aplicada — agora avise quem mudou de horário</b>
+    {avisar.map((t) => <span key={t.id}>{t.rotulo}: <b>{String(t.de).slice(0, 5)} → {String(t.para).slice(0, 5)}</b></span>)}
+    <span>O app não manda mensagem sozinho. Abra a conversa pelo cartão do compromisso.</span>
+    <button className="ghost" onClick={() => setAvisar(null)}>Pronto, avisei</button>
+  </div>;
   if (!r) return null;
   return <div className="danger-box"><b>⚠ Essa rota volta pra trás — cerca de {r.economia} min a mais de estrada.</b>
     <span>Marcado: {r.ordemAtual.join(" → ")}</span>
     <span>Melhor ordem: {r.ordemSugerida.join(" → ")}</span>
+    {podeAplicar && <button className="primary" onClick={aplicar} disabled={busy}>
+      {busy ? "Aplicando…" : `Aplicar essa ordem (troca ${r.trocas.length} horário${r.trocas.length > 1 ? "s" : ""})`}
+    </button>}
   </div>;
 }
 // TRAVA DE CONTATO: celular BR válido tem 11 dígitos (DDD + 9 + 8) ou 13 com o 55. Ficha sem o 9 não abre o
@@ -3684,7 +3787,7 @@ function Home() {
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
       {tab === "leads" && <LeadsView services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} inbox={inbox} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
-      {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} />}
+      {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} db={db} demo={demo} notify={notify} onChanged={loadAll} />}
       {tab === "financeiro" && <FinanceView finances={finances} dividas={dividas} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} dividas={dividas} services={activeServices} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
@@ -5859,7 +5962,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
       <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}</h3>
       {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora</span>}</>}
-      resumo={<AvisoRota compromissos={hojeAll} />}>
+      resumo={<AvisoRota compromissos={hojeAll} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />}>
       {hoje.length > 0
         ? [...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)
         : <div className="empty-state"><b>O dia está livre.</b><span>Nada marcado para {compactDate(today)}.</span></div>}
@@ -5927,7 +6030,7 @@ function LeadsView({ services, appointments, agendaHistorico, inbox, search, set
 }
 
 // Colapsado: só o essencial pra bater o olho (dia + rota). Clica pra abrir os compromissos do dia.
-function AgendaView({ appointments, services, customers, finances, fornecedores, onReschedule, onConcluir, onAdd }) {
+function AgendaView({ appointments, services, customers, finances, fornecedores, onReschedule, onConcluir, onAdd, db, demo, notify, onChanged }) {
   const [diaAberto, setDiaAberto] = useState(null);
   const hoje = hojeISO();
   const profissionais = nomesProfissionais(services);
@@ -5973,7 +6076,7 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
           <div className="agenda-dia-meta"><b>{items.length}</b><span>{items.length === 1 ? "compromisso" : "compromissos"}</span></div>
           <i className="agenda-dia-seta">{aberto ? "▲" : "▼"}</i>
         </button>
-        {aberto && <div className="agenda-dia-corpo"><AvisoRota compromissos={items} />{[...items].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
+        {aberto && <div className="agenda-dia-corpo"><AvisoRota compromissos={items} db={db} demo={demo} notify={notify} onChanged={onChanged} />{[...items].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
       </div>;
     })}
     {/* SEM HORA — recolhido por padrão, como os dias. 26 linhas abertas seriam a parede de texto que ele

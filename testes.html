@@ -317,6 +317,58 @@ async function carregarApp() {
   checar("sem criado_em não dá pra afirmar ordem: não acende", sucessorMaisNovoNoServico({ id: "k5", servico_id: "sv1" }, agK) === null, null);
   checar("agenda vazia não quebra", sucessorMaisNovoNoServico(agK[0], []) === null, null);
 
+  grupo("Aplicar a melhor ordem da rota (fase 2, 19/09/2026)");
+  // =========================================================================
+  // Isto reescreve HORÁRIO de compromisso com cliente. A regra tem que ser burra e previsível: os horários
+  // do dia são os mesmos, muda só quem ocupa cada um. Se um dia ela inventar horário, o Diego chega na casa
+  // de alguém que não estava esperando.
+  const pA = { id: "p1", titulo: "Entrega — Ana", cidade: "Valparaíso", hora: "08:00" };
+  const pB = { id: "p2", titulo: "Visita — Bruno", cidade: "Luziânia", hora: "10:30" };
+  const pC = { id: "p3", titulo: "Retirada — Célia", cidade: "Taguatinga", hora: "14:00" };
+  const trocas1 = trocasDeHorario([pA, pB, pC], [pB, pA, pC]);
+  checar("os horários do dia continuam os mesmos, só trocam de dono",
+    JSON.stringify(trocas1.map((t) => t.para).sort()) === JSON.stringify(["08:00", "10:30"]), trocas1.map((t) => t.para));
+  checar("quem sobe na ordem recebe o horário mais cedo",
+    trocas1.find((t) => t.id === "p2")?.para === "08:00" && trocas1.find((t) => t.id === "p1")?.para === "10:30", trocas1);
+  checar("quem não muda de horário fica fora da lista",
+    !trocas1.some((t) => t.id === "p3"), trocas1);
+  checar("ordem já ótima não gera troca nenhuma",
+    trocasDeHorario([pA, pB, pC], [pA, pB, pC]).length === 0, trocasDeHorario([pA, pB, pC], [pA, pB, pC]));
+  checar("o rótulo diz de quem é o compromisso e a cidade",
+    /Bruno/.test(trocas1[0].rotulo) && /Luziânia|Valparaíso/.test(trocas1[0].rotulo), trocas1[0].rotulo);
+  checar("segundos no banco não viram troca falsa (09:30 = 09:30:00)",
+    trocasDeHorario([{ id: "x", hora: "09:30:00" }, { id: "y", hora: "11:00:00" }],
+                    [{ id: "x", hora: "09:30:00" }, { id: "y", hora: "11:00:00" }]).length === 0, "sem troca");
+  checar("lista vazia não quebra", trocasDeHorario([], []).length === 0, null);
+  // O QUE NÃO SE MOVE — compromisso pessoal. Este caso nasceu de um defeito real visto na demonstração:
+  // o bloqueio "Apresentação na escola do filho" entrava na permutação como qualquer parada.
+  const pessoal = { id: "pp", titulo: "Apresentação na escola", cidade: "Luziânia", hora: "19:00", pessoal_id: "x1" };
+  const comPessoal = trocasDeHorario([pA, pB, pessoal], [pessoal, pB, pA]);
+  checar("compromisso pessoal nunca muda de horário",
+    !comPessoal.some((t) => t.id === "pp"), comPessoal);
+  checar("os móveis só disputam os horários que já eram deles (o das 19h fica de fora)",
+    comPessoal.every((t) => ["08:00", "10:30"].includes(t.para)), comPessoal.map((t) => t.para));
+  checar("pessoal virtual (sem linha na agenda) também não se move",
+    !trocasDeHorario([pA, { id: "pv", hora: "16:00", cidade: "Luziânia", pessoal_virtual: true }],
+                     [{ id: "pv", hora: "16:00", cidade: "Luziânia", pessoal_virtual: true }, pA]).some((t) => t.id === "pv"), null);
+  // A economia prometida é a da ordem APLICÁVEL, com os fixos parados — não a da ordem ideal.
+  const rotaComFixo = analisarRotaDoDia([
+    { id: "f1", tipo: "presencial", cidade: "Valparaíso", hora: "08:00" },
+    { id: "f2", tipo: "presencial", cidade: "Luziânia", hora: "10:00" },
+    { id: "f3", tipo: "presencial", cidade: "Valparaíso", hora: "12:00" },
+  ]);
+  checar("a economia aplicável nunca é maior que a da ordem ideal",
+    rotaComFixo.economiaAplicavel <= rotaComFixo.economia, [rotaComFixo.economiaAplicavel, rotaComFixo.economia]);
+  // A análise só devolve trocas quando de fato vale a pena — o corte de 15 min continua mandando.
+  const rota = analisarRotaDoDia([
+    { id: "r1", tipo: "presencial", cidade: "Valparaíso", hora: "08:00" },
+    { id: "r2", tipo: "presencial", cidade: "Luziânia", hora: "10:00" },
+    { id: "r3", tipo: "presencial", cidade: "Valparaíso", hora: "12:00" },
+  ]);
+  checar("rota que volta pra trás traz trocas junto do aviso", !!rota && rota.trocas.length > 0, rota && rota.trocas);
+  checar("um compromisso só não vira sugestão de rota",
+    analisarRotaDoDia([{ id: "r1", tipo: "presencial", cidade: "Valparaíso", hora: "08:00" }]) === null, null);
+
   placar.textContent = `${passou} passaram · ${falhou} falharam`;
   placar.style.color = falhou ? "#e8776a" : "#7fbf8f";
 })();
