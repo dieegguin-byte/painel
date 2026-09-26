@@ -485,6 +485,22 @@ button.sutil{opacity:.55;font-size:12px}
 @media(max-width:640px){.cronograma-fases{grid-template-columns:minmax(0,1fr)}.cronograma-contadores{grid-template-columns:repeat(2,minmax(0,1fr))}.cronograma-item-meta{grid-template-columns:minmax(0,1fr)}.cronograma-tecnico h2{font-size:23px}}
 .agente-ficha-action{min-height:44px;padding:8px 12px;font-size:12px;margin:8px 0}
 @media(max-width:640px){.agente-card{padding:18px 16px;border-radius:16px}.agente-card h2{font-size:26px}.agente-selector,.agente-fields{grid-template-columns:minmax(0,1fr)}.agente-actions>.primary{width:100%}.agente-result-head .ghost{width:100%}}
+/* CAIXA COMO FILA (26/09/2026) — um item por vez, com botões. Ver CaixaView. */
+.caixa-fila-topo{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 0 12px}
+.caixa-fila-topo span{font-size:12px;color:var(--muted)}
+.caixa-item{border:1px solid var(--line2);background:var(--surface2);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.caixa-item-topo{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.caixa-item-topo time{font-size:11px;color:var(--muted)}
+.caixa-texto{white-space:pre-wrap;word-break:break-word;margin:0;font-size:14px;line-height:1.45}
+.caixa-prints{display:flex;gap:8px;flex-wrap:wrap}
+.caixa-prints img{max-width:100%;max-height:360px;border-radius:10px;border:1px solid var(--line2)}
+.caixa-conversa{border-top:1px solid var(--line);padding-top:8px}
+.caixa-conversa summary{cursor:pointer;font-size:12px;color:var(--muted)}
+.caixa-conversa p{margin:6px 0 0;font-size:12px;color:var(--muted);white-space:pre-wrap;word-break:break-word}
+.caixa-conversa b{color:var(--text)}
+.caixa-acoes{display:flex;flex-wrap:wrap;gap:8px}
+.caixa-acoes button{flex:1 1 150px}
+.caixa-form{border-top:1px solid var(--line);padding-top:10px}
 </style>
 </head>
 <body>
@@ -676,6 +692,7 @@ function ProntosParaEntregarCard({ services, onOpenFicha }) {
 const demoInbox = [
   { id: "cx-101", texto: "Oi, quero reformar meu sofá retrátil. Sou Mariana, moro no Jardim Ingá. Pode fazer orçamento? Meu WhatsApp é (61) 90000-0000.", status: "respondido", conversa: [{ de: "ia", texto: "Você prefere visita presencial ou enviar as medidas?", em: new Date().toISOString() }, { de: "diego", texto: "Ela quer visita presencial amanhã à tarde.", em: new Date().toISOString() }], criado_em: "2026-07-10T10:20:00Z", processado: false },
   { id: "cx-102", texto: "Carlos pediu retorno sobre as 6 cadeiras. Disse que aprovou o tecido bege.", status: "novo", conversa: [], criado_em: "2026-07-10T11:00:00Z", processado: false },
+  { id: "cx-099", texto: "BLOQUEIO DE CADASTRO — Joana — WhatsApp +55 61 9123-4567 — Luziânia. Pediu orçamento para reformar o sofá de 3 lugares; o cadastro travou porque o telefone veio com 10 dígitos.", status: "novo", conversa: [], criado_em: "2026-07-09T13:00:00Z", processado: false },
   { id: "cx-103", texto: "Conta da Vivo apareceu em duplicidade, verificar antes de mexer.", status: "aguardando_voce", conversa: [{ de: "ia", texto: "Conferi o Financeiro: há apenas um lançamento. Você viu a duplicidade no app ou na fatura?", em: new Date().toISOString() }], criado_em: "2026-07-10T12:00:00Z", processado: false },
 ];
 const demoCustomers = [
@@ -1498,8 +1515,13 @@ async function resolverPendenciaComSucessor(db, { pendenciaId, agendaOrigemId, s
   if (!data) throw new Error("Informe a data combinada antes de resolver.");
   const tipoFinal = tipo || meta.tipo_original || "remoto";
   const cidadeFinal = tipoFinal === "presencial" ? (cidade || meta.cidade_original || null) : null;
-  const horaFinal = tipoFinal === "presencial" ? (hora || null) : null;
-  if (tipoFinal === "presencial" && (!cidadeFinal || !horaFinal)) throw new Error("Compromisso presencial exige cidade e hora realmente combinadas.");
+  // HORA EM TODO PLANEJADO, REMOTO TAMBÉM (26/09/2026). O banco recusa compromisso planejado sem hora
+  // (trg_agenda_planejado_exige_hora → AGENDA_PLANEJADA_EXIGE_HORA), e esta linha jogava fora a hora do
+  // remoto: toda remarcação remota estourava no UPDATE. A fila da Caixa achou isso no teste com as travas
+  // da produção. A hora vem do seletor de horário, que sempre entrega HH:MM.
+  const horaFinal = hora || null;
+  if (!horaFinal) throw new Error("Informe a hora — compromisso planejado precisa de HH:MM.");
+  if (tipoFinal === "presencial" && !cidadeFinal) throw new Error("Compromisso presencial exige cidade realmente combinada.");
 
   const { data: origem, error: origemErr } = origemId ? await db.from("agenda").select("id,status").eq("id", origemId).maybeSingle() : { data: null, error: null };
   if (origemErr) throw origemErr;
@@ -2984,7 +3006,18 @@ function Home() {
   // grava estado e não renderiza nada. Sem isto ele compartilharia, não veria mensagem nenhuma e concluiria
   // que o app perdeu (a carga está guardada, mas quem não vê não sabe).
   const [compartilhamentoGuardado, setCompartilhamentoGuardado] = useState(false);
-  const [tab, setTab] = useState("painel");
+  // O aviso "Nova entrada na caixa" abre ./nova.html?ir=caixa (push-enviar). Até 26/09 o app ignorava o
+  // parâmetro e o toque caía no Painel — ele tinha que achar a caixa sozinho, numa tela que nem existia.
+  const [tab, setTab] = useState(() => { try { return new URL(location.href).searchParams.get("ir") === "caixa" ? "caixa" : "painel"; } catch (e) { return "painel"; } });
+  // Tira o `ir` do endereço depois de usar: senão todo recarregar voltaria pra caixa.
+  useEffect(() => {
+    try {
+      const endereco = new URL(location.href);
+      if (!endereco.searchParams.has("ir")) return;
+      endereco.searchParams.delete("ir");
+      history.replaceState(history.state, "", endereco.pathname + endereco.search + endereco.hash);
+    } catch (e) { /* endereço estranho não pode impedir o app de abrir */ }
+  }, []);
   const [agenteServicoInicial, setAgenteServicoInicial] = useState("");
   const [agenteAbertura, setAgenteAbertura] = useState(0);
   const [leadsFiltroInicial, setLeadsFiltroInicial] = useState("todos");
@@ -3640,10 +3673,10 @@ function Home() {
         await cache.delete("./__compartilhado__");
         for (const item of listaArquivos) await cache.delete(item.url);
         if (cancelado) return;
-        setTab("painel");
+        setTab("caixa");
         await loadAll();
         notify(jaExistia ? "Esse compartilhamento já estava na Caixa."
-          : `Salvo na Caixa${uploaded.length ? ` com ${uploaded.length} arquivo(s)` : ""}. O Classic processa depois.`, "ok");
+          : `Salvo na Caixa${uploaded.length ? ` com ${uploaded.length} arquivo(s)` : ""}. Está na fila, pra você processar quando puder.`, "ok");
       } catch (e) {
         // Falhou: a carga CONTINUA no cache. Reabrir o app tenta de novo.
         notify("Não consegui salvar na Caixa: " + e.message + " — a carga continua guardada no aparelho.", "error");
@@ -3778,14 +3811,14 @@ function Home() {
   // O contador da aba conta as duas pendências do profissional: vale a descontar e trabalho a pagar.
   const contaProfissionais = valesPendentes + finances.filter(ehTrabalhoAberto).length;
   const contasFuturas = finances.filter(ehSaidaFutura).length;
-  // A CAIXA SAIU DA NAVEGAÇÃO EM 23/08/2026. Diego parou de lançar pelo app ("só serve de
-  // visualização agora", "só o Classic que mexe") e, como ninguém mais abria aquela tela,
-  // 25 itens ficaram lá dentro esperando resposta que nunca ia chegar — várias delas
-  // perguntas paradas desde 11/08. Aba que ninguém abre não é canal, é gaveta.
-  // O código da Caixa continua no arquivo, intacto: se ele voltar a operar pelo app, é só
-  // devolver a linha aqui. Nada foi apagado.
+  // A CAIXA SAIU DA NAVEGAÇÃO EM 23/08/2026 (o Diego parou de lançar pelo app e o Classic processava) e
+  // VOLTOU EM 26/09/2026 como fila com botões (CaixaView): sem ninguém processando, 18 itens ficaram parados,
+  // leads no meio. Logo depois do Painel porque é onde entra o que ainda não tem dono. O contador é o da fila.
+  // Conta direto, sem useMemo: este trecho vem DEPOIS do `return` da tela de login, e hook depois de
+  // return condicional quebra o React na hora em que a sessão chega (erro #310). São dezenas de itens.
+  const filaCaixa = itensDaFilaDaCaixa(inbox);
   const nav = [
-    { id: "painel", label: "Painel", icon: "⌂" }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
+    { id: "painel", label: "Painel", icon: "⌂" }, { id: "caixa", label: "Caixa", icon: "✉", count: filaCaixa.length || undefined }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
     { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "compras", label: "Compras", icon: "▣" }, { id: "futuro", label: "A pagar", icon: "◷", count: contasFuturas }, { id: "vales", label: "Profissionais", icon: "✎", count: contaProfissionais },
     { id: "clientes", label: "Clientes", icon: "○" }, { id: "fornecedores", label: "Fornecedores", icon: "▤" },
     // ESTOQUE É PÁGINA PRÓPRIA, NÃO ABA (item ESTOQUE-V2-APP-20260827-2338-001). O backend do Estoque V2 já
@@ -3819,12 +3852,14 @@ function Home() {
           financeiro. Com a operação passando pelo Classic, virou tela morta: 25 itens ficaram
           parados lá dentro, vários perguntas esperando resposta desde 11/08 que ninguém leu.
           A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
-          e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
+          e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela.
+          VOLTOU EM 26/09/2026, diferente: não é a triagem antiga, é a fila CaixaView (um item por vez). */}
 
       {/* Uma barreira por aba (ver BarreiraDaAba lá embaixo): erro numa aba não leva a barra de abas junto.
           `key={tab}` zera a barreira na troca de aba — sem ele, a aba quebrada contaminaria a próxima. */}
       <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}>
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} />}
+      {tab === "caixa" && <CaixaView inbox={inbox} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
           Nenhuma linha foi apagada: é só parar de passar a prop. */}
@@ -5241,10 +5276,11 @@ function ServicosSemProximoPassoCard({ services, appointments, agendaHistorico, 
 // processadas que o app não mostrava em lugar nenhum. E com o compartilhamento passando a salvar sozinho,
 // entrada sem visão vira exatamente a falha que o item chama de anti-esquecimento.
 //
-// SÓ LEITURA, de propósito. Não ressuscita a tela antiga de triagem: aqui ele vê O QUE ENTROU e o que ainda
-// não foi processado. Quem interpreta, responde e resolve continua sendo o Classic.
-function CaixaCard({ inbox, today }) {
-  const pendentes = (inbox || []).filter((i) => !i.processado);
+// Era SÓ LEITURA até 26/09: quem resolvia era o Classic, e a fila parou (18 itens, o mais antigo de 13/08).
+// Agora a caixa voltou como fila com botões (ver CaixaView) e este cartão é o resumo que leva até ela. Conta o
+// mesmo que a fila conta — checkpoint de operação do app que terminou bem não é entrada de ninguém.
+function CaixaCard({ inbox, today, onAbrir }) {
+  const pendentes = itensDaFilaDaCaixa(inbox);
   if (!pendentes.length) return null;
   const porStatus = (s) => pendentes.filter((i) => statusDaCaixa(i) === s).length;
   const aguardando = porStatus("aguardando_voce");
@@ -5263,11 +5299,470 @@ function CaixaCard({ inbox, today }) {
           {!!p.images.length && <span>📎 {p.images.length} arquivo(s): {p.images.map((i) => i.fileName).join(", ").slice(0, 60)}</span>}
           {quando && <em>{quando.toLocaleString("pt-BR")}</em>}
         </div>
-        <div className="funil-dir"><span className="status-pill">{statusDaCaixa(item)}</span></div>
+        <div className="funil-dir"><span className="status-pill">{(CAIXA_TIPOS[tipoDoItemDaCaixa(item)] || CAIXA_TIPOS.anotacao).rotulo}</span></div>
       </article>;
     })}</div>
     {pendentes.length > 10 && <p className="ficha-note">e mais {pendentes.length - 10} na fila.</p>}
+    {onAbrir && <div className="ficha-actions"><button className="primary" onClick={onAbrir}>Processar a caixa, um por vez</button></div>}
   </CardRecolhivel>;
+}
+
+// ===== A CAIXA VOLTA COMO FILA (recado de 26/09/2026) ============================================
+// Diego, 26/09: "É melhor deixar em um lugar com botões e eu ir processando um por um como em compromissos".
+// A caixa era a fila do fluxo antigo, em que o ChatGPT processava o que caía lá. Sem tela desde 23/08, item
+// entrava e ficava parado sem ninguém ver: em 26/09 eram 18, o mais antigo de 13/08, e no meio deles leads
+// que nunca viraram cadastro (Amanda, orçamento de R$ 3.300, travada por um telefone de 10 dígitos).
+//
+// STATUS SIMPLES: pendente (processado = false) ou processado. O `status` antigo de cada linha (novo,
+// pendente, aguardando_voce, CONFIRMAR…) continua gravado e aparece miúdo no cartão — nada é reescrito por
+// atacado. Ao processar, a linha vira processado + "resolvido" e a conversa ganha uma mensagem com
+// meta.tipo_operacional = "caixa_processada", guardando a ação, o status anterior e os vínculos criados.
+//
+// NADA DE LOTE: não existe "resolver todos". Os que estavam parados são dele, um por um, pelos botões.
+//
+// REGISTRO AUTOMÁTICO DO APP NÃO É ENTRADA: o checkpoint da porta única ("Operação concluída: financeiro ·
+// app-conta-paga-…") é a trava que impede pagar duas vezes, então continua morando na tabela — mas não entra
+// na fila. Só aparece se TRAVOU (falhou, ou ficou "aplicando" mais de 10 min), porque aí alguém tem que olhar.
+const CAIXA_OPERACAO_TRAVADA_MIN = 10;
+const CAIXA_TIPOS = {
+  remarcacao: { rotulo: "Precisa remarcar", icone: "↻" },
+  operacao_travada: { rotulo: "Operação do app que não terminou", icone: "⚠" },
+  pergunta: { rotulo: "Pergunta pra você", icone: "?" },
+  lead: { rotulo: "Lead / cliente novo", icone: "◇" },
+  print: { rotulo: "Print", icone: "▣" },
+  anotacao: { rotulo: "Anotação", icone: "✎" },
+};
+function tipoDoItemDaCaixa(item, agoraMs = Date.now()) {
+  const remarcacao = ultimaMetaRemarcacao(item);
+  if (remarcacao && !remarcacao.agenda_sucessora_id) return "remarcacao";
+  const operacao = metaEventoOperacao(item);
+  if (operacao) {
+    if (operacao.estado === "concluido") return "operacao_concluida";
+    const criado = Date.parse(item.criado_em || "");
+    const parado = Number.isFinite(criado) ? agoraMs - criado : Infinity;
+    return operacao.estado === "falhou" || parado > CAIXA_OPERACAO_TRAVADA_MIN * 60000 ? "operacao_travada" : "operacao_em_curso";
+  }
+  const metas = comoLista(item?.conversa).map((m) => m?.meta?.tipo_operacional).filter(Boolean);
+  if (item?.status === "aguardando_voce" || metas.includes("pergunta_operacao")) return "pergunta";
+  const texto = String(item?.texto || "");
+  if (/BLOQUEIO DE CADASTRO|LEAD BLOQUEADO/i.test(texto) || /^\s*lead\b/i.test(texto)
+    || metas.some((t) => String(t).startsWith("lead_") || t === "cadastro_bloqueado")) return "lead";
+  if (parseInbox(texto).images.length) return "print";
+  return "anotacao";
+}
+function itensDaFilaDaCaixa(inbox, agoraMs = Date.now()) {
+  return (inbox || [])
+    .filter((item) => item && !item.processado && !["operacao_concluida", "operacao_em_curso"].includes(tipoDoItemDaCaixa(item, agoraMs)))
+    .sort((a, b) => String(a.criado_em || "").localeCompare(String(b.criado_em || "")));
+}
+// O TEXTO DA CAIXA QUASE NUNCA É MENSAGEM DE CLIENTE: quem escreve é agente ("🔴 LEAD BLOQUEADO — Giovanna —
+// +55 61 99154-1582…", "BLOQUEIO DE CADASTRO — Amanda — WhatsApp +55 61 9671-8270…"). O extractLead foi feito
+// pra mensagem de cliente ("sou a Mariana, meu zap é…") e não pega esse formato; estes pegam os dois.
+// É só PRÉ-PREENCHIMENTO: o formulário mostra, o Diego confere e corrige antes de gravar qualquer coisa.
+function telefoneDoTextoDaCaixa(texto) {
+  const trechos = String(texto || "").match(/(?:\+?55[\s.-]*)?\(?\d{2}\)?[\s.-]*\d{4,5}[\s.-]?\d{4}/g) || [];
+  const achado = trechos.find((t) => { const d = t.replace(/\D/g, ""); return d.length >= 10 && d.length <= 13; });
+  return achado ? achado.trim() : "";
+}
+function nomeDoTextoDaCaixa(texto) {
+  const doCliente = extractLead(texto).name;
+  if (doCliente) return doCliente;
+  const candidato = (String(texto || "").split(/\s+[—–-]\s+/)[1] || "").trim();
+  return /^[A-ZÀ-Ú][A-Za-zÀ-ú]+(?:\s+[A-Za-zÀ-ú]+){0,3}$/.test(candidato) ? candidato : "";
+}
+function servicoDoTextoDaCaixa(texto) {
+  const t = semAcentoBaixo(texto);
+  const pecas = [["canto alemao", "canto alemão"], ["cabeceira", "cabeceira"], ["poltrona", "poltrona"], ["cadeira", "cadeiras"], ["colchao", "colchão"], ["puff", "puff"], ["sofa", "sofá"]];
+  // A peça que aparece PRIMEIRO no texto, não a primeira da lista: "2 sofás e 2 poltronas" é sofá.
+  const peca = pecas.filter(([chave]) => t.includes(chave)).sort((x, y) => t.indexOf(x[0]) - t.indexOf(y[0]))[0];
+  if (!peca) return "";
+  return (/higieniz|limpeza/.test(t) ? "Higienização de " : "Reforma de ") + peca[1];
+}
+function tituloDoTextoDaCaixa(texto) {
+  const linha = String(texto || "").split("\n").map((l) => l.trim()).find(Boolean) || "";
+  return linha.replace(/^[^\p{L}\p{N}]+/u, "").slice(0, 90);
+}
+const CAIXA_ACOES_TEXTO = {
+  resolvido: "Resolvido pelo Diego no app",
+  respondido: "Respondido pelo Diego no app",
+  descartado: "Descartado pelo Diego no app",
+  virou_compromisso: "Virou compromisso na agenda",
+  virou_lead: "Virou cliente/lead",
+};
+// A BAIXA DE UM ITEM. Relê a linha antes (a lista da tela pode estar velha e o Classic grava na mesma
+// tabela), anexa à conversa em vez de sobrescrever, e só baixa se ainda estiver pendente — se outro lugar
+// processou antes, avisa em vez de gravar por cima.
+// O print está na tela quando ele aperta o botão (a CaixaView mostra a imagem acima dos botões): por isso o
+// carimbo print_lido que a trava do banco (trava_caixa_print_precisa_ser_lido) exige vai junto.
+async function processarItemDaCaixa(db, item, { acao, nota, resposta, vinculos }) {
+  if (!CAIXA_ACOES_TEXTO[acao]) throw new Error("Ação da caixa desconhecida: " + acao);
+  const atual = await lerRegistro(db, "caixa_entrada", item.id, "id,texto,status,processado,conversa");
+  if (!atual) throw new Error("Este item não existe mais na caixa.");
+  if (atual.processado) throw new Error("Este item já foi processado em outro lugar. A lista vai ser atualizada.");
+  const agora = new Date().toISOString();
+  const textoNota = String(nota || "").trim();
+  const temPrint = parseInbox(atual.texto || "").images.length > 0;
+  const conversa = [...comoLista(atual.conversa)];
+  // Resposta a pergunta entra como mensagem do Diego, no formato da REGRA Nº 13, pra quem perguntou ler.
+  if (resposta && textoNota) conversa.push({ de: "diego", texto: textoNota, em: agora });
+  conversa.push({
+    de: "diego", tipo: "sistema", em: agora,
+    texto: CAIXA_ACOES_TEXTO[acao] + (textoNota && !resposta ? ": " + textoNota : "") + ".",
+    meta: {
+      tipo_operacional: "caixa_processada", acao, status_anterior: atual.status ?? null, nota: textoNota || null,
+      ...(vinculos || {}), ...(temPrint ? { print_lido: true } : {}),
+    },
+  });
+  const { data, error } = await db.from("caixa_entrada").update({ processado: true, processado_em: agora, status: "resolvido", conversa })
+    .eq("id", item.id).eq("processado", false).select("id,processado,status").maybeSingle();
+  if (error) throw error;
+  if (!data?.processado) throw new Error("A caixa não confirmou a baixa. Atualize e confira o item.");
+  return data;
+}
+// BLOQUEIO DE CADASTRO SE RESOLVE COM A CONFIRMAÇÃO DO DIEGO, feita agora, com o número que ELE conferiu com o
+// cliente (checkbox obrigatório no formulário). Formato de docs/agenda-caixa-identidade.md: anexa, nunca
+// reescreve — a ordem da conversa é o que decide o estado, no app e na RPC do banco.
+async function registrarCadastroValidadoNaCaixa(db, item, cliente, telefoneEstrito) {
+  const atual = await lerRegistro(db, "caixa_entrada", item.id, "id,texto,status,processado,conversa");
+  if (!atual) throw new Error("Este item não existe mais na caixa.");
+  const conversa = [...comoLista(atual.conversa), {
+    de: "diego", em: new Date().toISOString(),
+    texto: `Identidade confirmada pelo Diego no app: ${nomeDoCliente(cliente)} · WhatsApp ${corrigirTelefone(telefoneEstrito)} conferido com o cliente.`,
+    meta: { tipo_operacional: "cadastro_validado", cliente_id: cliente.id, telefone_confirmado: telefoneEstrito },
+  }];
+  const { error } = await db.from("caixa_entrada").update({ conversa }).eq("id", item.id);
+  if (error) throw error;
+  return { ...atual, conversa };
+}
+
+// RETOMADA: se uma tentativa anterior já criou o cartão desta entrada e só a baixa falhou, reaproveita o
+// cartão — a RPC recusaria um segundo pedido, com outra data, pra mesma origem.
+async function compromissoJaCriadoDaCaixa(db, item) {
+  const { data, error } = await db.from("agenda").select("*").eq("caixa_entrada_id", item.id).maybeSingle();
+  if (error) throw error;
+  return data && data.status === "planejado" ? data : null;
+}
+
+// OS TRÊS CAMINHOS QUE GRAVAM ficam fora dos componentes: a tela só coleta e confere, e o teste
+// (tests/caixa-fila.test.mjs) roda exatamente estas funções contra um Postgres local com as travas do banco.
+async function lerPendenteDaCaixa(db, item) {
+  const atual = await lerRegistro(db, "caixa_entrada", item.id, "id,texto,status,processado,conversa");
+  if (!atual) throw new Error("Este item não existe mais na caixa.");
+  if (atual.processado) throw new Error("Este item já foi processado em outro lugar. A lista vai ser atualizada.");
+  return { ...atual, conversa: comoLista(atual.conversa) };
+}
+async function virarCompromissoDaCaixa(db, item, { natureza, clienteId, servicoId, titulo, data, hora, tipo, cidade }) {
+  const atual = await lerPendenteDaCaixa(db, item);
+  const jaExistia = await compromissoJaCriadoDaCaixa(db, item);
+  const compromisso = jaExistia || await BahiaAgendaCaixa.criarDaCaixa(db, atual, {
+    natureza, clienteId: natureza === "cliente" ? clienteId : null, servicoId: natureza === "cliente" ? (servicoId || null) : null,
+    titulo, data, hora, horaAutomatica: false, tipo, cidade: cidade || null,
+  });
+  try {
+    await processarItemDaCaixa(db, item, { acao: "virou_compromisso", vinculos: { agenda_id: compromisso.id } });
+  } catch (e) { e.message = "O compromisso foi salvo, mas a caixa não deu baixa: " + e.message; throw e; }
+  return { compromisso, jaExistia: !!jaExistia };
+}
+// VIRAR CLIENTE/LEAD = ficha + serviço (lead) + cartão do próximo passo na agenda, tudo ligado a este item.
+// Regra do Diego: lead com ação pendente sem cartão em Compromissos some — texto em proxima_acao não basta.
+// Identidade é o TELEFONE, nunca o nome: se já existe ficha com esse WhatsApp, é ela que recebe o serviço.
+// Refazer depois de uma falha no meio não duplica: acha a ficha pelo telefone, o serviço pelo título e o
+// cartão pela origem (caixa_entrada_id).
+async function virarLeadDaCaixa(db, item, { nome, telefone, cidade, servico, proximaAcao, clienteId, confirmado, data, hora }) {
+  const estrito = BahiaAgendaCaixa.telefoneCadastroEstrito(telefone);
+  if (!estrito) throw new Error("WhatsApp inválido. Confira o número completo com o cliente.");
+  if (!String(servico || "").trim() || !String(proximaAcao || "").trim()) throw new Error("Serviço e próxima ação são obrigatórios.");
+  const atual = await lerPendenteDaCaixa(db, item);
+  const bloqueado = BahiaAgendaCaixa.cadastroBloqueado(atual);
+  if (bloqueado && !confirmado) throw new Error("Item com BLOQUEIO DE CADASTRO: confirme o WhatsApp com o cliente antes.");
+  const feitos = [];
+  try {
+    // 1. Ficha. Relida do banco: a lista da tela pode estar velha, e ficha dupla separa o histórico.
+    const { data: comTelefone, error: fichaErr } = await db.from("clientes").select("id,nome,telefone,cidade").not("telefone", "is", null);
+    if (fichaErr) throw fichaErr;
+    const iguais = (comTelefone || []).filter((c) => BahiaAgendaCaixa.telefoneCadastroEstrito(c.telefone) === estrito);
+    let cliente = clienteId ? iguais.find((c) => c.id === clienteId) || null : null;
+    if (clienteId && !cliente) throw new Error("A ficha escolhida não usa esse WhatsApp.");
+    if (!clienteId && iguais.length > 1) throw new Error("Mais de uma ficha usa esse WhatsApp. Escolha a certa.");
+    if (!cliente) cliente = iguais[0] || null;
+    if (!cliente) {
+      const { data: nova, error } = await db.from("clientes").insert({ nome: String(nome || "").trim() || null, telefone: corrigirTelefone(estrito), cidade: String(cidade || "").trim() || null, obs: parseInbox(atual.texto || "").text.slice(0, 500) || null }).select("*").single();
+      if (error) throw error;
+      cliente = nova; feitos.push("ficha");
+    }
+    // 2. Bloqueio de cadastro: a confirmação é dele, agora, com o número que ele conferiu.
+    const itemAtual = bloqueado ? await registrarCadastroValidadoNaCaixa(db, item, cliente, estrito) : atual;
+    // 3. Serviço: mesmo título na mesma ficha é o mesmo serviço.
+    const { data: existentes, error: buscaErr } = await db.from("servicos").select("*").eq("cliente_id", cliente.id).ilike("titulo", String(servico).trim()).limit(1);
+    if (buscaErr) throw buscaErr;
+    let servicoGravado = existentes?.[0] || null;
+    if (!servicoGravado) {
+      const { data: novo, error } = await db.from("servicos").insert({ cliente_id: cliente.id, titulo: String(servico).trim(), status: "lead", prioridade: "media", proxima_acao: String(proximaAcao).trim(), prazo: data }).select("*").single();
+      if (error) throw error;
+      servicoGravado = novo; feitos.push("serviço");
+    }
+    // 4. Cartão do próximo passo, pela RPC que confere identidade e liga o cartão a este item.
+    const jaExistia = await compromissoJaCriadoDaCaixa(db, item);
+    const compromisso = jaExistia || await BahiaAgendaCaixa.criarDaCaixa(db, itemAtual, {
+      natureza: "cliente", clienteId: cliente.id, servicoId: servicoGravado.id,
+      titulo: `${nomeDoCliente(cliente)} — ${String(proximaAcao).trim()}`, data, hora, horaAutomatica: false, tipo: "remoto", cidade: null,
+    });
+    if (!jaExistia) feitos.push("retorno na agenda");
+    // 5. Histórico e baixa.
+    const { error: hErr } = await db.from("historico").insert({ o_que: "Caixa virou lead", por: "diego", detalhe: `Fonte caixa_entrada#${item.id} · cliente#${cliente.id} · serviço#${servicoGravado.id} · agenda#${compromisso.id}` });
+    if (hErr) throw hErr;
+    await processarItemDaCaixa(db, item, { acao: "virou_lead", vinculos: { cliente_id: cliente.id, servico_id: servicoGravado.id, agenda_id: compromisso.id } });
+    return { cliente, servico: servicoGravado, compromisso, feitos };
+  } catch (e) {
+    if (feitos.length) e.message = `Já ficou salvo: ${feitos.join(", ")}. Faltou o resto — tente de novo, nada se duplica. ${e.message}`;
+    throw e;
+  }
+}
+// REMARCAR vai pela porta única (remarcacao_com_data → resolverPendenciaComSucessor): ela decide se remarca a
+// própria linha (origem ainda planejada) ou cria a sucessora (origem já feita), e baixa a pendência sozinha.
+function remarcarDaCaixa(db, item, { data, hora, tipo, cidade, titulo }) {
+  return processarEventoOperacaoBahia(db, {
+    tipo: "remarcacao_com_data", eventoId: `caixa-${item.id}-remarcar-${data}-${hora || "sem-hora"}`,
+    textoOriginal: parseInbox(item.texto || "").text.slice(0, 300),
+    dados: { pendenciaId: item.id, data, hora, tipo, cidade: tipo === "presencial" ? cidade : null, tituloNovo: titulo },
+  });
+}
+
+function CaixaView({ inbox, customers, services, agenda, agendaBruta, db, demo, notify, onChanged, onDemoProcessado }) {
+  const [agora, setAgora] = useState(() => Date.now());
+  const fila = useMemo(() => itensDaFilaDaCaixa(inbox, agora), [inbox, agora]);
+  const [atualId, setAtualId] = useState(null);
+  const [acao, setAcao] = useState(null);
+  const achado = fila.findIndex((i) => i.id === atualId);
+  const indice = achado >= 0 ? achado : 0;
+  const item = fila[indice] || null;
+  useEffect(() => { setAcao(null); }, [item?.id]);
+  if (!item) return <section className="content-card full"><div className="card-head"><div><p className="kicker">CAIXA DE ENTRADA</p><h3>Nada esperando você</h3></div></div>
+    <div className="empty-state"><b>Caixa vazia.</b><p className="ficha-note">O que chegar pelo compartilhar, pelo Claude ou pelo Classic aparece aqui, um por vez.</p></div></section>;
+
+  const ir = (delta) => { const alvo = fila[indice + delta]; if (alvo) setAtualId(alvo.id); };
+  const tipo = tipoDoItemDaCaixa(item, agora);
+  const info = CAIXA_TIPOS[tipo] || CAIXA_TIPOS.anotacao;
+  const p = parseInbox(item.texto || "");
+  const criado = item.criado_em ? new Date(item.criado_em) : null;
+  const dias = criado ? Math.max(0, Math.floor((agora - criado.getTime()) / 86400000)) : null;
+  const mensagens = comoLista(item.conversa).filter((m) => String(m?.texto || "").trim());
+  const meta = tipo === "remarcacao" ? ultimaMetaRemarcacao(item) : null;
+  const origem = meta?.agenda_origem_id ? (agendaBruta || []).find((a) => a.id === meta.agenda_origem_id) : null;
+  const statusAntigo = item.status && item.status !== "novo" ? item.status : null;
+  // Depois da baixa vai pro que estava DEPOIS deste — voltar pro começo da fila a cada item cansa à toa.
+  const feito = () => {
+    const proximo = fila[indice + 1] || fila[indice - 1] || null;
+    setAtualId(proximo ? proximo.id : null);
+    setAcao(null);
+    if (demo) onDemoProcessado(item.id); else onChanged();
+    setAgora(Date.now());
+  };
+  const comum = { item, db, demo, notify, onFeito: feito, onCancelar: () => setAcao(null) };
+  const botao = (id, rotulo, primario) => <button key={id} className={primario ? "primary" : "ghost"} onClick={() => setAcao(id)}>{rotulo}</button>;
+  const botoes = tipo === "remarcacao" ? [botao("remarcar", "📅 Remarcar", true), botao("cancelar_remarcacao", "✕ Não vai mais acontecer")]
+    : tipo === "operacao_travada" ? [botao("resolvido", "✓ Já resolvi", true), botao("descartado", "✕ Descartar")]
+    : tipo === "pergunta" ? [botao("respondido", "✍ Responder", true), botao("descartado", "✕ Descartar")]
+    : [botao("lead", "👤 Virar cliente/lead", tipo === "lead"), botao("compromisso", "📅 Virar compromisso"), botao("resolvido", "✓ Resolvido"), botao("descartado", "✕ Descartar")];
+
+  return <section className="content-card full">
+    <div className="card-head"><div><p className="kicker">CAIXA DE ENTRADA · UM POR VEZ</p><h3>{fila.length} pendente(s)</h3></div></div>
+    <div className="caixa-fila-topo">
+      <button className="ghost" onClick={() => ir(-1)} disabled={indice === 0 || !!acao}>‹ Anterior</button>
+      <span>{indice + 1} de {fila.length}</span>
+      <button className="ghost" onClick={() => ir(1)} disabled={indice >= fila.length - 1 || !!acao}>Próximo ›</button>
+    </div>
+    <article className="caixa-item">
+      <div className="caixa-item-topo"><span className="status-pill">{info.icone} {info.rotulo}</span><time>{criado ? `${criado.toLocaleDateString("pt-BR")} · ${dias === 0 ? "hoje" : `há ${dias} dia(s)`}` : "sem data"}</time></div>
+      <p className="caixa-texto">{p.text || "(sem texto — só arquivo)"}</p>
+      {!!p.images.length && <div className="caixa-prints">{p.images.map((img) => <a key={img.url} href={img.url} target="_blank" rel="noreferrer"><img src={img.url} alt={img.fileName} /></a>)}</div>}
+      {meta && <p className="ficha-note" style={{ margin: 0 }}>Compromisso original: {meta.titulo_original || "—"}{meta.data_original ? " · " + compactDate(meta.data_original) : ""}{origem ? ` · está ${origem.status}` : ""}{meta.motivo ? ` · motivo: ${meta.motivo}` : ""}</p>}
+      {!!mensagens.length && <details className="caixa-conversa" open={tipo === "pergunta"}><summary>Conversa ({mensagens.length})</summary>
+        {mensagens.map((m, i) => <p key={i}><b>{m.de || "?"}</b>{m.em ? " · " + new Date(m.em).toLocaleDateString("pt-BR") : ""}: {parseInbox(String(m.texto)).text || "(arquivo)"}</p>)}
+      </details>}
+      {statusAntigo && <p className="ficha-note" style={{ margin: 0 }}>Status antigo: {statusAntigo}</p>}
+      {!acao && <div className="caixa-acoes">{botoes}</div>}
+      {acao === "compromisso" && <CaixaFormCompromisso {...comum} customers={customers} services={services} agenda={agenda} />}
+      {acao === "lead" && <CaixaFormLead {...comum} customers={customers} agenda={agenda} />}
+      {acao === "remarcar" && <CaixaFormRemarcar {...comum} agenda={agenda} />}
+      {["resolvido", "descartado", "respondido", "cancelar_remarcacao"].includes(acao) && <CaixaFormBaixa {...comum} modo={acao} origem={origem} meta={meta} />}
+    </article>
+  </section>;
+}
+
+function CaixaFormBaixa({ item, modo, origem, meta, db, demo, notify, onFeito, onCancelar }) {
+  const [nota, setNota] = useState("");
+  const [busy, setBusy] = useState(false);
+  const acao = modo === "cancelar_remarcacao" ? "descartado" : modo;
+  const resposta = modo === "respondido";
+  const aviso = modo === "cancelar_remarcacao"
+    ? (origem && origem.status === "planejado"
+      ? `O compromisso original${meta?.data_original ? " de " + compactDate(meta.data_original) : ""} volta pra agenda como atrasado — lá você conclui ou remarca de vez.`
+      : "O compromisso original já foi encerrado; depois disso nada fica pendente dele.")
+    : acao === "descartado" ? "Sai da fila e fica guardado como descartado. Nada é apagado." : null;
+  const confirmar = async () => {
+    if (resposta && !nota.trim()) { notify("Escreva a resposta.", "error"); return; }
+    if (demo) { notify("Na demonstração não salva — o item sai da fila só nesta tela.", "info"); onFeito(); return; }
+    setBusy(true);
+    try {
+      await processarItemDaCaixa(db, item, { acao, nota, resposta, vinculos: modo === "cancelar_remarcacao" ? { remarcacao_cancelada: true } : {} });
+      notify(resposta ? "Resposta gravada e item concluído." : acao === "descartado" ? "Descartado. Saiu da fila." : "Resolvido. Saiu da fila.", "ok");
+      onFeito();
+    } catch (e) { notify("Nada foi baixado: " + e.message, "error"); }
+    finally { setBusy(false); }
+  };
+  return <div className="caixa-form form-grid">
+    {aviso && <div className="duplicate-warning"><b>{aviso}</b></div>}
+    <label>{resposta ? "Sua resposta*" : "Anotação (opcional)"}<textarea value={nota} onChange={(e) => setNota(e.target.value)} placeholder={resposta ? "O que você responde pra quem perguntou" : "O que foi feito, se valer registrar"} /></label>
+    <div className="ficha-actions">
+      <button className="primary" onClick={confirmar} disabled={busy}>{busy ? "Salvando…" : resposta ? "Responder e concluir" : acao === "descartado" ? "Confirmar descarte" : "Confirmar resolvido"}</button>
+      <button className="ghost" onClick={onCancelar} disabled={busy}>Voltar</button>
+    </div>
+  </div>;
+}
+
+function CaixaFormCompromisso({ item, customers, services, agenda, db, demo, notify, onFeito, onCancelar }) {
+  const texto = parseInbox(item.texto || "").text;
+  const [form, setForm] = useState(() => {
+    const estrito = window.BahiaAgendaCaixa ? BahiaAgendaCaixa.telefoneCadastroEstrito(corrigirTelefone(telefoneDoTextoDaCaixa(texto)) || "") : null;
+    const cliente = estrito ? (customers || []).find((c) => BahiaAgendaCaixa.telefoneCadastroEstrito(c.telefone) === estrito) : null;
+    const lead = extractLead(texto);
+    return { titulo: tituloDoTextoDaCaixa(texto), natureza: cliente ? "cliente" : "", clienteId: cliente?.id || "", servicoId: "", tipo: lead.tipo || "remoto", cidade: lead.cidade || cliente?.cidade || "" };
+  });
+  const [picker, setPicker] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const fisico = form.tipo === "presencial" || form.tipo === "operacional";
+  const clientes = useMemo(() => [...(customers || [])].sort((a, b) => nomeDoCliente(a).localeCompare(nomeDoCliente(b), "pt-BR")), [customers]);
+  const servicosDoCliente = (services || []).filter((s) => s.cliente_id === form.clienteId && STATUS_VIVOS.includes(s.status));
+  const abrir = () => {
+    if (!form.titulo.trim()) { notify("Escreva o que é o compromisso.", "error"); return; }
+    if (!form.natureza) { notify("Diga de quem é: cliente, avulso, operacional ou pessoal.", "error"); return; }
+    if (form.natureza === "cliente" && !form.clienteId) { notify("Escolha a ficha do cliente.", "error"); return; }
+    if (fisico && !form.cidade.trim()) { notify("Compromisso que sai de casa precisa de cidade.", "error"); return; }
+    if (!window.BahiaAgendaCaixa) { notify("A proteção da Caixa não carregou. Recarregue o app.", "error"); return; }
+    if (BahiaAgendaCaixa.cadastroBloqueado(item)) { notify("Este item tem BLOQUEIO DE CADASTRO: use \"Virar cliente/lead\" e confirme o WhatsApp primeiro.", "error"); return; }
+    setPicker(true);
+  };
+  const salvar = async (data, hora) => {
+    setPicker(false);
+    if (demo) { notify("Na demonstração não salva — o item sai da fila só nesta tela.", "info"); onFeito(); return; }
+    setBusy(true);
+    try {
+      const { compromisso, jaExistia } = await virarCompromissoDaCaixa(db, item, {
+        natureza: form.natureza, clienteId: form.clienteId, servicoId: form.servicoId,
+        titulo: form.titulo, data, hora, tipo: form.tipo, cidade: fisico ? form.cidade.trim() : null,
+      });
+      notify(jaExistia ? `Esta entrada já tinha virado compromisso (${compactDate(compromisso.data)}); mantive esse e dei baixa na caixa.` : "Virou compromisso e saiu da caixa.", "ok");
+      onFeito();
+    } catch (e) { notify(/^O compromisso foi salvo/.test(e.message) ? e.message : "Nada foi salvo: " + e.message, "error"); }
+    finally { setBusy(false); }
+  };
+  return <div className="caixa-form form-grid">
+    <label>Compromisso*<input value={form.titulo} onChange={(e) => set("titulo", e.target.value)} /></label>
+    <div className="row">
+      <label>É de quem?*<select value={form.natureza} onChange={(e) => setForm((f) => ({ ...f, natureza: e.target.value, clienteId: e.target.value === "cliente" ? f.clienteId : "", servicoId: "" }))}>
+        <option value="">Escolha</option><option value="cliente">Cliente</option><option value="avulso">Avulso</option><option value="operacional">Operacional (loja, fornecedor)</option><option value="pessoal">Pessoal</option>
+      </select></label>
+      <label>Tipo<select value={form.tipo} onChange={(e) => set("tipo", e.target.value)}>
+        <option value="remoto">Remoto (ligar, mensagem)</option><option value="presencial">Presencial</option><option value="operacional">Operacional (sair pra loja)</option><option value="pessoal">Pessoal</option>
+      </select></label>
+    </div>
+    {form.natureza === "cliente" && <div className="row">
+      <label>Cliente*<select value={form.clienteId} onChange={(e) => setForm((f) => ({ ...f, clienteId: e.target.value, servicoId: "" }))}><option value="">Escolha a ficha</option>{clientes.map((c) => <option key={c.id} value={c.id}>{nomeDoCliente(c)}{c.telefone ? " · " + c.telefone : ""}</option>)}</select></label>
+      <label>Serviço<select value={form.servicoId} onChange={(e) => set("servicoId", e.target.value)}><option value="">Sem serviço</option>{servicosDoCliente.map((s) => <option key={s.id} value={s.id}>{s.titulo}</option>)}</select></label>
+    </div>}
+    {fisico && <label>Cidade*<input value={form.cidade} onChange={(e) => set("cidade", e.target.value)} /></label>}
+    <div className="ficha-actions"><button className="primary" onClick={abrir} disabled={busy}>{busy ? "Salvando…" : "Escolher dia e horário"}</button><button className="ghost" onClick={onCancelar} disabled={busy}>Voltar</button></div>
+    {picker && <AgendaPicker appointments={agenda || []} appt={{ titulo: form.titulo, tipo: form.tipo, cidade: fisico ? form.cidade : null }} onClose={() => setPicker(false)} onPicked={salvar} />}
+  </div>;
+}
+
+function CaixaFormLead({ item, customers, agenda, db, demo, notify, onFeito, onCancelar }) {
+  const texto = parseInbox(item.texto || "").text;
+  const bloqueado = !!(window.BahiaAgendaCaixa && BahiaAgendaCaixa.cadastroBloqueado(item));
+  const [form, setForm] = useState(() => ({
+    nome: nomeDoTextoDaCaixa(texto), telefone: telefoneDoTextoDaCaixa(texto), cidade: detectCidade(texto),
+    servico: servicoDoTextoDaCaixa(texto), proximaAcao: "Responder o cliente e mandar o orçamento", confirmado: false, clienteId: "",
+  }));
+  const [picker, setPicker] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const estrito = window.BahiaAgendaCaixa ? BahiaAgendaCaixa.telefoneCadastroEstrito(form.telefone) : null;
+  const sugerido = corrigirTelefone(form.telefone);
+  const sugeridoValido = !estrito && sugerido && window.BahiaAgendaCaixa && BahiaAgendaCaixa.telefoneCadastroEstrito(sugerido) ? sugerido : null;
+  const mesmos = estrito ? (customers || []).filter((c) => BahiaAgendaCaixa.telefoneCadastroEstrito(c.telefone) === estrito) : [];
+  // NÚMERO MUDADO PEDE CONFIRMAÇÃO, não só o bloqueado: a regra dos agentes é "NÃO completar/inventar dígito"
+  // (o próprio item da Amanda diz isso). O app só SUGERE o 9; quem decide que o número é esse é o Diego, com o
+  // cliente — e o checkbox é onde ele diz que conferiu.
+  const soDigitos = (t) => String(t || "").replace(/\D/g, "").replace(/^55(?=\d{10,11}$)/, "");
+  const telefoneOriginal = telefoneDoTextoDaCaixa(texto);
+  const pedeConfirmacao = bloqueado || (!!telefoneOriginal && soDigitos(form.telefone) !== soDigitos(telefoneOriginal));
+  const abrir = () => {
+    if (!window.BahiaAgendaCaixa) { notify("A proteção da Caixa não carregou. Recarregue o app.", "error"); return; }
+    if (!estrito) { notify(sugeridoValido ? "Esse número não abre o WhatsApp. Toque em \"Usar\" na correção sugerida, se for o número dele." : "WhatsApp inválido. Confira o número completo com o cliente.", "error"); return; }
+    if (!form.servico.trim()) { notify("Diga o que o cliente quer (ex.: Reforma de sofá).", "error"); return; }
+    if (!form.proximaAcao.trim()) { notify("Escreva a próxima ação.", "error"); return; }
+    if (mesmos.length > 1 && !form.clienteId) { notify("Mais de uma ficha usa esse WhatsApp. Escolha a certa.", "error"); return; }
+    if (pedeConfirmacao && !form.confirmado) { notify(bloqueado ? "Item com BLOQUEIO DE CADASTRO: marque que você conferiu o WhatsApp com o cliente." : "O número é diferente do que veio no texto: marque que você conferiu com o cliente.", "error"); return; }
+    setPicker(true);
+  };
+  const salvar = async (data, hora) => {
+    setPicker(false);
+    if (demo) { notify("Na demonstração não salva — o item sai da fila só nesta tela.", "info"); onFeito(); return; }
+    setBusy(true);
+    try {
+      await virarLeadDaCaixa(db, item, { ...form, data, hora });
+      notify("Virou lead: ficha, serviço e retorno na agenda. Saiu da caixa.", "ok");
+      onFeito();
+    } catch (e) { notify(/^Já ficou salvo/.test(e.message) ? e.message : "Nada foi salvo: " + e.message, "error"); }
+    finally { setBusy(false); }
+  };
+  return <div className="caixa-form form-grid">
+    {bloqueado && <div className="duplicate-warning"><b>⚠ Este item tem BLOQUEIO DE CADASTRO</b><span>Confira o WhatsApp com o cliente antes. Sem essa confirmação o app não cria o retorno na agenda.</span></div>}
+    <div className="row"><label>Nome<input value={form.nome} onChange={(e) => set("nome", e.target.value)} placeholder="Se não souber, deixe vazio" /></label><label>WhatsApp*<input value={form.telefone} onChange={(e) => set("telefone", e.target.value)} inputMode="tel" /></label></div>
+    {sugeridoValido && <div className="duplicate-warning"><b>Esse número não abre o WhatsApp — falta o 9 do celular?</b><button onClick={() => set("telefone", sugeridoValido)}>Usar {sugeridoValido}</button></div>}
+    {mesmos.length === 1 && <p className="ficha-note" style={{ margin: 0 }}>Já existe ficha com esse WhatsApp: <b>{nomeDoCliente(mesmos[0])}</b>{mesmos[0].cidade ? " · " + mesmos[0].cidade : ""}. O serviço entra nela.</p>}
+    {mesmos.length > 1 && <label>Qual ficha?*<select value={form.clienteId} onChange={(e) => set("clienteId", e.target.value)}><option value="">Escolha</option>{mesmos.map((c) => <option key={c.id} value={c.id}>{nomeDoCliente(c)}{c.cidade ? " · " + c.cidade : ""}</option>)}</select></label>}
+    <div className="row"><label>Cidade<input value={form.cidade} onChange={(e) => set("cidade", e.target.value)} /></label><label>O que o cliente quer*<input value={form.servico} onChange={(e) => set("servico", e.target.value)} placeholder="Ex.: Reforma de sofá" /></label></div>
+    <label>Próxima ação*<input value={form.proximaAcao} onChange={(e) => set("proximaAcao", e.target.value)} /></label>
+    {pedeConfirmacao && <label className="check"><input type="checkbox" checked={form.confirmado} onChange={(e) => set("confirmado", e.target.checked)} /> Conferi com o cliente: este é o WhatsApp dele</label>}
+    <div className="ficha-actions"><button className="primary" onClick={abrir} disabled={busy}>{busy ? "Salvando…" : "Escolher dia do retorno"}</button><button className="ghost" onClick={onCancelar} disabled={busy}>Voltar</button></div>
+    {picker && <AgendaPicker appointments={agenda || []} appt={{ titulo: form.proximaAcao, tipo: "remoto", cidade: null }} onClose={() => setPicker(false)} onPicked={salvar} />}
+  </div>;
+}
+
+function CaixaFormRemarcar({ item, agenda, db, demo, notify, onFeito, onCancelar }) {
+  const meta = ultimaMetaRemarcacao(item) || {};
+  const [form, setForm] = useState(() => ({ titulo: meta.titulo_original || tituloDoTextoDaCaixa(parseInbox(item.texto || "").text), tipo: ["remoto", "presencial", "operacional"].includes(meta.tipo_original) ? meta.tipo_original : "remoto", cidade: meta.cidade_original || "" }));
+  const [picker, setPicker] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const abrir = () => {
+    if (!form.titulo.trim()) { notify("Escreva o compromisso.", "error"); return; }
+    if (form.tipo === "presencial" && !form.cidade.trim()) { notify("Presencial precisa de cidade.", "error"); return; }
+    setPicker(true);
+  };
+  const salvar = async (data, hora) => {
+    setPicker(false);
+    if (demo) { notify("Na demonstração não salva — o item sai da fila só nesta tela.", "info"); onFeito(); return; }
+    setBusy(true);
+    try {
+      await remarcarDaCaixa(db, item, { data, hora, tipo: form.tipo, cidade: form.cidade.trim(), titulo: form.titulo.trim() });
+      notify("Remarcado. O compromisso está na agenda com a data nova.", "ok");
+      onFeito();
+    } catch (e) { notify("Nada foi remarcado: " + e.message, "error"); }
+    finally { setBusy(false); }
+  };
+  return <div className="caixa-form form-grid">
+    <label>Compromisso*<input value={form.titulo} onChange={(e) => set("titulo", e.target.value)} /></label>
+    <div className="row">
+      <label>Tipo<select value={form.tipo} onChange={(e) => set("tipo", e.target.value)}><option value="remoto">Remoto</option><option value="presencial">Presencial</option><option value="operacional">Operacional</option></select></label>
+      {form.tipo === "presencial" && <label>Cidade*<input value={form.cidade} onChange={(e) => set("cidade", e.target.value)} /></label>}
+    </div>
+    <div className="ficha-actions"><button className="primary" onClick={abrir} disabled={busy}>{busy ? "Salvando…" : "Escolher a data nova"}</button><button className="ghost" onClick={onCancelar} disabled={busy}>Voltar</button></div>
+    {picker && <AgendaPicker appointments={agenda || []} appt={{ titulo: form.titulo, tipo: form.tipo, cidade: form.tipo === "presencial" ? form.cidade : null }} onClose={() => setPicker(false)} onPicked={salvar} />}
+  </div>;
 }
 
 // O CARD QUE FAZ A DATA VENCIDA REAPARECER. Ver retornoVencido() para o porquê.
@@ -5868,7 +6363,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} appointments={appointments} agendaHistorico={agendaHistorico} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
     <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
-    <CaixaCard inbox={inbox} today={today} />
+    <CaixaCard inbox={inbox} today={today} onAbrir={onAbrirCaixa} />
     {/* CONVERSA ENCERRADA SEM DESTINO — ver triagensSemDestino(). Fica recolhido e só existe quando há
         caso: se o Classic estiver encerrando tudo com destino, este card não aparece nunca, que é o
         estado desejado. */}
