@@ -3312,7 +3312,7 @@ function Home() {
   const duplicateCustomers = useMemo(() => {
     const phone = normalizePhone(form.phone);
     if (phone.length >= 10) return customers.filter((customer) => normalizePhone(customer.telefone || "") === phone);
-    if (form.name.trim().length >= 3) return customers.filter((customer) => customer.nome.toLowerCase().includes(form.name.trim().toLowerCase()));
+    if (form.name.trim().length >= 3) return customers.filter((customer) => (customer.nome || "").toLowerCase().includes(form.name.trim().toLowerCase()));
     return [];
   }, [customers, form.name, form.phone]);
 
@@ -3821,6 +3821,9 @@ function Home() {
           A TABELA `caixa_entrada` CONTINUA INTACTA no Supabase — nada de dado foi apagado,
           e o Classic segue lendo e escrevendo nela normalmente. O que saiu foi só a tela. */}
 
+      {/* Uma barreira por aba (ver BarreiraDaAba lá embaixo): erro numa aba não leva a barra de abas junto.
+          `key={tab}` zera a barreira na troca de aba — sem ele, a aba quebrada contaminaria a próxima. */}
+      <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}>
       {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
@@ -3833,13 +3836,15 @@ function Home() {
       {tab === "vales" && <ProfissionaisView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
+      </BarreiraDaAba>
     </main>
     <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => irParaAba(item)}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
-    {showGuia && <GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} />}
-    {fichaId && <FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} />}
-    {explicar && <ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
-    {concluirAppt && <ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} services={services} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} />}
-    {addAgendaOpen && <AddAgendaModal appointments={agendaVisivel} avisos={avisos} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} />}
+    {/* As janelas por cima também têm barreira própria: ficha com dado ruim fecha sozinha, não o app. */}
+    {showGuia && <BarreiraDaAba nome="O guia da IA" onFechar={() => setShowGuia(false)}><GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} /></BarreiraDaAba>}
+    {fichaId && <BarreiraDaAba nome="A ficha do cliente" onFechar={() => setFichaId(null)}><FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} /></BarreiraDaAba>}
+    {explicar && <BarreiraDaAba nome="A explicação" onFechar={() => setExplicar(null)}><ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
+    {concluirAppt && <BarreiraDaAba nome="A conclusão do compromisso" onFechar={() => setConcluirAppt(null)}><ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} services={services} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
+    {addAgendaOpen && <BarreiraDaAba nome="O novo compromisso" onFechar={() => setAddAgendaOpen(false)}><AddAgendaModal appointments={agendaVisivel} avisos={avisos} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} /></BarreiraDaAba>}
   </div>;
 }
 
@@ -8330,6 +8335,19 @@ function FornecedoresView({ fornecedores }) {
     {!fornecedores.length && <div className="empty-state"><b>Nenhum fornecedor cadastrado.</b></div>}</div>
   </section>;
 }
+// CLIENTE SEM NOME DERRUBAVA O APP (recado de 26/09/2026). `clientes.nome` aceita NULL no banco, e os agentes
+// gravam assim quando a conversa não traz o nome. A lista fazia `customer.nome.slice(0, 2)` pro avatar: com UM
+// nome nulo, o React derrubava tudo — desde 24/08, quando entrou o primeiro. Quem MOSTRA nome de cliente passa
+// por aqui: vazio vira "Sem nome" na tela e na busca (digitar "sem nome" acha os que faltam completar), e o
+// avatar vira "?". Nada disso grava no banco — o dado continua como está até o Diego saber o nome.
+const CLIENTE_SEM_NOME = "Sem nome";
+function nomeDoCliente(cliente) {
+  return String(cliente?.nome ?? "").trim() || CLIENTE_SEM_NOME;
+}
+function iniciaisDoCliente(cliente) {
+  const nome = nomeDoCliente(cliente);
+  return nome === CLIENTE_SEM_NOME ? "?" : nome.slice(0, 2).toUpperCase();
+}
 // A TRAVA DE TELEFONE SAI DA SOMBRA. `telefoneQuebrado` existia desde 22/07 e não era chamada em lugar
 // nenhum — código morto. As 19 fichas que não abriam o WhatsApp foram achadas na mão, uma a uma, e enquanto
 // isso eram 19 leads parados por um dígito. Agora a própria lista mostra quais são e deixa filtrar só elas.
@@ -8337,11 +8355,11 @@ function CustomersView({ customers, services, search, setSearch, onOpenFicha }) 
   const [soQuebrados, setSoQuebrados] = useState(false);
   const quebrados = customers.filter((customer) => telefoneCorrigivel(customer.telefone));
   const visible = customers
-    .filter((customer) => `${customer.nome} ${customer.telefone} ${customer.cidade}`.toLowerCase().includes(search.toLowerCase()))
+    .filter((customer) => [nomeDoCliente(customer), customer.telefone, customer.cidade].filter(Boolean).join(" ").toLowerCase().includes(search.toLowerCase()))
     .filter((customer) => !soQuebrados || telefoneCorrigivel(customer.telefone));
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">BASE ÚNICA</p><h3>{visible.length} clientes</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome, telefone ou cidade" /></div>
     {quebrados.length > 0 && <div className="duplicate-warning"><b>⚠ {quebrados.length} ficha(s) com telefone que não abre o WhatsApp</b><button onClick={() => setSoQuebrados((v) => !v)}>{soQuebrados ? "Ver todos os clientes" : "Ver só essas fichas"}</button></div>}
-    <div className="customer-list">{visible.map((customer) => <article className="clickable" key={customer.id} onClick={() => onOpenFicha(customer.id)}><div className="customer-avatar">{customer.nome.slice(0, 2).toUpperCase()}</div><div><strong>{customer.nome}</strong><span>{telefoneCorrigivel(customer.telefone) ? "⚠ " : ""}{customer.telefone || "Sem telefone"} · {customer.cidade || "Sem cidade"}</span></div><b>{services.filter((service) => service.cliente_id === customer.id && STATUS_VIVOS.includes(service.status)).length} ativo(s)</b></article>)}</div></section>;
+    <div className="customer-list">{visible.map((customer) => <article className="clickable" key={customer.id} onClick={() => onOpenFicha(customer.id)}><div className="customer-avatar">{iniciaisDoCliente(customer)}</div><div><strong>{nomeDoCliente(customer)}</strong><span>{telefoneCorrigivel(customer.telefone) ? "⚠ " : ""}{customer.telefone || "Sem telefone"} · {customer.cidade || "Sem cidade"}</span></div><b>{services.filter((service) => service.cliente_id === customer.id && STATUS_VIVOS.includes(service.status)).length} ativo(s)</b></article>)}</div></section>;
 }
 
 // LOCALIZAÇÃO EXATA DO CLIENTE — item LOC-CLIENTE-20260823-1446.
@@ -8582,7 +8600,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
 
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="modal-card">
-      <div className="modal-head"><div><p className="kicker">FICHA DO CLIENTE</p><h2>{cliente?.nome || "Cliente"}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
+      <div className="modal-head"><div><p className="kicker">FICHA DO CLIENTE</p><h2>{cliente ? nomeDoCliente(cliente) : "Cliente"}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
       {loading ? <div className="empty-state"><b>Carregando…</b></div> : !cliente ? <div className="empty-state"><b>Cliente não encontrado.</b></div> : <>
         {telefoneCorrigivel(cliente.telefone) && <div className="duplicate-warning"><b>⚠ Esse telefone não abre o WhatsApp</b>
           <span>{corrigirTelefone(cliente.telefone) ? `Falta o 9 do celular — o certo é ${corrigirTelefone(cliente.telefone)}` : "O número não tem o tamanho de um celular brasileiro. Confira com o cliente."}</span>
@@ -8666,6 +8684,18 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
   </div>;
 }
 
+// Registro do último erro no aparelho — as duas barreiras (app inteiro e aba) gravam no mesmo lugar.
+function guardarUltimoErro(erro, info, onde) {
+  try {
+    window.localStorage.setItem("tb-ultimo-erro", JSON.stringify({
+      em: new Date().toISOString(),
+      onde: onde || "app inteiro",
+      mensagem: String((erro && erro.message) || erro),
+      componente: String((info && info.componentStack) || "").trim().split("\n").slice(0, 6).join(" < ")
+    }));
+  } catch (e) { /* aparelho sem espaço: perder o registro não pode impedir a tela de aparecer */ }
+}
+
 // BARREIRA (22/08/2026). Sem isto, um erro em QUALQUER componente faz o React desmontar a árvore inteira
 // e deixar a página vazia — que num app de fundo escuro é uma tela preta muda, sem nada pra ler nem pra
 // clicar. Foi o que aconteceu com a anotação de conversa fora do formato. Agora o erro aparece escrito,
@@ -8673,15 +8703,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
 class Barreira extends React.Component {
   constructor(props) { super(props); this.state = { erro: null }; }
   static getDerivedStateFromError(erro) { return { erro }; }
-  componentDidCatch(erro, info) {
-    try {
-      window.localStorage.setItem("tb-ultimo-erro", JSON.stringify({
-        em: new Date().toISOString(),
-        mensagem: String((erro && erro.message) || erro),
-        componente: String((info && info.componentStack) || "").trim().split("\n").slice(0, 6).join(" < ")
-      }));
-    } catch (e) { /* aparelho sem espaço: perder o registro não pode impedir a tela de aparecer */ }
-  }
+  componentDidCatch(erro, info) { guardarUltimoErro(erro, info); }
   render() {
     if (!this.state.erro) return this.props.children;
     return <div className="loading-screen"><div className="login-card">
@@ -8692,6 +8714,35 @@ class Barreira extends React.Component {
       <button className="ghost wide" style={{ marginTop: 10 }} onClick={() => { location.href = "./socorro.html"; }}>Abrir a página de socorro</button>
       <p style={{ fontSize: 10, color: "#81736a", margin: "16px 0 0", wordBreak: "break-word" }}>{String((this.state.erro && this.state.erro.message) || this.state.erro)}</p>
     </div></div>;
+  }
+}
+
+// BARREIRA DA ABA (26/09/2026). A Barreira de cima segura o app INTEIRO — então um erro numa aba só trocava
+// tudo pela tela "O app quebrou nesta tela", sem barra de abas pra fugir. Foi assim com Clientes: um cliente
+// de nome vazio e o Diego ficou sem ficha, telefone e endereço na rua. "Recarregar" não adiantava, porque o
+// dado ruim continuava lá. Agora cada aba e cada janela tem a sua: o erro fica preso onde nasceu, o resto do
+// app segue, e o registro continua indo pro aparelho (tb-ultimo-erro, agora dizendo ONDE quebrou).
+// Com `onFechar` ela é janela (overlay com Fechar); sem, é o cartão no lugar da aba.
+class BarreiraDaAba extends React.Component {
+  constructor(props) { super(props); this.state = { erro: null }; }
+  static getDerivedStateFromError(erro) { return { erro }; }
+  componentDidCatch(erro, info) { guardarUltimoErro(erro, info, this.props.nome); }
+  render() {
+    if (!this.state.erro) return this.props.children;
+    const { nome, onFechar } = this.props;
+    const corpo = <>
+      <p className="kicker">ESTA PARTE QUEBROU — O RESTO DO APP CONTINUA FUNCIONANDO</p>
+      <h3>{nome} não conseguiu abrir</h3>
+      <p>Não se perdeu nada: os dados estão no servidor. {onFechar ? "Feche e siga pelo resto do app." : "Use as outras abas normalmente."} Se voltar a acontecer, me mande a mensagem de erro abaixo.</p>
+      <div className="ficha-actions">
+        <button className="primary" onClick={() => this.setState({ erro: null })}>Tentar de novo</button>
+        {onFechar && <button className="ghost" onClick={onFechar}>Fechar</button>}
+      </div>
+      <p style={{ fontSize: 10, color: "#81736a", margin: "12px 0 0", wordBreak: "break-word" }}>{String((this.state.erro && this.state.erro.message) || this.state.erro)}</p>
+    </>;
+    return onFechar
+      ? <div className="modal-overlay barreira-aba"><div className="modal-card small">{corpo}</div></div>
+      : <section className="content-card full barreira-aba">{corpo}</section>;
   }
 }
 
