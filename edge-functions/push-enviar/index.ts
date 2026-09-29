@@ -213,6 +213,7 @@ async function difundir(envios: Envio[]): Promise<any[]> {
       chaves: item.chaves,
       entregues: saidas.filter((s) => s.ok).length,
       de: saidas.length,
+      recibos: saidas.map((s) => s.recibo),
       erros: saidas.filter((s) => !s.ok).map((s) => `${s.status} ${s.erro}`),
     });
   }
