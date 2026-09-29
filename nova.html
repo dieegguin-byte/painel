@@ -3008,7 +3008,9 @@ function Home() {
   const [compartilhamentoGuardado, setCompartilhamentoGuardado] = useState(false);
   // O aviso "Nova entrada na caixa" abre ./nova.html?ir=caixa (push-enviar). Até 26/09 o app ignorava o
   // parâmetro e o toque caía no Painel — ele tinha que achar a caixa sozinho, numa tela que nem existia.
-  const [tab, setTab] = useState(() => { try { return new URL(location.href).searchParams.get("ir") === "caixa" ? "caixa" : "painel"; } catch (e) { return "painel"; } });
+  // O aviso de conta a vencer (D-3, desde 29/09) abre ?ir=futuro, a aba "A pagar" — ou ?ir=compras, quando é
+  // nota de material a prazo, que mora em Compras.
+  const [tab, setTab] = useState(() => { try { const ir = new URL(location.href).searchParams.get("ir"); return ["caixa", "futuro", "compras"].includes(ir) ? ir : "painel"; } catch (e) { return "painel"; } });
   // Tira o `ir` do endereço depois de usar: senão todo recarregar voltaria pra caixa.
   useEffect(() => {
     try {
@@ -7112,8 +7114,9 @@ function FinanceView({ finances, dividas, services, db, demo, mode, notify, onCh
   // caixa conciliado. Caixa é uma coisa só, o dinheiro da Tapeçaria, e não pode mudar de valor porque ele
   // trocou de aba. Entradas, Saídas e Resultado continuam obedecendo a aba: esses sim são recortes.
   const caixaEmpresa = realizados.filter((i) => (i.escopo || "empresa") === "empresa").reduce((soma, i) => soma + (i.tipo === "entrada" ? Number(i.valor) : -Number(i.valor)), 0);
-  const dividasAbertas = dividasEmAberto(dividas);
-  const totalDividas = dividasAbertas.reduce((s, d) => s + Math.max(0, saldoDivida(d)), 0);
+  // Só a parte sem data: a parcela já agendada entra na linha de cima, junto das outras contas.
+  const dividasAbertas = dividasSemData(dividas, finances);
+  const totalDividas = dividasAbertas.reduce((s, x) => s + x.semData, 0);
   // O alerta de vencimento mora no Painel (é lá que ele olha todo dia). Aqui fica só uma linha de resumo,
   // pra tela não virar uma parede de cards.
   const hoje = hojeISO();
@@ -8519,23 +8522,36 @@ function ehSaidaFutura(item) { return item.tipo === "saida" && item.status === "
 // isso as dívidas têm bloco próprio e ficam fora do plano de 15 dias e dos cards do topo.
 function dividasEmAberto(dividas) { return (dividas || []).filter((d) => d.status !== "quitada"); }
 function saldoDivida(d) { return Math.round((Number(d.valor_original || 0) - Number(d.valor_pago || 0)) * 100) / 100; }
-function DividasBloco({ dividas }) {
-  const abertas = dividasEmAberto(dividas).slice().sort((a, b) => saldoDivida(b) - saldoDivida(a));
+// DÍVIDA COM PARCELA AGENDADA (recado do Classic de 26/09/2026). A compra da Ellis paga nos cartões da Raquel
+// virou uma dívida de R$ 1.746 E duas contas a pagar (R$ 771 em 21/10, R$ 975 em 25/10): o mesmo dinheiro
+// aparecia duas vezes na mesma aba. Agora a parcela aponta pra dívida (financeiro.divida_id) e este bloco só
+// mostra o que ainda NÃO tem data — o resto já está na lista de contas, com vencimento e aviso de 3 dias.
+// Pagar a parcela baixa a dívida no próprio banco (gatilho financeiro_baixa_divida): nada a fazer aqui.
+// Dívida sem parcela ligada continua exatamente como era, inclusive a de saldo zerado esperando "quitada".
+function dividasSemData(dividas, finances) {
+  return dividasEmAberto(dividas).map((d) => {
+    const agendado = Math.round((finances || []).filter((f) => f.divida_id === d.id && f.status === "a_pagar").reduce((s, f) => s + Number(f.valor || 0), 0) * 100) / 100;
+    const saldo = Math.max(0, saldoDivida(d));
+    return { d, agendado, semData: agendado ? Math.round(Math.max(0, saldo - agendado) * 100) / 100 : saldo };
+  }).filter((x) => !x.agendado || x.semData > 0);
+}
+function DividasBloco({ dividas, finances }) {
+  const abertas = dividasSemData(dividas, finances).sort((a, b) => b.semData - a.semData);
   if (!abertas.length) return null;
-  const total = abertas.reduce((s, d) => s + Math.max(0, saldoDivida(d)), 0);
+  const total = abertas.reduce((s, x) => s + x.semData, 0);
   return <section className="content-card">
     <div className="card-head"><div><p className="kicker">DÍVIDAS EM ABERTO · SEM VENCIMENTO</p><h3>{money(total)} em {abertas.length} dívida(s)</h3></div></div>
-    {abertas.map((d) => {
+    {abertas.map(({ d, agendado, semData }) => {
       const saldo = saldoDivida(d);
       const pago = Number(d.valor_pago || 0);
       const desc = (d.descricao || "").trim();
       return <div className="finance-row" key={d.id}>
         <div><strong>{d.credor || "Credor não informado"}</strong>
-          <span>{money(d.valor_original)} original · {pago > 0 ? `${money(pago)} já pago` : "nada pago ainda"}{d.status && d.status !== "aberta" ? ` · ${d.status}` : ""}{saldo <= 0 ? " · saldo zerado, falta marcar quitada" : ""}{desc ? ` · ${desc.length > 60 ? desc.slice(0, 60) + "…" : desc}` : ""}</span></div>
-        <b className="saida">{money(Math.max(0, saldo))}</b>
+          <span>{money(d.valor_original)} original · {pago > 0 ? `${money(pago)} já pago` : "nada pago ainda"}{agendado ? ` · ${money(agendado)} já está nas contas com data` : ""}{d.status && d.status !== "aberta" ? ` · ${d.status}` : ""}{saldo <= 0 ? " · saldo zerado, falta marcar quitada" : ""}{desc ? ` · ${desc.length > 60 ? desc.slice(0, 60) + "…" : desc}` : ""}</span></div>
+        <b className="saida">{money(semData)}</b>
       </div>;
     })}
-    <p className="ficha-note">Saldo = valor original − o que já foi pago. Nada aqui mexe no caixa nem entra no plano de 15 dias: cada pagamento vira um lançamento no Financeiro, e o saldo cai quando o abatimento é registrado.</p>
+    <p className="ficha-note">Saldo = valor original − o que já foi pago − o que já está agendado como conta. Nada aqui mexe no caixa nem entra no plano de 15 dias: cada pagamento vira um lançamento no Financeiro, e o saldo cai quando o abatimento é registrado.</p>
   </section>;
 }
 function somaDiaMes(dataISO, meses) {
@@ -8757,7 +8773,7 @@ function FuturoView({ finances, dividas, services, db, demo, mode, notify, onCha
       <Metric label="Próximos 60 dias" value={money(noHorizonte.reduce((s, c) => s + Number(c.valor), 0))} detail={`De ${contas.length} conta(s) no total`} tone="green" />
     </section>
 
-    <DividasBloco dividas={dividas} />
+    <DividasBloco dividas={dividas} finances={finances} />
 
     <section className="content-card">
       <div className="card-head"><div><p className="kicker">SAÍDAS FUTURAS</p><h3>Agendar conta ou parcelamento</h3></div>

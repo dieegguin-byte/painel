@@ -192,7 +192,7 @@ async function assinaturasAtivas(): Promise<Assinatura[]> {
 
 // Um envio pode cobrir VÁRIOS itens: quando quatro compromissos caem na mesma hora, vai uma notificação
 // só, e as quatro chaves ficam marcadas como entregues.
-type Envio = { chaves: string[]; aviso: unknown };
+type Envio = { chaves: string[]; aviso: unknown; d3?: string[] };
 
 // Manda o mesmo aviso pra todos os aparelhos. Se NENHUM aceitou, solta as reservas pra que a próxima
 // varredura tente de novo — perder um lembrete por causa de um 500 do FCM seria pior.
@@ -306,11 +306,96 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
   return lista;
 }
 
+// ---------------------------------------------------------------- contas a pagar (D-3)
+//
+// RECADO DO CLASSIC DE 26/09/2026. O resumo das 07:30 dizia "14 conta(s) a pagar · R$ 3.665,27" e mais
+// nada — e 8 dessas 14 eram mão de obra antiga já acertada. Diego: "tem tudo que avisar com 3 dias de
+// antecedência ou ficar visível; desse jeito não vou saber." Agora cada conta vai com nome, valor e data,
+// e a que entra na janela de 3 dias ganha um aviso próprio UMA vez (chave conta:<id>:<data>). A data entra
+// na chave de propósito: conta recorrente que o Classic empurra pro mês seguinte volta a ser avisada.
+// O aviso não mexe em nada: a conta continua em "A pagar" até alguém marcar como paga.
+
+// Mesma regra do app (SEM_VENCIMENTO em nova.html). "Pago quando houver saldo" não tem prazo: a data do
+// lançamento é o dia em que a dívida foi reconhecida. Avisar "venceu" disso é alerta que mente.
+const SEM_VENCIMENTO = /(vencimento|data (exata )?de pagamento|data exata)[^.;]{0,60}n[ãa]o (informad|confirmad|definid)|sem vencimento|(assim que|quando)[^.;]{0,40}(houver|tiver) saldo|assim que poss[íi]vel|a pagar (ap[óo]s|depois d)|pagar (ap[óo]s|depois d)[^.;]{0,50}(servi[çc]o|entrega|receb)|quando (eu )?(tiver|receber) dinheiro/i;
+const JANELA_DIAS = 3;
+// Fora deste horário a varredura não manda aviso de conta: às 3h da manhã ele não paga nada. O que entrar na
+// janela de madrugada sai no resumo das 07:30, que já chama cada conta pelo nome.
+const HORA_INICIO_CONTAS = 8;
+const HORA_FIM_CONTAS = 21;
+
+function contasComPrazo(p: any): any[] {
+  return (p.contas || []).filter((c: any) => !SEM_VENCIMENTO.test(String(c.descricao || "")));
+}
+const naJanela = (c: any) => Number(c.dias) >= 0 && Number(c.dias) <= JANELA_DIAS;
+const chaveConta = (c: any) => `conta:${c.id}:${c.data}`;
+
+// A descrição que o Classic grava é um parágrafo ("Vivo — mensalidade recorrente, vencimento todo dia 26.
+// Valor-base R$ 69,00; ajustar..."). No aviso vai só o nome: o primeiro trecho antes de " — ", " - ", ". " ou ";".
+function nomeConta(c: any): string {
+  const t = String(c.descricao || "")
+    .replace(/^(\[[^\]]*\]\s*)+/, "")                                   // tags internas: [EM MÃOS] etc.
+    .replace(/^Pr[óo]xima ocorr[êe]ncia[^—–-]*[—–-]\s*/i, "")          // "Próxima ocorrência projetada — notebook..."
+    .trim();
+  const nome = t.split(/\s+[—–-]\s+|\.\s|;\s/)[0].trim() || c.categoria || "Conta";
+  return nome.length > 36 ? nome.slice(0, 35).trimEnd() + "…" : nome;
+}
+const SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+function dataCurta(iso: string): string {
+  const [a, m, d] = String(iso).split("-");
+  const dia = new Date(Date.UTC(Number(a), Number(m) - 1, Number(d), 12)).getUTCDay();
+  return `${SEMANA[dia]} ${d}/${m}`;
+}
+function quando(c: any): string {
+  const dias = Number(c.dias);
+  if (dias < 0) return `venceu ${dataCurta(c.data).slice(4)}`;
+  if (dias === 0) return "vence hoje";
+  if (dias === 1) return "vence amanhã";
+  return `vence ${dataCurta(c.data)}`;
+}
+const linhaConta = (c: any) => `${nomeConta(c)} ${dinheiro(Number(c.valor))} (${quando(c)})`;
+
+// No app, nota de material a prazo mora na aba Compras; o resto, em "A pagar". O toque abre a aba certa.
+const ehMaterial = (c: any) => c.categoria === "Material";
+
+function avisoContasD3(contas: any[]): Envio[] {
+  if (!contas.length) return [];
+  const chaves = contas.map(chaveConta);
+  const soMaterial = contas.every(ehMaterial);
+  const url = soMaterial ? "./nova.html?ir=compras" : "./nova.html?ir=futuro";
+  if (contas.length === 1) {
+    const c = contas[0];
+    const q = quando(c);
+    return [{ chaves, aviso: {
+      titulo: `${nomeConta(c)} · ${dinheiro(Number(c.valor))}`,
+      corpo: `${q[0].toUpperCase()}${q.slice(1)}${Number(c.dias) >= 2 ? "" : ` (${dataCurta(c.data)})`} · conta ${c.escopo === "pessoal" ? "pessoal" : "da empresa"}. Fica em ${soMaterial ? "Compras" : "A pagar"} até você marcar como paga.`,
+      tag: `conta-${c.id}`,
+      url,
+    } }];
+  }
+  const ultima = contas.reduce((m, c) => (c.data > m ? c.data : m), contas[0].data);
+  return [{ chaves, aviso: {
+    titulo: `${contas.length} contas vencem até ${dataCurta(ultima)}`,
+    corpo: contas.map(linhaConta).join(" · "),
+    tag: "contas-d3",
+    url,
+  } }];
+}
+
+// Quantas contas o resumo chama pelo nome. Passando disso vira "+N" — mas a conta da janela D-3 que ficou de
+// fora NÃO é marcada como avisada, e a varredura das 08:00 manda o aviso próprio dela.
+const CONTAS_NO_RESUMO = 8;
+
 function avisoDoResumo(p: any): Envio[] {
   const r = p.resumo || {};
   const partes: string[] = [];
+  // Contas primeiro: é o único item do resumo que custa dinheiro se passar do dia.
+  const contas = contasComPrazo(p);
+  const nomeadas = contas.slice(0, CONTAS_NO_RESUMO);
+  if (contas.length) {
+    partes.push(`A pagar: ${nomeadas.map(linhaConta).join(" · ")}${contas.length > nomeadas.length ? ` +${contas.length - nomeadas.length}` : ""}`);
+  }
   if (Number(r.retornos_vencidos) > 0) partes.push(`${r.retornos_vencidos} retorno(s) vencido(s)`);
-  if (Number(r.contas_vencendo) > 0) partes.push(`${r.contas_vencendo} conta(s) a pagar · ${dinheiro(r.contas_valor || 0)}`);
   if (Number(r.caixa_pendente) > 0) partes.push(`${r.caixa_pendente} na caixa`);
   // Dia limpo não merece notificação. Notificação que não pede nada ensina a ignorar as que pedem.
   if (!partes.length && !Number(r.compromissos_hoje)) return [];
@@ -320,6 +405,8 @@ function avisoDoResumo(p: any): Envio[] {
   return [{
     chaves: [`resumo:${p.hoje}`],
     aviso: { titulo, corpo: partes.join(" · ") || "Nada pendente.", tag: "resumo-diario", url: "./nova.html" },
+    // Contas da janela D-3 que o resumo já chamou pelo nome: contam como avisadas (ver o roteador).
+    d3: nomeadas.filter(naJanela).map(chaveConta),
   }];
 }
 
@@ -385,21 +472,34 @@ Deno.serve(async (req) => {
       candidatos = monta.length;
       if (monta.length) {
         const liberadas: string[] = await rpc("push_reservar", { chaves: monta[0].chaves });
-        if (liberadas.length) envios = monta;
+        if (liberadas.length) {
+          // As contas da janela D-3 que o resumo chamou pelo nome ficam marcadas como avisadas; senão a
+          // varredura das 08:00 repetiria o mesmo aviso meia hora depois. Vão junto nas chaves do envio: se
+          // nenhum aparelho receber, o `difundir` solta todas e a varredura tenta de novo.
+          const d3 = monta[0].d3 || [];
+          const d3Livres: string[] = d3.length ? await rpc("push_reservar", { chaves: d3 }) : [];
+          monta[0].chaves.push(...d3Livres);
+          envios = monta;
+        }
       }
     } else {
       // Só a leva entra na reserva. Reservar as 6 horas inteiras marcaria como "já avisado" um
       // compromisso das 10:30 que ninguém viu ainda, e ele nunca ganharia lembrete.
       const leva = levaDaAgenda(pendencias.agenda || []);
       const caixa = pendencias.caixa || [];
-      candidatos = leva.length + caixa.length;
+      const hora = Number(String(pendencias.agora || "").slice(11, 13));
+      const contas = hora >= HORA_INICIO_CONTAS && hora < HORA_FIM_CONTAS ? contasComPrazo(pendencias).filter(naJanela) : [];
+      candidatos = leva.length + caixa.length + contas.length;
       if (candidatos) {
-        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...caixa.map((c: any) => `caixa:${c.id}`)];
+        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta)];
         const liberadas = new Set<string>(await rpc("push_reservar", { chaves }));
-        envios = avisosDaVarredura(
-          leva.filter((a: any) => liberadas.has(`agenda:${a.id}`)),
-          caixa.filter((c: any) => liberadas.has(`caixa:${c.id}`)),
-        );
+        envios = [
+          ...avisosDaVarredura(
+            leva.filter((a: any) => liberadas.has(`agenda:${a.id}`)),
+            caixa.filter((c: any) => liberadas.has(`caixa:${c.id}`)),
+          ),
+          ...avisoContasD3(contas.filter((c: any) => liberadas.has(chaveConta(c)))),
+        ];
       }
     }
 
