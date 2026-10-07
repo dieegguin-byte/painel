@@ -199,6 +199,8 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .funil-dir b{font-size:12px;color:var(--cream)}
 .funil-dir time{font-size:9px;color:var(--dim)}
 .vale-fornecedor{margin-bottom:10px;border:1px solid var(--line);border-radius:12px;overflow:hidden}.vale-fornecedor-head{display:flex;justify-content:space-between;padding:9px 12px;background:var(--surface2);font-size:11px}.vale-fornecedor-head b{color:#e88477}.vale-fornecedor .finance-row{padding:9px 12px;margin:0}
+/* Acerto por serviço (06/10/2026): a linha carrega seletor e campo do lado direito, então precisa quebrar em duas no celular em vez de espremer o nome do cliente. */
+.acerto-filtro{margin:10px 0 12px}.acerto-linha{flex-wrap:wrap;align-items:center}.acerto-linha>div:first-child{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}.acerto-linha .agenda-acoes{flex:0 1 auto;align-items:center;justify-content:flex-end;max-width:100%}.acerto-linha .agenda-acoes b{white-space:nowrap}.vale-fornecedor input,.vale-fornecedor select{background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;outline:0;padding:7px 9px;font-size:14px}.vale-fornecedor input:focus,.vale-fornecedor select:focus{border-color:#d37742}.acerto-linha select,.acerto-linha input,.acerto-detalhe input{width:auto;max-width:11rem;min-width:0}.acerto-detalhe{padding:4px 12px 10px;background:var(--surface2);border-bottom:1px solid var(--line)}.vale-fornecedor .acerto-detalhe .finance-row{padding:7px 0}.acerto-detalhe>.agenda-acoes{margin-top:8px;align-items:center}.acerto-detalhe>.agenda-acoes input{flex:1 1 11rem;max-width:16rem}.acerto-resumo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:9px 12px;font-size:12px;color:var(--dim);border-bottom:1px solid var(--line)}.acerto-resumo strong{color:var(--text,inherit)}.acerto-resumo button{padding:6px 10px;font-size:9px}.vale-fornecedor>.ficha-note{margin:8px 12px}.vale-fornecedor>.agenda-acoes,.vale-fornecedor>button{margin:8px 12px}.vale-fornecedor-head button{padding:6px 10px;font-size:9px}
 .funil-filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}.funil-filtros button{background:var(--surface2);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:6px 13px;font-size:9px;cursor:pointer}.funil-filtros button.active{background:var(--orange);border-color:var(--orange);color:#1a1210;font-weight:700}
 .records-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.record-card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--yellow);border-radius:14px;padding:14px}.record-card.priority-alta{border-left-color:var(--red)}.record-card.priority-baixa{border-left-color:var(--green)}.record-top{display:flex;justify-content:space-between;align-items:center}.record-top time{font-size:9px;color:var(--dim)}.record-card h4{font-size:13px;margin:13px 0 3px}.record-card>p{font-size:10px;color:var(--muted);margin:0}.next-action{background:#0f0d0c;border-radius:9px;padding:9px;margin:13px 0;font-size:10px}.next-action small{display:block;color:var(--orange2);font-size:7px;margin-bottom:3px}.record-card footer{display:flex;justify-content:space-between;align-items:center;font-size:10px}.record-card footer a{color:#98c9a6;text-decoration:none}.rotina-lista{display:flex;flex-direction:column;gap:8px}.rotina-item{display:flex;justify-content:space-between;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--yellow);border-radius:12px;padding:12px 14px}.rotina-item.cor-alta{border-left-color:var(--red)}.rotina-item.cor-media{border-left-color:var(--yellow)}.rotina-esq{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 auto}.rotina-esq strong{font-size:14px}.rotina-esq span{font-size:11px;color:var(--dim)}.rotina-obs{margin:2px 0 0;padding:0;border:0;background:none;text-align:left;font:inherit;font-size:11px;line-height:1.35;color:var(--muted);cursor:pointer;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}.rotina-obs.aberta{display:block;-webkit-line-clamp:none;overflow:visible}.rotina-dir{display:flex;align-items:center;gap:10px;flex:none}.rotina-dir em{font-style:normal;font-size:12px;font-weight:700;color:var(--yellow);white-space:nowrap}.rotina-dir em.atrasada{color:#e88477}
 .cobranca-item{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--green);border-radius:12px;padding:12px 14px;margin-bottom:8px}.cobranca-item.cor-alta{border-left-color:var(--red)}.cobranca-item.cor-media{border-left-color:var(--yellow)}.cobranca-item.cor-baixa{border-left-color:var(--green)}.cobranca-esq{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1 1 260px}.cobranca-esq strong{font-size:14px}.cobranca-esq span{font-size:11px;color:var(--muted)}.cobranca-esq em{font-style:normal;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.3px}.cobranca-esq em.cobranca-teto{color:#e88477;text-transform:none;letter-spacing:0;font-size:11px;font-weight:600}.cobranca-dir{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap}
@@ -708,7 +710,7 @@ const demoCustomers = [
 ];
 const demoServices = [
   { id: "s1", cliente_id: "c1", titulo: "Reforma de sofá retrátil", status: "orcamento", prioridade: "alta", proxima_acao: "Confirmar visita", prazo: "2026-07-10", valor_orcamento: 2400, clientes: demoCustomers[0] },
-  { id: "s2", cliente_id: "c2", titulo: "6 cadeiras de jantar", status: "agendado", prioridade: "media", proxima_acao: "Buscar cadeiras", prazo: "2026-07-11", valor_orcamento: 1350, clientes: demoCustomers[1], loja_material: "Ellis Tecidos", materiais_necessarios: [{ item: "Tecido para 6 assentos", comprado: false }, { item: "Espuma D33", comprado: true }] },
+  { id: "s2", cliente_id: "c2", titulo: "6 cadeiras de jantar", status: "agendado", prioridade: "media", profissional_id: "p2", proxima_acao: "Buscar cadeiras", prazo: "2026-07-11", valor_orcamento: 1350, clientes: demoCustomers[1], loja_material: "Ellis Tecidos", materiais_necessarios: [{ item: "Tecido para 6 assentos", comprado: false }, { item: "Espuma D33", comprado: true }] },
   { id: "s3", cliente_id: "c3", titulo: "Cabeceira sob medida", status: "pronto", prioridade: "baixa", proxima_acao: "Pedir medidas", prazo: "2026-07-12", clientes: demoCustomers[2] },
   // s4 existe pra demo exercitar o aviso de compra repetida: mesma loja que o s2. Sem dois
   // serviços na mesma loja, o bloco de material nunca mostra a dica de juntar o frete.
@@ -747,7 +749,7 @@ const demoServices = [
   // s8 = O CASO DA DULCE (13/09/2026): em produção com prazo vencido há mais de um mês e nada acontecendo — o
   // sofá já tinha sido entregue e ninguém fechou. Sem compromisso nem lançamento de propósito: é o silêncio
   // que a Capacidade tem que apontar como "parado, talvez já entregue". Data relativa pra nunca envelhecer.
-  { id: "s8", cliente_id: "c2", titulo: "Reforma de sofá", status: "producao", prioridade: "media", responsavel: "Marlom Júnior", proxima_acao: "Confirmar tecido/metragem comprados", prazo: somarDias(hojeISO(), -34), valor_orcamento: 2160, clientes: demoCustomers[1] },
+  { id: "s8", cliente_id: "c2", titulo: "Reforma de sofá", status: "producao", prioridade: "media", responsavel: "Marlom Júnior", profissional_id: "p1", valor_mao_de_obra: 900, proxima_acao: "Confirmar tecido/metragem comprados", prazo: somarDias(hojeISO(), -34), valor_orcamento: 2160, clientes: demoCustomers[1] },
 ];
 // As duas primeiras usam data RELATIVA ao dia em que a demo é aberta. Com data fixa, a
 // demonstração abria sempre com "nada marcado para hoje" — que é justamente o bloco mais
@@ -797,6 +799,14 @@ const demoFinance = [
   { id: "f6", tipo: "saida", escopo: "empresa", categoria: "Mão de obra", valor: 200, descricao: "Mão de obra - Marcão · Entregou o móvel", status: "a_pagar", data: "2026-07-14", servico_id: null },
   { id: "f7", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 150, descricao: "Vale - Marcão · adiantamento pedido no sábado, abater no próximo acerto", status: "pago", data: "2026-07-13", servico_id: null },
   { id: "f8", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 80, descricao: "[ABATIDO] Vale - Marcão · conserto do compressor", status: "pago", data: "2026-07-05", servico_id: null },
+  // ACERTO POR SERVIÇO (06/10): o serviço s8 tem R$ 900 combinados com o Marlom Júnior. Estas linhas provam
+  // cada caso da conta: pagamento e vale DENTRO do serviço (falta 900 − 400 − 100 = 400), pagamento no mesmo
+  // serviço sem dizer de quem (fica fora), vale solto (desconta do total) e pagamento sem serviço (só informa).
+  { id: "f16", tipo: "saida", escopo: "empresa", categoria: "Mão de obra", valor: 400, descricao: "Pagamento ao Marlom Júnior — primeira parte da reforma de sofá, via Pix", status: "pago", data: somarDias(hojeISO(), -12), servico_id: "s8", profissional_id: "p1" },
+  { id: "f17", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 100, descricao: "Vale - Marlom Júnior · adiantamento por conta da reforma de sofá", status: "pago", data: somarDias(hojeISO(), -8), servico_id: "s8", profissional_id: "p1" },
+  { id: "f18", tipo: "saida", escopo: "empresa", categoria: "Mão de obra", valor: 50, descricao: "Pagamento ao marceneiro — conserto do pé do sofá", status: "pago", data: somarDias(hojeISO(), -7), servico_id: "s8", profissional_id: null },
+  { id: "f19", tipo: "saida", escopo: "empresa", categoria: "Vale", valor: 60, descricao: "Vale - Marlom Júnior · Pix de sexta, finalidade informada por Diego: vale", status: "pago", data: somarDias(hojeISO(), -3), servico_id: null, profissional_id: "p1" },
+  { id: "f20", tipo: "saida", escopo: "empresa", categoria: "Mão de obra", valor: 250, descricao: "Pix para Marlom Júnior — o serviço específico não foi identificado neste lançamento", status: "pago", data: somarDias(hojeISO(), -40), servico_id: null, profissional_id: "p1" },
   // PRÓ-LABORE NO FORMATO REAL (13/09): cada retirada é um PAR — saída da empresa + entrada pessoal — e o dízimo
   // sai do pessoal. Data de hoje porque o Financeiro abre no mês corrente. Sem estas linhas a demo não prova
   // nem a aba Pró-labore nem que "Em caixa hoje (empresa)" ignora o dinheiro pessoal.
@@ -883,6 +893,12 @@ const demoRotinas = [
 const demoEstoque = [
   { id: "e1", item: "Espuma PX1200 Soft 3 cm", saldo: 1.1, unidade: "m", status: "MINIMO_NAO_DEFINIDO" },
   { id: "e2", item: "TNT", saldo: 0, unidade: "m", status: "ZERADO_REPOR_URGENTE" },
+];
+// Cadastro mínimo pra demo provar o acerto por serviço: dois com conta e um só pra sugestão do seletor.
+const demoProfissionais = [
+  { id: "p1", nome: "Marlom Júnior", ativo: true },
+  { id: "p2", nome: "Marcão", ativo: true },
+  { id: "p3", nome: "Gaspar", ativo: true },
 ];
 const demoFornecedores = [
   { id: "f1", nome: "Afibracom", contato_nome: "Rafael", telefone: "6185580041", produtos: "Tecidos (linho Klee, Chagall), PVC couro, pés de PVC, insumos", dias_entrega: "terca,quinta", observacao: "Pedido 1 dia antes" },
@@ -1239,6 +1255,7 @@ const PROTOCOLO_CLAUDE_OPERACAO = [
   "10. Reagendamento e parcial sem data permanecem na Caixa. Resolver somente com data real ou servico terminal.",
   "11. Vale entregue e saida paga no dia. Vale abatido so recebe a marca de abatimento e nao mexe no caixa.",
   "11A. Trabalho do profissional (buscar, entregar ou o servico em si) usa mao_de_obra_anotada: nasce a_pagar, pode ir sem valor e NAO mexe no caixa. Quem paga e o acerto: mao_de_obra_acertada tira do caixa so o liquido (trabalhos menos vales) e marca os dois lados. Nunca lancar trabalho de profissional como saida paga solta.",
+  "11B. A mao de obra COMBINADA de um servico mora em servicos.valor_mao_de_obra, com servicos.profissional_id dizendo de quem e. Pagamento (categoria Mao de obra, status pago) e Vale desse servico levam o MESMO servico_id e o MESMO profissional_id: o saldo do servico e combinado menos esses dois, e so conta lancamento com os dois vinculos. Vale sem servico desconta do total da pessoa. Nunca vincular servico ou profissional por suposicao: sem certeza, deixar sem servico_id. A conta pronta esta nas views v_acerto_profissional_servico e v_acerto_profissional.",
   "12. Depois da chamada, conferir ok, jaConcluido e resultado. Em erro, nao improvisar: a operacao fica visivel na Caixa para retomada.",
   "13. Ao terminar o lote, gerar um COMPROVANTE_DE_EXECUCAO com evento, resultado e ids. Esse comprovante nunca volta como entrada.",
   "",
@@ -3036,6 +3053,9 @@ function Home() {
   // DÍVIDAS (recado de 13/09/2026, caso Raquel R$ 1.489,89). Obrigação viva sem vencimento — não é linha de
   // financeiro. Até aqui o app nunca lia a tabela: a dívida existia certa no banco e invisível na tela.
   const [dividas, setDividas] = useState([]);
+  // CADASTRO DE PROFISSIONAIS (06/10/2026): o acerto por serviço soma pelo vínculo, não pelo nome escrito.
+  // Só id e nome — é o que dá nome à conta e alimenta os seletores da aba Profissionais.
+  const [profissionais, setProfissionais] = useState([]);
   // DOMÍNIO PESSOAIS (item APP-PESSOAIS-CARD-20260824-2145) — vive na mesma tela por conveniência dele,
   // mas é outro domínio: não entra em cliente, serviço, financeiro nem em nenhum indicador da Tapeçaria.
   const [pessoais, setPessoais] = useState([]);
@@ -3109,6 +3129,7 @@ function Home() {
     setAvisos(p.avisos || []);
     // Dívidas entram no pacote (e no cache offline): sem sinal, a dívida não pode sumir e parecer quitada.
     setDividas(p.dividas || []);
+    setProfissionais(p.profissionais || []);
     // Distâncias não são estado de tela — alimentam tempoEstradaMin, que é função pura. Entram no pacote
     // pra virem junto no cache offline: sem sinal a trava de rota continua com os tempos aprendidos.
     aplicarDistanciasDoBanco(p.distancias);
@@ -3116,13 +3137,13 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setDividas(demoDividas); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setDividas(demoDividas); setProfissionais(demoProfissionais); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
-    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, firstError;
+    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, firstError;
     try {
-      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv] = await Promise.all([
+      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
@@ -3163,6 +3184,9 @@ function Home() {
         // que alguém invente amanhã (ou nulo) tem que APARECER com o nome dele, não sumir como os tipos de
         // agenda sumiam do filtro Presencial/Remoto. Volume minúsculo: 6 linhas em 13/09.
         db.from("dividas").select("id,credor,valor_original,valor_pago,descricao,status,criado_em,atualizado_em").or("status.is.null,status.neq.quitada").order("criado_em", { ascending: true }),
+        // PROFISSIONAIS: camada de apoio, como `ds`/`es`/`av`. Se falhar sozinha o app abre normal e a conta
+        // do acerto usa o nome que já vem embutido em cada serviço (profissional_cadastro).
+        db.from("profissionais").select("id,nome,ativo").order("nome", { ascending: true }),
       ]);
       // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
       // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
@@ -3181,7 +3205,7 @@ function Home() {
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
     setOfflineDesde(null);
-    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [] };
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [] };
     aplicarPacote(pacote);
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
@@ -3809,7 +3833,9 @@ function Home() {
 
   // Vale pendente = ainda não foi descontado do profissional. O dinheiro já saiu (status pago), então o
   // que marca a pendência é a ausência do [ABATIDO], não o status. Ver Regra Nº 9.
-  const valesPendentes = finances.filter((f) => f.categoria === "Vale" && !(f.descricao || "").startsWith(VALE_ABATIDO_TAG)).length;
+  // Desde 06/10/2026 o vale amarrado a um serviço do próprio profissional já está DENTRO da conta daquele
+  // serviço; pendente é só o vale solto. Mesma função da aba, pra o número do menu nunca desencontrar dela.
+  const valesPendentes = montarAcertoProfissionais(finances, services, profissionais).contas.reduce((soma, conta) => soma + conta.valesSoltos.length, 0);
   // O contador da aba conta as duas pendências do profissional: vale a descontar e trabalho a pagar.
   const contaProfissionais = valesPendentes + finances.filter(ehTrabalhoAberto).length;
   const contasFuturas = finances.filter(ehSaidaFutura).length;
@@ -3870,7 +3896,7 @@ function Home() {
       {tab === "financeiro" && <FinanceView finances={finances} dividas={dividas} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} dividas={dividas} services={activeServices} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
-      {tab === "vales" && <ProfissionaisView finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
+      {tab === "vales" && <ProfissionaisView finances={finances} services={services} profissionais={profissionais} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onOpenFicha={setFichaId} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
       </BarreiraDaAba>
@@ -7166,7 +7192,9 @@ function nomeFornecedorVale(descricao) {
   // "Vale - Marcão", "Vale Marcão" e "Vale: Marcão" são a mesma pessoa. O hífen era obrigatório aqui, então
   // os vales digitados sem ele viravam um profissional chamado "Vale Marcão".
   const semPrefixo = (descricao || "").replace(/^Vale\s*[-–—:]?\s*/i, "");
-  return semPrefixo.split(/[\(,]/)[0].trim() || "Sem nome";
+  // "·" e travessão também encerram o nome (06/10/2026): os vales lançados pelo Classic vêm como
+  // "Vale - Marlom Junior — favorecido…", e sem isso o nome virava a frase inteira e não casava com o cadastro.
+  return semPrefixo.split(/[\(,·–—]/)[0].trim() || "Sem nome";
 }
 // UMA PESSOA, UMA CONTA. Achado em 07/08/2026 na primeira tela real da aba Profissionais: o Marcão aparecia
 // TRÊS vezes — "Vale Marcão" (R$70), "Marcao" sem acento (R$131) e "Marcão" (R$288 + o trabalho). Enquanto
@@ -7177,52 +7205,201 @@ function chaveProfissional(nome) {
   return String(nome || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim() || "sem nome";
 }
 const VALE_ABATIDO_TAG = "[ABATIDO] ";
+// ACERTO POR SERVIÇO (recado de 06/10/2026: "acabar com a garimpagem nas conversas na hora de acertar as
+// contas com os tapeceiros"). O banco guardava o que SAIU pro profissional — vale e pagamento — mas não o que
+// foi COMBINADO por serviço. "Quanto falta do sofá da Renata?" só se respondia relendo o WhatsApp.
+// O combinado agora mora em `servicos.valor_mao_de_obra`, e a conta de cada serviço é:
+//     combinado − pagamentos − vales     (só o que tem o MESMO serviço E o MESMO profissional)
+// REGRA DE OURO, medida no banco em 06/10: o serviço da Renata tinha R$ 300 pagos ao Marlom Júnior e R$ 100
+// ao marceneiro, todos com o mesmo servico_id. Somar só por serviço diria que o Marlom recebeu R$ 400.
+// Por isso lançamento sem profissional não entra em saldo nenhum — aparece ao lado, esperando alguém dizer de
+// quem é. E vale sem serviço desconta do TOTAL da pessoa, nunca de um serviço escolhido por palpite.
+// A view `v_acerto_profissional_servico` faz a MESMA conta no banco, pro Classic ler o mesmo número que a
+// tela mostra. Mudou uma, muda a outra (migracoes/20261006190000_acerto_por_servico.sql).
+const STATUS_SERVICO_EM_ANDAMENTO = ["agendado", "producao", "pronto"];
+function somaValores(lista) { return Number((lista || []).reduce((soma, item) => soma + (Number(item.valor) || 0), 0).toFixed(2)); }
+function montarAcertoProfissionais(finances, services, profissionais) {
+  const cadastro = new Map();
+  (profissionais || []).forEach((p) => { if (p?.id) cadastro.set(p.id, p.nome || "Profissional sem nome"); });
+  // Sem sinal o pacote antigo pode não trazer o cadastro; o nome que veio embutido no serviço cobre isso.
+  (services || []).forEach((s) => { if (s.profissional_id && !cadastro.has(s.profissional_id) && s.profissional_cadastro?.nome) cadastro.set(s.profissional_id, s.profissional_cadastro.nome); });
+  // Lançamento antigo não tem profissional_id, só o nome no texto. Ele entra na conta do cadastro quando o
+  // nome bate inteiro (sem acento nem caixa). Dois cadastros com o mesmo nome: não casa com nenhum.
+  const idPorNome = new Map();
+  cadastro.forEach((nome, id) => { const chave = chaveProfissional(nome); idPorNome.set(chave, idPorNome.has(chave) ? null : id); });
+  const contas = new Map();
+  const abrir = (chave, id, nome) => {
+    if (!contas.has(chave)) contas.set(chave, { chave, id, nome, servicos: [], avulsos: [], valesSoltos: [], pagamentosSoltos: [] });
+    const conta = contas.get(chave);
+    if (!id && nome && nome.length > conta.nome.length) conta.nome = nome;
+    return conta;
+  };
+  const contaDoId = (id) => abrir("id:" + id, id, cadastro.get(id) || "Profissional sem nome");
+  const contaDoNome = (nome) => {
+    const chave = chaveProfissional(nome);
+    const id = idPorNome.get(chave);
+    return id ? contaDoId(id) : abrir("nome:" + chave, null, nome || "Sem nome");
+  };
+  const donoDoServico = new Map((services || []).map((s) => [s.id, s.profissional_id || null]));
+  const doServico = new Map();
+  const grupoDoServico = (id) => { if (!doServico.has(id)) doServico.set(id, { pagamentos: [], vales: [], foraDaConta: [] }); return doServico.get(id); };
+  for (const f of finances || []) {
+    const ehVale = f.categoria === "Vale";
+    if (!ehVale && f.categoria !== CATEGORIA_MAO_DE_OBRA) continue;
+    if (!ehVale && ehTrabalhoAberto(f)) {
+      (f.profissional_id ? contaDoId(f.profissional_id) : contaDoNome(nomeProfissionalMaoDeObra(f.descricao))).avulsos.push(f);
+      continue;
+    }
+    if (!ehVale && f.status !== "pago") continue; // a_pagar já [ACERTADO] é histórico
+    const dono = f.servico_id ? donoDoServico.get(f.servico_id) || null : null;
+    if (dono && f.profissional_id === dono) { (ehVale ? grupoDoServico(f.servico_id).vales : grupoDoServico(f.servico_id).pagamentos).push(f); continue; }
+    if (dono && !f.profissional_id) { grupoDoServico(f.servico_id).foraDaConta.push(f); continue; }
+    // Daqui pra baixo o lançamento NÃO está dentro de um serviço do próprio profissional.
+    if (ehVale) {
+      if ((f.descricao || "").startsWith(VALE_ABATIDO_TAG)) continue;
+      (f.profissional_id ? contaDoId(f.profissional_id) : contaDoNome(nomeFornecedorVale(f.descricao))).valesSoltos.push(f);
+    } else if (f.profissional_id) {
+      contaDoId(f.profissional_id).pagamentosSoltos.push(f);
+    }
+  }
+  for (const s of services || []) {
+    if (!s.profissional_id) continue;
+    const grupo = doServico.get(s.id) || { pagamentos: [], vales: [], foraDaConta: [] };
+    const combinado = s.valor_mao_de_obra === null || s.valor_mao_de_obra === undefined || s.valor_mao_de_obra === "" ? null : Number(s.valor_mao_de_obra);
+    const pago = somaValores(grupo.pagamentos);
+    const vale = somaValores(grupo.vales);
+    const saldo = combinado === null ? null : Number((combinado - pago - vale).toFixed(2));
+    const situacao = combinado === null ? "sem_valor" : saldo > 0 ? "aberto" : "quitado";
+    // "Sem valor" só aparece sozinho quando pede ação: serviço em andamento, ou encerrado que já tem dinheiro
+    // amarrado. Listar todo serviço antigo sem combinado seria uma parede de pendência que ninguém resolve.
+    const visivel = situacao === "aberto" || (situacao === "sem_valor" && (STATUS_SERVICO_EM_ANDAMENTO.includes(s.status) || pago + vale > 0));
+    contaDoId(s.profissional_id).servicos.push({ servico: s, combinado, pago, vale, saldo, situacao, visivel, pagamentos: grupo.pagamentos, vales: grupo.vales, foraDaConta: grupo.foraDaConta, fora: somaValores(grupo.foraDaConta) });
+  }
+  const ordemSituacao = { aberto: 0, sem_valor: 1, quitado: 2 };
+  const lista = [...contas.values()].map((conta) => {
+    conta.servicos.sort((a, b) => ordemSituacao[a.situacao] - ordemSituacao[b.situacao] || String(a.servico.prazo || "9999").localeCompare(String(b.servico.prazo || "9999")));
+    const faltaServicos = somaValores(conta.servicos.filter((l) => l.situacao === "aberto").map((l) => ({ valor: l.saldo })));
+    const somaAvulsos = somaValores(conta.avulsos);
+    const somaVales = somaValores(conta.valesSoltos);
+    return {
+      ...conta, faltaServicos, somaAvulsos, somaVales,
+      total: Number((faltaServicos + somaAvulsos - somaVales).toFixed(2)),
+      abertos: conta.servicos.filter((l) => l.situacao === "aberto").length,
+      semValor: conta.servicos.filter((l) => l.visivel && l.situacao === "sem_valor").length,
+      avulsosSemValor: conta.avulsos.filter((t) => !Number(t.valor)).length,
+      temAlgo: conta.servicos.some((l) => l.visivel) || conta.avulsos.length > 0 || conta.valesSoltos.length > 0,
+    };
+  }).sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome));
+  // Serviço em andamento sem profissional vinculado não cai na conta de ninguém. O nome escrito no texto vira
+  // só SUGESTÃO pro seletor — quem vincula é quem aperta o botão.
+  // O Diego não é profissional do cadastro: serviço que ele mesmo faz não tem acerto e não entra na lista.
+  const semProfissional = (services || []).filter((s) => !s.profissional_id && STATUS_SERVICO_EM_ANDAMENTO.includes(s.status) && chaveProfissional(s.profissional || s.responsavel || "") !== "diego")
+    .map((s) => ({ servico: s, sugestaoId: idPorNome.get(chaveProfissional(s.profissional || s.responsavel || "")) || "" }));
+  return { contas: lista, semProfissional, cadastro: [...cadastro.entries()].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome)) };
+}
 // ABA PROFISSIONAIS (era "Vales" até 06/08/2026)
 // O nome mudou porque a aba passou a ter os DOIS lados da conta com cada profissional: o que ele já pegou
 // adiantado (vale) e o que ele fez pra ganhar (buscar, entregar, o serviço). Diego: "eu tenho que ir anotando
 // que ele busca serviço comigo, isso é trabalho dele... só pra não esquecer quando for abater os vales".
 // Vale sozinho só mostrava a dívida DELE com o Diego. Faltava a do Diego com ele — que era a que sumia.
-function ProfissionaisView({ finances, services, db, demo, mode, notify, onChanged }) {
+function ProfissionaisView({ finances, services, profissionais, db, demo, mode, notify, onChanged, onOpenFicha }) {
   const [busyId, setBusyId] = useState(null);
   const [confirmando, setConfirmando] = useState(null);
   const [valores, setValores] = useState({});
   const [novo, setNovo] = useState({ profissional: "", oQue: "busca", detalhe: "", valor: "", data: hojeISO() });
+  // Estado só de tela do acerto por serviço: quem está filtrado, qual linha está aberta e o que foi digitado.
+  const [filtro, setFiltro] = useState("todos");
+  const [verQuitados, setVerQuitados] = useState(false);
+  const [aberto, setAberto] = useState(null);
+  const [combinados, setCombinados] = useState({});
+  const [escolhas, setEscolhas] = useState({});
   const vales = finances.filter((f) => f.categoria === "Vale");
-  const trabalhos = finances.filter((f) => f.categoria === CATEGORIA_MAO_DE_OBRA && f.status === "a_pagar");
-  const trabalhosAbertos = trabalhos.filter(ehTrabalhoAberto);
   // O DINHEIRO DO VALE SAI NA HORA (Diego confirmou em 25/07/2026: "todos vales já saem na hora" — Pix ou
   // dinheiro na mão). Então TODO vale nasce como saída PAGA: o caixa sente no dia em que ele entrega.
   // O que fica pendente NÃO é pagamento, é o DESCONTO no que ele vai pagar pro profissional depois.
   // Por isso "abatido" é marcado no texto e NÃO mexe no status — se mexesse, o mesmo dinheiro sairia duas
   // vezes. Antes o modelo estava invertido (vale entrava como "a pagar" e virava saída ao abater), e por
   // isso 6 vales de R$465,70 não apareciam no caixa mesmo com o dinheiro já tendo saído.
-  const pendentes = vales.filter((v) => !(v.descricao || "").startsWith(VALE_ABATIDO_TAG));
   const abatidos = vales.filter((v) => (v.descricao || "").startsWith(VALE_ABATIDO_TAG));
-  const totalPendente = pendentes.reduce((sum, v) => sum + Number(v.valor), 0);
-  const totalTrabalho = trabalhosAbertos.reduce((sum, t) => sum + Number(t.valor || 0), 0);
-  const semValor = trabalhosAbertos.filter((t) => !Number(t.valor)).length;
-  // UMA CONTA POR PESSOA: vale e trabalho da mesma pessoa caem na mesma linha, senão o acerto continuaria
-  // sendo feito de cabeça. A chave ignora acento e caixa (ver chaveProfissional) porque os vales antigos têm
-  // o mesmo nome escrito de três jeitos, e é assim que ele fala: "acertar com o Marcão", um só.
-  const contas = {};
-  const entrar = (nome) => {
-    const chave = chaveProfissional(nome);
-    const conta = (contas[chave] ||= { nome, vales: [], trabalhos: [] });
-    // Fica com o nome mais completo que apareceu — "Marcão" ganha de "Marcao", e não "Vale Marcão".
-    if (nome && nome.length > conta.nome.length) conta.nome = nome;
-    return conta;
-  };
-  pendentes.forEach((v) => entrar(nomeFornecedorVale(v.descricao)).vales.push(v));
-  trabalhosAbertos.forEach((t) => entrar(nomeProfissionalMaoDeObra(t.descricao)).trabalhos.push(t));
-  const listaContas = Object.values(contas).map((c) => {
-    const somaTrabalho = c.trabalhos.reduce((s, t) => s + Number(t.valor || 0), 0);
-    const somaVale = c.vales.reduce((s, v) => s + Number(v.valor), 0);
-    return { ...c, somaTrabalho, somaVale, liquido: Number((somaTrabalho - somaVale).toFixed(2)), pendencias: c.trabalhos.filter((t) => !Number(t.valor)).length };
-  }).sort((a, b) => b.liquido - a.liquido);
+  // UMA CONTA POR PESSOA, agora montada pelo vínculo do cadastro (profissional_id) e aberta por serviço.
+  // O nome no texto só entra pra lançamento antigo sem vínculo — ver montarAcertoProfissionais.
+  const acerto = montarAcertoProfissionais(finances, services, profissionais);
+  const contasComAlgo = acerto.contas.filter((c) => c.temAlgo);
+  const filtroAtivo = acerto.contas.some((c) => c.chave === filtro) ? filtro : "todos";
+  const listaContas = (verQuitados ? acerto.contas : contasComAlgo).filter((c) => filtroAtivo === "todos" || c.chave === filtroAtivo);
+  const faltaTotal = Number(contasComAlgo.reduce((s, c) => s + c.faltaServicos + c.somaAvulsos, 0).toFixed(2));
+  const valesSoltosTotal = Number(contasComAlgo.reduce((s, c) => s + c.somaVales, 0).toFixed(2));
+  const qtdValesSoltos = contasComAlgo.reduce((s, c) => s + c.valesSoltos.length, 0);
+  const qtdAbertos = contasComAlgo.reduce((s, c) => s + c.abertos + c.avulsos.length, 0);
+  const qtdSemValor = contasComAlgo.reduce((s, c) => s + c.semValor + c.avulsosSemValor, 0);
+  const saiNoAcerto = Number(contasComAlgo.reduce((s, c) => s + Math.max(0, c.total), 0).toFixed(2));
   const nomesConhecidos = [...new Set([
+    ...acerto.cadastro.map((p) => p.nome),
     ...(services || []).map((s) => s.responsavel).filter(Boolean),
-    ...Object.values(contas).map((c) => c.nome),
+    ...acerto.contas.map((c) => c.nome),
   ])];
+  const rotuloServico = (s) => [s?.clientes?.nome, s?.titulo].filter(Boolean).join(" — ") || "Serviço";
+  // O COMBINADO É UM NÚMERO SÓ, digitado onde a conta aparece. Zero vale ("esse eu não pago"); vazio não.
+  const salvarCombinado = async (servico) => {
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    const valor = parseMoedaBR(combinados[servico.id]);
+    if (!Number.isFinite(valor) || valor < 0) { notify("Digite quanto ficou combinado de mão de obra neste serviço.", "error"); return; }
+    setBusyId("comb-" + servico.id);
+    try {
+      const { error } = await db.from("servicos").update({ valor_mao_de_obra: valor, atualizado_em: new Date().toISOString() }).eq("id", servico.id);
+      if (error) throw error;
+      notify(`Mão de obra de ${money(valor)} anotada. Isso não mexe no caixa — só diz quanto falta acertar.`, "ok");
+      setCombinados({ ...combinados, [servico.id]: "" });
+      await onChanged();
+    } catch (e) { notify("Não salvou: " + e.message, "error"); } finally { setBusyId(null); }
+  };
+  const vincularServico = async (servico, escolha) => {
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    const profissional = acerto.cadastro.find((p) => p.id === escolha);
+    if (!profissional) { notify("Escolha de quem é o serviço.", "error"); return; }
+    const patch = { profissional_id: profissional.id, profissional: profissional.nome, atualizado_em: new Date().toISOString() };
+    const digitado = String(combinados[servico.id] || "").trim();
+    if (digitado) {
+      const valor = parseMoedaBR(digitado);
+      if (!Number.isFinite(valor) || valor < 0) { notify("O valor combinado não é um número. Corrija ou deixe vazio.", "error"); return; }
+      patch.valor_mao_de_obra = valor;
+    }
+    setBusyId("serv-" + servico.id);
+    try {
+      const { error } = await db.from("servicos").update(patch).eq("id", servico.id);
+      if (error) throw error;
+      notify(`Serviço entrou na conta do ${profissional.nome}.`, "ok");
+      setCombinados({ ...combinados, [servico.id]: "" });
+      await onChanged();
+    } catch (e) { notify("Não vinculou: " + e.message, "error"); } finally { setBusyId(null); }
+  };
+  // AMARRAR UM LANÇAMENTO É SEMPRE UM ATO DE QUEM SABE: o app nunca escolhe o serviço nem a pessoa sozinho.
+  // Fica um rastro no histórico porque a linha do financeiro não guarda quem mexeu nela.
+  const vincularLancamento = async (item, patch, oQue) => {
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusyId("vinc-" + item.id);
+    try {
+      const { error } = await db.from("financeiro").update(patch).eq("id", item.id);
+      if (error) throw error;
+      try {
+        await registrarHistoricoDaOperacao(db, "app-acerto-vinculo-" + item.id + "-" + (patch.servico_id || "") + "-" + (patch.profissional_id || ""), "acerto-vinculo", { o_que: oQue, por: "diego", detalhe: money(item.valor) + " · " + String(item.descricao || "").slice(0, 160) });
+      } catch (_) { /* o vínculo já está gravado; rastro que falha não desfaz a conta */ }
+      notify(oQue + ". O caixa não muda — esse dinheiro já tinha saído.", "ok");
+      await onChanged();
+    } catch (e) { notify("Não vinculou: " + e.message, "error"); } finally { setBusyId(null); }
+  };
+  const descontarNoServico = (item, conta) => {
+    const linha = conta.servicos.find((l) => l.servico.id === escolhas["fin-" + item.id]);
+    if (!linha) { notify("Escolha em qual serviço entra.", "error"); return; }
+    const patch = { servico_id: linha.servico.id };
+    if (!item.profissional_id) patch.profissional_id = conta.id;
+    vincularLancamento(item, patch, `${item.categoria === "Vale" ? "Vale" : "Pagamento"} amarrado ao serviço ${rotuloServico(linha.servico)}`);
+  };
+  const dizerDeQuemE = (item, profissionalId) => {
+    const profissional = acerto.cadastro.find((p) => p.id === profissionalId);
+    if (!profissional) { notify("Escolha de quem é.", "error"); return; }
+    vincularLancamento(item, { profissional_id: profissional.id }, `Lançamento marcado como do ${profissional.nome}`);
+  };
   const anotarTrabalho = async () => {
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     const profissional = novo.profissional.trim();
@@ -7258,10 +7435,10 @@ function ProfissionaisView({ finances, services, db, demo, mode, notify, onChang
         tipo: "mao_de_obra_acertada",
         // O id carrega o primeiro trabalho do lote: repetir o botão depois de uma falha retoma o MESMO acerto
         // (não paga duas vezes), mas um segundo acerto com a mesma pessoa no mesmo dia é outro lote e passa.
-        eventoId: "app-acerto-" + conta.nome.replace(/\s+/g, "-").toLowerCase() + "-" + conta.trabalhos[0].id,
-        dados: { profissional: conta.nome, trabalhoIds: conta.trabalhos.map((t) => t.id), valeIds: conta.vales.map((v) => v.id), data: hojeISO(), por: "diego" },
+        eventoId: "app-acerto-" + conta.nome.replace(/\s+/g, "-").toLowerCase() + "-" + conta.avulsos[0].id,
+        dados: { profissional: conta.nome, trabalhoIds: conta.avulsos.map((t) => t.id), valeIds: conta.valesSoltos.map((v) => v.id), data: hojeISO(), por: "diego" },
       });
-      const liquido = r?.resultado?.liquido ?? conta.liquido;
+      const liquido = r?.resultado?.liquido ?? Math.max(0, conta.somaAvulsos - conta.somaVales);
       notify(`Acerto com ${conta.nome} fechado: ${money(liquido)} saiu do caixa. Os vales dele já estavam pagos e foram descontados.`, "ok");
       setConfirmando(null);
       await onChanged();
@@ -7281,9 +7458,9 @@ function ProfissionaisView({ finances, services, db, demo, mode, notify, onChang
   const acertados = finances.filter((f) => f.categoria === CATEGORIA_MAO_DE_OBRA && (f.descricao || "").startsWith(MAO_DE_OBRA_ACERTADA_TAG));
   return <div className="page-grid">
     <section className="metric-grid finance-metrics">
-      <Metric label="Eles têm a receber" value={money(totalTrabalho)} detail={`${trabalhosAbertos.length} trabalho(s)${semValor ? ` · ${semValor} sem valor` : ""}`} tone={semValor ? "orange" : "yellow"} />
-      <Metric label="Vales já adiantados" value={money(totalPendente)} detail={`${pendentes.length} vale(s) a descontar`} tone="red" />
-      <Metric label="Sai do caixa no acerto" value={money(Math.max(0, totalTrabalho - totalPendente))} detail="Trabalho menos vale" tone="green" />
+      <Metric label="Falta pagar de mão de obra" value={money(faltaTotal)} detail={`${qtdAbertos} em aberto${qtdSemValor ? ` · ${qtdSemValor} sem valor` : ""}`} tone={qtdSemValor ? "orange" : "yellow"} />
+      <Metric label="Vales ainda soltos" value={money(valesSoltosTotal)} detail={`${qtdValesSoltos} vale(s) sem serviço`} tone="red" />
+      <Metric label="Sai do caixa no acerto" value={money(saiNoAcerto)} detail="Falta menos vale, por pessoa" tone="green" />
     </section>
 
     {/* ANOTAR É O CORAÇÃO DA ABA: se anotar der trabalho, ele não anota, e a busca do Marcão volta a se perder.
@@ -7308,11 +7485,65 @@ function ProfissionaisView({ finances, services, db, demo, mode, notify, onChang
     </section>
 
     <section className="content-card"><div className="card-head"><div><p className="kicker">CONTA COM CADA UM</p><h3>Acerto por profissional</h3></div></div>
-      {!listaContas.length && <div className="empty-state"><b>Nada em aberto com ninguém.</b><span>Anote acima quando alguém buscar, entregar ou fizer um trabalho — e os vales que você adiantar aparecem aqui do lado.</span></div>}
-      {listaContas.map((conta) => <div key={conta.nome} className="vale-fornecedor">
-        <div className="vale-fornecedor-head"><strong>{conta.nome}</strong><b className={conta.liquido > 0 ? "saida" : ""}>{conta.liquido > 0 ? money(conta.liquido) + " a pagar" : conta.liquido < 0 ? money(-conta.liquido) + " adiantado demais" : "quites"}</b></div>
+      <p className="ficha-note">Cada serviço mostra o combinado menos o que já foi pago ou adiantado <strong>naquele serviço</strong>. Vale sem serviço desconta do total da pessoa. Nada é encaixado por palpite.</p>
+      {acerto.contas.length > 0 && <div className="agenda-acoes acerto-filtro">
+        <button className={filtroAtivo === "todos" ? "primary" : "ghost"} onClick={() => setFiltro("todos")}>Todos</button>
+        {(verQuitados ? acerto.contas : contasComAlgo).map((c) => <button key={c.chave} className={filtroAtivo === c.chave ? "primary" : "ghost"} onClick={() => setFiltro(c.chave)}>{c.nome}</button>)}
+        <button className="ghost" onClick={() => setVerQuitados(!verQuitados)}>{verQuitados ? "Ocultar quitados" : "Mostrar quitados"}</button>
+      </div>}
+      {!listaContas.length && <div className="empty-state"><b>Nada em aberto com ninguém.</b><span>Anote a mão de obra combinada nos serviços em andamento — e os vales que você adiantar aparecem aqui do lado.</span></div>}
+      {listaContas.map((conta) => {
+        const linhas = conta.servicos.filter((l) => verQuitados || l.visivel);
+        const chaveSoltos = "soltos-" + conta.chave;
+        const liquidoAvulsos = Number((conta.somaAvulsos - conta.somaVales).toFixed(2));
+        return <div key={conta.chave} className="vale-fornecedor">
+        <div className="vale-fornecedor-head"><strong>{conta.nome}</strong><b className={conta.total > 0 ? "saida" : ""}>{conta.total > 0 ? money(conta.total) + " a pagar" : conta.total < 0 ? money(-conta.total) + " adiantado" : "quites"}</b></div>
 
-        {conta.trabalhos.map((t) => <div className="finance-row" key={t.id}>
+        {/* UMA LINHA POR SERVIÇO. Sem combinado, o campo pra anotar fica na própria linha: é um número só, e
+            quem sabe ele é o Diego no dia em que fecha com o tapeceiro. */}
+        {linhas.map((l) => {
+          const s = l.servico;
+          const estaAberto = aberto === s.id;
+          const digitado = (combinados[s.id] || "").trim();
+          return <React.Fragment key={s.id}>
+            <div className="finance-row acerto-linha">
+              <div>
+                <strong>{rotuloServico(s)}</strong>
+                <span>{statusLabel[s.status] || s.status}{l.combinado !== null ? ` · combinado ${money(l.combinado)}` : " · mão de obra ainda não anotada"}{l.pago ? ` · pago ${money(l.pago)}` : ""}{l.vale ? ` · vale ${money(l.vale)}` : ""}</span>
+                {l.fora > 0 && <span>⚠ {money(l.fora)} lançados neste serviço sem dizer de quem — fora da conta</span>}
+              </div>
+              <div className="agenda-acoes">
+                {l.situacao === "aberto" && <b className="saida">falta {money(l.saldo)}</b>}
+                {l.situacao === "quitado" && <b>{l.saldo < 0 ? `quitado · ${money(-l.saldo)} a mais` : "quitado"}</b>}
+                {l.situacao === "sem_valor" && <React.Fragment>
+                  <input value={combinados[s.id] || ""} onChange={(e) => setCombinados({ ...combinados, [s.id]: e.target.value })} placeholder="R$ combinado" inputMode="decimal" />
+                  <button className="ghost" disabled={busyId === "comb-" + s.id || !digitado} onClick={() => salvarCombinado(s)}>{busyId === "comb-" + s.id ? "..." : "Anotar"}</button>
+                </React.Fragment>}
+                <button className="ghost" onClick={() => setAberto(estaAberto ? null : s.id)}>{estaAberto ? "Fechar" : "Detalhes"}</button>
+              </div>
+            </div>
+            {estaAberto && <div className="acerto-detalhe">
+              {[...l.pagamentos, ...l.vales].sort((a, b) => String(a.data).localeCompare(String(b.data))).map((f) => <div className="finance-row" key={f.id}>
+                <div><strong>{compactDate(f.data)} · {f.categoria === "Vale" ? "vale" : "pagamento"}</strong><span>{descricaoFinanceiraVisivel(f.descricao)}</span></div>
+                <b className="saida">− {money(f.valor)}</b>
+              </div>)}
+              {!l.pagamentos.length && !l.vales.length && <p className="ficha-note">Nenhum pagamento nem vale amarrado a este serviço ainda.</p>}
+              {l.foraDaConta.map((f) => <div className="finance-row acerto-linha" key={f.id}>
+                <div><strong>{compactDate(f.data)} · sem profissional</strong><span>{descricaoFinanceiraVisivel(f.descricao)}</span></div>
+                <div className="agenda-acoes"><b>{money(f.valor)}</b><button className="ghost" disabled={busyId === "vinc-" + f.id} onClick={() => dizerDeQuemE(f, conta.id)}>{busyId === "vinc-" + f.id ? "..." : `É do ${conta.nome}`}</button></div>
+              </div>)}
+              <div className="agenda-acoes">
+                {l.situacao !== "sem_valor" && <React.Fragment>
+                  <input value={combinados[s.id] || ""} onChange={(e) => setCombinados({ ...combinados, [s.id]: e.target.value })} placeholder={`Corrigir combinado (${money(l.combinado)})`} inputMode="decimal" />
+                  <button className="ghost" disabled={busyId === "comb-" + s.id || !digitado} onClick={() => salvarCombinado(s)}>{busyId === "comb-" + s.id ? "..." : "Corrigir"}</button>
+                </React.Fragment>}
+                {onOpenFicha && s.cliente_id && <button className="ghost" onClick={() => onOpenFicha(s.cliente_id)}>Abrir ficha</button>}
+              </div>
+            </div>}
+          </React.Fragment>;
+        })}
+
+        {conta.avulsos.map((t) => <div className="finance-row" key={t.id}>
           <div><strong>{compactDate(t.data)}</strong><span>{(t.descricao || "").replace(/^Mão de obra\s*-\s*/i, "")}</span></div>
           {Number(t.valor)
             ? <b>+ {money(t.valor)}</b>
@@ -7322,22 +7553,76 @@ function ProfissionaisView({ finances, services, db, demo, mode, notify, onChang
               </div>}
         </div>)}
 
-        {conta.vales.map((v) => <div className="finance-row" key={v.id}>
-          <div><strong>{compactDate(v.data)}</strong><span>{v.descricao}</span></div>
-          <div className="agenda-acoes"><b className="saida">− {money(v.valor)}</b><button className="ghost" disabled={busyId === v.id} onClick={() => marcarAbatido(v)}>{busyId === v.id ? "..." : "Só abater"}</button></div>
+        {/* VALE SOLTO: desconta do total da pessoa. Pra entrar num serviço, alguém tem que dizer qual — o
+            seletor só oferece serviço do próprio profissional, e o app nunca escolhe sozinho. */}
+        {conta.valesSoltos.map((v) => <div className="finance-row acerto-linha" key={v.id}>
+          <div><strong>{compactDate(v.data)} · vale solto</strong><span>{v.descricao}</span></div>
+          <div className="agenda-acoes"><b className="saida">− {money(v.valor)}</b>
+            {conta.id && linhas.length > 0 && <React.Fragment>
+              <select value={escolhas["fin-" + v.id] || ""} onChange={(e) => setEscolhas({ ...escolhas, ["fin-" + v.id]: e.target.value })}><option value="">De qual serviço?</option>{linhas.map((l) => <option key={l.servico.id} value={l.servico.id}>{rotuloServico(l.servico)}</option>)}</select>
+              <button className="ghost" disabled={busyId === "vinc-" + v.id || !escolhas["fin-" + v.id]} onClick={() => descontarNoServico(v, conta)}>{busyId === "vinc-" + v.id ? "..." : "Amarrar"}</button>
+            </React.Fragment>}
+            {!conta.id && acerto.cadastro.length > 0 && <React.Fragment>
+              <select value={escolhas["dono-" + v.id] || ""} onChange={(e) => setEscolhas({ ...escolhas, ["dono-" + v.id]: e.target.value })}><option value="">De quem é?</option>{acerto.cadastro.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}</select>
+              <button className="ghost" disabled={busyId === "vinc-" + v.id || !escolhas["dono-" + v.id]} onClick={() => dizerDeQuemE(v, escolhas["dono-" + v.id])}>{busyId === "vinc-" + v.id ? "..." : "Vincular"}</button>
+            </React.Fragment>}
+            <button className="ghost" disabled={busyId === v.id} onClick={() => marcarAbatido(v)}>{busyId === v.id ? "..." : "Só abater"}</button>
+          </div>
         </div>)}
 
-        {/* O ACERTO PAGA O LÍQUIDO, NUNCA O CHEIO: o vale já saiu do caixa no dia em que ele pegou.
+        {/* PAGAMENTO SEM SERVIÇO: informação, não cobrança. Os antigos nunca vão ter serviço, e empilhar um
+            alerta por linha faria ele parar de ler a conta. Uma frase só; abre quem quiser amarrar. */}
+        {conta.pagamentosSoltos.length > 0 && <div className="acerto-resumo">
+          <span>{money(somaValores(conta.pagamentosSoltos))} pagos em {conta.pagamentosSoltos.length} lançamento(s) sem serviço dele — não entram em saldo nenhum.</span>
+          <button className="ghost" onClick={() => setAberto(aberto === chaveSoltos ? null : chaveSoltos)}>{aberto === chaveSoltos ? "Ocultar" : "Ver"}</button>
+        </div>}
+        {aberto === chaveSoltos && <div className="acerto-detalhe">
+          {conta.pagamentosSoltos.map((f) => <div className="finance-row acerto-linha" key={f.id}>
+            <div><strong>{compactDate(f.data)} · pagamento</strong><span>{descricaoFinanceiraVisivel(f.descricao)}</span></div>
+            <div className="agenda-acoes"><b>{money(f.valor)}</b>
+              {!f.servico_id && conta.servicos.length > 0 && <React.Fragment>
+                <select value={escolhas["fin-" + f.id] || ""} onChange={(e) => setEscolhas({ ...escolhas, ["fin-" + f.id]: e.target.value })}><option value="">De qual serviço?</option>{conta.servicos.map((l) => <option key={l.servico.id} value={l.servico.id}>{rotuloServico(l.servico)}</option>)}</select>
+                <button className="ghost" disabled={busyId === "vinc-" + f.id || !escolhas["fin-" + f.id]} onClick={() => descontarNoServico(f, conta)}>{busyId === "vinc-" + f.id ? "..." : "Amarrar"}</button>
+              </React.Fragment>}
+            </div>
+          </div>)}
+        </div>}
+
+        {(conta.abertos > 0 || conta.somaVales > 0 || conta.somaAvulsos > 0) && <div className="acerto-resumo"><span>
+          Serviços em aberto {money(conta.faltaServicos)}{conta.somaAvulsos ? ` + avulsos ${money(conta.somaAvulsos)}` : ""}{conta.somaVales ? ` − vales soltos ${money(conta.somaVales)}` : ""} = <strong>{conta.total >= 0 ? money(conta.total) + " a pagar" : money(-conta.total) + " adiantado"}</strong>
+        </span></div>}
+        {conta.semValor > 0 && <p className="ficha-note">Falta anotar a mão de obra de {conta.semValor} serviço(s). Enquanto isso eles não entram no total.</p>}
+
+        {/* O ACERTO DOS AVULSOS PAGA O LÍQUIDO, NUNCA O CHEIO: o vale já saiu do caixa no dia em que ele pegou.
             Pagar o total dos trabalhos aqui faria o mesmo dinheiro sair duas vezes. */}
-        {conta.pendencias > 0 && <p className="ficha-note">Falta valor em {conta.pendencias} trabalho(s) — o acerto não fecha assim, senão você paga por baixo.</p>}
-        {conta.trabalhos.length > 0 && (confirmando === conta.nome
+        {conta.avulsosSemValor > 0 && <p className="ficha-note">Falta valor em {conta.avulsosSemValor} trabalho(s) avulso(s) — o acerto não fecha assim, senão você paga por baixo.</p>}
+        {conta.avulsos.length > 0 && (confirmando === conta.chave
           ? <div className="agenda-acoes">
-              <span>{money(conta.somaTrabalho)} de trabalho {conta.somaVale ? `− ${money(conta.somaVale)} de vale ` : ""}= <strong>{money(Math.max(0, conta.liquido))} do caixa agora</strong></span>
+              <span>{money(conta.somaAvulsos)} de trabalho avulso {conta.somaVales ? `− ${money(conta.somaVales)} de vale ` : ""}= <strong>{money(Math.max(0, liquidoAvulsos))} do caixa agora</strong></span>
               <button className="primary" disabled={busyId === "acerto-" + conta.nome} onClick={() => acertar(conta)}>{busyId === "acerto-" + conta.nome ? "Fechando…" : "Confirmar acerto"}</button>
               <button className="ghost" onClick={() => setConfirmando(null)}>Cancelar</button>
             </div>
-          : <button className="ghost" disabled={conta.pendencias > 0} onClick={() => setConfirmando(conta.nome)}>Acertar com {conta.nome}</button>)}
-      </div>)}
+          : <button className="ghost" disabled={conta.avulsosSemValor > 0} onClick={() => setConfirmando(conta.chave)}>Acertar avulsos com {conta.nome}</button>)}
+      </div>; })}
+
+      {/* SERVIÇO EM ANDAMENTO SEM PROFISSIONAL não cai na conta de ninguém. Fica recolhido: boa parte é serviço
+          que ainda nem foi distribuído, e isso é estado normal, não pendência. */}
+      {filtroAtivo === "todos" && acerto.semProfissional.length > 0 && <div className="vale-fornecedor">
+        <div className="vale-fornecedor-head"><strong>{acerto.semProfissional.length} serviço(s) em andamento sem profissional vinculado</strong>
+          <button className="ghost" onClick={() => setAberto(aberto === "sem-prof" ? null : "sem-prof")}>{aberto === "sem-prof" ? "Ocultar" : "Ver"}</button></div>
+        {aberto === "sem-prof" && acerto.semProfissional.map(({ servico: s, sugestaoId }) => {
+          const chave = "serv-" + s.id;
+          const escolha = escolhas[chave] ?? sugestaoId;
+          return <div className="finance-row acerto-linha" key={s.id}>
+            <div><strong>{rotuloServico(s)}</strong><span>{statusLabel[s.status] || s.status}{(s.profissional || s.responsavel) ? ` · no texto: ${s.profissional || s.responsavel}` : ""}</span></div>
+            <div className="agenda-acoes">
+              <select value={escolha} onChange={(e) => setEscolhas({ ...escolhas, [chave]: e.target.value })}><option value="">Quem faz?</option>{acerto.cadastro.map((p) => <option key={p.id} value={p.id}>{p.nome}</option>)}</select>
+              <input value={combinados[s.id] || ""} onChange={(e) => setCombinados({ ...combinados, [s.id]: e.target.value })} placeholder="R$ combinado" inputMode="decimal" />
+              <button className="ghost" disabled={busyId === chave || !escolha} onClick={() => vincularServico(s, escolha)}>{busyId === chave ? "..." : "Vincular"}</button>
+            </div>
+          </div>;
+        })}
+      </div>}
     </section>
 
     {(abatidos.length > 0 || acertados.length > 0) && <section className="content-card"><div className="card-head"><div><p className="kicker">HISTÓRICO</p><h3>Já acertado</h3></div></div>
