@@ -4592,26 +4592,73 @@ function interlocutorCompromisso(a, svc, fornecedores, profissionais) {
   if ((forn || prof) && citaCliente) return { destino: "incerto", motivo: `envolve ${forn || prof} e o cliente` };
   return { destino: "cliente", motivo: "" };
 }
+// CONTEXTO DO LEAD (Diego, 08/10/2026: "a mensagem tem que ter contexto mais próximo do lead no momento,
+// tem uns que não batem"). Medido na agenda de 08/10: 7 de 11 mensagens de cliente saíam "Passando pra falar
+// do seu estofado" — inclusive pra capa de drone, 3 bancos de carro e peças de hamburgueria —, a ficha
+// "Sem nome" virava "Oi Sem", a Agatha (que ia MANDAR as medidas por vídeo) recebia "preciso passar aí pra
+// tirar as medidas", e a Rapha recebia "terminei seu orçamento" com a ficha sem valor nenhum.
+// Agora a frase lê o serviço inteiro: QUAL peça (título do serviço), EM QUE PÉ está (status + valor do
+// orçamento) e O QUE falta (próxima ação). Continua sem colar anotação interna: o título só escolhe.
+const PECAS_MENSAGEM = [
+  [/jogo de sofas?/, "o jogo de sofás", "o"], [/\bsofas\b|\b\d\s*\+\s*\d\b/, "os sofás", "os"], [/\bsofa\b/, "o sofá", "o"],
+  [/\bcabeceiras\b/, "as cabeceiras", "as"], [/\bcabeceira\b/, "a cabeceira", "a"],
+  [/\bpoltronas\b/, "as poltronas", "as"], [/\bpoltrona\b/, "a poltrona", "a"],
+  [/\bcadeiras\b/, "as cadeiras", "as"], [/\bcadeira\b/, "a cadeira", "a"],
+  [/\bbancos\b/, "os bancos", "os"], [/\bbanco\b/, "o banco", "o"],
+  [/\bassentos\b/, "os assentos", "os"], [/\bassento\b/, "o assento", "o"],
+  [/\bpuffs?\b|\bpufes?\b/, "o puff", "o"], [/\balmofadas\b/, "as almofadas", "as"], [/\bcolchao\b/, "o colchão", "o"],
+  [/\bcapas?\b/, "a capa", "a"], [/\bpecas\b/, "as peças", "as"], [/\bpeca\b/, "a peça", "a"],
+];
+// Título do serviço vem como "Peça — Nome do cliente"; o nome sai antes de procurar a peça.
+function pecaDoServico(svc) {
+  const t = semAcento(String(svc?.titulo || "").split(/\s+[—–]\s+/)[0]);
+  const hit = PECAS_MENSAGEM.find(([re]) => re.test(t));
+  return hit ? { com: hit[1], art: hit[2] } : { com: "o seu estofado", art: "o" };
+}
+// "Sem nome", "Cliente" e afins não são nome de gente: melhor "Oi, tudo bem?" do que "Oi Sem".
+function primeiroNomeCliente(svc) {
+  const nome = String(svc?.clientes?.nome || "").replace(/\(.*?\)/g, "").trim();
+  if (!nome || /^(sem nome|cliente|lead|desconhecido)\b/i.test(nome)) return "";
+  return nome.split(/\s+/)[0];
+}
+const deDa = (peca) => peca.com.replace(/^(o|a|os|as) /, (m, art) => ({ o: "do ", a: "da ", os: "dos ", as: "das " })[art]);
+const prontoDe = (peca) => ({ o: "pronto", a: "pronta", os: "prontos", as: "prontas" })[peca.art];
 function mensagemPadraoCompromisso(a, svc, hoje) {
-  const nome = svc?.clientes?.nome ? svc.clientes.nome.split(" ")[0] : "";
+  const nome = primeiroNomeCliente(svc);
   const oi = `Oi${nome ? " " + nome : ""}, tudo bem?`;
-  const alvo = `${svc?.proxima_acao || ""} ${a.titulo || ""}`.toLowerCase();
+  const alvo = semAcento(`${svc?.proxima_acao || ""} ${a.titulo || ""}`);
+  const peca = pecaDoServico(svc);
+  const Peca = peca.com[0].toUpperCase() + peca.com.slice(1);
+  const valor = Number(svc?.valor_orcamento) > 0 ? money(svc.valor_orcamento) : "";
+  const status = svc?.status || "";
   if (a.tipo !== "remoto") {
     const quando = quandoFalado(a.data, a.hora, hoje || hojeISO());
     // Sem ponto e sem endereço na ficha, marcar o horário não resolve: ele sai sem saber onde é.
     // Caso real de 24/08: Kely, visita às 10h, "endereço/localização pendente" no próprio evento.
     const cli = svc?.clientes || {};
     const pedeLocal = (!cli.latitude && !String(cli.endereco || "").trim()) ? " Me manda sua localização também, por favor." : "";
-    if (/entreg/.test(alvo)) return `${oi} Sua peça está pronta! Posso levar${quando}?${pedeLocal}`;
-    if (/buscar|retirad|retirar|pegar/.test(alvo)) return `${oi} Consigo passar${quando} pra buscar a peça. Fica bom pra você?${pedeLocal}`;
+    if (/entreg/.test(alvo)) return `${oi} ${Peca} já está ${prontoDe(peca)}! Posso levar${quando}?${pedeLocal}`;
+    if (/buscar|retirad|retirar|pegar/.test(alvo)) return `${oi} Consigo passar${quando} pra buscar ${peca.com}. Fica bom pra você?${pedeLocal}`;
+    if (/medi(r|da|cao)|avalia|visita/.test(alvo)) return `${oi} Consigo passar aí${quando} pra ver ${peca.com} e tirar as medidas. Fica bom pra você?${pedeLocal}`;
     return `${oi} Consigo passar aí${quando}. Fica bom pra você?${pedeLocal}`;
   }
-  if (/or[çc]amento pendente|mandar or[çc]amento|enviar or[çc]amento|passar or[çc]amento/.test(alvo)) return `${oi} Terminei de fazer seu orçamento aqui. Posso te mandar?`;
-  if (/confirmar hor[áa]rio|encaixar na rota|confirmar data/.test(alvo)) return `${oi} Consegue me confirmar um horário bom pra você? É pra eu encaixar direito na rota.`;
-  if (/medida/.test(alvo)) return `${oi} Preciso passar aí pra tirar as medidas. Que dia fica melhor pra você?`;
-  if (/decidir|marido|esposa|pensar|ver com/.test(alvo)) return `${oi} Passando pra saber se vocês já conseguiram decidir. Qualquer dúvida do orçamento eu explico.`;
-  if (/cobrar|retorno|resposta|aguardar|retomar|tentar contato|contato/.test(alvo)) return `${oi} Passando pra saber se você ainda tem interesse. Se tiver qualquer dúvida do orçamento, é só falar.`;
-  return `${oi} Passando pra falar do seu estofado. Consegue me dar um retorno?`;
+  // Serviço já fechado: o assunto é o andamento, nunca "ainda tem interesse?".
+  if (status === "pronto") return `${oi} ${Peca} já está ${prontoDe(peca)}! Qual o melhor dia e horário pra eu levar?`;
+  if (status === "producao" || status === "agendado" && /entreg/.test(alvo)) return `${oi} Passando pra te atualizar: ${peca.com} está em produção aqui. Assim que ficar ${prontoDe(peca)} te aviso pra combinar a entrega.`;
+  if (/visita (a|na) loja|vir (a|na) loja|passar na loja|trazer/.test(alvo)) return `${oi} Tudo certo pra você passar aqui na loja com ${peca.com}? Me avisa o horário que eu te espero.`;
+  if (/confirmar hor[a]rio|encaixar na rota|confirmar data/.test(alvo)) return `${oi} Consegue me confirmar um horário bom pra você? É pra eu encaixar direito na rota.`;
+  if (/video|pedir (as )?medidas|mandar (as )?medidas|enviar (as )?medidas/.test(alvo)) return `${oi}${/video/.test(alvo) ? " Vi o vídeo aqui." : ""} Consegue me mandar as medidas ${deDa(peca)} (largura, profundidade e altura)? Com elas já te passo o valor.`;
+  if (/medi(r|da|cao)/.test(alvo)) return `${oi} Preciso tirar as medidas ${deDa(peca)} pra fechar seu orçamento. Que dia e horário ficam bons pra você?`;
+  if (/identificar|a confirmar|a identificar|o que precisa|escopo/.test(alvo)) return `${oi} Consegue me mandar uma foto ${deDa(peca)} e me contar o que você quer fazer? Assim já te passo o valor.${/visita/.test(alvo) ? " Se preferir, posso passar aí pra ver." : ""}`;
+  if (/or[c]amento pendente|mandar or[c]amento|enviar or[c]amento|passar or[c]amento|mandar preco|(mandar|passar|responder\b.*\b)valor/.test(alvo)) return valor
+    ? `${oi} Terminei seu orçamento ${deDa(peca)} aqui. Posso te mandar?`
+    : `${oi} Estou fechando seu orçamento ${deDa(peca)} e já te mando por aqui.`;
+  // Daqui pra baixo é retomada. Com orçamento enviado, a conversa é sobre ELE (com o valor); sem
+  // orçamento, não existe "dúvida do orçamento" pra tirar — o passo é pedir o que falta pra orçar.
+  if (valor && /decidir|marido|esposa|pensar|ver com/.test(alvo)) return `${oi} Conseguiram decidir sobre ${peca.com}? O orçamento ficou em ${valor}; se quiser, te ajudo a escolher o tecido.`;
+  if (valor && (status === "orcamento" || /cobrar|retorno|resposta|aguardar|retomar|contato|decisao/.test(alvo))) return `${oi} Passando pra saber se ficou alguma dúvida no orçamento ${deDa(peca)} (${valor}). Posso te ajudar a decidir?`;
+  if (/decidir|marido|esposa|pensar|ver com/.test(alvo)) return `${oi} Passando pra saber se vocês já conseguiram decidir sobre ${peca.com}. Qualquer dúvida eu explico.`;
+  return `${oi} Passando pra saber se você ainda tem interesse no serviço ${deDa(peca)}. Se me mandar uma foto, já te passo um valor.`;
 }
 
 // Card de AÇÃO do Painel: diz o que fazer, já com a mensagem pronta e o botão do WhatsApp.
