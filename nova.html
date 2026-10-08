@@ -2619,8 +2619,9 @@ const WHATSAPP_PACOTE = "com.whatsapp.w4b";
 // A regra canônica (HANDOFF_TECNICO_WHATSAPP_BUSINESS, 01/09/2026, na Biblioteca) é "sempre Business
 // quando o fluxo nasce no app". Esta lista é a exceção NOMINAL a ela — cada número entra porque o Diego
 // pediu aquele caso, nunca por inferência do app. Segunda entrada: Luana (+55 61 99137-8814), recado de
-// 18/09/2026, mesmo motivo da Sabrina — a conversa dela vive no WhatsApp comum.
-const WHATSAPP_COMUM_POR_NUMERO = new Set(["61996031000", "61991378814"]);
+// 18/09/2026, mesmo motivo da Sabrina — a conversa dela vive no WhatsApp comum. Terceira: Rosana Alves
+// (+55 61 99184-4530), 08/10/2026 — chegou pelo WhatsApp comum (o número do Google Meu Negócio).
+const WHATSAPP_COMUM_POR_NUMERO = new Set(["61996031000", "61991378814", "61991844530"]);
 function pacoteWhatsapp(tel) {
   const d = String(tel || "").replace(/\D/g, "");
   const semPais = d.length > 11 && d.startsWith("55") ? d.slice(2) : d;
