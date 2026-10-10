@@ -4656,9 +4656,14 @@ function mensagemPadraoCompromisso(a, svc, hoje) {
     : `${oi} Estou fechando seu orçamento ${deDa(peca)} e já te mando por aqui.`;
   // Daqui pra baixo é retomada. Com orçamento enviado, a conversa é sobre ELE (com o valor); sem
   // orçamento, não existe "dúvida do orçamento" pra tirar — o passo é pedir o que falta pra orçar.
+  // Caso Hugo, 10/10/2026: orçamento já passado e o cliente "vai separar o dinheiro e te chama".
+  // Pedir foto aqui é errado: ele já mandou foto e já recebeu o valor.
+  if (valor && /dinheiro|separar|pagamento|salario|receber/.test(alvo)) return `${oi} Conseguiu ver aí sobre ${peca.com}? O valor ficou em ${valor}. Quando der certo pra você, a gente já marca.`;
   if (valor && /decidir|marido|esposa|pensar|ver com/.test(alvo)) return `${oi} Conseguiram decidir sobre ${peca.com}? O orçamento ficou em ${valor}; se quiser, te ajudo a escolher o tecido.`;
-  if (valor && (status === "orcamento" || /cobrar|retorno|resposta|aguardar|retomar|contato|decisao/.test(alvo))) return `${oi} Passando pra saber se ficou alguma dúvida no orçamento ${deDa(peca)} (${valor}). Posso te ajudar a decidir?`;
+  if (valor && (status === "orcamento" || /cobrar|retorno|resposta|aguardar|retomar|contato|decisao|follow-?up/.test(alvo))) return `${oi} Passando pra saber se ficou alguma dúvida no orçamento ${deDa(peca)} (${valor}). Posso te ajudar a decidir?`;
   if (/decidir|marido|esposa|pensar|ver com/.test(alvo)) return `${oi} Passando pra saber se vocês já conseguiram decidir sobre ${peca.com}. Qualquer dúvida eu explico.`;
+  // Com valor já passado, nunca pedir foto de novo: o assunto é o orçamento.
+  if (valor) return `${oi} Passando pra saber se ficou alguma dúvida no orçamento ${deDa(peca)} (${valor}). Posso te ajudar a decidir?`;
   return `${oi} Passando pra saber se você ainda tem interesse no serviço ${deDa(peca)}. Se me mandar uma foto, já te passo um valor.`;
 }
 
