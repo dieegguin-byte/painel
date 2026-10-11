@@ -619,6 +619,32 @@ button.sutil{opacity:.55;font-size:12px}
 .abertura-nome{font:500 20px Georgia,serif;color:var(--cream);margin:0 0 6px}
 .abertura-pontos span{display:inline-block;width:6px;height:6px;margin:0 3px;border-radius:50%;background:var(--orange2);animation:pontinho 1.2s infinite}
 .abertura-pontos span:nth-child(2){animation-delay:.15s}.abertura-pontos span:nth-child(3){animation-delay:.3s}
+/* EFEITOS, 4ª RODADA (11/10/2026, teste do Fable): CONFETE NA ENTREGA. Só quando um serviço vira
+   "Entregue" (dinheiro entrando), nunca no Concluído de rotina, pra não cansar. 36 pedacinhos em transform e
+   opacity, 1,3 s, o nó é removido do DOM no fim. Quem liga "reduzir movimento" não vê nada. */
+@keyframes confeteCai{0%{transform:translate3d(0,0,0) rotate(0);opacity:1}65%{opacity:1}100%{transform:translate3d(var(--cx),var(--cy),0) rotate(var(--cr));opacity:0}}
+.confete{position:fixed;left:50%;top:58%;z-index:1600;pointer-events:none}
+.confete i{position:absolute;left:0;top:0;width:9px;height:14px;border-radius:2px;background:var(--cor);animation:confeteCai 1.3s cubic-bezier(.15,.7,.35,1) forwards;will-change:transform,opacity}
+.confete i:nth-child(3n){width:7px;height:7px;border-radius:50%}
+.confete i:nth-child(4n){width:12px;height:6px}
+/* PAINEL, MAIS EFEITOS (11/10/2026, Diego: "No painel tem como mais efeito?"). */
+/* 1. Cascata ao rolar: cada bloco do Painel sobe e aparece quando entra na tela. A classe `revela` só é
+   posta pelo JS quando o IntersectionObserver existe, então sem ele nada fica escondido. */
+@keyframes blocoRevela{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.painel-rolagem>.revela{opacity:0}
+.painel-rolagem>.revela.visto{opacity:1;animation:blocoRevela .45s cubic-bezier(.2,.8,.3,1) both;animation-delay:var(--atraso,0ms)}
+/* 2. Rotina riscada: ao marcar feita, um risco atravessa o título, o check se desenha no botão e a linha
+   escorrega pra fora antes de sumir da lista. */
+@keyframes riscoCresce{to{transform:scaleX(1)}}
+@keyframes rotinaSai{to{opacity:0;transform:translateX(40px)}}
+.rotina-item .rotina-esq strong{position:relative;display:inline-block;max-width:100%}
+.rotina-item.riscando .rotina-esq strong::after{content:"";position:absolute;left:0;right:0;top:55%;height:2px;border-radius:2px;background:#9bc7a7;transform:scaleX(0);transform-origin:left;animation:riscoCresce .32s ease-out forwards}
+.rotina-item.riscando{animation:rotinaSai .3s .36s ease-in forwards;border-left-color:#75a987}
+.rotina-item.riscando .rotina-esq{color:var(--dim)}
+.rotina-item .notice-check{width:18px;height:18px;margin:-2px 0}
+/* 3. Inclinação 3D: o cartão inclina pro lado do dedo e volta com mola (o JS põe as variáveis). */
+.inclina{transform:perspective(700px) rotateX(var(--rx)) rotateY(var(--ry)) scale(.985)!important;transition:none}
+.inclina-volta{transition:transform .5s cubic-bezier(.2,1.5,.4,1)!important}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -651,6 +677,75 @@ document.addEventListener("pointerdown", (e) => {
   clearTimeout(el._toqueT);
   el._toqueT = setTimeout(() => el.classList.remove("toque", "toque-rel"), 550);
 }, { passive: true });
+// CONFETE NA ENTREGA (11/10/2026): espalha pedacinhos laranja e creme a partir do meio da tela e some em
+// 1,3 s. Fora do React, igual ao brilho no toque: cria o nó, remove sozinho. Chamado só no "Entregue".
+function comemorar() {
+  if (semMovimento()) return;
+  try {
+    const cores = ["#ed9057", "#ffc6a0", "#fff3e4", "#d86d36", "#9acaaa"];
+    const caixa = document.createElement("div"); caixa.className = "confete"; caixa.setAttribute("aria-hidden", "true");
+    for (let k = 0; k < 36; k++) {
+      const i = document.createElement("i");
+      const ang = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.25, dist = 160 + Math.random() * 240;
+      i.style.setProperty("--cx", `${Math.cos(ang) * dist}px`);
+      i.style.setProperty("--cy", `${Math.sin(ang) * dist + 260}px`);
+      i.style.setProperty("--cr", `${(Math.random() - 0.5) * 1080}deg`);
+      i.style.setProperty("--cor", cores[k % cores.length]);
+      i.style.animationDelay = `${Math.random() * 120}ms`;
+      caixa.appendChild(i);
+    }
+    document.body.appendChild(caixa);
+    vibrar([18, 50, 18, 50, 30]);
+    setTimeout(() => caixa.remove(), 1600);
+  } catch (e) {}
+}
+// CASCATA AO ROLAR (11/10/2026): blocos do Painel entram suaves quando aparecem na tela. Observa os filhos
+// diretos de `.painel-rolagem` (menos a grade de números, que já tem cascata própria). Fora do React.
+(() => {
+  if (!("IntersectionObserver" in window) || !("MutationObserver" in window) || semMovimento()) return;
+  let fila = 0, zera = 0;
+  const io = new IntersectionObserver((lista) => {
+    for (const e of lista) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target);
+      e.target.style.setProperty("--atraso", `${Math.min(fila++, 6) * 70}ms`);
+      e.target.classList.add("visto");
+      clearTimeout(zera); zera = setTimeout(() => { fila = 0; }, 250);
+    }
+  }, { threshold: 0.06 });
+  const olhar = (painel) => {
+    painel.querySelectorAll(":scope > *:not(.metric-grid):not(.funil-filtros):not(.revela)").forEach((el) => {
+      el.classList.add("revela"); io.observe(el);
+    });
+  };
+  new MutationObserver((muts) => muts.forEach((m) => m.addedNodes.forEach((n) => {
+    if (n.nodeType !== 1) return;
+    const painel = n.closest(".painel-rolagem") || n.querySelector(".painel-rolagem");
+    if (painel) olhar(painel);
+  }))).observe(document.body, { childList: true, subtree: true });
+  document.querySelectorAll(".painel-rolagem").forEach(olhar);
+})();
+// INCLINAÇÃO 3D (11/10/2026): o cartão pende pro lado onde o dedo encostou e volta com mola ao soltar.
+// Só transform; nada no DOM do React além de duas classes e duas variáveis.
+(() => {
+  const SEL = ".metric-card, .rotina-item, .compromisso-card, .funil-item, .queue-item, .customer-list article";
+  let atual = null;
+  const soltar = () => {
+    if (!atual) return; const el = atual; atual = null;
+    el.classList.remove("inclina"); el.classList.add("inclina-volta");
+    setTimeout(() => el.classList.remove("inclina-volta"), 520);
+  };
+  document.addEventListener("pointerdown", (e) => {
+    if (semMovimento() || e.pointerType === "mouse" && e.button !== 0) return;
+    const el = e.target.closest?.(SEL); if (!el) return;
+    const r = el.getBoundingClientRect(); if (!r.width || r.height > 420) return;
+    const px = (e.clientX - r.left) / r.width - 0.5, py = (e.clientY - r.top) / r.height - 0.5;
+    el.style.setProperty("--rx", `${(-py * 7).toFixed(2)}deg`); el.style.setProperty("--ry", `${(px * 7).toFixed(2)}deg`);
+    el.classList.remove("inclina-volta"); el.classList.add("inclina"); atual = el;
+  }, { passive: true });
+  ["pointerup", "pointercancel"].forEach((ev) => document.addEventListener(ev, soltar, { passive: true }));
+  document.addEventListener("scroll", soltar, { passive: true, capture: true });
+})();
 // NÚMEROS QUE CONTAM: o valor do cartão sobe de 0 até o número na primeira vez que aparece. Depois disso,
 // mudança de valor aparece direto (contar de novo a cada atualização seria enfeite atrapalhando leitura).
 function NumeroAnimado({ valor }) {
@@ -5378,6 +5473,9 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = fal
   // Atualização otimista: o onChanged recarrega tudo e demora, então a linha só sumiria segundos depois e
   // parecia que o clique não pegou. Aqui a data nova vale na hora e o recarregamento só reconcilia.
   const [feitasAgora, setFeitasAgora] = useState({});
+  // RISCADA ANTES DE SUMIR (11/10/2026): a linha fica ~0,65 s riscando e escorregando pra fora, e só então
+  // some da lista. Quem liga "reduzir movimento" vê sumir na hora, como antes.
+  const [riscandoId, setRiscandoId] = useState(null);
   const comOverride = rotinas.map((r) => feitasAgora[r.id] ? { ...r, ultima_execucao: feitasAgora[r.id] } : r);
   const pendentes = comOverride.map((r) => ({ r, st: statusRotina(r, hoje) })).filter((x) => x.st.estado !== "futura")
     .sort((a, b) => a.st.dias - b.st.dias);
@@ -5389,6 +5487,7 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = fal
     if (demo) { notify("Na demonstração a rotina não é salva.", "info"); return; }
     setBusyId(rotina.id);
     try {
+      if (!semMovimento()) { setRiscandoId(rotina.id); vibrar(10); await new Promise((ok) => setTimeout(ok, 650)); setRiscandoId(null); }
       setFeitasAgora((atual) => ({ ...atual, [rotina.id]: quando }));
       const { error } = await db.from("rotinas").update({ ultima_execucao: quando }).eq("id", rotina.id);
       if (error) { setFeitasAgora((atual) => { const copia = { ...atual }; delete copia[rotina.id]; return copia; }); throw error; }
@@ -5403,7 +5502,7 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = fal
   // O título já diz quantas estão atrasadas: isso basta pra decidir se vale abrir agora.
   const atrasadas = pendentes.filter((x) => x.st.estado === "vencida");
   const doDia = pendentes.filter((x) => x.st.estado !== "vencida");
-  const linha = ({ r, st }) => <article className={`rotina-item ${st.estado === "vencida" ? "cor-alta" : "cor-media"}`} key={r.id}>
+  const linha = ({ r, st }) => <article className={`rotina-item ${st.estado === "vencida" ? "cor-alta" : "cor-media"}${riscandoId === r.id ? " riscando" : ""}`} key={r.id}>
     <div className="rotina-esq">
       <strong>{r.titulo}</strong>
       <span>a cada {r.intervalo_dias} dia(s){r.hora ? ` · ${horaFalada(r.hora)}` : ""}</span>
@@ -5412,7 +5511,7 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = fal
     <div className="rotina-dir">
       <em className={st.estado === "vencida" ? "atrasada" : ""}>{textoRotina(st)}</em>
       <div className="agenda-acoes">
-        <button className="ghost" disabled={busyId === r.id} onClick={() => marcarFeita(r, hoje)}>{busyId === r.id ? "..." : "✓ Fiz hoje"}</button>
+        <button className="ghost" disabled={busyId === r.id} onClick={() => marcarFeita(r, hoje)}>{riscandoId === r.id ? <svg className="notice-check" viewBox="0 0 24 24" aria-label="Feita"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : busyId === r.id ? "..." : "✓ Fiz hoje"}</button>
         <button className="ghost" disabled={busyId === r.id} onClick={() => marcarFeita(r, ontem)}>Fiz ontem</button>
       </div>
     </div>
@@ -6304,7 +6403,7 @@ function CapacidadeCard({ services, finances, fornecedores, appointments, agenda
         dados: { servicoId, valor, data: hojeISO(), por: "diego", recebimento: recebido > 0 ? { valor: recebido, status: "pago", data: hojeISO() } : null,
           overrideMaterial: precisaOverride, motivoOverrideMaterial: precisaOverride ? (motivoMat.trim() || null) : null },
       });
-      notify(recebido > 0 ? `Entregue. ${money(recebido)} no caixa.` : "Entregue. Serviço fechado (sem recebimento).", "ok");
+      comemorar(); notify(recebido > 0 ? `Entregue. ${money(recebido)} no caixa.` : "Entregue. Serviço fechado (sem recebimento).", "ok");
       setEntregando(null); setOverrideMat(null); setMotivoMat(""); await onChanged?.();
     } catch (e) {
       // Material em aberto não bloqueia de vez: vira um segundo clique consciente, que fica no histórico.
@@ -6762,7 +6861,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   };
   const rotinasPendentesHoje = (rotinas || []).filter((r) => statusRotina(r, today).estado !== "futura").length;
   const atrasadoMaisAntigo = atrasados.length ? [...atrasados].sort((x, y) => String(x.data).localeCompare(String(y.data)))[0] : null;
-  return <div className="page-grid">
+  return <div className="page-grid painel-rolagem">
     {(atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}
       {/* ETIQUETA NUM CONTROLE SÓ (Diego, 11/10/2026: a linha de 14 botões empurrava os cards pra baixo). */}
       {todosDoTipo.length > 0 && <select className={`filtro-selo-select${filtroSelo ? " ativo" : ""}`} value={filtroSelo || ""} onChange={(e) => setFiltroSelo(e.target.value || null)} aria-label="Filtrar por etiqueta">
@@ -7136,7 +7235,7 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, servic
     const valor = parseMoedaBR(valorEntrega);
     if (!valor || valor <= 0) { notify("Qual foi o valor do serviço? Sem isso não dá pra marcar como entregue.", "error"); return; }
     if (!svc?.id) { notify("Esta entrega não está ligada a um serviço.", "error"); return; }
-    if (demo) { notify("Entregue (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: svc.id, statusServico: "entregue", valorServico: valor, proximaAcao: null }); return; }
+    if (demo) { comemorar(); notify("Entregue (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: svc.id, statusServico: "entregue", valorServico: valor, proximaAcao: null }); return; }
     setBusy(true);
     try {
       const operacao = await processarEventoOperacaoBahia(db, {
@@ -7151,7 +7250,7 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, servic
           const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
         } catch (upErr) { notify("Entrega fechada, mas os prints não anexaram: " + upErr.message, "error"); }
       }
-      notify("Entregue. Serviço, agenda e histórico foram atualizados juntos.", "ok");
+      comemorar(); notify("Entregue. Serviço, agenda e histórico foram atualizados juntos.", "ok");
       onDone({ agendaId: appt.id, servicoId: svc.id, statusServico: "entregue", valorServico: valor, proximaAcao: null, resultado: operacao.resultado });
     } catch (e) {
       // Mesma regra da Capacidade: material em aberto vira segundo clique consciente, registrado no histórico.
@@ -9774,7 +9873,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
         dados: { servicoId, valor, data: hojeISO(), por: "diego", recebimento: recebido > 0 ? { valor: recebido, status: "pago", data: hojeISO() } : null,
           overrideMaterial: overrideMat === servicoId, motivoOverrideMaterial: overrideMat === servicoId ? "Confirmado no segundo clique, pela ficha do cliente" : null },
       });
-      notify(recebido > 0 ? `Entregue. ${money(recebido)} no caixa.` : "Entregue. Serviço fechado (sem recebimento).", "ok");
+      comemorar(); notify(recebido > 0 ? `Entregue. ${money(recebido)} no caixa.` : "Entregue. Serviço fechado (sem recebimento).", "ok");
       setEntregando(null); setOverrideMat(null); await load(); onChanged?.();
     } catch (e) {
       // Mesma regra da Capacidade e da agenda: material em aberto pede um segundo clique, e ele fica gravado.
