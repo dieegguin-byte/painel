@@ -576,6 +576,49 @@ button.sutil{opacity:.55;font-size:12px}
 .barra-compacta.visivel{transform:none;opacity:1}
 @media(max-width:850px){.barra-compacta{left:0}}
 @media(prefers-reduced-motion:reduce){.barra-compacta{display:none}}
+/* EFEITOS, 3ª RODADA (11/10/2026, Diego: "não ficou lento pode fazer mais"). Mesmo critério: transform e
+   opacity; os gestos (arrastar gaveta, puxar pra atualizar) são JS leve com ouvintes passivos. */
+@keyframes avisoMola{0%{transform:translateY(-120%) scale(.96);opacity:0}60%{transform:translateY(6px) scale(1);opacity:1}100%{transform:none;opacity:1}}
+@keyframes avisoTempo{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+@keyframes checkDesenha{to{stroke-dashoffset:0}}
+@keyframes piscaSobe{0%{color:#9bf0b4;text-shadow:0 0 14px #5fd38a88}100%{color:inherit;text-shadow:none}}
+@keyframes piscaDesce{0%{color:#ff9d90;text-shadow:0 0 14px #e8847788}100%{color:inherit;text-shadow:none}}
+@keyframes fundoVivo{0%{transform:translate3d(-8%,0,0) scale(1)}50%{transform:translate3d(6%,4%,0) scale(1.12)}100%{transform:translate3d(-2%,-3%,0) scale(1.04)}}
+@keyframes seloEntra{from{transform:scale(.6) rotate(-8deg);opacity:0}to{transform:none;opacity:1}}
+@keyframes seloBrilha{0%,100%{box-shadow:0 17px 40px #0008,inset 0 1px 0 #fff5,0 0 0 0 #ed905700}50%{box-shadow:0 17px 40px #0008,inset 0 1px 0 #fff5,0 0 38px 6px #ed905755}}
+@keyframes seloReflexo{0%{transform:translateX(-120%) skewX(-20deg)}60%,100%{transform:translateX(220%) skewX(-20deg)}}
+@keyframes pontinho{0%,80%,100%{opacity:.2}40%{opacity:1}}
+@keyframes girar{to{transform:rotate(360deg)}}
+/* 1. Gaveta: o JS move a janela enquanto o dedo arrasta (ver "ARRASTAR A GAVETA") */
+.modal-card.arrastando{animation:none;transition:none}
+.modal-card.soltando{transition:transform .22s ease}
+/* 2. Puxar pra atualizar (só com o app instalado; no navegador o próprio navegador já faz isso) */
+.puxar-atualizar{position:fixed;top:0;left:50%;z-index:1400;width:40px;height:40px;margin-left:-20px;border-radius:50%;display:grid;place-items:center;background:#211915;border:1px solid var(--line2);box-shadow:0 8px 20px #0009;color:var(--orange2);font-size:20px;pointer-events:none;transform:translateY(-60px);opacity:0}
+.puxar-atualizar.pronto{color:#ffd2b0;border-color:#d86d36}
+.puxar-atualizar.girando i{display:block;animation:girar .7s linear infinite}
+.puxar-atualizar i{font-style:normal;display:block}
+/* 3 e 4. Avisos: entram com mola, barrinha do tempo, deslizar some, ✓ que se desenha */
+.notice{display:flex;align-items:center;gap:10px;overflow:hidden;animation:avisoMola .5s cubic-bezier(.2,.9,.3,1.2) backwards;touch-action:none}
+.notice::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:currentColor;opacity:.35;transform-origin:left;animation:avisoTempo 4.2s linear forwards}
+.notice.saindo{transition:transform .2s ease,opacity .2s ease;opacity:0}
+.notice-check{flex:0 0 22px;width:22px;height:22px;fill:none;stroke:#8fe0a6;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:24;stroke-dashoffset:24;animation:checkDesenha .45s .15s ease-out forwards}
+/* 5. Pílula que escorrega entre as abas da barra de baixo */
+.mobile-nav button{position:relative;z-index:1}
+.mobile-nav button.active{background:transparent;box-shadow:none}
+.nav-pilula{position:absolute;top:6px;bottom:6px;left:0;width:0;border-radius:10px;background:linear-gradient(180deg,#d86d3638,#d86d361a);box-shadow:inset 0 0 0 1px #d86d3680,0 0 18px #d86d3633;pointer-events:none;z-index:0;opacity:0}
+.nav-pilula.pronta{opacity:1;transition:transform .35s cubic-bezier(.3,1.25,.5,1),width .35s cubic-bezier(.3,1.25,.5,1)}
+/* 6. Número que mudou depois de atualizar pisca */
+.num-sobe{animation:piscaSobe 1.4s ease-out}
+.num-desce{animation:piscaDesce 1.4s ease-out}
+/* 7. Fundo vivo: brilho cobre atrás do topo, bem devagar */
+.product-shell{isolation:isolate}
+.fundo-vivo{position:fixed;top:-30vh;left:-20vw;width:140vw;height:75vh;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 60% 40%,#c2581f2e 0,#c2581f00 60%);animation:fundoVivo 22s ease-in-out infinite alternate;will-change:transform}
+/* 8. Abertura com a marca */
+.loading-screen .brand-seal{position:relative;overflow:hidden;animation:seloEntra .6s cubic-bezier(.2,.9,.3,1.3) backwards,seloBrilha 2s .6s ease-in-out infinite}
+.loading-screen .brand-seal::after{content:"";position:absolute;inset:0;width:40%;background:linear-gradient(90deg,transparent,#fff6,transparent);animation:seloReflexo 2.2s .5s ease-in-out infinite}
+.abertura-nome{font:500 20px Georgia,serif;color:var(--cream);margin:0 0 6px}
+.abertura-pontos span{display:inline-block;width:6px;height:6px;margin:0 3px;border-radius:50%;background:var(--orange2);animation:pontinho 1.2s infinite}
+.abertura-pontos span:nth-child(2){animation-delay:.15s}.abertura-pontos span:nth-child(3){animation-delay:.3s}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -583,7 +626,7 @@ button.sutil{opacity:.55;font-size:12px}
 <div id="classic-bridge-badge" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9999;pointer-events:none;padding:5px 9px;border-radius:999px;background:#1f422d;border:1px solid #47785a;color:#dff5e5;font:700 10px/1.2 Inter,system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 6px 18px #0006;white-space:nowrap">Claude conectado ✓</div>
 <!-- Este "Carregando" é de propósito HTML puro, sem depender de nada: é a primeira coisa que aparece,
      mesmo que todo o resto falhe. O React limpa a #root quando desenha, então ele some sozinho. -->
-<div id="root"><div class="loading-screen" id="tb-carregando"><div><div class="brand-seal">TB</div><p>Carregando o painel…</p></div></div></div>
+<div id="root"><div class="loading-screen" id="tb-carregando"><div><div class="brand-seal">TB</div><p class="abertura-nome">Tapeçaria Bahia</p><p class="abertura-pontos" aria-label="Carregando o painel"><span></span><span></span><span></span></p></div></div></div>
 <p id="agenda-caixa-erro" role="alert" hidden>Não foi possível carregar a proteção da Caixa. Recarregue o app antes de concluir uma triagem.</p>
 <script src="agenda-caixa.js" onerror="document.getElementById('agenda-caixa-erro').hidden=false"></script>
 <script type="text/plain" id="app-source">
@@ -619,7 +662,12 @@ function NumeroAnimado({ valor }) {
   const formata = (v) => v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas, useGrouping: agrupa });
   const [texto, setTexto] = useState(() => achado && !semMovimento() ? alvo.replace(achado[0], formata(0)) : alvo);
   const jaContou = React.useRef(false);
+  const anterior = React.useRef(null);
+  const [pisca, setPisca] = useState({ classe: "", n: 0 });
   useEffect(() => {
+    const atual = achado ? parseFloat(achado[0].replace(/\./g, "").replace(",", ".")) * (/-\s*R?\$?\s*\d/.test(alvo) ? -1 : 1) : null;
+    const antes = anterior.current; anterior.current = atual;
+    if (jaContou.current && antes !== null && atual !== null && atual !== antes) setPisca((p) => ({ classe: atual > antes ? "num-sobe" : "num-desce", n: p.n + 1 }));
     if (jaContou.current || !achado || semMovimento()) { jaContou.current = true; setTexto(alvo); return; }
     jaContou.current = true;
     const total = parseFloat(achado[0].replace(/\./g, "").replace(",", "."));
@@ -635,8 +683,78 @@ function NumeroAnimado({ valor }) {
     quadro = requestAnimationFrame(passo);
     return () => cancelAnimationFrame(quadro);
   }, [alvo]);
-  return primitivo ? texto : valor;
+  if (!primitivo) return valor;
+  return pisca.classe ? <span key={pisca.n} className={pisca.classe}>{texto}</span> : texto;
 }
+// ARRASTAR A GAVETA (celular): puxando pelo topo da janela (área do puxador) ela desce com o dedo; soltando
+// depois de ~110px, fecha pelo mesmo caminho de tocar fora (mousedown no fundo escuro). Antes disso, volta.
+(() => {
+  let card = null, y0 = 0, dy = 0, t0 = 0;
+  document.addEventListener("touchstart", (e) => {
+    if (window.innerWidth > 768) return;
+    const c = e.target.closest?.(".modal-overlay:not(.barreira-aba) > .modal-card");
+    if (!c || c.scrollTop > 0) return;
+    const toque = e.touches[0];
+    if (toque.clientY - c.getBoundingClientRect().top > 56) return;
+    card = c; y0 = toque.clientY; dy = 0; t0 = Date.now();
+    card.classList.remove("soltando"); card.classList.add("arrastando");
+  }, { passive: true });
+  document.addEventListener("touchmove", (e) => {
+    if (!card) return;
+    dy = Math.max(0, e.touches[0].clientY - y0);
+    card.style.transform = `translateY(${dy}px)`;
+  }, { passive: true });
+  document.addEventListener("touchend", () => {
+    if (!card) return;
+    const c = card; card = null;
+    c.classList.remove("arrastando"); c.classList.add("soltando");
+    const rapido = dy > 40 && dy / Math.max(1, Date.now() - t0) > 0.6;
+    if (dy > 110 || rapido) {
+      c.style.transform = "translateY(100%)";
+      vibrar(8);
+      setTimeout(() => {
+        const fundo = c.parentElement;
+        if (fundo) fundo.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      }, 200);
+    } else c.style.transform = "";
+  }, { passive: true });
+})();
+// PUXAR PRA ATUALIZAR: só com o app instalado na tela inicial. No navegador comum o Chrome/Safari já recarrega
+// a página no mesmo gesto, e os dois juntos brigariam. Chama o mesmo loadAll do botão "Atualizar".
+(() => {
+  const instalado = () => { try { return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; } catch (e) { return false; } };
+  let el = null, y0 = null, dy = 0;
+  const bolinha = () => {
+    if (!el) { el = document.createElement("div"); el.className = "puxar-atualizar"; el.innerHTML = "<i>↻</i>"; document.body.appendChild(el); }
+    return el;
+  };
+  document.addEventListener("touchstart", (e) => {
+    y0 = null;
+    if (!instalado() || window.scrollY > 0 || !window.__tbAtualizar) return;
+    if (e.target.closest?.(".modal-overlay, .mobile-nav, input, textarea, select")) return;
+    y0 = e.touches[0].clientY; dy = 0;
+  }, { passive: true });
+  document.addEventListener("touchmove", (e) => {
+    if (y0 === null) return;
+    dy = e.touches[0].clientY - y0;
+    if (dy <= 0 || window.scrollY > 0) { if (el) el.style.opacity = 0; return; }
+    const b = bolinha(), d = Math.min(dy * 0.5, 90);
+    b.classList.remove("girando"); b.classList.toggle("pronto", d >= 70);
+    b.style.transition = "none"; b.style.opacity = Math.min(1, d / 40);
+    b.style.transform = `translateY(${d - 40}px) rotate(${d * 4}deg)`;
+  }, { passive: true });
+  document.addEventListener("touchend", async () => {
+    if (y0 === null || !el) { y0 = null; return; }
+    y0 = null;
+    const b = el;
+    b.style.transition = "transform .25s ease, opacity .25s ease";
+    if (Math.min(dy * 0.5, 90) >= 70) {
+      b.style.transform = "translateY(30px)"; b.classList.add("girando"); vibrar(10);
+      try { await window.__tbAtualizar(); } catch (e) {}
+    }
+    b.classList.remove("girando", "pronto"); b.style.opacity = 0; b.style.transform = "translateY(-60px)";
+  }, { passive: true });
+})();
 function Esqueleto() { return <div className="esqueleto" aria-label="Carregando"><span /><span /><span /></div>; }
 
 const SUPABASE_URL = "https://iymlzdcloaeyybhefywp.supabase.co";
@@ -3193,6 +3311,20 @@ function Home() {
     const obs = new IntersectionObserver(([e]) => setRolou(!e.isIntersecting));
     obs.observe(no); observadorCabecalho.current = obs;
   }, []);
+  // PÍLULA DA BARRA DE BAIXO: mede o botão ativo e escorrega até ele. Na primeira medida só aparece (sem viagem).
+  useEffect(() => {
+    const medir = () => {
+      const pilula = document.querySelector("nav.mobile-nav .nav-pilula");
+      const ativo = document.querySelector("nav.mobile-nav button.active");
+      if (!pilula || !ativo) return;
+      pilula.style.width = `${ativo.offsetWidth}px`;
+      pilula.style.transform = `translateX(${ativo.offsetLeft}px)`;
+      if (!pilula.classList.contains("pronta")) requestAnimationFrame(() => pilula.classList.add("pronta"));
+    };
+    const quadro = requestAnimationFrame(medir);
+    window.addEventListener("resize", medir);
+    return () => { cancelAnimationFrame(quadro); window.removeEventListener("resize", medir); };
+  });
   // Tira o `ir` do endereço depois de usar: senão todo recarregar voltaria pra caixa.
   useEffect(() => {
     try {
@@ -3252,7 +3384,7 @@ function Home() {
   const [addAgendaOpen, setAddAgendaOpen] = useState(false);
 
   const notify = useCallback((text, kind = "info") => {
-    setNotice({ text, kind });
+    setNotice({ text, kind, id: Date.now() });
     if (kind === "ok") vibrar([12, 40, 12]);
     window.setTimeout(() => setNotice(null), 4200);
   }, []);
@@ -3380,6 +3512,8 @@ function Home() {
     if (!firstError) { try { window.localStorage.setItem(CACHE_OFFLINE, JSON.stringify({ em: Date.now(), pacote })); } catch (e) { /* aparelho sem espaço: segue sem cache */ } }
     setLoading(false);
   }, [db, demo, notify, session, aplicarPacote]);
+  // O gesto de puxar pra atualizar (fora do React) chama isto.
+  useEffect(() => { window.__tbAtualizar = loadAll; return () => { if (window.__tbAtualizar === loadAll) window.__tbAtualizar = null; }; }, [loadAll]);
 
   useEffect(() => { if (demo || session) loadAll(); }, [demo, session, loadAll]);
 
@@ -4033,7 +4167,15 @@ function Home() {
     abaAnterior.current = { tab, classe: de < 0 || para < 0 ? "" : para > de ? " vem-direita" : " vem-esquerda" };
   }
   return <div className={`product-shell mode-${mode}`}>
-    {notice && <div className={`notice ${notice.kind}`}>{notice.text}</div>}
+    {notice && <div key={notice.id} className={`notice ${notice.kind}`}
+      onTouchStart={(e) => { const t = e.touches[0]; e.currentTarget._x0 = t.clientX; e.currentTarget._y0 = t.clientY; }}
+      onTouchMove={(e) => { const el = e.currentTarget, t = e.touches[0]; const dx = t.clientX - el._x0, dy = Math.min(0, t.clientY - el._y0); el.style.transform = `translate(${dx}px, ${dy}px)`; el.style.opacity = String(Math.max(0.2, 1 - Math.abs(dx) / 260)); }}
+      onTouchEnd={(e) => { const el = e.currentTarget, t = e.changedTouches[0]; const dx = t.clientX - el._x0, dy = t.clientY - el._y0;
+        if (Math.abs(dx) > 70 || dy < -40) { el.classList.add("saindo"); el.style.transform = Math.abs(dx) > 70 ? `translateX(${dx > 0 ? 120 : -120}%)` : "translateY(-130%)"; setTimeout(() => setNotice(null), 200); }
+        else { el.style.transform = ""; el.style.opacity = ""; } }}>
+      {notice.kind === "ok" && <svg className="notice-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
+      <span>{notice.text}</span></div>}
+    <div className="fundo-vivo" aria-hidden="true" />
     {loading && <div className="barra-carregando" />}
     {/* SEM SINAL: a tela precisa dizer que está velha, senão ele decide em cima de dado defasado sem saber.
         Fica fixo no topo, acima de tudo, porque nesse estado nada mais na tela pode ser confiado às cegas. */}
@@ -4073,7 +4215,7 @@ function Home() {
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
       </div></BarreiraDaAba>
     </main>
-    <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => irParaAba(item)}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
+    <nav className="mobile-nav"><span className="nav-pilula" aria-hidden="true" />{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => irParaAba(item)}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
     {/* As janelas por cima também têm barreira própria: ficha com dado ruim fecha sozinha, não o app. */}
     {showGuia && <BarreiraDaAba nome="O guia da IA" onFechar={() => setShowGuia(false)}><GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} /></BarreiraDaAba>}
     {fichaId && <BarreiraDaAba nome="A ficha do cliente" onFechar={() => setFichaId(null)}><FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} /></BarreiraDaAba>}
