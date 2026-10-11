@@ -6572,7 +6572,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} appointments={appointments} agendaHistorico={agendaHistorico} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
     <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
-    <CaixaCard inbox={inbox} today={today} onAbrir={onAbrirCaixa} />
+    {/* SAIU DO PAINEL o card Caixa (Diego, 11/10/2026: "está muito cheio"). A aba Caixa no menu já mostra a contagem. */}
     {/* CONVERSA ENCERRADA SEM DESTINO — ver triagensSemDestino(). Fica recolhido e só existe quando há
         caso: se o Classic estiver encerrando tudo com destino, este card não aparece nunca, que é o
         estado desejado. */}
