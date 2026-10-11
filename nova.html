@@ -6477,6 +6477,83 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   };
   const atrasadoMaisAntigo = atrasados.length ? [...atrasados].sort((x, y) => String(x.data).localeCompare(String(y.data)))[0] : null;
   return <div className="page-grid">
+    {(atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}</div>}
+    {todosDoTipo.length > 0 && <div className="funil-filtros filtro-selos">
+      <button className={!filtroSelo ? "active" : ""} onClick={() => setFiltroSelo(null)}>Todas ({todosDoTipo.length})</button>
+      {Object.entries(contagemSelos).sort((x, y) => y[1] - x[1]).map(([r, n]) => <button key={r} className={filtroSelo === r ? "active" : ""} onClick={() => setFiltroSelo(filtroSelo === r ? null : r)}>{r} ({n})</button>)}
+    </div>}
+    {filtroSelo && escondidosPorSelo > 0 && <p className="filtro-aviso">Mostrando só “{filtroSelo}” · {escondidosPorSelo} {escondidosPorSelo === 1 ? "compromisso escondido" : "compromissos escondidos"} · <button type="button" onClick={() => setFiltroSelo(null)}>Mostrar todos</button></p>}
+    {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes"
+      cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
+      <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
+        ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasDeAtraso(atrasadoMaisAntigo.data, today)} dia(s)`
+        : "De 1 a 14 dias de atraso"}</span></>}>
+      {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
+    {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
+        informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
+    {/* O aviso de rota vai no `resumo`, ou seja, FORA do recolhível: rota que volta é erro que ele precisa
+        ver sem abrir nada. Aqui é a casa definitiva dele — ele fala do deslocamento de HOJE. */}
+    <CardRecolhivel
+      cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
+      <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}</h3>
+      {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora</span>}</>}
+      resumo={<AvisoRota compromissos={hojeAll} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />}>
+      {hoje.length > 0
+        ? [...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)
+        : <div className="empty-state"><b>O dia está livre.</b><span>Nada marcado para {compactDate(today)}.</span></div>}
+    </CardRecolhivel>
+    {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
+    {/* Bloco COBRANÇAS removido do Painel em 23/08/2026 a pedido do Diego. O ciclo de cobrança
+       continua vivo no código (CobrancaCard, onCobrou, onRespondeu, onEncerrar) e nada foi
+       apagado do banco — saiu só o bloco da tela do Painel. */}
+    {/* Só data POSTERIOR a hoje. O "N ainda hoje" saiu daqui: hoje tem card próprio, e repetir o mesmo
+        compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
+    {futuros.length > 0 && <CardRecolhivel
+      cabecalho={<><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
+      {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
+    {pessoaisAtrasados.length > 0 && <CardRecolhivel cabecalho={<><p className="kicker">PESSOAIS</p><h3>{pessoaisAtrasados.length} item(ns) com data vencida</h3><span className="ficha-note" style={{ margin: 0 }}>Concluir ou remarcar no card Pessoais</span></>}>
+      {[...pessoaisAtrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
+    {antigos.length > 0 && <CardRecolhivel id="secao-revisao-antiga" className="content-card revisao-antiga"
+      cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
+      <span className="ficha-note" style={{ margin: 0 }}>{antigosAcima30.length} com mais de 30 dias · histórico preservado para revisão</span></>}>
+      {[...antigos].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
+    {filtroTipo !== "todos" && atrasados.length === 0 && antigos.length === 0 && pessoaisAtrasados.length === 0 && hoje.length === 0 && futuros.length === 0 && (atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
+    {(() => {
+      // CONTA CHEGANDO: entra sozinho no Painel 3 dias antes do vencimento (e fica enquanto estiver vencida),
+      // com o caixa possível do lado — porque a pergunta que ele faz é "tenho de onde tirar?".
+      const r = resumoContas(finances, services, today);
+      const temPrazo = r.vencidas.length > 0 || r.urgentes.length > 0;
+      if (!temPrazo && !r.semVencimento.length) return null;
+      // Descrição de lançamento pode ser um parágrafo inteiro — o Classic escreve o contexto nela. No Painel
+      // isso vira parede de texto no meio da rota; aqui ele só precisa reconhecer a conta, então corta.
+      const curto = (f) => { const t = (descricaoFinanceiraVisivel(f.descricao) || f.categoria || "").trim(); return t.length > 64 ? t.slice(0, 61).trimEnd() + "…" : t; };
+      // O PAR "QUANTO DEVO / DE ONDE TIRO" FICA FORA DO RECOLHÍVEL, porque é ele que responde a pergunta que
+      // traz o Diego a este card.
+      // GRANDE E LEGÍVEL FECHADO (recado de 14/09/2026). O card tinha título de 12px e linhas de 9px, e QUAL conta
+      // vencia só aparecia depois de abrir — foi assim que a Havan passou. Agora a conta que vence primeiro fica
+      // no cabeçalho, com o prazo em palavra e em cor; abrir mostra todas. Classe própria (`contas-card`) porque
+      // `warning-card` também veste o card Pessoais, e aumentar a letra lá não foi pedido.
+      const alerta = [...r.vencidas, ...r.urgentes];
+      const linhaConta = (f) => { const rv = rotuloVencimento(f, today); return <span className="conta-linha" key={f.id}>
+        <em className={`conta-prazo ${rv.nivel}`}>{rv.texto}</em><strong>{curto(f)}</strong><b>{money(f.valor)}</b>
+      </span>; };
+      return <CardRecolhivel className="warning-card contas-card"
+        cabecalho={temPrazo
+          ? <><b>{money(r.totalVencidas + r.totalUrgentes)} a pagar {r.vencidas.length ? "— tem conta vencida" : `nos próximos ${DIAS_ANTECEDENCIA_CONTAS} dias`}</b>
+              {linhaConta(alerta[0])}
+              {alerta.length > 1 && <span>e mais {alerta.length - 1} conta(s) — toque em abrir</span>}</>
+          : <b>{money(r.totalSemVencimento)} a pagar quando houver saldo</b>}
+        resumo={r.potencialCaixa > 0
+          ? <span>💰 Dá pra levantar {money(r.potencialCaixa)}{r.prontosSemCobranca.length ? ` — ${r.prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")} sem pagamento registrado` : ""}</span>
+          : <span>Nenhum serviço pronto pra cobrar no momento.</span>}>
+        {alerta.map(linhaConta)}
+        {onVerAPagar && <button type="button" className="ghost" onClick={onVerAPagar}>Ver todas em A pagar</button>}
+        {/* SEM PRAZO fica no Painel de propósito: foi assim que a dívida do Ozair saiu da rotina — o lembrete
+            irmão não nasceu e só o Financeiro guardou. Aqui ela não vence, não cobra e não some. */}
+        {r.semVencimento.slice(0, 3).map((f) => <span key={f.id}>{curto(f)} · {money(f.valor)} · sem prazo, pagar quando houver saldo</span>)}
+        {r.semVencimento.length > 3 && <span>e mais {r.semVencimento.length - 3} sem prazo marcado</span>}
+      </CardRecolhivel>;
+    })()}
     {addInbox && <CardRecolhivel cabecalho={<><p className="kicker">ANOTAR AGORA</p><h3>O que aconteceu?</h3></>}>
       <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />
     </CardRecolhivel>}{/* Os dois cartões da Caixa ("Para Claude" e "Aguardando você") saíram em 23/08/2026 junto
@@ -6550,48 +6627,6 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         </article>)}</div>
       </section>;
     })()}
-    {(atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}</div>}
-    {todosDoTipo.length > 0 && <div className="funil-filtros filtro-selos">
-      <button className={!filtroSelo ? "active" : ""} onClick={() => setFiltroSelo(null)}>Todas ({todosDoTipo.length})</button>
-      {Object.entries(contagemSelos).sort((x, y) => y[1] - x[1]).map(([r, n]) => <button key={r} className={filtroSelo === r ? "active" : ""} onClick={() => setFiltroSelo(filtroSelo === r ? null : r)}>{r} ({n})</button>)}
-    </div>}
-    {filtroSelo && escondidosPorSelo > 0 && <p className="filtro-aviso">Mostrando só “{filtroSelo}” · {escondidosPorSelo} {escondidosPorSelo === 1 ? "compromisso escondido" : "compromissos escondidos"} · <button type="button" onClick={() => setFiltroSelo(null)}>Mostrar todos</button></p>}
-    {(() => {
-      // CONTA CHEGANDO: entra sozinho no Painel 3 dias antes do vencimento (e fica enquanto estiver vencida),
-      // com o caixa possível do lado — porque a pergunta que ele faz é "tenho de onde tirar?".
-      const r = resumoContas(finances, services, today);
-      const temPrazo = r.vencidas.length > 0 || r.urgentes.length > 0;
-      if (!temPrazo && !r.semVencimento.length) return null;
-      // Descrição de lançamento pode ser um parágrafo inteiro — o Classic escreve o contexto nela. No Painel
-      // isso vira parede de texto no meio da rota; aqui ele só precisa reconhecer a conta, então corta.
-      const curto = (f) => { const t = (descricaoFinanceiraVisivel(f.descricao) || f.categoria || "").trim(); return t.length > 64 ? t.slice(0, 61).trimEnd() + "…" : t; };
-      // O PAR "QUANTO DEVO / DE ONDE TIRO" FICA FORA DO RECOLHÍVEL, porque é ele que responde a pergunta que
-      // traz o Diego a este card.
-      // GRANDE E LEGÍVEL FECHADO (recado de 14/09/2026). O card tinha título de 12px e linhas de 9px, e QUAL conta
-      // vencia só aparecia depois de abrir — foi assim que a Havan passou. Agora a conta que vence primeiro fica
-      // no cabeçalho, com o prazo em palavra e em cor; abrir mostra todas. Classe própria (`contas-card`) porque
-      // `warning-card` também veste o card Pessoais, e aumentar a letra lá não foi pedido.
-      const alerta = [...r.vencidas, ...r.urgentes];
-      const linhaConta = (f) => { const rv = rotuloVencimento(f, today); return <span className="conta-linha" key={f.id}>
-        <em className={`conta-prazo ${rv.nivel}`}>{rv.texto}</em><strong>{curto(f)}</strong><b>{money(f.valor)}</b>
-      </span>; };
-      return <CardRecolhivel className="warning-card contas-card"
-        cabecalho={temPrazo
-          ? <><b>{money(r.totalVencidas + r.totalUrgentes)} a pagar {r.vencidas.length ? "— tem conta vencida" : `nos próximos ${DIAS_ANTECEDENCIA_CONTAS} dias`}</b>
-              {linhaConta(alerta[0])}
-              {alerta.length > 1 && <span>e mais {alerta.length - 1} conta(s) — toque em abrir</span>}</>
-          : <b>{money(r.totalSemVencimento)} a pagar quando houver saldo</b>}
-        resumo={r.potencialCaixa > 0
-          ? <span>💰 Dá pra levantar {money(r.potencialCaixa)}{r.prontosSemCobranca.length ? ` — ${r.prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")} sem pagamento registrado` : ""}</span>
-          : <span>Nenhum serviço pronto pra cobrar no momento.</span>}>
-        {alerta.map(linhaConta)}
-        {onVerAPagar && <button type="button" className="ghost" onClick={onVerAPagar}>Ver todas em A pagar</button>}
-        {/* SEM PRAZO fica no Painel de propósito: foi assim que a dívida do Ozair saiu da rotina — o lembrete
-            irmão não nasceu e só o Financeiro guardou. Aqui ela não vence, não cobra e não some. */}
-        {r.semVencimento.slice(0, 3).map((f) => <span key={f.id}>{curto(f)} · {money(f.valor)} · sem prazo, pagar quando houver saldo</span>)}
-        {r.semVencimento.length > 3 && <span>e mais {r.semVencimento.length - 3} sem prazo marcado</span>}
-      </CardRecolhivel>;
-    })()}
     {/* SAIU o card "material sem dia marcado pra pedir": desde 25/07 o material que entra na lista de compras
         já nasce com compromisso na agenda, então esse aviso só acenderia pra lançamento velho — ruído diário
         pra um caso que não se repete. O que trava produção continua avisado no card "esperando material". */}
@@ -6616,41 +6651,6 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       // continua valendo (agendado = fechado); o que saiu foi o card diário.
       return null;
     })()}
-    {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes"
-      cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
-      <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
-        ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasDeAtraso(atrasadoMaisAntigo.data, today)} dia(s)`
-        : "De 1 a 14 dias de atraso"}</span></>}>
-      {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
-    {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
-        informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
-    {/* O aviso de rota vai no `resumo`, ou seja, FORA do recolhível: rota que volta é erro que ele precisa
-        ver sem abrir nada. Aqui é a casa definitiva dele — ele fala do deslocamento de HOJE. */}
-    <CardRecolhivel
-      cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
-      <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}</h3>
-      {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora</span>}</>}
-      resumo={<AvisoRota compromissos={hojeAll} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />}>
-      {hoje.length > 0
-        ? [...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)
-        : <div className="empty-state"><b>O dia está livre.</b><span>Nada marcado para {compactDate(today)}.</span></div>}
-    </CardRecolhivel>
-    {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
-    {/* Bloco COBRANÇAS removido do Painel em 23/08/2026 a pedido do Diego. O ciclo de cobrança
-       continua vivo no código (CobrancaCard, onCobrou, onRespondeu, onEncerrar) e nada foi
-       apagado do banco — saiu só o bloco da tela do Painel. */}
-    {/* Só data POSTERIOR a hoje. O "N ainda hoje" saiu daqui: hoje tem card próprio, e repetir o mesmo
-        compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
-    {futuros.length > 0 && <CardRecolhivel
-      cabecalho={<><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
-      {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
-    {pessoaisAtrasados.length > 0 && <CardRecolhivel cabecalho={<><p className="kicker">PESSOAIS</p><h3>{pessoaisAtrasados.length} item(ns) com data vencida</h3><span className="ficha-note" style={{ margin: 0 }}>Concluir ou remarcar no card Pessoais</span></>}>
-      {[...pessoaisAtrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
-    {antigos.length > 0 && <CardRecolhivel id="secao-revisao-antiga" className="content-card revisao-antiga"
-      cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
-      <span className="ficha-note" style={{ margin: 0 }}>{antigosAcima30.length} com mais de 30 dias · histórico preservado para revisão</span></>}>
-      {[...antigos].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
-    {filtroTipo !== "todos" && atrasados.length === 0 && antigos.length === 0 && pessoaisAtrasados.length === 0 && hoje.length === 0 && futuros.length === 0 && (atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
     {/* DEPOIS DOS COMPROMISSOS, DE PROPÓSITO (Diego, 24/08: "um card lá embaixo de compromissos"). Comprar
         material é consequência da rota do dia, não concorrente dela: ele decide onde vai, e aí olha o que
         aproveita comprar no caminho. Se subisse pro topo, competiria com a agenda pela primeira olhada. */}
