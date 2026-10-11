@@ -630,9 +630,9 @@ button.sutil{opacity:.55;font-size:12px}
 /* PAINEL, MAIS EFEITOS (11/10/2026, Diego: "No painel tem como mais efeito?"). */
 /* 1. Cascata ao rolar: cada bloco do Painel sobe e aparece quando entra na tela. A classe `revela` só é
    posta pelo JS quando o IntersectionObserver existe, então sem ele nada fica escondido. */
-@keyframes blocoRevela{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes blocoRevela{from{opacity:0;transform:translateY(36px) scale(.94)}to{opacity:1;transform:none}}
 .painel-rolagem>.revela{opacity:0}
-.painel-rolagem>.revela.visto{opacity:1;animation:blocoRevela .45s cubic-bezier(.2,.8,.3,1) both;animation-delay:var(--atraso,0ms)}
+.painel-rolagem>.revela.visto{opacity:1;animation:blocoRevela .6s cubic-bezier(.2,.9,.3,1.1) both;animation-delay:var(--atraso,0ms)}
 /* 2. Rotina riscada: ao marcar feita, um risco atravessa o título, o check se desenha no botão e a linha
    escorrega pra fora antes de sumir da lista. */
 @keyframes riscoCresce{to{transform:scaleX(1)}}
@@ -643,22 +643,44 @@ button.sutil{opacity:.55;font-size:12px}
 .rotina-item.riscando .rotina-esq{color:var(--dim)}
 .rotina-item .notice-check{width:18px;height:18px;margin:-2px 0}
 /* 3. Inclinação 3D: o cartão inclina pro lado do dedo e volta com mola (o JS põe as variáveis). */
-.inclina{transform:perspective(700px) rotateX(var(--rx)) rotateY(var(--ry)) scale(.985)!important;transition:none}
+.inclina{transform:perspective(700px) rotateX(var(--rx)) rotateY(var(--ry)) scale(.97)!important;transition:none}
 .inclina-volta{transition:transform .5s cubic-bezier(.2,1.5,.4,1)!important}
-/* PAINEL ORGANIZADO (11/10/2026): grupos. Cada card de antes vira uma linha lisa dentro do grupo. */
-.grupo-card{padding:14px 18px 6px}
-.grupo-card>.kicker{margin-bottom:4px}
-.grupo-card>.content-card,.grupo-card>.warning-card,.grupo-card>.pend-linha{background:none;border:0;border-radius:0;box-shadow:none;padding:12px 0;margin:0;border-top:1px solid var(--line);animation:none}
-.grupo-card>.content-card::after,.grupo-card>.warning-card::after{display:none}
+/* PAINEL ORGANIZADO + PREMIUM (11/10/2026, Diego: "ficou simplificado demais... quero algo premium, cards
+   bonitos e efeitos mais fortes"). Grupos continuam; cada linha é um mini-card com selo de número colorido.
+   Tons: vermelho (atraso), âmbar (revisão/avançar), verde (retorno/leads), azul (pessoais), laranja (produção). */
+@keyframes linhaEntra{from{opacity:0;transform:translateX(-22px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes seloPop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.18);opacity:1}100%{transform:none;opacity:1}}
+@keyframes luzPassa{0%{transform:translateX(-140%) skewX(-18deg)}45%,100%{transform:translateX(340%) skewX(-18deg)}}
+@keyframes contaPulsa{0%,100%{box-shadow:0 0 0 2px #df6a5d66,0 0 18px #df6a5d33}50%{box-shadow:0 0 0 3px #df6a5dcc,0 0 36px 4px #df6a5d66}}
+.tom-vermelho{--tom:#df6a5d;--tom2:#8e3a30}.tom-ambar{--tom:#e4bd72;--tom2:#8c6a2b}.tom-verde{--tom:#9bc7a7;--tom2:#3f7a52}.tom-azul{--tom:#8fb8dc;--tom2:#35628a}.tom-laranja{--tom:#ed9057;--tom2:#9f4621}
+.grupo-card{position:relative;padding:16px 14px 14px;counter-reset:linhas;background:linear-gradient(160deg,#1e1714,#141110);border-color:var(--line2)}
+.grupo-card::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;border-radius:18px 18px 0 0;background:linear-gradient(90deg,#ed9057,#d86d3600 70%)}
+.grupo-titulo{font:500 22px Georgia,serif;text-transform:none;letter-spacing:0;color:var(--cream);margin:0 4px 12px}
+.grupo-total{position:absolute;top:14px;right:16px;font-style:normal;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;background:#d86d3626;border:1px solid #d86d3666;color:#ffcfac}
+.grupo-total::before{content:counter(linhas)}
+.grupo-card>.com-selo{counter-increment:linhas;background:linear-gradient(150deg,#ffffff0c,#ffffff02 50%),var(--surface);border:1px solid var(--line);border-left:3px solid var(--tom);border-radius:14px;padding:12px 12px 12px 10px;margin:0 0 8px;box-shadow:inset 0 1px 0 #ffffff10,0 1px 2px #0000004d,0 10px 24px -12px #000000a6;animation:linhaEntra .5s cubic-bezier(.2,.9,.3,1.15) backwards;transition:border-color .2s,box-shadow .2s}
+.grupo-card>.com-selo:nth-child(2){animation-delay:.08s}.grupo-card>.com-selo:nth-child(3){animation-delay:.16s}.grupo-card>.com-selo:nth-child(4){animation-delay:.24s}.grupo-card>.com-selo:nth-child(5){animation-delay:.32s}.grupo-card>.com-selo:nth-child(n+6){animation-delay:.4s}
+.grupo-card>.com-selo.aberto{border-color:var(--tom);box-shadow:inset 0 1px 0 #ffffff10,0 0 0 1px var(--tom),0 0 22px -4px var(--tom)}
+.grupo-card>.com-selo::after{display:none}
+.grupo-card .card-toggle{gap:12px}
 .grupo-card .card-toggle .kicker{display:none}
-.grupo-card .card-toggle h3{font-size:15px;font-weight:600;line-height:1.3}
+.grupo-card .card-toggle h3{font-size:15px;font-weight:600;line-height:1.3;color:var(--cream)}
 .grupo-card .ficha-note{font-size:11px}
-.grupo-card>.warning-card .card-toggle h3,.grupo-card>.atrasados-recentes .card-toggle h3{color:#ffb9ae}
-.grupo-card .card-corpo{margin-top:10px}
-.pend-linha{width:100%;display:flex;justify-content:space-between;align-items:center;gap:12px;color:inherit;text-align:left;font:inherit}
-.pend-linha h3{font-size:15px;font-weight:600;margin:0;color:#b9d9c3}
+.grupo-card .card-corpo{margin-top:12px}
+.selo-num{flex:none;width:46px;height:46px;border-radius:14px;display:grid;place-items:center;position:relative;background:linear-gradient(145deg,var(--tom),var(--tom2));box-shadow:0 8px 18px -6px var(--tom),inset 0 1px 0 #ffffff55;animation:seloPop .55s .25s cubic-bezier(.2,.9,.3,1.3) backwards}
+.selo-num b{font:800 20px/1 Inter,system-ui,sans-serif;color:#fff9f1;text-shadow:0 1px 2px #0006}
+.selo-num small{position:absolute;right:-5px;bottom:-5px;width:18px;height:18px;border-radius:50%;background:#15100d;border:1px solid var(--line2);display:grid;place-items:center;font-size:10px;line-height:1}
+.pend-linha{width:100%;display:flex;align-items:center;gap:12px;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.pend-linha h3{flex:1;font-size:15px;font-weight:600;margin:0;color:var(--cream)}
 .pend-linha i{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);white-space:nowrap}
 .grupo-card:not(:has(.card-toggle,.pend-linha)){display:none}
+/* Hoje em destaque: degradê laranja, data grande e um reflexo de luz passando devagar */
+.hoje-card{position:relative;overflow:hidden;background:linear-gradient(160deg,#4a2211 0,#2a1812 38%,#17120f 100%);border-color:#d86d3655;box-shadow:inset 0 1px 0 #ffffff1a,0 1px 2px #0000004d,0 18px 40px -14px #c2581f66}
+.hoje-card::before{content:"";position:absolute;top:-20%;bottom:-20%;left:0;width:34%;background:linear-gradient(90deg,transparent,#ffb07a14,transparent);pointer-events:none;animation:luzPassa 7s 1.2s ease-in-out infinite}
+.hoje-card .card-toggle .kicker{font-size:11px;letter-spacing:2px;color:#ffb07a}
+.hoje-card .card-toggle h3{font:500 25px Georgia,serif;color:#fff3e4}
+/* Contas vencida: brilho pulsando mais forte */
+.contas-card::after{animation:contaPulsa 1.8s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -722,7 +744,7 @@ function comemorar() {
     for (const e of lista) {
       if (!e.isIntersecting) continue;
       io.unobserve(e.target);
-      e.target.style.setProperty("--atraso", `${Math.min(fila++, 6) * 70}ms`);
+      e.target.style.setProperty("--atraso", `${Math.min(fila++, 6) * 90}ms`);
       e.target.classList.add("visto");
       clearTimeout(zera); zera = setTimeout(() => { fila = 0; }, 250);
     }
@@ -742,7 +764,7 @@ function comemorar() {
 // INCLINAÇÃO 3D (11/10/2026): o cartão pende pro lado onde o dedo encostou e volta com mola ao soltar.
 // Só transform; nada no DOM do React além de duas classes e duas variáveis.
 (() => {
-  const SEL = ".metric-card, .rotina-item, .compromisso-card, .funil-item, .queue-item, .customer-list article";
+  const SEL = ".metric-card, .rotina-item, .compromisso-card, .funil-item, .queue-item, .customer-list article, .grupo-card > .com-selo";
   let atual = null;
   const soltar = () => {
     if (!atual) return; const el = atual; atual = null;
@@ -754,7 +776,7 @@ function comemorar() {
     const el = e.target.closest?.(SEL); if (!el) return;
     const r = el.getBoundingClientRect(); if (!r.width || r.height > 420) return;
     const px = (e.clientX - r.left) / r.width - 0.5, py = (e.clientY - r.top) / r.height - 0.5;
-    el.style.setProperty("--rx", `${(-py * 7).toFixed(2)}deg`); el.style.setProperty("--ry", `${(px * 7).toFixed(2)}deg`);
+    el.style.setProperty("--rx", `${(-py * 13).toFixed(2)}deg`); el.style.setProperty("--ry", `${(px * 13).toFixed(2)}deg`);
     el.classList.remove("inclina-volta"); el.classList.add("inclina"); atual = el;
   }, { passive: true });
   ["pointerup", "pointercancel"].forEach((ev) => document.addEventListener(ev, soltar, { passive: true }));
@@ -1032,7 +1054,7 @@ function ProntidaoButton({ service, db, demo, notify, onChanged }) {
 function ProntosParaEntregarCard({ services, onOpenFicha }) {
   const prontos = (services || []).filter(servicoPronto);
   if (!prontos.length) return null; // dentro do grupo Produção, linha vazia não aparece (11/10/2026)
-  return <CardRecolhivel cabecalho={<><p className="kicker">PRODUÇÃO CONCLUÍDA</p><h3>Prontos para entregar · {prontos.length}</h3></>}>
+  return <CardRecolhivel selo={prontos.length} tom="laranja" icone="📦" cabecalho={<><p className="kicker">PRODUÇÃO CONCLUÍDA</p><h3>Prontos para entregar · {prontos.length}</h3></>}>
     {!prontos.length && <p>Nenhum serviço aguardando entrega.</p>}
     {prontos.map((s) => <article className="capacidade-servico" key={s.id}>
       <strong>{s.clientes?.nome || "Cliente"}</strong><span>{s.titulo}</span>
@@ -5466,10 +5488,14 @@ function ComposerCaixa({ composer, setComposer, files, setFiles, addInbox, busy,
 // SEMPRE COMEÇA FECHADO, sem exceção e sem memória. Diego, 04/08: "quero tudo recolhível sem abrir sozinho
 // no painel principal ao iniciar". Card que abre sozinho porque o app achou urgente vira o estado normal, e
 // aí nada é urgente — foi exatamente o que aconteceu com as rotinas atrasadas.
-function CardRecolhivel({ className, id, cabecalho, resumo, children }) {
+// `selo`/`tom`/`icone` (11/10/2026, Painel premium): número grande num selo colorido à esquerda do título.
+// Só é usado dentro dos grupos do Painel; sem `selo` o card fica como sempre foi.
+function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null }) {
   const [aberto, setAberto] = useState(false);
-  return <section id={id} className={className || "content-card"}>
+  const comSelo = selo !== null && selo !== undefined;
+  return <section id={id} className={`${className || "content-card"}${comSelo ? ` com-selo tom-${tom}` : ""}${aberto ? " aberto" : ""}`}>
     <button type="button" className="card-toggle" aria-expanded={aberto} onClick={() => setAberto((v) => !v)}>
+      {comSelo && <span className="selo-num" aria-hidden="true"><b>{selo}</b>{icone && <small>{icone}</small>}</span>}
       <div>{cabecalho}</div>
       <i>{aberto ? "▾ fechar" : "▸ abrir"}</i>
     </button>
@@ -5759,7 +5785,7 @@ function ServicosSemProximoPassoCard({ services, appointments, agendaHistorico, 
       .sort((a, b) => (a.s.status === "agendado") - (b.s.status === "agendado") || String(a.s.prazo || "9999").localeCompare(String(b.s.prazo || "9999")));
   }, [services, appointments, agendaHistorico, inbox, idsEncaixe]);
   if (!parados.length) return null;
-  return <CardRecolhivel
+  return <CardRecolhivel selo={parados.length} tom="ambar" icone="⚠"
     cabecalho={<><p className="kicker">PRECISA AVANÇAR</p>
       <h3>{parados.length} serviço(s) fechado(s) sem encaminhamento ativo</h3>
       {/* O título mudou de "sem próximo passo" pra "precisa avançar" porque quase nenhum destes está sem
@@ -6296,7 +6322,7 @@ function RetornosVencidosCard({ services, today, onVerLeads, onOpenFicha, notify
   // Mostra os 8 mais parados; o resto fica atrás do botão que leva pra aba Leads já filtrada. Despejar 61
   // linhas no Painel seria trocar um problema invisível por uma parede que ele também não lê.
   const visiveis = vencidos.slice(0, 8);
-  return <CardRecolhivel
+  return <CardRecolhivel selo={vencidos.length} tom="verde" icone="↩"
     cabecalho={<><p className="kicker">ESPERANDO RETORNO</p>
       <h3>{vencidos.length} cliente(s) com a data de retorno vencida</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{antigos ? `${antigos} há mais de 15 dias` : "nenhum há mais de 15 dias"}{semAcao ? ` · ${semAcao} sem próxima ação escrita` : ""}</span></>}>
@@ -6459,7 +6485,7 @@ function CapacidadeCard({ services, finances, fornecedores, appointments, agenda
   const ativosTotal = nomes.reduce((n, [, lista]) => n + lista.length, 0);
   // Fechado, o card também tem que dizer que há fantasma — foi fechado que o Diego "nem viu direito".
   const paradosTotal = nomes.reduce((n, [, lista]) => n + lista.filter(parado).length, 0);
-  return <CardRecolhivel
+  return <CardRecolhivel selo={ativosTotal} tom="laranja" icone="🔨"
     cabecalho={<><p className="kicker">CAPACIDADE</p><h3>{ativosTotal} serviço(s) com profissional</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{nomes.map(([nome, lista]) => `${nome === SEM_PROFISSIONAL ? "⚠ sem dono" : nome} ${lista.length}`).join(" · ")}{paradosTotal ? ` · ⚠ ${paradosTotal} parado(s), talvez já entregue(s)` : ""}</span></>}>
     <div className="capacidade-profissionais">{nomes.map(([nome, lista]) => { const isAberto = aberto === nome; return <div className={`capacidade-item${isAberto ? " active" : ""}`} key={nome}>
@@ -6888,7 +6914,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
     {/* O aviso de rota vai no `resumo`, ou seja, FORA do recolhível: rota que volta é erro que ele precisa
         ver sem abrir nada. Aqui é a casa definitiva dele — ele fala do deslocamento de HOJE. */}
-    <CardRecolhivel
+    <CardRecolhivel className="content-card hoje-card"
       cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
       <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${rotinasPendentesHoje} rotina(s)` : ""}</h3>
       {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora</span>}</>}
@@ -6904,21 +6930,21 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         porque repetiam o que as linhas de Pendências já contam; o card de Rotinas solto saiu porque as
         rotinas já estão dentro de Hoje. Grupo sem nenhuma linha some sozinho (`:has`). */}
     <section className="content-card grupo-card">
-      <p className="kicker">PENDÊNCIAS</p>
-    {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes"
+      <p className="kicker grupo-titulo">Pendências</p>
+    {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes" selo={atrasados.length} tom="vermelho" icone="⏰"
       cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
         ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasDeAtraso(atrasadoMaisAntigo.data, today)} dia(s)`
         : "De 1 a 14 dias de atraso"}</span></>}>
       {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
-    {antigos.length > 0 && <CardRecolhivel id="secao-revisao-antiga" className="content-card revisao-antiga"
+    {antigos.length > 0 && <CardRecolhivel id="secao-revisao-antiga" className="content-card revisao-antiga" selo={antigos.length} tom="ambar" icone="🗂"
       cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{antigosAcima30.length} com mais de 30 dias · histórico preservado para revisão</span></>}>
       {[...antigos].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
-    {pessoaisAtrasados.length > 0 && <CardRecolhivel cabecalho={<><p className="kicker">PESSOAIS</p><h3>{pessoaisAtrasados.length} item(ns) com data vencida</h3><span className="ficha-note" style={{ margin: 0 }}>Concluir ou remarcar no card Pessoais</span></>}>
+    {pessoaisAtrasados.length > 0 && <CardRecolhivel selo={pessoaisAtrasados.length} tom="azul" icone="🏠" cabecalho={<><p className="kicker">PESSOAIS</p><h3>{pessoaisAtrasados.length} item(ns) com data vencida</h3><span className="ficha-note" style={{ margin: 0 }}>Concluir ou remarcar no card Pessoais</span></>}>
       {[...pessoaisAtrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
       <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
-      {noAction.length > 0 && <button type="button" className="pend-linha" onClick={onSemProximaAcao}><h3>{noAction.length} lead(s) sem próxima ação</h3><i>ver leads ›</i></button>}
+      {noAction.length > 0 && <button type="button" className="pend-linha com-selo tom-verde" onClick={onSemProximaAcao}><span className="selo-num" aria-hidden="true"><b>{noAction.length}</b><small>◇</small></span><h3>{noAction.length} lead(s) sem próxima ação</h3><i>ver leads ›</i></button>}
     {/* SAIU DO PAINEL o card Caixa (Diego, 11/10/2026: "está muito cheio"). A aba Caixa no menu já mostra a contagem. */}
     {/* CONVERSA ENCERRADA SEM DESTINO — ver triagensSemDestino(). Fica recolhido e só existe quando há
         caso: se o Classic estiver encerrando tudo com destino, este card não aparece nunca, que é o
@@ -6926,7 +6952,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {(() => {
       const perdidas = triagensSemDestino(agendaHistorico, appointments, customers);
       if (!perdidas.length) return null;
-      return <CardRecolhivel className="warning-card"
+      return <CardRecolhivel className="warning-card" selo={perdidas.length} tom="vermelho" icone="💬"
         cabecalho={<><p className="kicker">CONVERSA SEM DESTINO</p>
           <h3>{perdidas.length} conversa(s) encerrada(s) sem virar nada</h3>
           <span className="ficha-note" style={{ margin: 0 }}>Sem cliente, sem serviço e sem compromisso vivo com esse número</span></>}>
@@ -6940,6 +6966,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         {perdidas.length > 8 && <span>e mais {perdidas.length - 8}</span>}
       </CardRecolhivel>;
     })()}
+      <i className="grupo-total" aria-hidden="true" />
     </section>
     {(() => {
       // CONTA CHEGANDO: entra sozinho no Painel 3 dias antes do vencimento (e fica enquanto estiver vencida),
@@ -6978,10 +7005,11 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       </CardRecolhivel>;
     })()}
     <section className="content-card grupo-card">
-      <p className="kicker">PRODUÇÃO</p>
+      <p className="kicker grupo-titulo">Produção</p>
       <ProntosParaEntregarCard services={services} onOpenFicha={onOpenFicha} />
       <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} appointments={appointments} agendaHistorico={agendaHistorico} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
       <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
+      <i className="grupo-total" aria-hidden="true" />
     </section>
     {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
     {/* Bloco COBRANÇAS removido do Painel em 23/08/2026 a pedido do Diego. O ciclo de cobrança
