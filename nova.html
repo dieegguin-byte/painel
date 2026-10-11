@@ -619,6 +619,14 @@ button.sutil{opacity:.55;font-size:12px}
 .abertura-nome{font:500 20px Georgia,serif;color:var(--cream);margin:0 0 6px}
 .abertura-pontos span{display:inline-block;width:6px;height:6px;margin:0 3px;border-radius:50%;background:var(--orange2);animation:pontinho 1.2s infinite}
 .abertura-pontos span:nth-child(2){animation-delay:.15s}.abertura-pontos span:nth-child(3){animation-delay:.3s}
+/* EFEITOS, 4ª RODADA (11/10/2026, teste do Fable): CONFETE NA ENTREGA. Só quando um serviço vira
+   "Entregue" (dinheiro entrando), nunca no Concluído de rotina, pra não cansar. 36 pedacinhos em transform e
+   opacity, 1,3 s, o nó é removido do DOM no fim. Quem liga "reduzir movimento" não vê nada. */
+@keyframes confeteCai{0%{transform:translate3d(0,0,0) rotate(0);opacity:1}65%{opacity:1}100%{transform:translate3d(var(--cx),var(--cy),0) rotate(var(--cr));opacity:0}}
+.confete{position:fixed;left:50%;top:58%;z-index:1600;pointer-events:none}
+.confete i{position:absolute;left:0;top:0;width:9px;height:14px;border-radius:2px;background:var(--cor);animation:confeteCai 1.3s cubic-bezier(.15,.7,.35,1) forwards;will-change:transform,opacity}
+.confete i:nth-child(3n){width:7px;height:7px;border-radius:50%}
+.confete i:nth-child(4n){width:12px;height:6px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -651,6 +659,28 @@ document.addEventListener("pointerdown", (e) => {
   clearTimeout(el._toqueT);
   el._toqueT = setTimeout(() => el.classList.remove("toque", "toque-rel"), 550);
 }, { passive: true });
+// CONFETE NA ENTREGA (11/10/2026): espalha pedacinhos laranja e creme a partir do meio da tela e some em
+// 1,3 s. Fora do React, igual ao brilho no toque: cria o nó, remove sozinho. Chamado só no "Entregue".
+function comemorar() {
+  if (semMovimento()) return;
+  try {
+    const cores = ["#ed9057", "#ffc6a0", "#fff3e4", "#d86d36", "#9acaaa"];
+    const caixa = document.createElement("div"); caixa.className = "confete"; caixa.setAttribute("aria-hidden", "true");
+    for (let k = 0; k < 36; k++) {
+      const i = document.createElement("i");
+      const ang = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.25, dist = 160 + Math.random() * 240;
+      i.style.setProperty("--cx", `${Math.cos(ang) * dist}px`);
+      i.style.setProperty("--cy", `${Math.sin(ang) * dist + 260}px`);
+      i.style.setProperty("--cr", `${(Math.random() - 0.5) * 1080}deg`);
+      i.style.setProperty("--cor", cores[k % cores.length]);
+      i.style.animationDelay = `${Math.random() * 120}ms`;
+      caixa.appendChild(i);
+    }
+    document.body.appendChild(caixa);
+    vibrar([18, 50, 18, 50, 30]);
+    setTimeout(() => caixa.remove(), 1600);
+  } catch (e) {}
+}
 // NÚMEROS QUE CONTAM: o valor do cartão sobe de 0 até o número na primeira vez que aparece. Depois disso,
 // mudança de valor aparece direto (contar de novo a cada atualização seria enfeite atrapalhando leitura).
 function NumeroAnimado({ valor }) {
@@ -6304,7 +6334,7 @@ function CapacidadeCard({ services, finances, fornecedores, appointments, agenda
         dados: { servicoId, valor, data: hojeISO(), por: "diego", recebimento: recebido > 0 ? { valor: recebido, status: "pago", data: hojeISO() } : null,
           overrideMaterial: precisaOverride, motivoOverrideMaterial: precisaOverride ? (motivoMat.trim() || null) : null },
       });
-      notify(recebido > 0 ? `Entregue. ${money(recebido)} no caixa.` : "Entregue. Serviço fechado (sem recebimento).", "ok");
+      comemorar(); notify(recebido > 0 ? `Entregue. ${money(recebido)} no caixa.` : "Entregue. Serviço fechado (sem recebimento).", "ok");
       setEntregando(null); setOverrideMat(null); setMotivoMat(""); await onChanged?.();
     } catch (e) {
       // Material em aberto não bloqueia de vez: vira um segundo clique consciente, que fica no histórico.
@@ -7136,7 +7166,7 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, servic
     const valor = parseMoedaBR(valorEntrega);
     if (!valor || valor <= 0) { notify("Qual foi o valor do serviço? Sem isso não dá pra marcar como entregue.", "error"); return; }
     if (!svc?.id) { notify("Esta entrega não está ligada a um serviço.", "error"); return; }
-    if (demo) { notify("Entregue (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: svc.id, statusServico: "entregue", valorServico: valor, proximaAcao: null }); return; }
+    if (demo) { comemorar(); notify("Entregue (demo).", "ok"); onDone({ agendaId: appt.id, servicoId: svc.id, statusServico: "entregue", valorServico: valor, proximaAcao: null }); return; }
     setBusy(true);
     try {
       const operacao = await processarEventoOperacaoBahia(db, {
@@ -7151,7 +7181,7 @@ function ConcluirModal({ db, demo, notify, appt, materiais, fornecedores, servic
           const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: buildInboxPayload(uploaded, nota), status: "novo", conversa: [], processado: false }); if (cxErr) throw cxErr;
         } catch (upErr) { notify("Entrega fechada, mas os prints não anexaram: " + upErr.message, "error"); }
       }
-      notify("Entregue. Serviço, agenda e histórico foram atualizados juntos.", "ok");
+      comemorar(); notify("Entregue. Serviço, agenda e histórico foram atualizados juntos.", "ok");
       onDone({ agendaId: appt.id, servicoId: svc.id, statusServico: "entregue", valorServico: valor, proximaAcao: null, resultado: operacao.resultado });
     } catch (e) {
       // Mesma regra da Capacidade: material em aberto vira segundo clique consciente, registrado no histórico.
@@ -9774,7 +9804,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
         dados: { servicoId, valor, data: hojeISO(), por: "diego", recebimento: recebido > 0 ? { valor: recebido, status: "pago", data: hojeISO() } : null,
           overrideMaterial: overrideMat === servicoId, motivoOverrideMaterial: overrideMat === servicoId ? "Confirmado no segundo clique, pela ficha do cliente" : null },
       });
-      notify(recebido > 0 ? `Entregue. ${money(recebido)} no caixa.` : "Entregue. Serviço fechado (sem recebimento).", "ok");
+      comemorar(); notify(recebido > 0 ? `Entregue. ${money(recebido)} no caixa.` : "Entregue. Serviço fechado (sem recebimento).", "ok");
       setEntregando(null); setOverrideMat(null); await load(); onChanged?.();
     } catch (e) {
       // Mesma regra da Capacidade e da agenda: material em aberto pede um segundo clique, e ele fica gravado.
