@@ -674,6 +674,17 @@ button.sutil{opacity:.55;font-size:12px}
 .pend-linha h3{flex:1;font-size:15px;font-weight:600;margin:0;color:var(--cream)}
 .pend-linha i{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);white-space:nowrap}
 .grupo-card:not(:has(.card-toggle,.pend-linha)){display:none}
+/* Topo do Painel: Atrasados e Próximos como cards grandes com selo, no mesmo nível do Hoje */
+.topo-card{position:relative;overflow:hidden;border-color:var(--line2);box-shadow:inset 0 1px 0 #ffffff14,0 1px 2px #0000004d,0 16px 36px -14px var(--tom)}
+.topo-card::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--tom),transparent 75%)}
+.topo-card .card-toggle{gap:14px}
+.topo-card .card-toggle .kicker{font-size:11px;letter-spacing:2px;color:var(--tom)}
+.topo-card .card-toggle h3{font:500 22px Georgia,serif}
+.topo-card .selo-num{width:54px;height:54px;border-radius:16px}
+.topo-card .selo-num b{font-size:24px}
+.topo-card.aberto{border-color:var(--tom)}
+.atrasados-recentes.topo-card{background:linear-gradient(160deg,#4a1f1a 0,#2a1715 40%,#17120f 100%)}
+.atrasados-recentes.topo-card::after{box-shadow:0 0 0 2px #df6a5d88,0 0 22px #df6a5d55}
 /* Hoje em destaque: degradê laranja, data grande e um reflexo de luz passando devagar */
 .hoje-card{position:relative;overflow:hidden;background:linear-gradient(160deg,#4a2211 0,#2a1812 38%,#17120f 100%);border-color:#d86d3655;box-shadow:inset 0 1px 0 #ffffff1a,0 1px 2px #0000004d,0 18px 40px -14px #c2581f66}
 .hoje-card::before{content:"";position:absolute;top:-20%;bottom:-20%;left:0;width:34%;background:linear-gradient(90deg,transparent,#ffb07a14,transparent);pointer-events:none;animation:luzPassa 7s 1.2s ease-in-out infinite}
@@ -6910,6 +6921,14 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         {Object.entries(contagemSelos).sort((x, y) => y[1] - x[1]).map(([r, n]) => <option key={r} value={r}>{r} ({n})</option>)}
       </select>}</div>}
     {filtroSelo && escondidosPorSelo > 0 && <p className="filtro-aviso">Só “{filtroSelo}” · {escondidosPorSelo} escondido(s) · <button type="button" onClick={() => setFiltroSelo(null)}>Mostrar todos</button></p>}
+    {/* TOPO DO PAINEL (Diego, 11/10/2026: "compromisso atrasado, Hoje e próximos compromissos são os mais
+        importantes"): os três ficam no alto, como cards grandes, fora do grupo Pendências. */}
+    {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes topo-card tom-vermelho" selo={atrasados.length} tom="vermelho" icone="⏰"
+      cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
+      <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
+        ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasDeAtraso(atrasadoMaisAntigo.data, today)} dia(s)`
+        : "De 1 a 14 dias de atraso"}</span></>}>
+      {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
     {/* O aviso de rota vai no `resumo`, ou seja, FORA do recolhível: rota que volta é erro que ele precisa
@@ -6924,6 +6943,15 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         : <div className="empty-state"><b>O dia está livre.</b><span>Nada marcado para {compactDate(today)}.</span></div>}
       <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} soLista />
     </CardRecolhivel>
+    {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
+    {/* Bloco COBRANÇAS removido do Painel em 23/08/2026 a pedido do Diego. O ciclo de cobrança
+       continua vivo no código (CobrancaCard, onCobrou, onRespondeu, onEncerrar) e nada foi
+       apagado do banco — saiu só o bloco da tela do Painel. */}
+    {/* Só data POSTERIOR a hoje. O "N ainda hoje" saiu daqui: hoje tem card próprio, e repetir o mesmo
+        compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
+    {futuros.length > 0 && <CardRecolhivel className="content-card topo-card tom-laranja" selo={futuros.length} tom="laranja" icone="📅"
+      cabecalho={<><p className="kicker">PRÓXIMOS COMPROMISSOS</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
+      {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
     {/* PAINEL ORGANIZADO (11/10/2026, Diego: "Está muito carregado"). Os blocos viraram grupos: Pendências,
         Contas, Produção, Próximos, Anotar, Pessoais. Nada foi apagado — cada card de antes continua inteiro,
         só que como uma linha dentro do grupo (ver CSS `.grupo-card`). Os dois quadrados de número saíram
@@ -6931,12 +6959,6 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         rotinas já estão dentro de Hoje. Grupo sem nenhuma linha some sozinho (`:has`). */}
     <section className="content-card grupo-card">
       <p className="kicker grupo-titulo">Pendências</p>
-    {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes" selo={atrasados.length} tom="vermelho" icone="⏰"
-      cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
-      <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
-        ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasDeAtraso(atrasadoMaisAntigo.data, today)} dia(s)`
-        : "De 1 a 14 dias de atraso"}</span></>}>
-      {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {antigos.length > 0 && <CardRecolhivel id="secao-revisao-antiga" className="content-card revisao-antiga" selo={antigos.length} tom="ambar" icone="🗂"
       cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{antigosAcima30.length} com mais de 30 dias · histórico preservado para revisão</span></>}>
@@ -7011,15 +7033,6 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
       <i className="grupo-total" aria-hidden="true" />
     </section>
-    {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
-    {/* Bloco COBRANÇAS removido do Painel em 23/08/2026 a pedido do Diego. O ciclo de cobrança
-       continua vivo no código (CobrancaCard, onCobrou, onRespondeu, onEncerrar) e nada foi
-       apagado do banco — saiu só o bloco da tela do Painel. */}
-    {/* Só data POSTERIOR a hoje. O "N ainda hoje" saiu daqui: hoje tem card próprio, e repetir o mesmo
-        compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
-    {futuros.length > 0 && <CardRecolhivel
-      cabecalho={<><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
-      {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
     {addInbox && <CardRecolhivel cabecalho={<><p className="kicker">ANOTAR AGORA</p><h3>O que aconteceu?</h3></>}>
       <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />
     </CardRecolhivel>}{/* Os dois cartões da Caixa ("Para Claude" e "Aguardando você") saíram em 23/08/2026 junto
