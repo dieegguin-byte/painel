@@ -645,6 +645,20 @@ button.sutil{opacity:.55;font-size:12px}
 /* 3. Inclinação 3D: o cartão inclina pro lado do dedo e volta com mola (o JS põe as variáveis). */
 .inclina{transform:perspective(700px) rotateX(var(--rx)) rotateY(var(--ry)) scale(.985)!important;transition:none}
 .inclina-volta{transition:transform .5s cubic-bezier(.2,1.5,.4,1)!important}
+/* PAINEL ORGANIZADO (11/10/2026): grupos. Cada card de antes vira uma linha lisa dentro do grupo. */
+.grupo-card{padding:14px 18px 6px}
+.grupo-card>.kicker{margin-bottom:4px}
+.grupo-card>.content-card,.grupo-card>.warning-card,.grupo-card>.pend-linha{background:none;border:0;border-radius:0;box-shadow:none;padding:12px 0;margin:0;border-top:1px solid var(--line);animation:none}
+.grupo-card>.content-card::after,.grupo-card>.warning-card::after{display:none}
+.grupo-card .card-toggle .kicker{display:none}
+.grupo-card .card-toggle h3{font-size:15px;font-weight:600;line-height:1.3}
+.grupo-card .ficha-note{font-size:11px}
+.grupo-card>.warning-card .card-toggle h3,.grupo-card>.atrasados-recentes .card-toggle h3{color:#ffb9ae}
+.grupo-card .card-corpo{margin-top:10px}
+.pend-linha{width:100%;display:flex;justify-content:space-between;align-items:center;gap:12px;color:inherit;text-align:left;font:inherit}
+.pend-linha h3{font-size:15px;font-weight:600;margin:0;color:#b9d9c3}
+.pend-linha i{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);white-space:nowrap}
+.grupo-card:not(:has(.card-toggle,.pend-linha)){display:none}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -1017,6 +1031,7 @@ function ProntidaoButton({ service, db, demo, notify, onChanged }) {
 
 function ProntosParaEntregarCard({ services, onOpenFicha }) {
   const prontos = (services || []).filter(servicoPronto);
+  if (!prontos.length) return null; // dentro do grupo Produção, linha vazia não aparece (11/10/2026)
   return <CardRecolhivel cabecalho={<><p className="kicker">PRODUÇÃO CONCLUÍDA</p><h3>Prontos para entregar · {prontos.length}</h3></>}>
     {!prontos.length && <p>Nenhum serviço aguardando entrega.</p>}
     {prontos.map((s) => <article className="capacidade-servico" key={s.id}>
@@ -6869,12 +6884,6 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         {Object.entries(contagemSelos).sort((x, y) => y[1] - x[1]).map(([r, n]) => <option key={r} value={r}>{r} ({n})</option>)}
       </select>}</div>}
     {filtroSelo && escondidosPorSelo > 0 && <p className="filtro-aviso">Só “{filtroSelo}” · {escondidosPorSelo} escondido(s) · <button type="button" onClick={() => setFiltroSelo(null)}>Mostrar todos</button></p>}
-    {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes"
-      cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
-      <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
-        ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasDeAtraso(atrasadoMaisAntigo.data, today)} dia(s)`
-        : "De 1 a 14 dias de atraso"}</span></>}>
-      {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
     {/* O aviso de rota vai no `resumo`, ou seja, FORA do recolhível: rota que volta é erro que ele precisa
@@ -6889,22 +6898,49 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         : <div className="empty-state"><b>O dia está livre.</b><span>Nada marcado para {compactDate(today)}.</span></div>}
       <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} soLista />
     </CardRecolhivel>
-    {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
-    {/* Bloco COBRANÇAS removido do Painel em 23/08/2026 a pedido do Diego. O ciclo de cobrança
-       continua vivo no código (CobrancaCard, onCobrou, onRespondeu, onEncerrar) e nada foi
-       apagado do banco — saiu só o bloco da tela do Painel. */}
-    {/* Só data POSTERIOR a hoje. O "N ainda hoje" saiu daqui: hoje tem card próprio, e repetir o mesmo
-        compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
-    {futuros.length > 0 && <CardRecolhivel
-      cabecalho={<><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
-      {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
-    {pessoaisAtrasados.length > 0 && <CardRecolhivel cabecalho={<><p className="kicker">PESSOAIS</p><h3>{pessoaisAtrasados.length} item(ns) com data vencida</h3><span className="ficha-note" style={{ margin: 0 }}>Concluir ou remarcar no card Pessoais</span></>}>
-      {[...pessoaisAtrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
+    {/* PAINEL ORGANIZADO (11/10/2026, Diego: "Está muito carregado"). Os blocos viraram grupos: Pendências,
+        Contas, Produção, Próximos, Anotar, Pessoais. Nada foi apagado — cada card de antes continua inteiro,
+        só que como uma linha dentro do grupo (ver CSS `.grupo-card`). Os dois quadrados de número saíram
+        porque repetiam o que as linhas de Pendências já contam; o card de Rotinas solto saiu porque as
+        rotinas já estão dentro de Hoje. Grupo sem nenhuma linha some sozinho (`:has`). */}
+    <section className="content-card grupo-card">
+      <p className="kicker">PENDÊNCIAS</p>
+    {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes"
+      cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
+      <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
+        ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasDeAtraso(atrasadoMaisAntigo.data, today)} dia(s)`
+        : "De 1 a 14 dias de atraso"}</span></>}>
+      {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {antigos.length > 0 && <CardRecolhivel id="secao-revisao-antiga" className="content-card revisao-antiga"
       cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{antigosAcima30.length} com mais de 30 dias · histórico preservado para revisão</span></>}>
       {[...antigos].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
-    {filtroTipo !== "todos" && atrasados.length === 0 && antigos.length === 0 && pessoaisAtrasados.length === 0 && hoje.length === 0 && futuros.length === 0 && (atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
+    {pessoaisAtrasados.length > 0 && <CardRecolhivel cabecalho={<><p className="kicker">PESSOAIS</p><h3>{pessoaisAtrasados.length} item(ns) com data vencida</h3><span className="ficha-note" style={{ margin: 0 }}>Concluir ou remarcar no card Pessoais</span></>}>
+      {[...pessoaisAtrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
+      <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
+      {noAction.length > 0 && <button type="button" className="pend-linha" onClick={onSemProximaAcao}><h3>{noAction.length} lead(s) sem próxima ação</h3><i>ver leads ›</i></button>}
+    {/* SAIU DO PAINEL o card Caixa (Diego, 11/10/2026: "está muito cheio"). A aba Caixa no menu já mostra a contagem. */}
+    {/* CONVERSA ENCERRADA SEM DESTINO — ver triagensSemDestino(). Fica recolhido e só existe quando há
+        caso: se o Classic estiver encerrando tudo com destino, este card não aparece nunca, que é o
+        estado desejado. */}
+    {(() => {
+      const perdidas = triagensSemDestino(agendaHistorico, appointments, customers);
+      if (!perdidas.length) return null;
+      return <CardRecolhivel className="warning-card"
+        cabecalho={<><p className="kicker">CONVERSA SEM DESTINO</p>
+          <h3>{perdidas.length} conversa(s) encerrada(s) sem virar nada</h3>
+          <span className="ficha-note" style={{ margin: 0 }}>Sem cliente, sem serviço e sem compromisso vivo com esse número</span></>}>
+        {perdidas.slice(0, 8).map((a) => {
+          const tel = telefoneWhatsapp(a.bruto);
+          return <span key={a.id}>
+            {compactDate(a.data)} · {(a.titulo || "").replace(/^(RECUPERAÇÃO — )?TRIAGEM TEMPORÁRIA — /i, "").slice(0, 52)}
+            {tel ? <> · <a href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">abrir conversa</a></> : ""}
+          </span>;
+        })}
+        {perdidas.length > 8 && <span>e mais {perdidas.length - 8}</span>}
+      </CardRecolhivel>;
+    })()}
+    </section>
     {(() => {
       // CONTA CHEGANDO: entra sozinho no Painel 3 dias antes do vencimento (e fica enquanto estiver vencida),
       // com o caixa possível do lado — porque a pergunta que ele faz é "tenho de onde tirar?".
@@ -6941,37 +6977,26 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         {r.semVencimento.length > 3 && <span>e mais {r.semVencimento.length - 3} sem prazo marcado</span>}
       </CardRecolhivel>;
     })()}
+    <section className="content-card grupo-card">
+      <p className="kicker">PRODUÇÃO</p>
+      <ProntosParaEntregarCard services={services} onOpenFicha={onOpenFicha} />
+      <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} appointments={appointments} agendaHistorico={agendaHistorico} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
+      <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
+    </section>
+    {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
+    {/* Bloco COBRANÇAS removido do Painel em 23/08/2026 a pedido do Diego. O ciclo de cobrança
+       continua vivo no código (CobrancaCard, onCobrou, onRespondeu, onEncerrar) e nada foi
+       apagado do banco — saiu só o bloco da tela do Painel. */}
+    {/* Só data POSTERIOR a hoje. O "N ainda hoje" saiu daqui: hoje tem card próprio, e repetir o mesmo
+        compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
+    {futuros.length > 0 && <CardRecolhivel
+      cabecalho={<><p className="kicker">AGENDA</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
+      {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
     {addInbox && <CardRecolhivel cabecalho={<><p className="kicker">ANOTAR AGORA</p><h3>O que aconteceu?</h3></>}>
       <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />
     </CardRecolhivel>}{/* Os dois cartões da Caixa ("Para Claude" e "Aguardando você") saíram em 23/08/2026 junto
     com a tela dela. Contador que leva pra uma tela que não existe mais só quebraria no toque. */}
-<section className="metric-grid"><Metric label="Atrasados recentes" value={atrasos.recentes.length} detail={`Até 14 dias · ${atrasos.antigos.length} em revisão antiga abaixo`} tone="yellow" onClick={atrasos.recentes.length > 0 ? irParaVencendo : null} /><Metric label="Sem próxima ação" value={noAction.length} detail="Leads que podem parar" tone="green" onClick={noAction.length > 0 ? onSemProximaAcao : null} /></section>
-    <RotinasCard rotinas={rotinas || []} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
-    <ProntosParaEntregarCard services={services} onOpenFicha={onOpenFicha} />
-    <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} appointments={appointments} agendaHistorico={agendaHistorico} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
-    <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
-    <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
-    {/* SAIU DO PAINEL o card Caixa (Diego, 11/10/2026: "está muito cheio"). A aba Caixa no menu já mostra a contagem. */}
-    {/* CONVERSA ENCERRADA SEM DESTINO — ver triagensSemDestino(). Fica recolhido e só existe quando há
-        caso: se o Classic estiver encerrando tudo com destino, este card não aparece nunca, que é o
-        estado desejado. */}
-    {(() => {
-      const perdidas = triagensSemDestino(agendaHistorico, appointments, customers);
-      if (!perdidas.length) return null;
-      return <CardRecolhivel className="warning-card"
-        cabecalho={<><p className="kicker">CONVERSA SEM DESTINO</p>
-          <h3>{perdidas.length} conversa(s) encerrada(s) sem virar nada</h3>
-          <span className="ficha-note" style={{ margin: 0 }}>Sem cliente, sem serviço e sem compromisso vivo com esse número</span></>}>
-        {perdidas.slice(0, 8).map((a) => {
-          const tel = telefoneWhatsapp(a.bruto);
-          return <span key={a.id}>
-            {compactDate(a.data)} · {(a.titulo || "").replace(/^(RECUPERAÇÃO — )?TRIAGEM TEMPORÁRIA — /i, "").slice(0, 52)}
-            {tel ? <> · <a href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">abrir conversa</a></> : ""}
-          </span>;
-        })}
-        {perdidas.length > 8 && <span>e mais {perdidas.length - 8}</span>}
-      </CardRecolhivel>;
-    })()}
+    {filtroTipo !== "todos" && atrasados.length === 0 && antigos.length === 0 && pessoaisAtrasados.length === 0 && hoje.length === 0 && futuros.length === 0 && (atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
     {/* PESSOAIS mora na mesma home por conveniência dele, mas é outro domínio — e fica DEPOIS do trabalho,
         porque a primeira olhada do dia é a rota. Só sobe pra cara dele quando tem atrasado. */}
     <PessoaisCard pessoais={pessoais} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
