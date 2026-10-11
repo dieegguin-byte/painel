@@ -507,6 +507,38 @@ button.sutil{opacity:.55;font-size:12px}
 .caixa-acoes{display:flex;flex-wrap:wrap;gap:8px}
 .caixa-acoes button{flex:1 1 150px}
 .caixa-form{border-top:1px solid var(--line);padding-top:10px}
+/* EFEITOS VISUAIS (11/10/2026, Diego: "Sim os 6"). Só CSS, nada de biblioteca. Anima só transform e
+   opacity, que o celular faz sem esforço. Quem liga "reduzir movimento" no celular fica sem nenhum. */
+@keyframes abaEntra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes cartaoEntra{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes abreDeslizando{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes fundoEscurece{from{opacity:0}to{opacity:1}}
+@keyframes janelaSobe{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
+@keyframes iconePulo{0%{transform:none}40%{transform:translateY(-4px) scale(1.12)}100%{transform:none}}
+@keyframes bordaPulsa{0%,100%{opacity:0}50%{opacity:1}}
+/* 1. Troca de aba */
+.aba-entra{animation:abaEntra .28s ease-out backwards}
+/* 2. Barra de baixo: pílula laranja na aba ativa e pulinho do ícone */
+.mobile-nav button{transition:background-color .2s,color .2s,box-shadow .2s}
+.mobile-nav button.active{background:#d86d3626;box-shadow:inset 0 0 0 1px #d86d3666}
+.mobile-nav button.active i{animation:iconePulo .38s ease-out}
+.side-nav nav button{transition:background-color .2s,color .2s}
+/* 3. Cartões do Painel: entram em cascata e afundam no toque */
+.metric-card{animation:cartaoEntra .35s ease-out backwards}
+.metric-card:nth-child(2){animation-delay:.05s}.metric-card:nth-child(3){animation-delay:.1s}.metric-card:nth-child(4){animation-delay:.15s}
+.metric-card:nth-child(5){animation-delay:.2s}.metric-card:nth-child(6){animation-delay:.25s}.metric-card:nth-child(n+7){animation-delay:.3s}
+.metric-card.clickable:active,.queue-item:active,.customer-list article.clickable:active,.funil-item:active{transform:scale(.97)}
+/* 4. Agenda e cards recolhíveis: abre deslizando, seta gira */
+.agenda-dia-corpo,.card-corpo{animation:abreDeslizando .25s ease-out backwards}
+.agenda-dia-seta{display:inline-block;transition:transform .25s ease}
+.agenda-dia-seta.aberta{transform:rotate(180deg)}
+/* 5. Fichas e janelas: fundo escurece, janela sobe */
+.modal-overlay{animation:fundoEscurece .2s ease-out backwards}
+.modal-card{animation:janelaSobe .28s cubic-bezier(.2,.8,.3,1) backwards}
+/* 6. Atrasados: borda pulsando de leve (pseudo-elemento + opacity, barato pro celular) */
+.warning-card,.atrasados-recentes{position:relative}
+.warning-card::after,.atrasados-recentes::after{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;box-shadow:0 0 0 2px #df6a5d88,0 0 14px #df6a5d44;opacity:0;animation:bordaPulsa 2.8s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -3920,7 +3952,7 @@ function Home() {
 
       {/* Uma barreira por aba (ver BarreiraDaAba lá embaixo): erro numa aba não leva a barra de abas junto.
           `key={tab}` zera a barreira na troca de aba — sem ele, a aba quebrada contaminaria a próxima. */}
-      <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}>
+      <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}><div className="aba-entra">
       {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} />}
       {tab === "caixa" && <CaixaView inbox={inbox} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
@@ -3934,7 +3966,7 @@ function Home() {
       {tab === "vales" && <ProfissionaisView finances={finances} services={services} profissionais={profissionais} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onOpenFicha={setFichaId} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
-      </BarreiraDaAba>
+      </div></BarreiraDaAba>
     </main>
     <nav className="mobile-nav">{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => irParaAba(item)}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
     {/* As janelas por cima também têm barreira própria: ficha com dado ruim fecha sozinha, não o app. */}
@@ -6751,7 +6783,7 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
             {cidadesUnicas.length > 1 && <span className="badge-conflito">⚠️ 2 rotas</span>}
           </div>
           <div className="agenda-dia-meta"><b>{items.length}</b><span>{items.length === 1 ? "compromisso" : "compromissos"}</span></div>
-          <i className="agenda-dia-seta">{aberto ? "▲" : "▼"}</i>
+          <i className={`agenda-dia-seta${aberto ? " aberta" : ""}`}>▼</i>
         </button>
         {aberto && <div className="agenda-dia-corpo"><AvisoRota compromissos={items} db={db} demo={demo} notify={notify} onChanged={onChanged} />{[...items].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
       </div>;
@@ -6765,7 +6797,7 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
           <div className="agenda-dia-data"><b>{semHora.length}</b><span>sem</span><em>hora</em></div>
           <div className="agenda-dia-badges"><span className="badge-remoto">◌ Não ocupa rota</span></div>
           <div className="agenda-dia-meta"><b>{semHora.length}</b><span>esperando contato</span></div>
-          <i className="agenda-dia-seta">{aberto ? "▲" : "▼"}</i>
+          <i className={`agenda-dia-seta${aberto ? " aberta" : ""}`}>▼</i>
         </button>
         {aberto && <div className="agenda-dia-corpo">{[...semHora].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
       </div>;
