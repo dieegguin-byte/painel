@@ -164,6 +164,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-idc>span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .selo-followup{display:inline-block;font-style:normal;font-size:11px;font-weight:700;color:#8fc3e6;background:#4a90c41f;border:1px solid #4a90c459;border-radius:999px;padding:1px 8px;margin-right:7px;vertical-align:1px}
 .selo-followup.zapia{color:#9fd4ae;background:#75a9872b;border-color:#75a98780}
+.selo-followup.compras{color:#f1a06d;background:#d86d361f;border-color:#d86d3666}.selo-followup.pagamento{color:#e4bd72;background:#d4a64e1f;border-color:#d4a64e66}.selo-followup.entrega{color:#c9a7e8;background:#9a6fc41f;border-color:#9a6fc466}.selo-followup.visita{color:#e8b0c4;background:#c46f8f1f;border-color:#c46f8f66}.selo-followup.orcamento{color:#d9cfc4;background:#8a7a6a26;border-color:#8a7a6a66}.selo-followup.pessoal{color:#b8b0a8;background:#5a524a33;border-color:#6a625a66}
 .compromisso-card.followup-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
 .compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}
 .compromisso-card .compromisso-corpo{margin-top:13px}
@@ -1361,6 +1362,27 @@ function ehFollowUp(a) { return /follow[\s-]?up/i.test(String((a && a.titulo) ||
 // FOLLOW-UP DA ZAPIA EM VERDE (Diego, 11/10/2026). Só o "Follow-up 1 — Nome", criado pelo agente do WhatsApp,
 // é mandado pela Zapia ao cliente; os outros follow-ups ele faz na mão. Verde = não precisa mandar, a Zapia manda.
 function ehFollowUpZapia(a) { return /^\s*follow[\s-]?up\s*1\s*[—–-]/i.test(String((a && a.titulo) || "")); }
+// SELO DO TIPO DE COMPROMISSO (Diego, 11/10/2026: "coloque compras e veja outras que identifiquem rápido").
+// Sai do título, na ordem abaixo: a primeira regra que casar vence ("Acertar com Marlom (na entrega)" é
+// pagamento, não entrega; "Follow-up orçamento" é follow-up, não orçamento). Sem regra, sem selo.
+const SELOS_COMPROMISSO = [
+  [/acertar com|\bpagar\b|pagamento|\bpix\b/i, "$ Pagamento", "pagamento"],
+  [/checar (resposta|retorno|decis)|retomar|cobrar resposta|revisar desfecho/i, "↻ Retorno", ""],
+  [/\bcompras?\b|pedido|madeireira|afibracom|fornecedor/i, "🛒 Compras", "compras"],
+  [/entreg/i, "➜ Entrega", "entrega"],
+  [/retirad|retirar|buscar/i, "⤺ Retirada", "entrega"],
+  [/visita|medida|medi[cç][aã]o/i, "⌖ Visita / medida", "visita"],
+  [/or[cç]amento|valor e prazo/i, "✎ Orçamento", "orcamento"],
+];
+function seloCompromisso(a) {
+  if (ehFollowUpZapia(a)) return ["↻ Follow-up · Zapia envia", "zapia"];
+  if (ehFollowUp(a)) return ["↻ Follow-up", ""];
+  const t = String((a && a.titulo) || "");
+  const r = SELOS_COMPROMISSO.find(([re]) => re.test(t));
+  if (r) return [r[1], r[2]];
+  if (a && (a.pessoal || a.tipo === "pessoal" || a.tipo === "bloqueio_pessoal")) return ["Pessoal", "pessoal"];
+  return null;
+}
 // Parada que consome estrada: não é remota, e tem para onde ir e quando. Bloqueio pessoal e item
 // operacional entram aqui de propósito — "arrumar o parafuso do banco do carro" às 11:30 em Luziânia
 // ocupa a rota igual a uma retirada, e ficava invisível pra conta de deslocamento.
@@ -4879,6 +4901,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   const linkMaps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinoRota)}`;
   const selo = soCidade ? " (só cidade)" : "";
   const nomeCliente = cli?.nome || tituloCard;
+  const seloTipo = seloCompromisso(a);
   const cidadeCard = ehRemoto(a) ? "◌ Remoto" : `⌖ ${cli?.cidade || a.cidade || "Cidade não informada"}`;
   // INSTRUÇÕES DO ATENDIMENTO (Diego, 23/08/2026: "cada cliente com instruções do que precisa
   // ser feito"). Reúne aqui tudo que ele precisa saber ANTES de bater na porta, sem ter que
@@ -4905,7 +4928,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       </span>
       <span className="compromisso-idc">
         <strong>{nomeCliente}</strong>
-        <span>{ehFollowUp(a) && <i className={`selo-followup${ehFollowUpZapia(a) ? " zapia" : ""}`}>{ehFollowUpZapia(a) ? "↻ Follow-up · Zapia envia" : "↻ Follow-up"}</i>}{cidadeCard}</span>
+        <span>{seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
       </span>
       <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
     </button>
