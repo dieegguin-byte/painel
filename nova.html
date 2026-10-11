@@ -620,6 +620,9 @@ button.sutil{opacity:.55;font-size:12px}
 .abertura-pontos span{display:inline-block;width:6px;height:6px;margin:0 3px;border-radius:50%;background:var(--orange2);animation:pontinho 1.2s infinite}
 .abertura-pontos span:nth-child(2){animation-delay:.15s}.abertura-pontos span:nth-child(3){animation-delay:.3s}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* CARDS DA AGENDA COM AÇÕES (11/10/2026): Feito / Remarcar / Cancelar / recado com áudio. */
+.card-acoes{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}.card-acoes textarea{width:100%;min-height:64px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:14px;line-height:1.45}.card-acoes textarea:focus{border-color:#d37742}.card-acoes-botoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.card-acoes-botoes button{min-height:44px;font-size:12px}.card-acoes-botoes .perigo{color:#f08a7a;border-color:#7a3a30}.gravador{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.gravador button{min-height:40px;font-size:12px}.gravador audio{height:36px;max-width:100%;flex:1 1 180px}.gravador small,.card-acoes small{font-size:11px;color:var(--dim)}.gravador .gravando{animation:pulsoGravando 1.2s ease-in-out infinite}@keyframes pulsoGravando{50%{opacity:.55}}.selo-claude{margin:8px 12px 0;padding:10px 12px;border-radius:12px;background:#d4a64e17;border:1px solid #d4a64e66;font-size:13px;line-height:1.45}.selo-claude b{display:block;color:#e8c06d;margin-bottom:3px}.selo-claude .selo-botoes{display:flex;gap:6px;margin-top:8px}.selo-claude .selo-botoes button{min-height:40px;font-size:12px;flex:1}.selo-recado{margin:8px 12px 0;padding:8px 12px;border-radius:12px;background:#6097c014;border:1px solid #6097c055;color:#a9c8e2;font-size:12px;line-height:1.45}.recados-do-card{display:flex;flex-direction:column;gap:6px}.recados-do-card div{font-size:12px;line-height:1.45;padding:8px 10px;border-radius:10px;background:var(--surface2);border:1px solid var(--line)}.recados-do-card em{display:block;font-style:normal;color:var(--dim);font-size:11px}.recados-do-card button{margin-top:4px;min-height:36px;font-size:11px}
 </style>
 </head>
 <body>
@@ -1007,7 +1010,8 @@ const demoAppointments = [
   // criado_em MAIS NOVO que o do a7 de propósito: os dois são do serviço s1, e é esse par que reproduz o caso
   // Karol (16/09/2026) — a visita só foi marcada porque o orçamento do a7 já tinha sido enviado, mas o a7
   // continua planejado e aparece como atrasado. É o que acende o aviso "pode já estar feito".
-  { id: "a3", titulo: "Mariana — visita sofá", data: somarDias(hojeISO(), 1), hora: "09:30", cidade: "Jardim Ingá", local: "Jardim Ingá — endereço/localização pendente", tipo: "presencial", status: "planejado", servico_id: "s1", criado_em: somarDias(hojeISO(), -1) + "T15:00:00Z" },
+  { id: "a3", titulo: "Mariana — visita sofá", data: somarDias(hojeISO(), 1), hora: "09:30", cidade: "Jardim Ingá", local: "Jardim Ingá — endereço/localização pendente", tipo: "presencial", status: "planejado", servico_id: "s1", criado_em: somarDias(hojeISO(), -1) + "T15:00:00Z",
+    nota_claude: "Saiu de hoje 14h pra amanhã 9h30, porque hoje à tarde você já está em Valparaíso e o Jardim Ingá fica no caminho de amanhã.", nota_claude_conferida: false },
   { id: "a4", titulo: "Carlos — buscar cadeiras", data: "2026-07-11", hora: "09:00", cidade: "Luziânia", local: "Ozair", tipo: "presencial", status: "planejado", servico_id: "s2" },
   // Dois casos que entraram em 01/09/2026 e que a demo não cobria:
   // a5 = bloqueio pessoal. O card TEM que mostrar "Apresentação na escola do filho", não "Compromisso
@@ -4124,6 +4128,8 @@ function Home() {
     if (patch.agendaId && patch.removerAgenda !== false) setAppointments((prev) => prev.filter((a) => a.id !== patch.agendaId));
   }, []);
 
+  const acoesAgenda = useRecadosAgenda({ db, demo, session, notify, onChanged: loadAll, setAppointments });
+
   if (booting) return <div className="loading-screen"><div className="brand-seal">TB</div><p>Preparando a central…</p></div>;
   if (!session && !demo) return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">NOVA CENTRAL OPERACIONAL</p><h1>Tapeçaria Bahia</h1><p>Um ambiente separado para Diego e Claude trabalharem na mesma fila, sem apagar, duplicar ou perder o próximo passo.</p>{compartilhamentoGuardado && <div className="success-box" style={{ marginBottom: 14, textAlign: "left" }}><b>Chegou um compartilhamento.</b><br />Está <b>guardado no aparelho</b> e ainda NÃO foi salvo na Caixa. Entre na sua conta que ele sobe sozinho.</div>}{loginSent ? <div className="success-box">Link enviado. Abra seu e-mail neste aparelho.</div> : <><label>E-mail de acesso<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" onKeyDown={(event) => event.key === "Enter" && sendMagicLink()} /></label><button className="primary" onClick={sendMagicLink} disabled={busy || !email.trim()}>Enviar link de acesso</button></>}<button className="ghost demo-button" onClick={() => setDemo(true)}>Ver demonstração do novo site</button></div></div>;
   if (!demo && pinState === "checking") return <div className="loading-screen"><div className="brand-seal">TB</div><p>Verificando o bloqueio…</p></div>;
@@ -4166,7 +4172,7 @@ function Home() {
     const de = nav.findIndex((item) => item.id === abaAnterior.current.tab), para = nav.findIndex((item) => item.id === tab);
     abaAnterior.current = { tab, classe: de < 0 || para < 0 ? "" : para > de ? " vem-direita" : " vem-esquerda" };
   }
-  return <div className={`product-shell mode-${mode}`}>
+  return <AcoesAgendaCtx.Provider value={acoesAgenda}><div className={`product-shell mode-${mode}`}>
     {notice && <div key={notice.id} className={`notice ${notice.kind}`}
       onTouchStart={(e) => { const t = e.touches[0]; e.currentTarget._x0 = t.clientX; e.currentTarget._y0 = t.clientY; }}
       onTouchMove={(e) => { const el = e.currentTarget, t = e.touches[0]; const dx = t.clientX - el._x0, dy = Math.min(0, t.clientY - el._y0); el.style.transform = `translate(${dx}px, ${dy}px)`; el.style.opacity = String(Math.max(0.2, 1 - Math.abs(dx) / 260)); }}
@@ -4222,7 +4228,7 @@ function Home() {
     {explicar && <BarreiraDaAba nome="A explicação" onFechar={() => setExplicar(null)}><ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
     {concluirAppt && <BarreiraDaAba nome="A conclusão do compromisso" onFechar={() => setConcluirAppt(null)}><ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} services={services} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
     {addAgendaOpen && <BarreiraDaAba nome="O novo compromisso" onFechar={() => setAddAgendaOpen(false)}><AddAgendaModal appointments={agendaVisivel} avisos={avisos} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} /></BarreiraDaAba>}
-  </div>;
+  </div></AcoesAgendaCtx.Provider>;
 }
 
 function agenteTexto(valor, vazio = "Não registrado") {
@@ -5045,8 +5051,215 @@ function PessoalDetalhe({ p, a, today }) {
   </React.Fragment>)}</div>;
 }
 
+// CARDS DA AGENDA COM AÇÕES (Diego, 11/10/2026). Desde 23/08 o card era só leitura; agora cada um tem
+// Feito / Remarcar / Cancelar e um recado pro Claude (texto e áudio). O app grava o mínimo e na hora:
+//   Feito    -> agenda.status = feito (o banco recusa data futura) + recado em agenda_recados
+//   Cancelar -> agenda.status = cancelado + recado com o motivo (motivo obrigatório)
+//   Remarcar -> só o recado. O Diego NÃO escolhe data: a rotina do Claude (8h, 12h, 16h e 18h, Brasília)
+//               escolhe pela rota saindo de casa em Luziânia, pelos compromissos e pela carga dos
+//               profissionais, move o card e escreve agenda.nota_claude ("Remarcado pelo Claude — motivo")
+//               com nota_claude_conferida = false. O selo amarelo fica até ele tocar Manter ou Mudar.
+//   Recado   -> só o recado.
+// A rotina lê SÓ agenda_recados com processado_em nulo; card sem recado ela nem abre. O resto da arrumação
+// (próxima ação do serviço, financeiro, ficha) é da rotina, não da tela.
+// ÁUDIO: fica no bucket fotos-servicos em recados-agenda/<agenda_id>/. O Claude não escuta áudio, então o
+// celular transcreve enquanto grava (reconhecimento de voz do navegador, pt-BR) e o texto cai na caixinha,
+// onde o Diego confere. Se o aparelho não transcrever, o áudio vai mesmo assim e o card avisa.
+const AcoesAgendaCtx = React.createContext(null);
+const HORARIOS_ROTINA_RECADOS = "8h, 12h, 16h e 18h";
+const ACAO_RECADO_ROTULO = { recado: "Recado", feito: "Feito", remarcar: "Remarcar", cancelar: "Cancelar" };
+
+function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointments }) {
+  const [recados, setRecados] = useState([]);
+  const carregar = useCallback(async () => {
+    if (demo || !db || !session) return;
+    // Abertos + o que a rotina respondeu nos últimos 3 dias (pra ele ver o que o Claude fez).
+    const desde = new Date(Date.now() - 3 * 864e5).toISOString();
+    const { data, error } = await db.from("agenda_recados").select("*").or(`processado_em.is.null,processado_em.gte.${desde}`).order("criado_em", { ascending: true });
+    if (!error) setRecados(data || []);
+  }, [db, demo, session]);
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const enviar = useCallback(async (a, { acao, texto, audio }) => {
+    const limpo = (texto || "").trim() || null;
+    if (demo) {
+      setRecados((prev) => [...prev, { id: "demo-" + Date.now(), agenda_id: a.id, acao, texto: limpo, audio_path: audio ? "demo" : null, criado_em: new Date().toISOString(), processado_em: null }]);
+      if (acao === "feito" || acao === "cancelar") setAppointments((prev) => prev.filter((x) => x.id !== a.id));
+      notify("Anotado (demo).", "ok");
+      return true;
+    }
+    if (acao === "feito" && a.data > hojeISO()) throw new Error("Esse compromisso ainda não chegou. Use Remarcar ou mande um recado.");
+    let audioPath = null;
+    if (audio?.blob) {
+      const ext = /mp4|aac|m4a/.test(audio.tipo) ? "m4a" : /ogg/.test(audio.tipo) ? "ogg" : "webm";
+      audioPath = `recados-agenda/${a.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await db.storage.from("fotos-servicos").upload(audioPath, audio.blob, { contentType: audio.tipo || "audio/webm" });
+      if (upErr) throw new Error("O áudio não subiu: " + upErr.message);
+    }
+    // O recado nasce ANTES da mudança na agenda: se a mudança falhar, ele é apagado; se o recado falhasse
+    // depois da mudança, o card sumiria sem a rotina saber que precisa arrumar o resto.
+    const { data: rec, error: recErr } = await db.from("agenda_recados").insert({ agenda_id: a.id, acao, texto: limpo, audio_path: audioPath }).select("*").single();
+    if (recErr) throw recErr;
+    const patch = acao === "feito" ? { status: "feito" } : acao === "cancelar" ? { status: "cancelado" } : null;
+    const conferir = a.nota_claude && a.nota_claude_conferida === false ? { nota_claude_conferida: true } : null;
+    if (patch || conferir) {
+      const { error: agErr } = await db.from("agenda").update({ ...(patch || {}), ...(conferir || {}) }).eq("id", a.id).eq("status", "planejado");
+      if (agErr) { await db.from("agenda_recados").delete().eq("id", rec.id); throw agErr; }
+    }
+    // Histórico é registro, não trava: se falhar, a ação já valeu.
+    try { await db.from("historico").insert({ o_que: `${ACAO_RECADO_ROTULO[acao]}: ${a.titulo}`, por: "diego", detalhe: limpo || (audioPath ? "(áudio)" : null) }); } catch (e) { /* segue */ }
+    setRecados((prev) => [...prev, rec]);
+    if (patch) setAppointments((prev) => prev.filter((x) => x.id !== a.id));
+    notify(acao === "feito" ? "Feito. Saiu da agenda."
+      : acao === "cancelar" ? "Cancelado. Saiu da agenda."
+      : acao === "remarcar" ? `Anotado. O Claude escolhe a nova data na próxima rodada (${HORARIOS_ROTINA_RECADOS}).`
+      : `Recado guardado. O Claude lê na próxima rodada (${HORARIOS_ROTINA_RECADOS}).`, "ok");
+    if (onChanged) onChanged();
+    return true;
+  }, [db, demo, notify, onChanged, setAppointments]);
+
+  const manter = useCallback(async (a) => {
+    if (demo) { setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, nota_claude_conferida: true } : x)); return; }
+    const { error } = await db.from("agenda").update({ nota_claude_conferida: true }).eq("id", a.id);
+    if (error) { notify("Não salvou: " + error.message, "error"); return; }
+    setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, nota_claude_conferida: true } : x));
+    notify("Mantido.", "ok");
+  }, [db, demo, notify, setAppointments]);
+
+  const ouvir = useCallback(async (path) => {
+    if (demo || !path) return null;
+    const { data, error } = await db.storage.from("fotos-servicos").createSignedUrl(path, 60 * 60);
+    if (error) { notify("Não abriu o áudio: " + error.message, "error"); return null; }
+    return data?.signedUrl || null;
+  }, [db, demo, notify]);
+
+  return useMemo(() => ({ recados, enviar, manter, ouvir, notify }), [recados, enviar, manter, ouvir, notify]);
+}
+
+// Selo SEMPRE visível (fora do corpo recolhido): remarcação do Claude esperando conferência e recados que a
+// rotina ainda não leu. É o que impede ele de achar que o toque "não pegou".
+function SelosClaudeDoCard({ a, acoes, onMudar }) {
+  const abertos = acoes.recados.filter((r) => r.agenda_id === a.id && !r.processado_em);
+  return <>
+    {a.nota_claude && a.nota_claude_conferida === false && <div className="selo-claude">
+      <b>🔁 Remarcado pelo Claude</b>
+      <span>{a.nota_claude}</span>
+      <div className="selo-botoes">
+        <button type="button" className="primary" onClick={() => acoes.manter(a)}>Manter</button>
+        <button type="button" className="ghost" onClick={onMudar}>Mudar</button>
+      </div>
+    </div>}
+    {abertos.length > 0 && <p className="selo-recado">⏳ {abertos.map((r) => ACAO_RECADO_ROTULO[r.acao] || r.acao).join(" · ")} enviado. O Claude lê na próxima rodada ({HORARIOS_ROTINA_RECADOS}).</p>}
+  </>;
+}
+
+function GravadorAudio({ audio, onAudio, onTexto, disabled }) {
+  const [gravando, setGravando] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const ref = React.useRef({});
+  const parar = useCallback(() => {
+    const r = ref.current; r.ativo = false;
+    if (r.limite) window.clearTimeout(r.limite);
+    try { if (r.fala) r.fala.stop(); } catch (e) { /* já parou */ }
+    try { if (r.rec && r.rec.state !== "inactive") r.rec.stop(); } catch (e) { /* já parou */ }
+  }, []);
+  useEffect(() => () => { parar(); try { ref.current.stream?.getTracks().forEach((t) => t.stop()); } catch (e) { /* nada */ } }, [parar]);
+  const comecar = async () => {
+    setAviso("");
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { setAviso("Este aparelho não grava áudio aqui. Use o microfone do teclado."); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch (e) { setAviso("O microfone não foi liberado para o app."); return; }
+    const tipos = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
+    const mime = tipos.find((m) => window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported(m)) || "";
+    const rec = new window.MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    const partes = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) partes.push(e.data); };
+    rec.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      const tipo = (rec.mimeType || mime || "audio/webm").split(";")[0];
+      const blob = new Blob(partes, { type: tipo });
+      if (blob.size) onAudio({ blob, tipo, url: URL.createObjectURL(blob) });
+      setGravando(false);
+    };
+    ref.current = { rec, stream, ativo: true, transcreveu: false };
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SR) {
+      try {
+        const fala = new SR();
+        fala.lang = "pt-BR"; fala.continuous = true; fala.interimResults = false;
+        fala.onresult = (ev) => { for (let i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) { const t = ev.results[i][0].transcript.trim(); if (t) { ref.current.transcreveu = true; onTexto(t); } } };
+        fala.onerror = () => { /* o áudio continua gravando */ };
+        // No Android o reconhecimento para sozinho no silêncio; enquanto estiver gravando, religa.
+        fala.onend = () => { if (ref.current.ativo) { try { fala.start(); } catch (e) { /* desistiu */ } } };
+        fala.start();
+        ref.current.fala = fala;
+      } catch (e) { /* sem transcrição */ }
+    } else setAviso("Este aparelho não transcreve: o áudio vai, mas escreva um resumo na caixinha.");
+    ref.current.limite = window.setTimeout(parar, 3 * 60 * 1000);
+    rec.start(1000);
+    setGravando(true);
+  };
+  return <div className="gravador">
+    {!gravando
+      ? <button type="button" className="ghost" onClick={comecar} disabled={disabled}>🎤 {audio ? "Gravar de novo" : "Gravar áudio"}</button>
+      : <button type="button" className="primary gravando" onClick={parar}>⏹ Parar</button>}
+    {audio && !gravando && <><audio controls src={audio.url} /><button type="button" className="ghost" onClick={() => onAudio(null)}>Apagar áudio</button></>}
+    {gravando && <small>Gravando… fale normalmente; o texto aparece na caixinha.</small>}
+    {aviso && <small>{aviso}</small>}
+  </div>;
+}
+
+function RecadoEnviado({ r, acoes }) {
+  const [url, setUrl] = useState(null);
+  return <div>
+    <em>{ACAO_RECADO_ROTULO[r.acao] || r.acao} · {new Date(r.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}{r.processado_em ? " · lido pelo Claude" : " · esperando o Claude"}</em>
+    {r.texto && <span>{r.texto}</span>}
+    {r.audio_path && (url ? <audio controls src={url} style={{ display: "block", maxWidth: "100%", marginTop: 4 }} />
+      : <button type="button" className="ghost" onClick={async () => setUrl(await acoes.ouvir(r.audio_path))}>🔊 Ouvir áudio</button>)}
+    {r.resultado && <span style={{ display: "block", marginTop: 4, color: "#e8c06d" }}>Claude: {r.resultado}</span>}
+  </div>;
+}
+
+function AcoesDoCompromisso({ a, acoes, today }) {
+  const [texto, setTexto] = useState("");
+  const [audio, setAudio] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const futuro = !!a.data && a.data > today;
+  const doCard = acoes.recados.filter((r) => r.agenda_id === a.id);
+  const enviar = async (acao) => {
+    if (busy) return;
+    if (acao === "cancelar" && !texto.trim() && !audio) { acoes.notify("Diga o motivo do cancelamento (texto ou áudio).", "error"); return; }
+    if (acao === "recado" && !texto.trim() && !audio) { acoes.notify("Escreva ou grave o recado primeiro.", "error"); return; }
+    if (acao === "cancelar" && !window.confirm(`Cancelar “${a.titulo_visivel || a.titulo}”?`)) return;
+    if (acao === "feito" && !window.confirm(`Marcar “${a.titulo_visivel || a.titulo}” como feito?`)) return;
+    setBusy(acao);
+    try {
+      await acoes.enviar(a, { acao, texto, audio });
+      setTexto(""); setAudio(null);
+    } catch (e) { acoes.notify("Não salvou: " + (e.message || e), "error"); }
+    finally { setBusy(null); }
+  };
+  return <div className="card-acoes">
+    <p className="kicker" style={{ margin: 0 }}>RECADO PRO CLAUDE</p>
+    {doCard.length > 0 && <div className="recados-do-card">{doCard.map((r) => <RecadoEnviado key={r.id} r={r} acoes={acoes} />)}</div>}
+    <textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ex.: cliente pediu pra passar depois das 14h" />
+    <GravadorAudio audio={audio} onAudio={setAudio} onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={!!busy} />
+    <div className="card-acoes-botoes">
+      <button type="button" className="primary" onClick={() => enviar("feito")} disabled={!!busy || futuro}>{busy === "feito" ? "…" : "✅ Feito"}</button>
+      <button type="button" className="secondary" onClick={() => enviar("remarcar")} disabled={!!busy}>{busy === "remarcar" ? "…" : "🔁 Remarcar"}</button>
+      <button type="button" className="ghost perigo" onClick={() => enviar("cancelar")} disabled={!!busy}>{busy === "cancelar" ? "…" : "✖ Cancelar"}</button>
+      <button type="button" className="ghost" onClick={() => enviar("recado")} disabled={!!busy}>{busy === "recado" ? "…" : "💬 Só recado"}</button>
+    </div>
+    <small>{futuro ? "Feito só a partir do dia marcado. " : ""}No Remarcar você só explica: o Claude escolhe o dia e a hora ({HORARIOS_ROTINA_RECADOS}) e move o card.</small>
+  </div>;
+}
+
 function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais, revisaoData = false, sucessor = null }) {
   const [aberto, setAberto] = useState(false);
+  // Ações do card (Feito/Remarcar/Cancelar/recado) vêm do contexto, não de prop: o card é desenhado em
+  // vários lugares (Painel, Agenda, atrasados) e nenhum deles precisa saber gravar no banco.
+  const acoes = React.useContext(AcoesAgendaCtx);
   const diasAtraso = diasDeAtraso(a.data, today);
   const idadeAtraso = diasAtraso > 0 && <em className={`idade-atraso${diasAtraso > 30 ? " antigo" : ""}`}>{diasAtraso} {diasAtraso === 1 ? "dia de atraso" : "dias de atraso"}{diasAtraso > 30 && <small>Mais de 30 dias</small>}</em>;
   // Sem `notify` aqui (o card não recebe a prop) — o aviso da cópia vive no próprio card.
@@ -5214,6 +5427,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
     </button>
     {revisaoData && <p className="revisao-data">Remarcação pendente · idade calculada pela data original. A data precisa de revisão.</p>}
+    {acoes && !a.pessoal_id && <SelosClaudeDoCard a={a} acoes={acoes} onMudar={() => setAberto(true)} />}
     {sucessor && diasAtraso > 0 && <p className="talvez-feito">Pode já estar feito: “{sucessor.titulo}” foi criado depois deste, no mesmo serviço. Se a etapa aconteceu, conclua aqui — o app não fecha sozinho.</p>}
     {aberto && <div className="compromisso-corpo">
       <h4>{tituloCard}</h4>
@@ -5271,6 +5485,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         </div>
         {avisoGPT && <p className="compromisso-material">{avisoGPT}</p>}
       </div>
+      {acoes && !a.pessoal_id && <AcoesDoCompromisso a={a} acoes={acoes} today={today} />}
     </div>}
   </article>;
 }
