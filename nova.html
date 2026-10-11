@@ -538,6 +538,44 @@ button.sutil{opacity:.55;font-size:12px}
 /* 6. Atrasados: borda pulsando de leve (pseudo-elemento + opacity, barato pro celular) */
 .warning-card,.atrasados-recentes{position:relative}
 .warning-card::after,.atrasados-recentes::after{content:"";position:absolute;inset:-1px;border-radius:inherit;pointer-events:none;box-shadow:0 0 0 2px #df6a5d88,0 0 14px #df6a5d44;opacity:0;animation:bordaPulsa 2.8s ease-in-out infinite}
+/* VISUAL PREMIUM, 2ª RODADA (11/10/2026, Diego: "ficou bom mas bem discreto... mais parecido com app premium
+   mas sem ficar lento"). Continua leve: sombras e brilhos são estáticos; o que anima é transform/opacity. */
+@keyframes abaDireita{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes abaEsquerda{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+@keyframes gavetaSobe{from{transform:translateY(100%)}to{transform:none}}
+@keyframes toqueBrilho{from{transform:scale(.15);opacity:1}to{transform:scale(1);opacity:0}}
+@keyframes esqueletoBrilho{from{background-position:120% 0}to{background-position:-20% 0}}
+@keyframes barraCarregando{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+/* 1. Profundidade: brilho fino na borda de cima + sombra em camadas */
+.content-card,.metric-card,.compromisso-card,.agenda-dia-card,.queue-item,.funil-item,.customer-list article{box-shadow:inset 0 1px 0 #ffffff12,0 1px 2px #0000004d,0 10px 26px -10px #000000a6}
+.metric-card{background:linear-gradient(160deg,#ffffff0a,#ffffff00 45%),var(--surface)}
+.mobile-nav{backdrop-filter:blur(24px) saturate(1.5);-webkit-backdrop-filter:blur(24px) saturate(1.5);box-shadow:inset 0 1px 0 #ffffff17,0 14px 34px #000000b3}
+.mobile-nav button.active{background:linear-gradient(180deg,#d86d3638,#d86d361a);box-shadow:inset 0 0 0 1px #d86d3680,0 0 18px #d86d3633;color:#ffcfac}
+.primary{box-shadow:inset 0 1px 0 #ffffff38,0 8px 22px #8e391e4d}
+/* 3. Abas deslizam pelo lado do arrasto */
+.aba-entra.vem-direita{animation:abaDireita .32s cubic-bezier(.2,.8,.3,1) backwards}
+.aba-entra.vem-esquerda{animation:abaEsquerda .32s cubic-bezier(.2,.8,.3,1) backwards}
+/* 4. No celular as janelas viram gaveta: encostam no rodapé, sobem e têm puxador */
+@media(max-width:768px){
+.modal-overlay{place-items:end center;padding:0}
+.modal-card,.modal-card.small{width:100%;max-height:92vh;border-radius:24px 24px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom));border-bottom:0;animation:gavetaSobe .38s cubic-bezier(.2,.9,.25,1) backwards}
+.modal-card::before{content:"";display:block;width:44px;height:5px;border-radius:99px;background:#ffffff2e;margin:-6px auto 12px}
+}
+/* 5. Brilho onde o dedo tocou (o JS põe a classe e a posição; ver "BRILHO NO TOQUE") */
+.toque-rel{position:relative}
+.toque{overflow:hidden}
+.toque::after{content:"";position:absolute;left:var(--tx);top:var(--ty);width:var(--td);height:var(--td);margin:calc(var(--td) / -2) 0 0 calc(var(--td) / -2);border-radius:50%;background:radial-gradient(circle,#ffb07a59 0,#ffb07a00 70%);pointer-events:none;animation:toqueBrilho .5s ease-out forwards}
+/* 6. Carregando: blocos com brilho passando + fiozinho no topo enquanto atualiza */
+.esqueleto{display:flex;flex-direction:column;gap:10px;padding:6px 0}
+.esqueleto span{display:block;height:54px;border-radius:12px;background:linear-gradient(100deg,#ffffff08 30%,#ffffff17 50%,#ffffff08 70%);background-size:250% 100%;animation:esqueletoBrilho 1.3s linear infinite}
+.esqueleto span:nth-child(2){width:86%}.esqueleto span:nth-child(3){width:64%}
+.barra-carregando{position:fixed;top:0;left:0;right:0;height:2px;z-index:1500;overflow:hidden;pointer-events:none}
+.barra-carregando::before{content:"";display:block;width:40%;height:100%;background:linear-gradient(90deg,transparent,#ff9a5c,transparent);animation:barraCarregando 1.1s ease-in-out infinite}
+/* 7. Cabeçalho compacto: aparece de vidro no topo quando o título grande sai da tela */
+.barra-compacta{position:fixed;top:0;left:250px;right:0;z-index:90;padding:calc(10px + env(safe-area-inset-top)) 18px 10px;background:#14110fcc;backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border-bottom:1px solid var(--line);font:500 18px Georgia,serif;color:var(--cream);transform:translateY(-110%);opacity:0;transition:transform .25s ease,opacity .25s ease;pointer-events:none}
+.barra-compacta.visivel{transform:none;opacity:1}
+@media(max-width:850px){.barra-compacta{left:0}}
+@media(prefers-reduced-motion:reduce){.barra-compacta{display:none}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -550,6 +588,56 @@ button.sutil{opacity:.55;font-size:12px}
 <script src="agenda-caixa.js" onerror="document.getElementById('agenda-caixa-erro').hidden=false"></script>
 <script type="text/plain" id="app-source">
 const { useCallback, useEffect, useMemo, useState } = React;
+// EFEITOS PREMIUM (11/10/2026). Vibração curta: só Android obedece; iPhone ignora sem erro.
+function vibrar(padrao) { try { navigator.vibrate?.(padrao); } catch (e) {} }
+const semMovimento = () => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
+// BRILHO NO TOQUE: acende um brilho laranja onde o dedo tocou. Não mexe no DOM do React, só põe classe e
+// variáveis CSS por meio segundo. Pula quem já usa ::after (ex.: o pulso dos atrasados).
+document.addEventListener("pointerdown", (e) => {
+  if (semMovimento()) return;
+  const el = e.target.closest?.("button, .metric-card.clickable, .queue-item, .funil-item, .customer-list article.clickable");
+  if (!el || el.disabled) return;
+  if (el.classList.contains("toque")) { el.classList.remove("toque"); void el.offsetWidth; }
+  else if (getComputedStyle(el, "::after").content !== "none") return;
+  const r = el.getBoundingClientRect();
+  el.style.setProperty("--tx", `${e.clientX - r.left}px`);
+  el.style.setProperty("--ty", `${e.clientY - r.top}px`);
+  el.style.setProperty("--td", `${Math.max(r.width, r.height) * 2}px`);
+  if (getComputedStyle(el).position === "static") el.classList.add("toque-rel");
+  el.classList.add("toque");
+  clearTimeout(el._toqueT);
+  el._toqueT = setTimeout(() => el.classList.remove("toque", "toque-rel"), 550);
+}, { passive: true });
+// NÚMEROS QUE CONTAM: o valor do cartão sobe de 0 até o número na primeira vez que aparece. Depois disso,
+// mudança de valor aparece direto (contar de novo a cada atualização seria enfeite atrapalhando leitura).
+function NumeroAnimado({ valor }) {
+  const primitivo = typeof valor === "string" || typeof valor === "number";
+  const alvo = primitivo ? String(valor) : "";
+  const achado = alvo.match(/\d[\d.]*(?:,\d+)?/);
+  const casas = achado && achado[0].includes(",") ? achado[0].split(",")[1].length : 0;
+  const agrupa = Boolean(achado && achado[0].includes("."));
+  const formata = (v) => v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas, useGrouping: agrupa });
+  const [texto, setTexto] = useState(() => achado && !semMovimento() ? alvo.replace(achado[0], formata(0)) : alvo);
+  const jaContou = React.useRef(false);
+  useEffect(() => {
+    if (jaContou.current || !achado || semMovimento()) { jaContou.current = true; setTexto(alvo); return; }
+    jaContou.current = true;
+    const total = parseFloat(achado[0].replace(/\./g, "").replace(",", "."));
+    if (!isFinite(total) || total === 0) { setTexto(alvo); return; }
+    const inicio = performance.now();
+    let quadro;
+    const passo = (agora) => {
+      const t = Math.min(1, (agora - inicio) / 800);
+      if (t >= 1) { setTexto(alvo); return; }
+      setTexto(alvo.replace(achado[0], formata(total * (1 - Math.pow(1 - t, 3)))));
+      quadro = requestAnimationFrame(passo);
+    };
+    quadro = requestAnimationFrame(passo);
+    return () => cancelAnimationFrame(quadro);
+  }, [alvo]);
+  return primitivo ? texto : valor;
+}
+function Esqueleto() { return <div className="esqueleto" aria-label="Carregando"><span /><span /><span /></div>; }
 
 const SUPABASE_URL = "https://iymlzdcloaeyybhefywp.supabase.co";
 const SUPABASE_KEY = "sb_publishable_kGmPlLLQdFSxdslH6Y9f2w_Cuox7hFm";
@@ -3095,6 +3183,16 @@ function Home() {
   // O aviso de conta a vencer (D-3, desde 29/09) abre ?ir=futuro, a aba "A pagar" — ou ?ir=compras, quando é
   // nota de material a prazo, que mora em Compras.
   const [tab, setTab] = useState(() => { try { const ir = new URL(location.href).searchParams.get("ir"); return ["caixa", "futuro", "compras"].includes(ir) ? ir : "painel"; } catch (e) { return "painel"; } });
+  // EFEITOS PREMIUM (11/10/2026): lado de onde a aba nova entra e cabeçalho compacto ao rolar.
+  const abaAnterior = React.useRef({ tab, classe: "" });
+  const [rolou, setRolou] = useState(false);
+  const observadorCabecalho = React.useRef(null);
+  const cabecalhoRef = useCallback((no) => {
+    observadorCabecalho.current?.disconnect(); observadorCabecalho.current = null;
+    if (!no || !("IntersectionObserver" in window)) { setRolou(false); return; }
+    const obs = new IntersectionObserver(([e]) => setRolou(!e.isIntersecting));
+    obs.observe(no); observadorCabecalho.current = obs;
+  }, []);
   // Tira o `ir` do endereço depois de usar: senão todo recarregar voltaria pra caixa.
   useEffect(() => {
     try {
@@ -3155,6 +3253,7 @@ function Home() {
 
   const notify = useCallback((text, kind = "info") => {
     setNotice({ text, kind });
+    if (kind === "ok") vibrar([12, 40, 12]);
     window.setTimeout(() => setNotice(null), 4200);
   }, []);
 
@@ -3927,10 +4026,15 @@ function Home() {
     { id: "estoque", label: "Estoque", icon: "▦", pagina: "./estoque.html" },
   ];
   // Item que aponta pra página própria sai do app; o resto continua trocando de aba aqui dentro.
-  const irParaAba = (item) => { if (item.pagina) { window.location.href = item.pagina; return; } setTab(item.id); setSelectedId(null); };
+  const irParaAba = (item) => { if (item.pagina) { window.location.href = item.pagina; return; } if (item.id !== tab) vibrar(8); setTab(item.id); setSelectedId(null); };
 
+  if (abaAnterior.current.tab !== tab) {
+    const de = nav.findIndex((item) => item.id === abaAnterior.current.tab), para = nav.findIndex((item) => item.id === tab);
+    abaAnterior.current = { tab, classe: de < 0 || para < 0 ? "" : para > de ? " vem-direita" : " vem-esquerda" };
+  }
   return <div className={`product-shell mode-${mode}`}>
     {notice && <div className={`notice ${notice.kind}`}>{notice.text}</div>}
+    {loading && <div className="barra-carregando" />}
     {/* SEM SINAL: a tela precisa dizer que está velha, senão ele decide em cima de dado defasado sem saber.
         Fica fixo no topo, acima de tudo, porque nesse estado nada mais na tela pode ser confiado às cegas. */}
     {offlineDesde && <div className="notice error">Sem conexão — mostrando os dados baixados {idadeDoDado(offlineDesde)}. Dá pra consultar agenda, telefone e endereço, mas nada que você mudar agora será salvo.</div>}
@@ -3940,7 +4044,8 @@ function Home() {
       <div className="operator-card"><span>Operador atual</span><strong>{mode === "claude" ? "Claude" : "Diego"}</strong><small>{mode === "claude" ? "Operações tipadas liberadas · exclusões bloqueadas" : "Controle e aprovações"}</small><button onClick={() => setMode(mode === "claude" ? "diego" : "claude")}>Trocar para {mode === "claude" ? "Diego" : "Claude"}</button></div>
     </aside>
     <main className="workspace">
-      <header className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><BotaoNotificacao db={db} demo={demo} notify={notify} /><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
+      <div className={`barra-compacta${rolou ? " visivel" : ""}`} aria-hidden="true">{nav.find((item) => item.id === tab)?.label}</div>
+      <header ref={cabecalhoRef} className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><BotaoNotificacao db={db} demo={demo} notify={notify} /><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
 
       {/* A TELA DA CAIXA DE ENTRADA FOI REMOVIDA EM 23/08/2026, a pedido do Diego.
           Ela era a porta de digitação do app — colar mensagem, triar, virar cliente/agenda/
@@ -3952,7 +4057,7 @@ function Home() {
 
       {/* Uma barreira por aba (ver BarreiraDaAba lá embaixo): erro numa aba não leva a barra de abas junto.
           `key={tab}` zera a barreira na troca de aba — sem ele, a aba quebrada contaminaria a próxima. */}
-      <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}><div className="aba-entra">
+      <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}><div className={`aba-entra${abaAnterior.current.classe}`}>
       {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} />}
       {tab === "caixa" && <CaixaView inbox={inbox} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
@@ -4482,7 +4587,7 @@ function GuiaModal({ db, demo, notify, onClose }) {
     <div className="modal-card">
       <div className="modal-head"><div><p className="kicker">CARTILHA DA IA</p><h2>Guia da IA</h2></div><div className="ficha-actions"><button className="ghost" onClick={copiarProtocolos}>Copiar instruções pro chat</button><button className="ghost" onClick={onClose}>Fechar</button></div></div>
       <p className="modal-intro">As regras críticas são travas do app. Este guia explica ao chat como estruturar os fatos e ao Claude como chamar a porta única sem duplicar.</p>
-      {rows === null ? <div className="empty-state"><b>Carregando…</b></div> : <>
+      {rows === null ? <Esqueleto /> : <>
         <div className="guia-block readonly"><h3>Regras automáticas vigentes</h3><pre>{REGRAS_SISTEMA_ATUAIS}</pre></div>
         <div className="guia-block readonly"><h3>Protocolo do chat e do Claude</h3><pre>{PROTOCOLO_CHAT_OPERACAO + "\n\n" + PROTOCOLO_CLAUDE_OPERACAO}</pre></div>
         {["empresa", "como_agir", "regras"].map((sec) => <div className="guia-block" key={sec}><h3>{SECAO_LABEL[sec]}</h3><textarea value={drafts[sec]} onChange={(e) => setDrafts((d) => ({ ...d, [sec]: e.target.value }))} /><button className="primary" onClick={() => save(sec)} disabled={savingSec === sec}>{savingSec === sec ? "Salvando…" : "Salvar"}</button></div>)}
@@ -6699,7 +6804,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {/* SAIU o aviso financeiro do rodapé: era o mesmo assunto do card "a pagar" lá em cima, só que sem o
         valor e sem o caixa possível — repetia a preocupação sem ajudar a decidir. Diego, 25/07. */}</div>;
 }
-function Metric({ label, value, detail, tone, onClick }) { return <article className={`metric-card ${tone}${onClick ? " clickable" : ""}`} onClick={onClick || undefined}><span>{label}</span><b>{value}</b><small>{detail}</small></article>; }
+function Metric({ label, value, detail, tone, onClick }) { return <article className={`metric-card ${tone}${onClick ? " clickable" : ""}`} onClick={onClick || undefined}><span>{label}</span><b><NumeroAnimado valor={value} /></b><small>{detail}</small></article>; }
 
 const FUNIL_FILTROS = [{ id: "todos", label: "Todos" }, { id: "sem_acao", label: "Sem ação" }, { id: "precisa_avancar", label: "Precisa avançar" }, { id: "retorno_vencido", label: "Retorno vencido" }, { id: "lead", label: "Lead" }, { id: "orcamento", label: "Orçamento" }, { id: "agendado", label: "Agendado" }, { id: "producao", label: "Em produção" }, { id: "pronto", label: "Prontos para entregar" }, { id: "entregue", label: "Entregue" }];
 function LeadsView({ services, appointments, agendaHistorico, inbox, search, setSearch, onOpenFicha, initialFiltro, onConsumedInitialFiltro }) {
@@ -9539,7 +9644,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <div className="modal-card">
       <div className="modal-head"><div><p className="kicker">FICHA DO CLIENTE</p><h2>{cliente ? nomeDoCliente(cliente) : "Cliente"}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
-      {loading ? <div className="empty-state"><b>Carregando…</b></div> : !cliente ? <div className="empty-state"><b>Cliente não encontrado.</b></div> : <>
+      {loading ? <Esqueleto /> : !cliente ? <div className="empty-state"><b>Cliente não encontrado.</b></div> : <>
         {telefoneCorrigivel(cliente.telefone) && <div className="duplicate-warning"><b>⚠ Esse telefone não abre o WhatsApp</b>
           <span>{corrigirTelefone(cliente.telefone) ? `Falta o 9 do celular — o certo é ${corrigirTelefone(cliente.telefone)}` : "O número não tem o tamanho de um celular brasileiro. Confira com o cliente."}</span>
           {corrigirTelefone(cliente.telefone) && <button onClick={() => { setForm((f) => ({ ...f, telefone: corrigirTelefone(cliente.telefone) })); setEditing(true); }}>Corrigir e revisar</button>}
