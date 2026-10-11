@@ -685,6 +685,40 @@ button.sutil{opacity:.55;font-size:12px}
 .topo-card.aberto{border-color:var(--tom)}
 .atrasados-recentes.topo-card{background:linear-gradient(160deg,#4a1f1a 0,#2a1715 40%,#17120f 100%)}
 .atrasados-recentes.topo-card::after{box-shadow:0 0 0 2px #df6a5d88,0 0 22px #df6a5d55}
+/* PAINEL ÚNICO, etapa 1 (11/10/2026) */
+.selo-num.selo-txt{width:auto;min-width:46px;padding:0 10px;border-radius:12px}
+.selo-num.selo-txt b{font-size:13px;letter-spacing:-.2px;white-space:nowrap}
+.grupo-card>.contas-card{margin:0 0 8px;border-radius:14px;padding:14px;counter-increment:linhas}
+.grupo-card>.contas-card::after{display:block}
+.dinheiro-linha{display:flex;align-items:baseline;gap:8px 10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.dinheiro-linha em{font-style:normal;font-size:11px;color:var(--dim);white-space:nowrap}
+.dinheiro-linha strong{flex:1 1 120px;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.dinheiro-linha b{white-space:nowrap}
+.mat-loja{border-left:3px solid #ed9057}
+.mat-loja-head b{font-size:12px;font-weight:800;padding:2px 9px;border-radius:999px;background:#d86d3626;border:1px solid #d86d3666;color:#ffcfac}
+.mat-item{align-items:center}
+.mat-item>span>strong{display:block;font-weight:600}
+.mat-item>span>em{display:block;font-style:normal;font-size:11px;color:var(--dim);margin-top:2px}
+.mat-prazo{flex:none;font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;background:#d4a64e2e;color:var(--yellow);border:1px solid #d4a64e80;white-space:nowrap}
+.mat-prazo.atrasado{background:var(--red);color:#fff;border-color:var(--red)}
+.encaixes-card .card-toggle{margin-bottom:12px;gap:12px}
+.encaixes-lista{display:flex;flex-direction:column;gap:12px}
+.encaixe-regiao{display:flex;flex-direction:column;gap:7px}
+.encaixe-chip{align-self:flex-start;font-size:11px;font-weight:800;letter-spacing:.3px;padding:4px 10px;border-radius:999px;background:#8fb8dc22;border:1px solid #8fb8dc66;color:#bcd9ef}
+.encaixe-item{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-left:3px solid #8fb8dc;border-radius:12px;padding:11px 12px;cursor:pointer}
+.encaixe-item>div{min-width:0;flex:1}
+.encaixe-item strong{display:block;font-size:15px}
+.encaixe-item em{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.35}
+.encaixe-item>i{font-style:normal;color:var(--dim);font-size:20px;flex:none}
+/* Barra com 4 botões e o "Mais" */
+.mobile-nav button{position:relative}
+.nav-contagem{position:absolute;top:2px;right:10px;font-size:9px;font-weight:800;padding:1px 6px;border-radius:999px;background:var(--orange);color:#fff}
+.mais-card{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+.mais-grade{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.mais-grade button{position:relative;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:14px;padding:12px 6px;font-size:11px;display:grid;gap:4px;justify-items:center}
+.mais-grade button i{font-style:normal;font-size:24px;color:#987665}
+.mais-grade button.active{border-color:#d86d3680;color:#ffcfac;background:#d86d361a}
+.mais-grade button b{position:absolute;top:6px;right:8px;font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;background:var(--orange);color:#fff}
 /* Hoje em destaque: degradê laranja, data grande e um reflexo de luz passando devagar */
 .hoje-card{position:relative;overflow:hidden;background:linear-gradient(160deg,#4a2211 0,#2a1812 38%,#17120f 100%);border-color:#d86d3655;box-shadow:inset 0 1px 0 #ffffff1a,0 1px 2px #0000004d,0 18px 40px -14px #c2581f66}
 .hoje-card::before{content:"";position:absolute;top:-20%;bottom:-20%;left:0;width:34%;background:linear-gradient(90deg,transparent,#ffb07a14,transparent);pointer-events:none;animation:luzPassa 7s 1.2s ease-in-out infinite}
@@ -3522,6 +3556,7 @@ function Home() {
   // esta linha — `const monitorConferencia = useConferenciaMonitor({ db, demo, session, offlineDesde });` —,
   // a aba "Conferência" no `nav`, o resumo do Painel, a renderização da aba e o `onConferir` da ficha.
   const [notice, setNotice] = useState(null);
+  const [maisAberto, setMaisAberto] = useState(false); // menu "Mais" da barra de baixo (Painel único, 11/10/2026)
   const [search, setSearch] = useState("");
   const [pinState, setPinState] = useState("checking");
   const [showGuia, setShowGuia] = useState(false);
@@ -4349,7 +4384,7 @@ function Home() {
       {/* Uma barreira por aba (ver BarreiraDaAba lá embaixo): erro numa aba não leva a barra de abas junto.
           `key={tab}` zera a barreira na troca de aba — sem ele, a aba quebrada contaminaria a próxima. */}
       <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}><div className={`aba-entra${abaAnterior.current.classe}`}>
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} cadastroProfissionais={profissionais} />}
       {tab === "caixa" && <CaixaView inbox={inbox} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
       {/* Sem `addInbox`, o bloco "ANOTAR AGORA" do Painel não renderiza — ele já era guardado
           por essa prop. Era a caixa de colar mensagem, e o Diego não lança mais pelo app.
@@ -4364,7 +4399,14 @@ function Home() {
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
       </div></BarreiraDaAba>
     </main>
-    <nav className="mobile-nav"><span className="nav-pilula" aria-hidden="true" />{nav.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => irParaAba(item)}><i>{item.icon}</i><span>{item.label}</span></button>)}</nav>
+    {/* BARRA COM 4 BOTÕES (Diego, 11/10/2026: "não ter esse tanto de abas... precisar apenas do Painel"). Painel,
+        Agenda e Caixa ficam na barra; o resto vai pro "Mais". Nenhuma tela foi apagada. */}
+    <nav className="mobile-nav"><span className="nav-pilula" aria-hidden="true" />{nav.filter((item) => NAV_BARRA.includes(item.id)).map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setMaisAberto(false); irParaAba(item); }}><i>{item.icon}</i><span>{item.label}</span></button>)}
+      <button className={!NAV_BARRA.includes(tab) ? "active" : ""} onClick={() => { vibrar(8); setMaisAberto((v) => !v); }}><i>☰</i><span>Mais</span>{(() => { const n = nav.filter((item) => !NAV_BARRA.includes(item.id)).reduce((soma, item) => soma + (item.count || 0), 0); return n ? <b className="nav-contagem">{n}</b> : null; })()}</button></nav>
+    {maisAberto && <div className="modal-overlay mais-overlay" onClick={() => setMaisAberto(false)}><div className="modal-card mais-card" onClick={(e) => e.stopPropagation()}>
+      <p className="kicker">MAIS TELAS</p>
+      <div className="mais-grade">{nav.filter((item) => !NAV_BARRA.includes(item.id)).map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setMaisAberto(false); irParaAba(item); }}><i>{item.icon}</i><span>{item.label}</span>{item.count ? <b>{item.count}</b> : null}</button>)}</div>
+    </div></div>}
     {/* As janelas por cima também têm barreira própria: ficha com dado ruim fecha sozinha, não o app. */}
     {showGuia && <BarreiraDaAba nome="O guia da IA" onFechar={() => setShowGuia(false)}><GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} /></BarreiraDaAba>}
     {fichaId && <BarreiraDaAba nome="A ficha do cliente" onFechar={() => setFichaId(null)}><FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} /></BarreiraDaAba>}
@@ -5716,12 +5758,12 @@ function ComposerCaixa({ composer, setComposer, files, setFiles, addInbox, busy,
 // aí nada é urgente — foi exatamente o que aconteceu com as rotinas atrasadas.
 // `selo`/`tom`/`icone` (11/10/2026, Painel premium): número grande num selo colorido à esquerda do título.
 // Só é usado dentro dos grupos do Painel; sem `selo` o card fica como sempre foi.
-function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null }) {
+function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null }) {
   const [aberto, setAberto] = useState(false);
-  const comSelo = selo !== null && selo !== undefined;
+  const comSelo = (selo !== null && selo !== undefined) || !!seloTexto;
   return <section id={id} className={`${className || "content-card"}${comSelo ? ` com-selo tom-${tom}` : ""}${aberto ? " aberto" : ""}`}>
     <button type="button" className="card-toggle" aria-expanded={aberto} onClick={() => setAberto((v) => !v)}>
-      {comSelo && <span className="selo-num" aria-hidden="true"><b>{selo}</b>{icone && <small>{icone}</small>}</span>}
+      {comSelo && <span className={`selo-num${seloTexto ? " selo-txt" : ""}`} aria-hidden="true"><b>{seloTexto || selo}</b>{icone && <small>{icone}</small>}</span>}
       <div>{cabecalho}</div>
       <i>{aberto ? "▾ fechar" : "▸ abrir"}</i>
     </button>
@@ -6851,18 +6893,18 @@ function MateriaisCard({ services, today, estoque, onVerCompras }) {
   const atrasados = pendentes.filter((p) => p.servico.prazo && p.servico.prazo < today).length;
   const emTransito = pendentes.filter((p) => p.pedido).length;
   const palpites = pendentes.filter((p) => p.palpite).length;
-  return <CardRecolhivel
+  return <CardRecolhivel selo={pendentes.length} tom="laranja" icone="🛒"
     cabecalho={<><p className="kicker">COMPRAS</p><h3>{pendentes.length} material(is) pra comprar</h3>
       {atrasados > 0 && <span className="ficha-note" style={{ margin: 0 }}>{atrasados} em serviço com prazo vencido</span>}</>}
     resumo={<div className="mat-resumo">{ordenadas.map(([loja, itens]) => <span className="mat-chip" key={loja}>{loja} · {itens.length}</span>)}</div>}>
     <div className="mat-lojas">
       {ordenadas.map(([loja, itens]) => <div className="mat-loja" key={loja}>
-        <div className="mat-loja-head"><strong>{loja}</strong><b>{itens.length} item(ns)</b></div>
+        <div className="mat-loja-head"><strong>🏬 {loja}</strong><b>{itens.length}</b></div>
         {itens.map((p, i) => { const atrasado = !!p.servico.prazo && p.servico.prazo < today; return <div className="mat-item" key={loja + "-" + i}>
-          <span>{p.item}{p.pedido ? " 🚚" : ""}{p.palpite ? " ?" : ""}<em>{p.servico.clientes?.nome || "Cliente"} · {p.servico.titulo}</em>
+          <span><strong>{p.item === "(item sem nome)" ? "Item sem nome" : p.item}{p.pedido ? " 🚚" : ""}{p.palpite ? " ?" : ""}</strong><em>{(p.servico.clientes?.nome || "Cliente").split(" ").slice(0, 2).join(" ")} · {p.servico.titulo}</em>
             {/* Pergunta, não afirmação: o app não sabe se a espuma de 3 cm serve pra quem precisa de 10 cm. */}
             {p.noEstoque && <em className="mat-estoque">▦ tem {fmtQtd(p.noEstoque.item.saldo)} {p.noEstoque.item.unidade || ""} de “{p.noEstoque.item.item}” na prateleira — serve?</em>}</span>
-          <time className={atrasado ? "atrasado" : ""}>{prazoComRotulo(p.servico) || "sem prazo"}</time>
+          <time className={`mat-prazo${atrasado ? " atrasado" : ""}`}>{p.servico.prazo ? compactDate(p.servico.prazo) : "sem prazo"}</time>
         </div>; })}
       </div>)}
       {(emTransito > 0 || palpites > 0) && <p className="ficha-note" style={{ margin: 0 }}>{emTransito > 0 ? "🚚 = já pedido, ainda não chegou. " : ""}{palpites > 0 ? "? = loja que o app deduziu, confira antes de sair." : ""}</p>}
@@ -6871,6 +6913,7 @@ function MateriaisCard({ services, today, estoque, onVerCompras }) {
   </CardRecolhivel>;
 }
 
+const NAV_BARRA = ["painel", "agenda", "caixa"];
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
 // Dias civis da agenda: UTC apenas para subtrair datas, sem depender de horário de verão.
 function diasDeAtraso(data, hoje) {
@@ -6904,7 +6947,7 @@ function separarAtrasadosPorIdade(appointments, hoje) {
   });
   return { recentes, antigos, acima30 };
 }
-function Dashboard({ inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+function Dashboard({ inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   // Filtro por etiqueta (Diego, 11/10/2026). Nunca guardado: o app sempre abre em "Todas", pra nenhum card
   // "sumir" por filtro esquecido (susto de 08/10).
@@ -7181,6 +7224,8 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {pessoaisAtrasados.length > 0 && <CardRecolhivel selo={pessoaisAtrasados.length} tom="azul" icone="🏠" cabecalho={<><p className="kicker">PESSOAIS</p><h3>{pessoaisAtrasados.length} item(ns) com data vencida</h3><span className="ficha-note" style={{ margin: 0 }}>Concluir ou remarcar no card Pessoais</span></>}>
       {[...pessoaisAtrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
       <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
+      {(() => { const perguntas = (inbox || []).filter((item) => item.status === "aguardando_voce"); if (!perguntas.length || !onAbrirCaixa) return null;
+        return <button type="button" className="pend-linha com-selo tom-azul" onClick={onAbrirCaixa}><span className="selo-num" aria-hidden="true"><b>{perguntas.length}</b><small>❓</small></span><h3>{perguntas.length} pergunta(s) aguardando você na Caixa</h3><i>abrir ›</i></button>; })()}
       {noAction.length > 0 && <button type="button" className="pend-linha com-selo tom-verde" onClick={onSemProximaAcao}><span className="selo-num" aria-hidden="true"><b>{noAction.length}</b><small>◇</small></span><h3>{noAction.length} lead(s) sem próxima ação</h3><i>ver leads ›</i></button>}
     {/* SAIU DO PAINEL o card Caixa (Diego, 11/10/2026: "está muito cheio"). A aba Caixa no menu já mostra a contagem. */}
     {/* CONVERSA ENCERRADA SEM DESTINO — ver triagensSemDestino(). Fica recolhido e só existe quando há
@@ -7205,6 +7250,10 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     })()}
       <i className="grupo-total" aria-hidden="true" />
     </section>
+    {/* DINHEIRO (Painel único, 11/10/2026): contas (card de sempre) + a pagar + profissionais + mês. Só leitura e
+        atalho; marcar pago continua nas telas de sempre, que abrem pelo "ver tudo". */}
+    <section className="content-card grupo-card grupo-dinheiro">
+      <p className="kicker grupo-titulo">Dinheiro</p>
     {(() => {
       // CONTA CHEGANDO: entra sozinho no Painel 3 dias antes do vencimento (e fica enquanto estiver vencida),
       // com o caixa possível do lado — porque a pergunta que ele faz é "tenho de onde tirar?".
@@ -7241,11 +7290,45 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         {r.semVencimento.length > 3 && <span>e mais {r.semVencimento.length - 3} sem prazo marcado</span>}
       </CardRecolhivel>;
     })()}
+      {(() => {
+        const futuras = (finances || []).filter(ehSaidaFutura).sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+        if (!futuras.length) return null;
+        const total = futuras.reduce((soma, f) => soma + Number(f.valor || 0), 0);
+        return <CardRecolhivel seloTexto={money(total)} tom="ambar" icone="◷"
+          cabecalho={<><p className="kicker">A PAGAR</p><h3>{futuras.length} conta(s) a pagar</h3><span className="ficha-note" style={{ margin: 0 }}>Próxima: {descricaoFinanceiraVisivel(futuras[0].descricao) || futuras[0].categoria} · {compactDate(futuras[0].data)}</span></>}>
+          {futuras.slice(0, 6).map((f) => <span className="dinheiro-linha" key={f.id}><em>{compactDate(f.data)}</em><strong>{descricaoFinanceiraVisivel(f.descricao) || f.categoria}</strong><b>{money(f.valor)}</b></span>)}
+          {futuras.length > 6 && <span className="ficha-note">e mais {futuras.length - 6}</span>}
+          {onVerAPagar && <button type="button" className="ghost" style={{ width: "100%", marginTop: 10 }} onClick={onVerAPagar}>Ver tudo em A pagar</button>}
+        </CardRecolhivel>;
+      })()}
+      {(() => {
+        const acerto = montarAcertoProfissionais(finances, services, cadastroProfissionais);
+        const contas = acerto.contas.filter((c) => c.temAlgo);
+        if (!contas.length) return null;
+        const falta = contas.reduce((soma, c) => soma + c.faltaServicos + c.somaAvulsos, 0);
+        const vales = contas.reduce((soma, c) => soma + c.somaVales, 0);
+        return <CardRecolhivel seloTexto={money(falta)} tom="laranja" icone="✎"
+          cabecalho={<><p className="kicker">PROFISSIONAIS</p><h3>Falta pagar {money(falta)}{vales > 0 ? ` · vales soltos ${money(vales)}` : ""}</h3><span className="ficha-note" style={{ margin: 0 }}>{contas.map((c) => c.nome).join(", ")}</span></>}>
+          {contas.map((c) => <span className="dinheiro-linha" key={c.chave}><strong>{c.nome}</strong><b>{money(c.faltaServicos + c.somaAvulsos)}</b>{c.somaVales > 0 && <em>vales {money(c.somaVales)}</em>}</span>)}
+          {onVerProfissionais && <button type="button" className="ghost" style={{ width: "100%", marginTop: 10 }} onClick={onVerProfissionais}>Ver tudo em Profissionais</button>}
+        </CardRecolhivel>;
+      })()}
+      {(() => {
+        const mes = today.slice(0, 7);
+        const doMes = (finances || []).filter((f) => (f.escopo || "empresa") === "empresa" && (f.data || "").startsWith(mes) && (!f.status || f.status === "pago"));
+        const entrou = doMes.filter((f) => f.tipo === "entrada").reduce((soma, f) => soma + Number(f.valor || 0), 0);
+        const saiu = doMes.filter((f) => f.tipo === "saida").reduce((soma, f) => soma + Number(f.valor || 0), 0);
+        if (!doMes.length) return null;
+        const saldo = entrou - saiu;
+        return <button type="button" className={`pend-linha com-selo ${saldo >= 0 ? "tom-verde" : "tom-vermelho"}`} onClick={onVerFinanceiro}><span className="selo-num selo-txt" aria-hidden="true"><b>{money(saldo)}</b><small>$</small></span><h3>No mês: entrou {money(entrou)} · saiu {money(saiu)}</h3><i>ver ›</i></button>;
+      })()}
+    </section>
     <section className="content-card grupo-card">
       <p className="kicker grupo-titulo">Produção</p>
       <ProntosParaEntregarCard services={services} onOpenFicha={onOpenFicha} />
       <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} appointments={appointments} agendaHistorico={agendaHistorico} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
       <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
+      <MateriaisCard services={services} today={today} estoque={estoque} onVerCompras={onVerCompras} />
       <i className="grupo-total" aria-hidden="true" />
     </section>
     {addInbox && <CardRecolhivel cabecalho={<><p className="kicker">ANOTAR AGORA</p><h3>O que aconteceu?</h3></>}>
@@ -7276,23 +7359,24 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       // inteira ("Elizabeth — passar no Marlom Júnior para grampear embaixo os encostos e depois
       // entregar"). Em negrito, no celular, isso ocupa três linhas antes de a região aparecer.
       const curta = (t, n = 96) => (t.length > n ? t.slice(0, n - 3).trimEnd() + "…" : t);
-      return <section className="content-card">
-        <p className="kicker">ENCAIXES DE ROTA</p>
-        <h3 style={{ margin: "0 0 5px" }}>📍 {encaixes.length} caso(s) esperando uma rota compatível</h3>
-        <span className="ficha-note" style={{ display: "block", margin: "0 0 12px" }}>Sem data marcada de propósito: a ida isolada não compensa. Quando fechar rota pra região, encaixa.</span>
+      // Nome curto: até o travessão, e no máximo duas palavras (Painel único, 11/10/2026: "muito ruim de visualização").
+      const nomeCurto = (t) => String(t || "").split(/\s[—–-]\s/)[0].trim().split(/\s+/).slice(0, 3).join(" ");
+      const porRegiao = {};
+      encaixes.forEach((e) => (porRegiao[e.regiao || "Região não informada"] ||= []).push(e));
+      return <section className="content-card encaixes-card">
+        <div className="card-toggle"><span className="selo-num tom-azul" aria-hidden="true"><b>{encaixes.length}</b><small>📍</small></span><div><p className="kicker">ENCAIXES DE ROTA</p><h3>{encaixes.length} caso(s) esperando rota</h3><span className="ficha-note" style={{ margin: 0 }}>Sem data de propósito: quando fechar rota pra região, encaixa.</span></div></div>
         {/* SEM `funil-dir` NESTE CARD, medido no A23 (360px): a `status-pill` "AGUARDANDO ROTA" é uppercase
             e sobe pra 13px no celular — comia 164px de um cartão de 292 e espremia nome, região e ação em
             86px. Não havia estouro de página, então o teste de largura sozinho passava; o defeito era a
             PROPORÇÃO. A informação não se perdeu: ela virou o sufixo da linha da região, que é onde ela
             responde a pergunta ("por que isso não tem data?") sem disputar espaço com o conteúdo. */}
-        <div className="funil-lista">{encaixes.map((e) => <article className={`funil-item${e.svc ? ` st-${e.svc.status}` : ""}`} key={e.id}
-          onClick={e.cliente?.id && onOpenFicha ? () => onOpenFicha(e.cliente.id) : undefined}>
-          <div className="funil-esq">
-            <strong>{curta(e.nome, 48)}</strong>
-            <span>{e.regiao || "Região não informada"} · aguardando rota</span>
-            <em>→ {curta(e.acao) || "Encaixar em próxima rota compatível"}</em>
-          </div>
-        </article>)}</div>
+        <div className="encaixes-lista">{Object.entries(porRegiao).map(([regiao, lista]) => <div className="encaixe-regiao" key={regiao}>
+          <span className="encaixe-chip">📍 {regiao} · {lista.length}</span>
+          {lista.map((e) => <article className="encaixe-item" key={e.id} onClick={e.cliente?.id && onOpenFicha ? () => onOpenFicha(e.cliente.id) : undefined}>
+            <div><strong>{nomeCurto(e.nome)}</strong><em>{curta(e.acao, 80) || "Encaixar em próxima rota compatível"}</em></div>
+            {e.cliente?.id && onOpenFicha && <i>›</i>}
+          </article>)}
+        </div>)}</div>
       </section>;
     })()}
     {/* SAIU o card "material sem dia marcado pra pedir": desde 25/07 o material que entra na lista de compras
@@ -7322,7 +7406,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {/* DEPOIS DOS COMPROMISSOS, DE PROPÓSITO (Diego, 24/08: "um card lá embaixo de compromissos"). Comprar
         material é consequência da rota do dia, não concorrente dela: ele decide onde vai, e aí olha o que
         aproveita comprar no caminho. Se subisse pro topo, competiria com a agenda pela primeira olhada. */}
-    <MateriaisCard services={services} today={today} estoque={estoque} onVerCompras={onVerCompras} />
+    {/* O card de Compras subiu pro grupo Produção (Painel único, 11/10/2026). */}
     {/* SAIU o aviso financeiro do rodapé: era o mesmo assunto do card "a pagar" lá em cima, só que sem o
         valor e sem o caixa possível — repetia a preocupação sem ajudar a decidir. Diego, 25/07. */}</div>;
 }
