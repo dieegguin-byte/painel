@@ -867,8 +867,6 @@ button.sutil{opacity:.55;font-size:12px}
 .agente-item time{font-size:12px;font-weight:700;color:var(--muted);padding-top:2px;font-variant-numeric:tabular-nums}
 .agente-item strong{display:block;font-size:14px;font-weight:600;color:var(--text);overflow-wrap:anywhere}
 .agente-item span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
-.agente-item.por-auditoria time{color:var(--orange2)}
-.agente-fonte{display:inline-block;font-style:normal;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--orange2);margin-right:6px}
 .agente-vazio{margin:0;padding:6px 0 2px}
 .agente-rodada{margin:0 0 10px;font-size:12px;color:var(--muted);background:#ffffff08;border-radius:8px;padding:7px 10px}
 .agente-mudanca{display:flex!important;flex-wrap:wrap;align-items:center;gap:6px;margin-top:5px!important;font-size:12px}
@@ -876,15 +874,6 @@ button.sutil{opacity:.55;font-size:12px}
 .agente-mudanca em{font-style:normal;color:var(--orange2);font-weight:800}
 .agente-mudanca b{color:#a9e7c2;font-weight:600}
 .agente-registro{font-size:12px!important;color:var(--text)!important;background:#ffffff08;border-radius:6px;padding:4px 8px;margin-top:5px!important;display:inline-block!important}
-.agente-secao{margin:0 0 6px;font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--text)}
-.agente-auditoria{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
-.agente-auditoria summary{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;list-style:none;min-height:36px}
-.agente-auditoria summary::-webkit-details-marker{display:none}
-.agente-auditoria summary .agente-secao{margin:0;color:var(--muted)}
-.agente-auditoria summary small{font-size:11px;color:var(--dim);white-space:nowrap}
-.agente-auditoria summary small::after{content:" ›";color:var(--orange2);font-weight:800}
-.agente-auditoria[open] summary small::after{content:" ⌄"}
-.agente-auditoria .agente-rodada{margin-top:8px}
 .agente-abrir{display:inline-block;margin-top:7px;background:none;border:1px solid var(--line2);color:var(--orange2);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;min-height:34px;cursor:pointer}
 /* TOPO ENXUTO (12/10/2026): menu "⋯" no lugar dos seis botões */
 .header-actions{position:relative}
@@ -3880,7 +3869,7 @@ function Home() {
         // `por` agente/auditoria/claude nos últimos 7 dias. Tabela que já existia; nada de schema novo.
         // `historico_por_check` só aceita 'diego' e 'claude', então as rotinas gravam por='claude' e dizem quem
         // são no começo do `o_que`: "Agente: …" ou "Auditoria: …". O filtro de prefixo fica no JS (AgenteCard).
-        db.from("historico").select("id,o_que,por,detalhe,quando").eq("por", "claude").or("o_que.ilike.Agente:%,o_que.ilike.Auditoria:%").gte("quando", new Date(Date.now() - 7 * 86400000).toISOString()).order("quando", { ascending: false }).limit(80),
+        db.from("historico").select("id,o_que,por,detalhe,quando").eq("por", "claude").ilike("o_que","Agente:%").gte("quando", new Date(Date.now() - 7 * 86400000).toISOString()).order("quando", { ascending: false }).limit(80),
       ]);
       // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
       // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
@@ -7332,7 +7321,7 @@ function GrupoRecolhivel({ titulo, resumo = null, contagem = null, semContador =
 // ===== O QUE O AGENTE FEZ (Diego, 12/10/2026: "acompanhamento do que o Agente está fazendo") =====
 // Fonte: `historico`, por='claude', `o_que` começando com "Agente: " (rotina de hora em hora) ou "Auditoria: "
 // (02h20) — o check `historico_por_check` só deixa 'diego' e 'claude', então quem fez vai no prefixo. Últimos
-// 7 dias. O card fica recolhido como os outros; fechado mostra quando foi a última vez e quantas ações hoje;
+// 7 dias. Só linhas "Agente:" entram no card (12/10: "Auditoria nem precisa"). Fechado mostra a última rodada e quantas ações hoje;
 // aberto, a lista por dia. "Agente: Rodou — nada novo" é a batida de presença de cada hora: entra na conta
 // da última vez e fica de fora da lista.
 const AGENTE_PREFIXO = /^(agente|auditoria)\s*:\s*/i;
@@ -7368,58 +7357,40 @@ function resolverRefsAgente(refs, { services = [], appointments = [], customers 
   return { clienteId, itens };
 }
 function AgenteCard({ itens, today, services, appointments, customers, finances, onOpenFicha }) {
-  // AGENTE SEPARADO DA AUDITORIA (Diego, 12/10/2026: "lá em agente passou o que fizemos na auditoria, não o
-  // trabalho que o agente está executando"). O que o agente de hora em hora fez SOZINHO fica em cima, em
-  // destaque; o que a auditoria (com o Diego nos cartões) lançou fica embaixo, recolhido.
-  const linhas = (itens || []).filter((h) => h && h.quando).map(separarFonteAgente).filter(Boolean).sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+  // SÓ O AGENTE (Diego, 12/10/2026: "lá em agente passou o que fizemos na auditoria, não o trabalho que o agente
+  // está executando" / "Auditoria nem precisa"). O card mostra apenas as linhas "Agente:", o que o agente de hora
+  // em hora fez SOZINHO. Linhas "Auditoria:" continuam no historico, mas ficam fora deste card.
+  const linhas = (itens || []).filter((h) => h && h.quando).map(separarFonteAgente).filter((h) => h && h.fonte === "agente").sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
   const nomeDe = (id) => { const c = (customers || []).find((x) => x.id === id); return c ? nomeDoCliente(c) : null; };
   const diaDe = (h) => { const d = new Date(h.quando); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const ontem = somarDias(today, -1);
   const rotuloDia = (dia) => dia === today ? "Hoje" : dia === ontem ? "Ontem" : compactDate(dia);
   const hora = (h) => { const d = new Date(h.quando); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
   const haQuanto = (h) => { const minutos = Math.max(0, Math.round((Date.now() - new Date(h.quando).getTime()) / 60000)); return minutos < 2 ? "agora" : minutos < 60 ? `há ${minutos} min` : minutos < 36 * 60 ? `há ${Math.round(minutos / 60)} h` : compactDate(diaDe(h)); };
-  const textoBatida = (h) => `${h.texto.replace(AGENTE_BATIDA, "").replace(/^\s*[—-]\s*/, "")}${h.detalhe ? ` · ${parseDetalheAgente(h.detalhe).texto}` : ""}`;
-  const porDia = (acoes) => { const grupos = []; acoes.forEach((h) => { const dia = diaDe(h); const g = grupos[grupos.length - 1]; if (g && g.dia === dia) g.itens.push(h); else grupos.push({ dia, itens: [h] }); }); return grupos; };
-  const lista = (acoes) => porDia(acoes).slice(0, 7).map((g) => <div className="agente-dia" key={g.dia}>
-    <p className="agente-dia-titulo">{rotuloDia(g.dia)}</p>
-    {g.itens.map((h) => { const d = parseDetalheAgente(h.detalhe); const r = resolverRefsAgente(d.refs, { services, appointments, customers, finances }); const nome = r.clienteId ? nomeDe(r.clienteId) : null; return <div className={`agente-item por-${h.fonte}`} key={h.id}>
-      <time>{hora(h)}</time>
-      <div>
-        <strong>{h.texto}</strong>
-        {d.antes !== null && <span className="agente-mudanca"><s>{d.antes}</s><em>→</em><b>{d.depois}</b></span>}
-        {r.itens.map((it, i) => <span className="agente-registro" key={i}>{it.icone} {it.texto}</span>)}
-        {d.texto && <span>{d.texto.length > 140 ? d.texto.slice(0, 137).trimEnd() + "…" : d.texto}</span>}
-        {r.clienteId && onOpenFicha && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onOpenFicha(r.clienteId); }}>Abrir ficha{nome ? ` de ${nome.split(" ")[0]}` : ""} ›</button>}
-      </div>
-    </div>; })}
-  </div>);
-  const agente = linhas.filter((h) => h.fonte === "agente");
-  const auditoria = linhas.filter((h) => h.fonte === "auditoria");
-  const acoesAgente = agente.filter((h) => !AGENTE_BATIDA.test(h.texto));
-  const rodadaAgente = agente.find((h) => AGENTE_BATIDA.test(h.texto));
-  const acoesAud = auditoria.filter((h) => !AGENTE_BATIDA.test(h.texto));
-  const rodadaAud = auditoria.find((h) => AGENTE_BATIDA.test(h.texto));
-  if (!linhas.length) return <GrupoRecolhivel titulo="Agente" className="grupo-agente" semContador resumo="ainda não registrou nada aqui">
-    <p className="ficha-note agente-vazio">Quando o Agente de hora em hora fizer algo sozinho, aparece aqui. O que a auditoria lançar fica numa seção separada.</p>
+  if (!linhas.length) return <GrupoRecolhivel titulo="Agente" className="grupo-agente" semContador resumo="ainda não rodou">
+    <p className="ficha-note agente-vazio">Quando o Agente de hora em hora fizer algo sozinho, aparece aqui.</p>
   </GrupoRecolhivel>;
-  const hojeAgente = acoesAgente.filter((h) => diaDe(h) === today).length;
-  const hojeAud = acoesAud.filter((h) => diaDe(h) === today).length;
-  const resumo = [
-    agente.length ? `agente ${haQuanto(agente[0])}${hojeAgente ? ` · ${hojeAgente} ${hojeAgente === 1 ? "ação" : "ações"} hoje` : " · nada hoje"}` : "agente ainda não rodou",
-    hojeAud ? `auditoria ${hojeAud}` : null,
-  ].filter(Boolean).join(" · ");
+  const acoes = linhas.filter((h) => !AGENTE_BATIDA.test(h.texto));
+  const rodada = linhas.find((h) => AGENTE_BATIDA.test(h.texto));
+  const hojeN = acoes.filter((h) => diaDe(h) === today).length;
+  const resumo = `última rodada ${haQuanto(linhas[0])} · ${hojeN ? `${hojeN} ${hojeN === 1 ? "ação" : "ações"} hoje` : "nada hoje"}`;
+  const grupos = []; acoes.forEach((h) => { const dia = diaDe(h); const g = grupos[grupos.length - 1]; if (g && g.dia === dia) g.itens.push(h); else grupos.push({ dia, itens: [h] }); });
   return <GrupoRecolhivel titulo="Agente" className="grupo-agente" semContador resumo={resumo}>
-    <p className="agente-secao">🤖 O que o agente fez sozinho</p>
-    {rodadaAgente && <p className="agente-rodada">Última rodada {hora(rodadaAgente)} ({haQuanto(rodadaAgente)}): {textoBatida(rodadaAgente)}</p>}
-    {!agente.length && <p className="ficha-note agente-vazio">O agente de hora em hora ainda não registrou rodada nos últimos 7 dias.</p>}
-    {agente.length > 0 && !acoesAgente.length && <p className="ficha-note agente-vazio">Nenhuma ação automática nos últimos 7 dias, só rodadas sem novidade.</p>}
-    {lista(acoesAgente)}
-    {auditoria.length > 0 && <details className="agente-auditoria">
-      <summary><span className="agente-secao">📋 Auditoria (com você nos cartões)</span><small>{acoesAud.length} {acoesAud.length === 1 ? "ação" : "ações"}{rodadaAud ? ` · última ${haQuanto(rodadaAud)}` : ""}</small></summary>
-      {rodadaAud && <p className="agente-rodada">Última auditoria {hora(rodadaAud)}: {textoBatida(rodadaAud)}</p>}
-      {lista(acoesAud)}
-      {!acoesAud.length && <p className="ficha-note agente-vazio">Nenhum lançamento da auditoria nos últimos 7 dias.</p>}
-    </details>}
+    {rodada && <p className="agente-rodada">Última rodada {hora(rodada)} ({haQuanto(rodada)}): {rodada.texto.replace(AGENTE_BATIDA, "").replace(/^\s*[—-]\s*/, "")}{rodada.detalhe ? ` · ${parseDetalheAgente(rodada.detalhe).texto}` : ""}</p>}
+    {!acoes.length && <p className="ficha-note agente-vazio">Nenhuma ação automática nos últimos 7 dias, só rodadas sem novidade.</p>}
+    {grupos.slice(0, 7).map((g) => <div className="agente-dia" key={g.dia}>
+      <p className="agente-dia-titulo">{rotuloDia(g.dia)}</p>
+      {g.itens.map((h) => { const d = parseDetalheAgente(h.detalhe); const r = resolverRefsAgente(d.refs, { services, appointments, customers, finances }); const nome = r.clienteId ? nomeDe(r.clienteId) : null; return <div className="agente-item" key={h.id}>
+        <time>{hora(h)}</time>
+        <div>
+          <strong>{h.texto}</strong>
+          {d.antes !== null && <span className="agente-mudanca"><s>{d.antes}</s><em>→</em><b>{d.depois}</b></span>}
+          {r.itens.map((it, i) => <span className="agente-registro" key={i}>{it.icone} {it.texto}</span>)}
+          {d.texto && <span>{d.texto.length > 140 ? d.texto.slice(0, 137).trimEnd() + "…" : d.texto}</span>}
+          {r.clienteId && onOpenFicha && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onOpenFicha(r.clienteId); }}>Abrir ficha{nome ? ` de ${nome.split(" ")[0]}` : ""} ›</button>}
+        </div>
+      </div>; })}
+    </div>)}
   </GrupoRecolhivel>;
 }
 // ===== RESUMO DA MANHÃ (Diego, 11/10/2026: "3 bacana") =====
