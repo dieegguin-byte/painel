@@ -3902,6 +3902,54 @@ function Home() {
   // O gesto de puxar pra atualizar (fora do React) chama isto.
   useEffect(() => { window.__tbAtualizar = loadAll; return () => { if (window.__tbAtualizar === loadAll) window.__tbAtualizar = null; }; }, [loadAll]);
 
+  // BOTÃO VOLTAR DO CELULAR (Diego, 12/10/2026: "o botão voltar traga para a tela inicial e não saia do app").
+  // Regra: com algo aberto por cima (ficha, modal, menu "⋯", folha do Mais, Anotar) → fecha isso; em outra aba →
+  // volta pro Painel; no Painel limpo → o próximo voltar sai do app, como ele pediu.
+  // Como: enquanto houver pra onde voltar, o app mantém UMA entrada de guarda no histórico do navegador; o voltar
+  // físico tira essa entrada (popstate) e o app decide o que fechar, em vez de o Android fechar o app. Quando
+  // volta ao Painel limpo, a guarda é retirada, pra que o voltar seguinte saia de verdade — sem toque "perdido".
+  // Fechar o que está aberto é feito pelo próprio pano de fundo de cada modal (todos fecham ao tocar fora), então
+  // nenhum modal precisou ser reescrito; o que não tem pano de fundo não entra na conta.
+  const tabRef = React.useRef(tab); tabRef.current = tab;
+  const ignorarPop = React.useRef(false);
+  useEffect(() => {
+    const GUARDA = { tbGuarda: true };
+    const armado = () => { try { return !!(window.history.state && window.history.state.tbGuarda); } catch (e) { return false; } };
+    const abertoPorCima = () => document.querySelector(".modal-overlay, .menu-topo-fundo");
+    const sincronizar = () => {
+      const precisa = tabRef.current !== "painel" || !!abertoPorCima();
+      try {
+        if (precisa && !armado()) window.history.pushState(GUARDA, "");
+        else if (!precisa && armado()) { ignorarPop.current = true; window.history.back(); }
+      } catch (e) { /* navegador sem histórico: segue sem a guarda */ }
+    };
+    const onPop = () => {
+      if (ignorarPop.current) { ignorarPop.current = false; return; }
+      const topo = (() => { const todos = document.querySelectorAll(".modal-overlay, .menu-topo-fundo"); return todos[todos.length - 1]; })();
+      if (topo) {
+        // Mesmo gesto de "tocar fora": os modais ouvem mousedown ou click no próprio pano de fundo.
+        topo.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+        topo.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        setTimeout(sincronizar, 50);
+        return;
+      }
+      if (tabRef.current !== "painel") { vibrar(8); setTab("painel"); setSelectedId(null); return; }
+      // Painel limpo e sem guarda: nada a fazer; o Android fecha o app no próximo voltar.
+    };
+    let agendado = null;
+    const obs = new MutationObserver(() => { if (agendado) return; agendado = requestAnimationFrame(() => { agendado = null; sincronizar(); }); });
+    obs.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("popstate", onPop);
+    sincronizar();
+    return () => { obs.disconnect(); window.removeEventListener("popstate", onPop); if (agendado) cancelAnimationFrame(agendado); };
+  }, []);
+  useEffect(() => {
+    // Mudou de aba: arma (saiu do Painel) ou desarma (voltou pro Painel limpo).
+    const precisa = tab !== "painel" || !!document.querySelector(".modal-overlay, .menu-topo-fundo");
+    const armado = !!(window.history.state && window.history.state.tbGuarda);
+    try { if (precisa && !armado) window.history.pushState({ tbGuarda: true }, ""); else if (!precisa && armado) { ignorarPop.current = true; window.history.back(); } } catch (e) { /* segue */ }
+  }, [tab]);
+
   useEffect(() => { if (demo || session) loadAll(); }, [demo, session, loadAll]);
 
   // O APP EM TEMPO REAL (recado de 04/09: "compromisso gravado na fonte oficial e ainda assim não
