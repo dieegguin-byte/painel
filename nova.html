@@ -658,10 +658,10 @@ button.sutil{opacity:.55;font-size:12px}
 .grupo-titulo{font:500 22px Georgia,serif;text-transform:none;letter-spacing:0;color:var(--cream);margin:0 4px 12px}
 .grupo-total{position:absolute;top:14px;right:16px;font-style:normal;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;background:#d86d3626;border:1px solid #d86d3666;color:#ffcfac}
 .grupo-total::before{content:counter(linhas)}
-.grupo-card>.com-selo{counter-increment:linhas;background:linear-gradient(150deg,#ffffff0c,#ffffff02 50%),var(--surface);border:1px solid var(--line);border-left:3px solid var(--tom);border-radius:14px;padding:12px 12px 12px 10px;margin:0 0 8px;box-shadow:inset 0 1px 0 #ffffff10,0 1px 2px #0000004d,0 10px 24px -12px #000000a6;animation:linhaEntra .5s cubic-bezier(.2,.9,.3,1.15) backwards;transition:border-color .2s,box-shadow .2s}
-.grupo-card>.com-selo:nth-child(2){animation-delay:.08s}.grupo-card>.com-selo:nth-child(3){animation-delay:.16s}.grupo-card>.com-selo:nth-child(4){animation-delay:.24s}.grupo-card>.com-selo:nth-child(5){animation-delay:.32s}.grupo-card>.com-selo:nth-child(n+6){animation-delay:.4s}
-.grupo-card>.com-selo.aberto{border-color:var(--tom);box-shadow:inset 0 1px 0 #ffffff10,0 0 0 1px var(--tom),0 0 22px -4px var(--tom)}
-.grupo-card>.com-selo::after{display:none}
+.grupo-corpo>.com-selo{counter-increment:linhas;background:linear-gradient(150deg,#ffffff0c,#ffffff02 50%),var(--surface);border:1px solid var(--line);border-left:3px solid var(--tom);border-radius:14px;padding:12px 12px 12px 10px;margin:0 0 8px;box-shadow:inset 0 1px 0 #ffffff10,0 1px 2px #0000004d,0 10px 24px -12px #000000a6;animation:linhaEntra .5s cubic-bezier(.2,.9,.3,1.15) backwards;transition:border-color .2s,box-shadow .2s}
+.grupo-corpo>.com-selo:nth-child(2){animation-delay:.08s}.grupo-corpo>.com-selo:nth-child(3){animation-delay:.16s}.grupo-corpo>.com-selo:nth-child(4){animation-delay:.24s}.grupo-corpo>.com-selo:nth-child(5){animation-delay:.32s}.grupo-corpo>.com-selo:nth-child(n+6){animation-delay:.4s}
+.grupo-corpo>.com-selo.aberto{border-color:var(--tom);box-shadow:inset 0 1px 0 #ffffff10,0 0 0 1px var(--tom),0 0 22px -4px var(--tom)}
+.grupo-corpo>.com-selo::after{display:none}
 .grupo-card .card-toggle{gap:12px}
 .grupo-card .card-toggle .kicker{display:none}
 .grupo-card .card-toggle h3{font-size:15px;font-weight:600;line-height:1.3;color:var(--cream)}
@@ -688,8 +688,8 @@ button.sutil{opacity:.55;font-size:12px}
 /* PAINEL ÚNICO, etapa 1 (11/10/2026) */
 .selo-num.selo-txt{width:auto;min-width:46px;padding:0 10px;border-radius:12px}
 .selo-num.selo-txt b{font-size:13px;letter-spacing:-.2px;white-space:nowrap}
-.grupo-card>.contas-card{margin:0 0 8px;border-radius:14px;padding:14px;counter-increment:linhas}
-.grupo-card>.contas-card::after{display:block}
+.grupo-corpo>.contas-card{margin:0 0 8px;border-radius:14px;padding:14px;counter-increment:linhas}
+.grupo-corpo>.contas-card::after{display:block}
 .dinheiro-linha{display:flex;align-items:baseline;gap:8px 10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
 .dinheiro-linha em{font-style:normal;font-size:11px;color:var(--dim);white-space:nowrap}
 .dinheiro-linha strong{flex:1 1 120px;min-width:0;font-weight:600;overflow-wrap:anywhere}
@@ -722,10 +722,10 @@ button.sutil{opacity:.55;font-size:12px}
 /* PAINEL ÚNICO, etapa 2 (11/10/2026): Clientes e Leads, estoque, "ver tudo" e o botão flutuante de anotar */
 .grupo-ver-tudo{display:block;width:100%;margin:4px 0 0;padding:11px;border:1px dashed var(--line2);background:transparent;color:#ffcfac;border-radius:12px;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;cursor:pointer;transition:background-color .2s,border-color .2s}
 .grupo-ver-tudo:active,.grupo-ver-tudo:hover{background:#d86d3618;border-color:#d86d3680}
-.grupo-card>.encaixes-card{margin:0 0 8px;border-radius:14px;padding:12px;counter-increment:linhas;border-left:3px solid #8fb8dc;animation:linhaEntra .5s cubic-bezier(.2,.9,.3,1.15) backwards}
-.grupo-card>.encaixes-card .card-toggle{margin-bottom:10px}
-.grupo-card>.encaixes-card .card-toggle .kicker{display:none}
-.grupo-card>.encaixes-card .card-toggle h3{font-size:15px;font-weight:600;color:var(--cream)}
+.grupo-corpo>.encaixes-card{margin:0 0 8px;border-radius:14px;padding:12px;counter-increment:linhas;border-left:3px solid #8fb8dc;animation:linhaEntra .5s cubic-bezier(.2,.9,.3,1.15) backwards}
+.grupo-corpo>.encaixes-card .card-toggle{margin-bottom:10px}
+.grupo-corpo>.encaixes-card .card-toggle .kicker{display:none}
+.grupo-corpo>.encaixes-card .card-toggle h3{font-size:15px;font-weight:600;color:var(--cream)}
 .pend-linha.com-selo .linha-sub{display:block;font-size:11px;font-weight:500;color:var(--dim);margin-top:2px;line-height:1.3}
 /* Botão flutuante "Anotar": fica acima da barra de baixo, sempre à mão; abre a mesma caixa de sempre numa gaveta */
 .anotar-fab{position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:150;height:52px;padding:0 20px 0 16px;border-radius:999px;border:1px solid #ffb07a66;background:linear-gradient(145deg,#f09a5c,#c8551f);color:#fff8f0;display:flex;align-items:center;gap:8px;font:800 14px/1 Inter,system-ui,sans-serif;letter-spacing:.3px;box-shadow:0 10px 26px -6px #d86d36cc,inset 0 1px 0 #ffffff55;cursor:pointer;animation:seloPop .55s .6s cubic-bezier(.2,.9,.3,1.3) backwards;transition:transform .15s,box-shadow .2s}
@@ -759,6 +759,25 @@ button.sutil{opacity:.55;font-size:12px}
 .resumo-bloco.prioridades ul{counter-reset:prio}
 .resumo-bloco.prioridades li::before{content:counter(prio);width:22px;height:22px;border-radius:7px;background:linear-gradient(145deg,#ed9057,#c8551f);color:#fff8f0;font:800 12px/22px Inter,system-ui,sans-serif;text-align:center;margin-top:0;box-shadow:none}
 .resumo-card p.resumo-livre{margin:6px 0 0;font-size:14px;line-height:1.5;color:var(--cream);white-space:pre-wrap}
+/* GRUPOS RECOLHIDOS (Diego, 12/10/2026: "quero tudo recolhido para ficar mais mínima na lista"). O corpo fica
+   montado mas escondido (height 0 + visibility), não display:none: assim o contador CSS das linhas continua
+   contando e o grupo vazio continua sumindo pelo :has(). */
+.grupo-cabecalho{display:flex;align-items:center;gap:10px;width:100%;background:transparent;border:0;color:inherit;text-align:left;font:inherit;cursor:pointer;padding:0;min-height:44px}
+.grupo-cabecalho .grupo-titulo{margin:0;flex:1;min-width:0}
+.grupo-cabecalho .grupo-resumo{font:800 15px/1 Inter,system-ui,sans-serif;color:#ffcfac;white-space:nowrap;letter-spacing:-.2px}
+.grupo-cabecalho>i{font-style:normal;font-size:16px;color:var(--dim);transition:transform .25s;width:22px;text-align:center}
+.grupo-card.aberto .grupo-cabecalho>i{transform:rotate(90deg)}
+.grupo-card.aberto .grupo-cabecalho{margin-bottom:12px}
+.grupo-card.fechado .grupo-corpo{height:0;overflow:hidden;visibility:hidden;margin:0;padding:0}
+.grupo-card.fechado .grupo-ver-tudo{display:none}
+.grupo-card .grupo-total{position:static;flex:none}
+.grupo-card.sem-contador .grupo-total{display:none}
+.grupo-card .grupo-total.contagem-js::before{content:attr(data-n)}
+/* FICHA DO CLIENTE: botões menores (Diego, 12/10/2026: "isso aí é antigo, agora é pra ficar menor"). Os cinco
+   botões grandes viram pílulas numa linha só, que quebra se precisar. Mesmo alvo de toque mínimo (40px). */
+.ficha-actions{flex-wrap:wrap;gap:6px;margin-top:4px}
+.ficha-actions .ghost{flex:0 1 auto;min-height:40px;padding:8px 13px;font-size:12px;font-weight:700;border-radius:999px;letter-spacing:.2px;white-space:nowrap;line-height:1.2}
+.ficha-actions+.ficha-actions{margin-top:0}
 /* Contas vencida: brilho pulsando mais forte */
 .contas-card::after{animation:contaPulsa 1.8s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
@@ -7067,6 +7086,23 @@ function separarAtrasadosPorIdade(appointments, hoje) {
   });
   return { recentes, antigos, acima30 };
 }
+// ===== GRUPO RECOLHÍVEL DO PAINEL (Diego, 12/10/2026: "tudo recolhido, quando eu clicar eu abro") =====
+// Nasce fechado: só o título e a quantidade (ou o valor, no Dinheiro). O corpo fica montado e escondido por
+// CSS, de propósito: o contador de linhas (counter `linhas`) e o `:has()` que some com grupo vazio dependem
+// dos filhos existirem. `contagem` vem calculada em JS quando o número de ITENS é mais honesto que o de linhas.
+function GrupoRecolhivel({ titulo, resumo = null, contagem = null, semContador = false, verTudo = null, onVerTudo = null, className = "", children }) {
+  const [aberto, setAberto] = useState(false);
+  return <section className={`content-card grupo-card ${className}${aberto ? " aberto" : " fechado"}${semContador ? " sem-contador" : ""}`}>
+    <button type="button" className="grupo-cabecalho" aria-expanded={aberto} onClick={() => { vibrar(6); setAberto((v) => !v); }}>
+      <p className="kicker grupo-titulo">{titulo}</p>
+      {resumo && <b className="grupo-resumo">{resumo}</b>}
+      {!semContador && <i className={`grupo-total${contagem !== null ? " contagem-js" : ""}`} data-n={contagem !== null ? contagem : undefined} aria-hidden="true" />}
+      <i>›</i>
+    </button>
+    <div className="grupo-corpo">{children}</div>
+    {aberto && verTudo && onVerTudo && <button type="button" className="grupo-ver-tudo" onClick={onVerTudo}>{verTudo}</button>}
+  </section>;
+}
 // ===== RESUMO DA MANHÃ (Diego, 11/10/2026: "3 bacana") =====
 // A auditoria das 2h20 grava UMA linha em avisos_operacionais com dominio "resumo_manha" e expira_em = o dia,
 // e o Painel só mostra. Sem tabela nova: o pacote já traz os avisos ativos. Formato do texto, de propósito
@@ -7371,6 +7407,18 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         </div>)}</div>
       </CardRecolhivel>;
     })();
+  // Contagens dos grupos recolhidos (12/10/2026): itens, não linhas, pra "Pendências · 7" dizer quantas coisas tem.
+  const perguntasCaixa = (inbox || []).filter((item) => item.status === "aguardando_voce");
+  const conversasSemDestino = triagensSemDestino(agendaHistorico, appointments, customers);
+  const contagemPendencias = antigos.length + pessoaisAtrasados.length + perguntasCaixa.length + conversasSemDestino.length;
+  const orcamentosAbertos = services.filter((s) => s.status === "orcamento");
+  const leadsNovos = services.filter((s) => s.status === "lead");
+  const retornosVencidosN = services.filter((s) => retornoVencido(s, today)).length;
+  const contagemClientes = orcamentosAbertos.length + leadsNovos.length + noAction.length + retornosVencidosN + encaixes.length;
+  const materiaisPendentesN = services.filter((s) => ["agendado", "producao"].includes(s.status)).reduce((n, s) => n + (s.materiais_necessarios || []).filter((m) => !m.arquivado && !m.comprado).length, 0);
+  const estoqueBaixoN = (estoque || []).filter((e) => /^(ZERADO|ABAIXO)/i.test(String(e.status || ""))).length;
+  const contagemProducao = services.filter(servicoPronto).length + services.filter(ocupaCapacidade).length + materiaisPendentesN + estoqueBaixoN;
+  const totalAPagar = (finances || []).filter((f) => f.status === "a_pagar" && f.tipo === "saida" && f.categoria !== "Vale" && f.categoria !== CATEGORIA_MAO_DE_OBRA).reduce((soma, f) => soma + Number(f.valor || 0), 0);
   return <div className="page-grid painel-rolagem">
     {(atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}
       {/* ETIQUETA NUM CONTROLE SÓ (Diego, 11/10/2026: a linha de 14 botões empurrava os cards pra baixo). */}
@@ -7419,8 +7467,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         só que como uma linha dentro do grupo (ver CSS `.grupo-card`). Os dois quadrados de número saíram
         porque repetiam o que as linhas de Pendências já contam; o card de Rotinas solto saiu porque as
         rotinas já estão dentro de Hoje. Grupo sem nenhuma linha some sozinho (`:has`). */}
-    <section className="content-card grupo-card">
-      <p className="kicker grupo-titulo">Pendências</p>
+    <GrupoRecolhivel titulo="Pendências" contagem={contagemPendencias} verTudo="ver a agenda toda ›" onVerTudo={onVerAgenda}>
     {antigos.length > 0 && <CardRecolhivel id="secao-revisao-antiga" className="content-card revisao-antiga" selo={antigos.length} tom="ambar" icone="🗂"
       cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{antigosAcima30.length} com mais de 30 dias · histórico preservado para revisão</span></>}>
@@ -7450,14 +7497,11 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         {perdidas.length > 8 && <span>e mais {perdidas.length - 8}</span>}
       </CardRecolhivel>;
     })()}
-      <i className="grupo-total" aria-hidden="true" />
-      {onVerAgenda && <button type="button" className="grupo-ver-tudo" onClick={onVerAgenda}>ver a agenda toda ›</button>}
-    </section>
+    </GrupoRecolhivel>
     {/* CLIENTES E LEADS (Painel único, etapa 2, 11/10/2026): o que está vivo no funil, num lugar só. Orçamentos
         abertos com o valor somado, leads novos, sem próxima ação (saiu de Pendências), retorno vencido (idem) e
         os encaixes de rota, que são clientes esperando a rota passar. "Ver tudo" abre a aba Leads. */}
-    <section className="content-card grupo-card">
-      <p className="kicker grupo-titulo">Clientes e Leads</p>
+    <GrupoRecolhivel titulo="Clientes e Leads" contagem={contagemClientes} verTudo="ver todos os clientes e leads ›" onVerTudo={onVerLeads}>
       {(() => {
         const abertos = services.filter((s) => s.status === "orcamento");
         if (!abertos.length) return null;
@@ -7473,13 +7517,10 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       {noAction.length > 0 && <button type="button" className="pend-linha com-selo tom-verde" onClick={onSemProximaAcao}><span className="selo-num" aria-hidden="true"><b>{noAction.length}</b><small>◇</small></span><h3>{noAction.length} lead(s) sem próxima ação</h3><i>ver leads ›</i></button>}
       <RetornosVencidosCard services={services} today={today} onVerLeads={onVerRetornosVencidos} onOpenFicha={onOpenFicha} notify={notify} />
       {blocoEncaixes}
-      <i className="grupo-total" aria-hidden="true" />
-      {onVerLeads && <button type="button" className="grupo-ver-tudo" onClick={onVerLeads}>ver todos os clientes e leads ›</button>}
-    </section>
+    </GrupoRecolhivel>
     {/* DINHEIRO (Painel único, 11/10/2026): contas (card de sempre) + a pagar + profissionais + mês. Só leitura e
         atalho; marcar pago continua nas telas de sempre, que abrem pelo "ver tudo". */}
-    <section className="content-card grupo-card grupo-dinheiro">
-      <p className="kicker grupo-titulo">Dinheiro</p>
+    <GrupoRecolhivel titulo="Dinheiro" className="grupo-dinheiro" semContador resumo={totalAPagar > 0 ? `${money(totalAPagar)} a pagar` : null} verTudo="ver o financeiro todo ›" onVerTudo={onVerFinanceiro}>
     {(() => {
       // CONTA CHEGANDO: entra sozinho no Painel 3 dias antes do vencimento (e fica enquanto estiver vencida),
       // com o caixa possível do lado — porque a pergunta que ele faz é "tenho de onde tirar?".
@@ -7548,10 +7589,8 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         const saldo = entrou - saiu;
         return <button type="button" className={`pend-linha com-selo ${saldo >= 0 ? "tom-verde" : "tom-vermelho"}`} onClick={onVerFinanceiro}><span className="selo-num selo-txt" aria-hidden="true"><b>{money(saldo)}</b><small>$</small></span><h3>No mês: entrou {money(entrou)} · saiu {money(saiu)}</h3><i>ver ›</i></button>;
       })()}
-      {onVerFinanceiro && <button type="button" className="grupo-ver-tudo" onClick={onVerFinanceiro}>ver o financeiro todo ›</button>}
-    </section>
-    <section className="content-card grupo-card">
-      <p className="kicker grupo-titulo">Produção</p>
+    </GrupoRecolhivel>
+    <GrupoRecolhivel titulo="Produção" contagem={contagemProducao} verTudo="ver as compras todas ›" onVerTudo={onVerCompras}>
       <ProntosParaEntregarCard services={services} onOpenFicha={onOpenFicha} />
       <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} appointments={appointments} agendaHistorico={agendaHistorico} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
       <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
@@ -7564,9 +7603,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         const zerados = baixos.filter((e) => /^ZERADO/i.test(String(e.status || ""))).length;
         return <button type="button" className={`pend-linha com-selo ${zerados ? "tom-vermelho" : "tom-ambar"}`} onClick={onVerEstoque}><span className="selo-num" aria-hidden="true"><b>{baixos.length}</b><small>▦</small></span><h3>{baixos.length} item(ns) de estoque {zerados ? (zerados === baixos.length ? "zerado(s)" : "zerado(s) ou baixo(s)") : "abaixo do mínimo"}<span className="linha-sub">{baixos.slice(0, 3).map((e) => e.item).join(", ")}{baixos.length > 3 ? ` e mais ${baixos.length - 3}` : ""}</span></h3><i>estoque ›</i></button>;
       })()}
-      <i className="grupo-total" aria-hidden="true" />
-      {onVerCompras && <button type="button" className="grupo-ver-tudo" onClick={onVerCompras}>ver as compras todas ›</button>}
-    </section>
+    </GrupoRecolhivel>
     {/* ANOTAR AGORA virou botão flutuante (Painel único, etapa 2, 11/10/2026): o card no meio da página só era
         visto quando ele rolava até lá; o botão fica sempre no mesmo canto, acima da barra, e abre a mesma caixa
         numa gaveta. Tudo igual por dentro: mesmo composer, mesma fila da Caixa. */}
