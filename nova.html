@@ -888,6 +888,28 @@ button.sutil{opacity:.55;font-size:12px}
 .funil-item .fluxo-causa{display:block;font-size:11px;margin-top:7px;line-height:1.4}
 .funil-proxima{display:block;font-style:normal;font-size:12px;color:var(--text);margin-top:7px;padding:7px 10px;border-radius:9px;background:#ffffff08;line-height:1.4}
 .funil-item.st-lead .funil-proxima,.funil-item.st-orcamento .funil-proxima{color:#f0cf8a}
+/* CARD DO COMPROMISSO ENXUTO (12/10/2026) */
+.compromisso-corpo h4{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:15px;line-height:1.35}
+.compromisso-chip{margin:2px 0 10px;font-size:12px;color:var(--muted)}
+.compromisso-info strong{margin-bottom:8px}
+.compromisso-obs{margin:0 0 10px}
+.compromisso-obs summary{cursor:pointer;list-style:none;font-size:12px;color:var(--muted);min-height:32px;display:flex;align-items:center}
+.compromisso-obs summary::-webkit-details-marker{display:none}
+.compromisso-obs p{margin:4px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
+.compromisso-obs .compromisso-obs-texto{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--text)}
+.compromisso-botoes{display:grid;grid-template-columns:1fr 1fr 52px;gap:6px}
+.compromisso-botoes.sem-rota{grid-template-columns:1fr}
+.compromisso-botoes.sem-wpp{grid-template-columns:1fr 52px}
+.compromisso-botoes.sem-wpp.sem-rota{display:none}
+.compromisso-botoes .btn-wpp,.compromisso-botoes .btn-rota{min-width:0;padding:12px 8px;font-size:13px;display:flex;align-items:center;justify-content:center;min-height:48px}
+.btn-mais{background:#1f1714;border:1px solid var(--line2);color:var(--muted);font-size:20px;line-height:1;cursor:pointer;font-family:inherit}
+.btn-mais.aberto{background:var(--orange);color:#1a1210;border-color:var(--orange)}
+.compromisso-extra{margin-top:6px}
+.compromisso-extra .btn-rota{flex:1;min-height:44px;padding:10px 8px}
+.card-acoes-botoes.linha{grid-template-columns:1fr 1.25fr 1.2fr 44px}
+.card-acoes-botoes.linha button{padding:0 4px;font-size:11px;letter-spacing:0;white-space:nowrap;min-width:0;overflow:hidden}
+.card-acoes-botoes button.ativo{border-color:var(--orange);color:var(--orange2)}
+.card-recado{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:#ffffff06;border:1px dashed var(--line2)}
 /* O QUE O AGENTE FEZ (12/10/2026) */
 .grupo-agente .grupo-titulo::before{content:"🤖 ";font-size:12px}
 .agente-dia{margin:0 0 10px}
@@ -5815,18 +5837,31 @@ function AcoesDoCompromisso({ a, acoes, today }) {
     } catch (e) { acoes.notify("Não salvou: " + (e.message || e), "error"); }
     finally { setBusy(null); }
   };
+  // CARD ENXUTO (Diego, 12/10/2026: "esse card precisa de reformulação"): os botões vêm primeiro, numa linha
+  // só; o campo "Recado pro Claude" e o microfone só aparecem quando ele toca em Remarcar, Cancelar ou Recado.
+  // Feito continua direto (com a confirmação de sempre).
+  const [modo, setModo] = useState(null);
+  const ROTULO = { remarcar: "Remarcar", cancelar: "Cancelar", recado: "Só recado" };
+  const abrir = (m) => { vibrar(6); setModo((atual) => (atual === m ? null : m)); };
   return <div className="card-acoes">
-    <p className="kicker" style={{ margin: 0 }}>RECADO PRO CLAUDE</p>
     {doCard.length > 0 && <div className="recados-do-card">{doCard.map((r) => <RecadoEnviado key={r.id} r={r} acoes={acoes} />)}</div>}
-    <textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ex.: cliente pediu pra passar depois das 14h" />
-    <GravadorAudio audio={audio} onAudio={setAudio} onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={!!busy} />
-    <div className="card-acoes-botoes">
+    <div className="card-acoes-botoes linha">
       <button type="button" className="primary" onClick={() => enviar("feito")} disabled={!!busy}>{busy === "feito" ? "…" : "✅ Feito"}</button>
-      <button type="button" className="secondary" onClick={() => enviar("remarcar")} disabled={!!busy}>{busy === "remarcar" ? "…" : "🔁 Remarcar"}</button>
-      <button type="button" className="ghost perigo" onClick={() => enviar("cancelar")} disabled={!!busy}>{busy === "cancelar" ? "…" : "✖ Cancelar"}</button>
-      <button type="button" className="ghost" onClick={() => enviar("recado")} disabled={!!busy}>{busy === "recado" ? "…" : "💬 Só recado"}</button>
+      <button type="button" className={`secondary${modo === "remarcar" ? " ativo" : ""}`} onClick={() => abrir("remarcar")} disabled={!!busy}>🔁 Remarcar</button>
+      <button type="button" className={`ghost perigo${modo === "cancelar" ? " ativo" : ""}`} onClick={() => abrir("cancelar")} disabled={!!busy}>✖ Cancelar</button>
+      <button type="button" className={`ghost${modo === "recado" ? " ativo" : ""}`} onClick={() => abrir("recado")} disabled={!!busy} aria-label="Só recado">💬</button>
     </div>
-    <small>{futuro ? "Feito antes do dia: a data vira hoje. " : ""}No Remarcar você só explica: o Claude escolhe o dia e a hora ({HORARIOS_ROTINA_RECADOS}) e move o card.</small>
+    {modo && <div className="card-recado">
+      <p className="kicker" style={{ margin: 0 }}>RECADO PRO CLAUDE · {ROTULO[modo]}</p>
+      <textarea autoFocus value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={modo === "remarcar" ? "Ex.: cliente pediu pra passar depois das 14h" : modo === "cancelar" ? "Motivo do cancelamento" : "O que o Claude precisa saber"} />
+      <GravadorAudio audio={audio} onAudio={setAudio} onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={!!busy} />
+      <div className="card-acoes-botoes">
+        <button type="button" className="primary" onClick={() => enviar(modo)} disabled={!!busy}>{busy === modo ? "…" : `Enviar ${ROTULO[modo].toLowerCase()}`}</button>
+        <button type="button" className="ghost" onClick={() => setModo(null)} disabled={!!busy}>Voltar</button>
+      </div>
+      {modo === "remarcar" && <small>Você só explica: o Claude escolhe o dia e a hora ({HORARIOS_ROTINA_RECADOS}) e move o card.</small>}
+    </div>}
+    {!modo && futuro && <small>Feito antes do dia: a data vira hoje.</small>}
   </div>;
 }
 
@@ -5981,13 +6016,16 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   const instrucoes = [];
   // Pessoal já diz "O QUE É" no bloco do registro (PessoalDetalhe); repetir o título aqui é ruído lido dirigindo.
   if (oQueFazer && !a.pessoal) instrucoes.push(["O QUE FAZER", oQueFazer]);
-  if (svc?.titulo && svc.titulo !== oQueFazer && svc.titulo !== a.titulo) instrucoes.push(["SERVIÇO", svc.titulo]);
+  // SERVIÇO virou chip embaixo do título e OBSERVAÇÃO DA FICHA ficou recolhida (12/10/2026): o card passava
+  // de duas telas e ele lê isso dirigindo. Nada saiu — só mudou de lugar.
+  const chipServico = svc?.titulo && svc.titulo !== oQueFazer && svc.titulo !== a.titulo ? svc.titulo : "";
   if (materialPendente.length) instrucoes.push(["MATERIAL QUE FALTA",
     materialPendente.map((m) => m.item + (m.pedido ? " (já pedido)" : "")).join(" · ")
     + (svc?.loja_material ? " — comprar em " + svc.loja_material : "")]);
   if (Number(svc?.valor_orcamento)) instrucoes.push(["VALOR DO SERVIÇO",
     money(svc.valor_orcamento) + (svc?.prazo ? " · prazo " + compactDate(svc.prazo) : "")]);
-  if (cli?.obs) instrucoes.push(["OBSERVAÇÃO DA FICHA", cli.obs]);
+  const obsFicha = cli?.obs ? String(cli.obs).trim() : "";
+  const [maisBotoes, setMaisBotoes] = useState(false);
   return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehFollowUpZapia(a) ? " followup-zapia" : ""}`}>
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
@@ -6005,7 +6043,8 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
     {acoes && !a.pessoal_id && <SelosClaudeDoCard a={a} acoes={acoes} onMudar={() => setAberto(true)} />}
     {sucessor && diasAtraso > 0 && <p className="talvez-feito">Pode já estar feito: “{sucessor.titulo}” foi criado depois deste, no mesmo serviço. Se a etapa aconteceu, conclua aqui — o app não fecha sozinho.</p>}
     {aberto && <div className="compromisso-corpo">
-      <h4>{tituloCard}</h4>
+      {(a.pessoal || oQueFazer !== tituloCard) && <h4 title={tituloCard}>{tituloCard}</h4>}
+      {chipServico && <p className="compromisso-chip">🛋️ {chipServico}{svc?.status ? ` · ${statusLabel[svc.status] || svc.status}` : ""}</p>}
       {/* BLOQUEIO PESSOAL: a linha da agenda existe pra dizer que ele está indisponível, e o registro
           completo continua morando no card Pessoais.
           MUDOU EM 29/08 (item APP-AGENDA-TITULO-PESSOAL-20260829-01): antes o card escondia o motivo de
@@ -6039,25 +6078,30 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         {!sugestao && quem.destino === "cliente" && semServico && !ehEnvelopeDeTriagem(a) && cli && <p className="compromisso-material">
           ✎ Compromisso ligado ao cliente, mas ainda sem serviço — o WhatsApp abre vazio de propósito. Nada foi combinado no app pra ele repetir.
         </p>}
-        <div className="compromisso-acoes">
-          {/* Sem `target="_blank"` no Android, igual ao Waze: aba nova não sabe abrir intent:// e ficaria em branco. */}
-          {tel && <a className="btn-wpp" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">Abrir WhatsApp{sugestao ? " com resposta" : ""}</a>}
-          {/* Rota só em compromisso presencial — num remoto o botão de mapa é ruído e convida
-              pro toque errado. O sufixo do rótulo diz a precisão real do destino. */}
-          {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-waze" href={linkWaze} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Waze{selo}</a>}
-          {a.tipo !== "remoto" && destinoRota && <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>}
-          {/* Aqui o `servico_id` é inequívoco: o card TEM um serviço só. Quando o compromisso não
-              tem serviço (compra de material, por exemplo), vai só o `agenda_id` — não se adivinha. */}
-          <button type="button" className="btn-rota btn-gpt" onClick={() => compartilharGPT(payloadGPT([
-            ["cliente_id", svc?.cliente_id || a.cliente_id],
-            ["servico_id", svc?.id],
-            ["agenda_id", a.id],
-            ["nome", cli?.nome],
-            ["cidade", cli?.cidade || a.cidade],
-            ["compromisso", a.titulo],
-            ["situacao_data", revisaoData ? "Remarcação pendente: a data exibida é a original e precisa de revisão." : null],
-          ]), (msg) => setAvisoGPT(msg))}>💬 ChatGPT</button>
-        </div>
+        {/* SOBRE O CLIENTE, recolhido no próprio card (Diego, 12/10/2026: "pensei em algo recolhível dentro dos próprios
+            cards"): telefone, endereço, ponto no mapa, profissional e a observação da ficha, sem precisar abrir a ficha. */}
+        {cli && <details className="compromisso-obs"><summary>Sobre {cli.nome ? cli.nome.split(" ")[0] : "o cliente"} ›</summary>
+          <p>📞 {cli.telefone || "sem telefone"}{tel && !cli.telefone ? " (da triagem)" : ""}</p>
+          <p>📍 {[cli.cidade, cli.endereco].filter(Boolean).join(" · ") || "sem endereço"}{cli.latitude != null ? " · ⌖ ponto no mapa" : " · sem ponto no mapa"}</p>
+          {svc?.responsavel && <p>👤 {svc.responsavel}</p>}
+          {obsFicha && <p className="compromisso-obs-texto">{obsFicha}</p>}
+        </details>}
+        {(() => {
+          // RÉGUA DE BOTÕES IGUAL À DA FICHA (12/10/2026): WhatsApp grande, Rota ao lado, "⋯" abre Maps e ChatGPT.
+          // Sem `target="_blank"` no Android, igual ao Waze: aba nova não sabe abrir intent:// e ficaria em branco.
+          const temRota = a.tipo !== "remoto" && !!destinoRota;
+          return <>
+            <div className={`compromisso-botoes${tel ? "" : " sem-wpp"}${temRota ? "" : " sem-rota"}`}>
+              {tel && <a className="btn-wpp" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">Abrir WhatsApp{sugestao ? " com resposta" : ""}</a>}
+              {temRota && <a className="btn-rota btn-waze" href={linkWaze} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Rota{selo}</a>}
+              {temRota && <button type="button" className={`btn-rota btn-mais${maisBotoes ? " aberto" : ""}`} aria-label="Mais opções" aria-expanded={maisBotoes} onClick={() => { vibrar(6); setMaisBotoes((v) => !v); }}>⋯</button>}
+            </div>
+            {/* 💬 ChatGPT saiu dos cards (Diego, 12/10/2026: "o GPT não está mais no negócio por dentro"). */}
+            {maisBotoes && temRota && <div className="compromisso-acoes compromisso-extra">
+              <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>
+            </div>}
+          </>;
+        })()}
         {avisoGPT && <p className="compromisso-material">{avisoGPT}</p>}
       </div>
       {acoes && !a.pessoal_id && <AcoesDoCompromisso a={a} acoes={acoes} today={today} />}
@@ -6316,9 +6360,6 @@ function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
         <button className="ghost" disabled={busy === p.id} onClick={() => { setRemarcando(remarcando === p.id ? null : p.id); setDataDraft(p.data_alvo || ""); }}>{remarcando === p.id ? "Cancelar" : "↻ Remarcar"}</button>
         {/* Mesmo princípio do botão do cliente: leva IDENTIDADE, não detalhe. Nada de descrição, motivo
             médico, nome de escola ou histórico — só o id, o título e a data. */}
-        <button className="ghost" onClick={() => compartilharGPT(payloadGPT([
-          ["pessoal_id", p.id], ["titulo", p.titulo], ["data_alvo", p.data_alvo], ["impacto_operacao", p.impacto_operacao],
-        ], PESSOAL_ASSINATURA_GPT, PESSOAL_INSTRUCAO_GPT), (msg) => setAvisoGPT(msg))}>💬 ChatGPT</button>
       </div>}
       {remarcando === p.id && <div className="responsavel-edit-row" style={{ width: "100%" }}>
         <input type="date" value={dataDraft} onChange={(e) => setDataDraft(e.target.value)} autoFocus />
@@ -7053,13 +7094,6 @@ function RetornosVencidosCard({ services, today, onVerLeads, onOpenFicha, notify
               `stopPropagation` nos dois porque o cartão inteiro abre a ficha no clique. */}
           <div className="ficha-servico-acoes">
             {tel && <a className="ghost" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={(e) => e.stopPropagation()}>WhatsApp</a>}
-            <button className="ghost" onClick={(e) => { e.stopPropagation(); compartilharGPT(payloadGPT([
-              ["cliente_id", s.cliente_id],
-              ["servico_id", s.id],
-              ["nome", s.clientes?.nome],
-              ["cidade", s.clientes?.cidade],
-              ["servico", s.titulo],
-            ]), notify || (() => {})); }}>💬 ChatGPT</button>
           </div>
         </div>
       </article>;
@@ -10977,7 +11011,6 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
             {cliente.latitude != null && <a className="ghost" href={`https://www.google.com/maps/search/?api=1&query=${cliente.latitude},${cliente.longitude}`} target="_blank" rel="noreferrer">📍 Maps</a>}
             {/* Ficha é nível CLIENTE: aqui o cliente pode ter vários serviços, então `servico_id`
                 fica de fora. Escolher um seria adivinhar, e adivinhar é o que gera atendimento errado. */}
-            <button className="ghost" onClick={() => compartilharGPT(payloadGPT([["cliente_id", cliente.id], ["nome", cliente.nome], ["cidade", cliente.cidade]]), notify)}>💬 ChatGPT</button>
           </div>}
           {colarLink && <div className="responsavel-edit-row"><input value={linkDraft} onChange={(e) => setLinkDraft(e.target.value)} placeholder="Cole o link do Google Maps já aberto" autoFocus /><button className="ghost" onClick={usarLinkMaps}>Salvar ponto</button></div>}
         </div> : <div className="ficha-edit form-grid">
