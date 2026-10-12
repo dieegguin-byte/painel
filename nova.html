@@ -858,6 +858,36 @@ button.sutil{opacity:.55;font-size:12px}
 .foto.video::after{content:"▶";position:absolute;inset:0;display:grid;place-items:center;font-size:26px;color:#fff;text-shadow:0 2px 8px #000c;pointer-events:none}
 .foto-add{aspect-ratio:1;border-radius:10px;font-size:11px;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center}
 .foto-add b{font-size:22px;line-height:1;color:var(--orange2)}
+/* CARDS DE CLIENTE E LEADS NO PADRÃO NOVO (12/10/2026) */
+.customer-list article.cliente-item{grid-template-columns:40px 1fr auto;align-items:start;padding:12px 13px;border-left:3px solid #d86d3660}
+.customer-list article.cliente-item.sem-vivo{border-left-color:var(--line2)}
+.cliente-main{min-width:0}
+.cliente-main strong{font-size:15px;font-weight:600;color:var(--cream)}
+.cliente-main>span{font-size:12px;color:var(--muted);margin-top:2px}
+.cliente-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.cliente-chips .status-pill{font-size:10px;padding:3px 8px}
+.cliente-falta{font-style:normal;font-size:10px;font-weight:700;color:#e4bd72;background:#d4a64e18;border:1px solid #d4a64e55;border-radius:999px;padding:3px 8px;white-space:nowrap}
+.cliente-proxima{display:block;font-style:normal;font-size:12px;color:var(--dim);margin-top:6px;line-height:1.4}
+.cliente-proxima time{color:var(--muted);font-weight:600}
+.cliente-proxima time.passou{color:#f3a8a3}
+.customer-list article>b.cliente-seta{display:flex;align-items:center;gap:4px;font-size:13px;font-weight:700;color:var(--muted);padding-top:2px}
+.cliente-seta i{font-style:normal;color:var(--dim);font-size:16px}
+.funil-filtros{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;margin:0 -4px 12px;padding:2px 4px 6px}
+.funil-filtros::-webkit-scrollbar{display:none}
+.funil-filtros button{flex:none;white-space:nowrap}
+.funil-item{display:block;padding:12px 14px}
+.funil-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.funil-topo strong{font-size:15px;font-weight:600;color:var(--cream);flex:1 1 auto;min-width:0}
+.funil-item .funil-titulo{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.funil-faixa{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:8px}
+.funil-faixa b{font-size:15px;color:var(--orange2)}
+.funil-faixa b.sem-valor{font-size:12px;color:var(--dim);font-weight:600}
+.funil-faixa time{font-size:12px;color:var(--muted)}
+.funil-faixa time.passou{color:#f3a8a3;font-weight:700}
+.funil-faixa .responsavel-badge{margin-top:0}
+.funil-item .fluxo-causa{display:block;font-size:11px;margin-top:7px;line-height:1.4}
+.funil-proxima{display:block;font-style:normal;font-size:12px;color:var(--text);margin-top:7px;padding:7px 10px;border-radius:9px;background:#ffffff08;line-height:1.4}
+.funil-item.st-lead .funil-proxima,.funil-item.st-orcamento .funil-proxima{color:#f0cf8a}
 /* O QUE O AGENTE FEZ (12/10/2026) */
 .grupo-agente .grupo-titulo::before{content:"🤖 ";font-size:12px}
 .agente-dia{margin:0 0 10px}
@@ -8067,19 +8097,16 @@ function LeadsView({ services, appointments, agendaHistorico, inbox, search, set
     .sort((a, b) => (ORDEM_FILA[a.status] ?? 9) - (ORDEM_FILA[b.status] ?? 9) || String(a.prazo || "9999").localeCompare(String(b.prazo || "9999")));
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">FUNIL DE TRABALHO</p><h3>{visible.length} serviços ativos</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar cliente ou serviço" /></div>
     <div className="funil-filtros">{FUNIL_FILTROS.map((f) => <button key={f.id} className={filtroStatus === f.id ? "active" : ""} onClick={() => setFiltroStatus(f.id)}>{f.label}</button>)}</div>
-    <div className="funil-lista">{visible.map((service) => { const fluxo = fluxoDe(service); return <article className={`funil-item st-${service.status || "lead"}`} key={service.id} onClick={() => onOpenFicha(service.cliente_id)}>
-      <div className="funil-esq">
-        <strong>{service.clientes?.nome || "Cliente"}</strong>
-        <span>{service.titulo}</span>
-        {fluxo.estado === "precisa_avancar" && <em className="fluxo-causa">⚠ {fluxo.causa}</em>}
-        <em>→ {service.proxima_acao || "Sem próxima ação"}</em>
-      </div>
-      <div className="funil-dir">
-        <span className="status-pill">{statusLabel[service.status] || service.status}</span>
+    <div className="funil-lista">{visible.map((service) => { const fluxo = fluxoDe(service); const passou = service.prazo && service.prazo < hojeISO() && STATUS_VIVOS.includes(service.status); return <article className={`funil-item st-${service.status || "lead"}`} key={service.id} onClick={() => onOpenFicha(service.cliente_id)}>
+      <div className="funil-topo"><strong>{service.clientes?.nome || "Cliente"}</strong><span className={`status-pill st-${service.status || "lead"}`}>{statusLabel[service.status] || service.status}</span></div>
+      <span className="funil-titulo">{service.titulo}</span>
+      <div className="funil-faixa">
+        <b className={service.valor_orcamento ? "" : "sem-valor"}>{service.valor_orcamento ? money(service.valor_orcamento) : "sem valor"}</b>
+        {service.prazo && <time className={passou ? "passou" : ""}>{prazoComRotulo(service)}</time>}
         {service.responsavel && <span className="responsavel-badge">👤 {service.responsavel}</span>}
-        <b>{service.valor_orcamento ? money(service.valor_orcamento) : "—"}</b>
-        <time title={prazoComRotulo(service)}>{prazoComRotulo(service) || "—"}</time>
       </div>
+      {fluxo.estado === "precisa_avancar" && <em className="fluxo-causa">⚠ {fluxo.causa}</em>}
+      <em className="funil-proxima">{service.proxima_acao ? `→ ${service.proxima_acao}` : "Sem próxima ação"}</em>
     </article>; })}
     {!visible.length && <div className="empty-state"><b>Nenhum serviço nesse filtro.</b></div>}</div></section>;
 }
@@ -10644,7 +10671,28 @@ function CustomersView({ customers, services, search, setSearch, onOpenFicha }) 
     .filter((customer) => !soQuebrados || telefoneCorrigivel(customer.telefone));
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">BASE ÚNICA</p><h3>{visible.length} clientes</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome, telefone ou cidade" /></div>
     {quebrados.length > 0 && <div className="duplicate-warning"><b>⚠ {quebrados.length} ficha(s) com telefone que não abre o WhatsApp</b><button onClick={() => setSoQuebrados((v) => !v)}>{soQuebrados ? "Ver todos os clientes" : "Ver só essas fichas"}</button></div>}
-    <div className="customer-list">{visible.map((customer) => <article className="clickable" key={customer.id} onClick={() => onOpenFicha(customer.id)}><div className="customer-avatar">{iniciaisDoCliente(customer)}</div><div><strong>{nomeDoCliente(customer)}</strong><span>{telefoneCorrigivel(customer.telefone) ? "⚠ " : ""}{customer.telefone || "Sem telefone"} · {customer.cidade || "Sem cidade"}</span></div><b>{services.filter((service) => service.cliente_id === customer.id && STATUS_VIVOS.includes(service.status)).length} ativo(s)</b></article>)}</div></section>;
+    <div className="customer-list">{visible.map((customer) => {
+      // CARD DE CLIENTE NO PADRÃO NOVO (Diego, 12/10/2026: "mudança nos cards do cliente, no visual"): em vez de
+      // "2 ativo(s)", chips por status do que está vivo, o prazo mais perto e um aviso quando falta telefone/endereço.
+      const vivos = services.filter((service) => service.cliente_id === customer.id && STATUS_VIVOS.includes(service.status));
+      const porStatus = STATUS_VIVOS.map((st) => ({ st, n: vivos.filter((x) => x.status === st).length })).filter((x) => x.n);
+      const comPrazo = vivos.filter((x) => x.prazo).sort((a, b) => String(a.prazo).localeCompare(String(b.prazo)))[0];
+      const passou = comPrazo && comPrazo.prazo < hojeISO();
+      const proxima = vivos.map((x) => x.proxima_acao).find(Boolean);
+      const faltas = [!customer.telefone && "sem telefone", !customer.endereco && customer.latitude == null && "sem endereço"].filter(Boolean);
+      return <article className={`clickable cliente-item${vivos.length ? "" : " sem-vivo"}`} key={customer.id} onClick={() => onOpenFicha(customer.id)}>
+        <div className="customer-avatar">{iniciaisDoCliente(customer)}</div>
+        <div className="cliente-main">
+          <strong>{nomeDoCliente(customer)}</strong>
+          <span>{telefoneCorrigivel(customer.telefone) ? "⚠ " : ""}{customer.telefone || "Sem telefone"} · {customer.cidade || "Sem cidade"}</span>
+          {(porStatus.length > 0 || faltas.length > 0) && <div className="cliente-chips">
+            {porStatus.map((x) => <i className={`status-pill st-${x.st}`} key={x.st}>{x.n > 1 ? `${x.n} · ` : ""}{statusLabel[x.st]}</i>)}
+            {faltas.map((f) => <i className="cliente-falta" key={f}>⚠ {f}</i>)}
+          </div>}
+          {(comPrazo || proxima) && <em className="cliente-proxima">{comPrazo && <time className={passou ? "passou" : ""}>{prazoComRotulo(comPrazo)}</time>}{comPrazo && proxima && " · "}{proxima && `→ ${proxima}`}</em>}
+        </div>
+        <b className="cliente-seta">{vivos.length ? vivos.length : ""}<i>›</i></b>
+      </article>; })}</div></section>;
 }
 
 // LOCALIZAÇÃO EXATA DO CLIENTE — item LOC-CLIENTE-20260823-1446.
