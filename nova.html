@@ -506,7 +506,7 @@ button.sutil{opacity:.55;font-size:12px}
 .caixa-conversa b{color:var(--text)}
 .caixa-acoes{display:flex;flex-wrap:wrap;gap:8px}
 .caixa-acoes button{flex:1 1 150px}
-.caixa-form{border-top:1px solid var(--line);padding-top:10px}.caixa-recado{background:#d4a64e0f;border:1px solid #d4a64e44;border-radius:12px;padding:10px 12px}.caixa-recado .kicker{margin:0}
+.caixa-form{border-top:1px solid var(--line);padding-top:10px}.caixa-arquivo{font-size:11px;color:var(--muted);word-break:break-all}.caixa-recado{background:#d4a64e0f;border:1px solid #d4a64e44;border-radius:12px;padding:10px 12px}.caixa-recado .kicker{margin:0}
 /* EFEITOS VISUAIS (11/10/2026, Diego: "Sim os 6"). Só CSS, nada de biblioteca. Anima só transform e
    opacity, que o celular faz sem esforço. Quem liga "reduzir movimento" no celular fica sem nenhum. */
 @keyframes abaEntra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -4411,6 +4411,14 @@ function Home() {
   // ORDEM QUE IMPORTA: persistir primeiro, apagar o cache depois. Se qualquer passo falhar, a carga continua
   // no aparelho e reabrir o app tenta de novo. Sucesso falso aqui é o pior desfecho possível — ele fecharia
   // o app achando que guardou.
+  // CONFIRMAR ANTES DE SALVAR (Diego, 12/10/2026: "fui exportar um comprovante, automaticamente ele lança, não
+  // deixa eu falar o que é e confirmar"). A carga continua no cache do aparelho; o app só mostra o que chegou
+  // e pergunta "de quem é / o que é". Upload e insert acontecem SÓ no "Salvar na Caixa". Fechar sem salvar
+  // mantém a carga no aparelho: reabrir o app pergunta de novo. Nada é apagado antes do insert confirmado.
+  const [compartilhamentoPendente, setCompartilhamentoPendente] = useState(null);
+  // Depois de salvar, a Caixa abre NO item recém-salvo — e não no mais antigo da fila (Diego, 12/10:
+  // "aparece na minha frente o comprovante que já estava antes").
+  const [caixaAbrirId, setCaixaAbrirId] = useState(null);
   useEffect(() => {
     const endereco = new URL(location.href);
     if (endereco.searchParams.get("compartilhado") !== "1") return;
@@ -4455,15 +4463,6 @@ function Home() {
           notify("Guardado no aparelho, ainda NÃO salvo na Caixa — entre na sua conta.", "info");
           return;
         }
-        const uploaded = [];
-        for (const f of recebidos) {
-          const path = `caixa-entrada/${carga.em}_${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-          const up = await db.storage.from("fotos-servicos").upload(path, f, { upsert: true });
-          if (up.error) throw up.error;
-          const assinada = await db.storage.from("fotos-servicos").createSignedUrl(path, 60 * 60 * 24 * 365);
-          if (assinada.error) throw assinada.error;
-          uploaded.push({ url: assinada.data.signedUrl, fileName: f.name });
-        }
         // CONVERSA EXPORTADA DO WHATSAPP. "Exportar conversa" manda um `_chat.txt` e o conteúdo está
         // DENTRO do arquivo — o campo de texto do compartilhamento vem vazio. Sem ler aqui, a Caixa
         // guardaria só um link assinado e o Classic teria que baixar uma URL pra descobrir o que chegou.
@@ -4485,30 +4484,17 @@ function Home() {
             }
             textoDeArquivos += `\n\n--- conteúdo de ${f.name} ---\n${conteudo}`;
           } catch (e) {
-            // Arquivo ilegível não pode derrubar o salvamento: o anexo já subiu e vale como evidência.
+            // Arquivo ilegível não pode derrubar o salvamento: o anexo sobe junto e vale como evidência.
             textoDeArquivos += `\n\n[não consegui ler o conteúdo de ${f.name}: ${e.message}]`;
           }
         }
-        // IDEMPOTÊNCIA PELO CARIMBO DA CARGA: `carga.em` é gravado pelo service worker no instante do
-        // compartilhamento e não muda se o app for recarregado ou reaberto. Mesmo compartilhamento gera
-        // sempre o mesmo id, então refresh não vira segunda entrada.
-        const id = await uuidDeterministicoEvento("compartilhado-" + carga.em, "caixa");
-        const { jaExistia } = await inserirComIdDeterministico(db, "caixa_entrada", id, {
-          texto: buildInboxPayload(uploaded, ((carga.texto || "") + textoDeArquivos).trim()), status: "novo", conversa: [], processado: false,
-        }, ["texto"]);
-        // SÓ AGORA a evidência bruta some do aparelho: depois do insert confirmado, nunca antes.
-        // Era aqui o buraco — o app apagava o cache e jogava a carga num campo de texto que não é mais
-        // renderizado (a UI da Caixa saiu em 23/08). Compartilhamento entrava e desaparecia em silêncio.
-        await cache.delete("./__compartilhado__");
-        for (const item of listaArquivos) await cache.delete(item.url);
         if (cancelado) return;
-        setTab("caixa");
-        await loadAll();
-        notify(jaExistia ? "Esse compartilhamento já estava na Caixa."
-          : `Salvo na Caixa${uploaded.length ? ` com ${uploaded.length} arquivo(s)` : ""}. Está na fila, pra você processar quando puder.`, "ok");
+        // Prévia local (object URL) pra ele VER o que vai salvar antes de confirmar. Revogada ao fechar.
+        const previas = recebidos.map((f) => ({ nome: f.name, tipo: f.type || "", url: (f.type || "").startsWith("image/") ? URL.createObjectURL(f) : null }));
+        setCompartilhamentoPendente({ carga, cache, listaArquivos, recebidos, textoDeArquivos, previas });
       } catch (e) {
         // Falhou: a carga CONTINUA no cache. Reabrir o app tenta de novo.
-        notify("Não consegui salvar na Caixa: " + e.message + " — a carga continua guardada no aparelho.", "error");
+        notify("Não consegui ler o compartilhamento: " + e.message + " — a carga continua guardada no aparelho.", "error");
       } finally {
         history.replaceState(null, "", endereco.pathname);
       }
@@ -4517,6 +4503,50 @@ function Home() {
   // Reentrada é segura: o replaceState tira o ?compartilhado=1 e a guarda do topo corta na hora. E mesmo
   // que rodasse de novo, o id determinístico impede a segunda entrada.
   }, [notify, db, session, demo, loadAll]);
+
+  // SALVAR NA CAIXA, com o recado dele. Mesma ordem de sempre: upload → insert → só então apagar o cache.
+  const salvarCompartilhamento = useCallback(async ({ clienteId, texto }) => {
+    const p = compartilhamentoPendente;
+    if (!p) return;
+    const { carga, cache, listaArquivos, recebidos, textoDeArquivos } = p;
+    const uploaded = [];
+    for (const f of recebidos) {
+      const path = `caixa-entrada/${carga.em}_${f.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const up = await db.storage.from("fotos-servicos").upload(path, f, { upsert: true });
+      if (up.error) throw up.error;
+      const assinada = await db.storage.from("fotos-servicos").createSignedUrl(path, 60 * 60 * 24 * 365);
+      if (assinada.error) throw assinada.error;
+      uploaded.push({ url: assinada.data.signedUrl, fileName: f.name });
+    }
+    // O recado "de quem é / o que é" nasce junto com o item, no mesmo formato do CaixaRecado (meta
+    // recado_caixa), pra quem processar ler primeiro. Sem recado, conversa[] nasce vazia como antes.
+    const cliente = clienteId ? (customers || []).find((c) => c.id === clienteId) : null;
+    const partes = [cliente ? `De quem é: ${nomeDoCliente(cliente)}${cliente.telefone ? " · " + cliente.telefone : ""}` : "", String(texto || "").trim() ? `O que é: ${String(texto).trim()}` : ""].filter(Boolean);
+    const conversa = partes.length ? [{ de: "diego", texto: partes.join("\n"), em: new Date().toISOString(), meta: { tipo_operacional: "recado_caixa", cliente_id: clienteId || null, cliente_nome: cliente ? nomeDoCliente(cliente) : null, ...(uploaded.length ? { print_lido: true } : {}) } }] : [];
+    // IDEMPOTÊNCIA PELO CARIMBO DA CARGA: `carga.em` é gravado pelo service worker no instante do
+    // compartilhamento e não muda se o app for recarregado ou reaberto. Mesmo compartilhamento gera
+    // sempre o mesmo id, então refresh não vira segunda entrada.
+    const id = await uuidDeterministicoEvento("compartilhado-" + carga.em, "caixa");
+    const { jaExistia } = await inserirComIdDeterministico(db, "caixa_entrada", id, {
+      texto: buildInboxPayload(uploaded, ((carga.texto || "") + textoDeArquivos).trim()), status: "novo", conversa, processado: false,
+    }, ["texto"]);
+    // SÓ AGORA a evidência bruta some do aparelho: depois do insert confirmado, nunca antes.
+    await cache.delete("./__compartilhado__");
+    for (const item of listaArquivos) await cache.delete(item.url);
+    p.previas.forEach((pv) => { if (pv.url) URL.revokeObjectURL(pv.url); });
+    setCompartilhamentoPendente(null);
+    setCaixaAbrirId(id);
+    setTab("caixa");
+    await loadAll();
+    notify(jaExistia ? "Esse compartilhamento já estava na Caixa."
+      : `Salvo na Caixa${uploaded.length ? ` com ${uploaded.length} arquivo(s)` : ""}${partes.length ? ", com o seu recado" : ""}. Fica na fila até o Claude processar.`, "ok");
+  }, [compartilhamentoPendente, db, customers, loadAll, notify]);
+  const fecharCompartilhamento = useCallback(() => {
+    const p = compartilhamentoPendente;
+    if (p) p.previas.forEach((pv) => { if (pv.url) URL.revokeObjectURL(pv.url); });
+    setCompartilhamentoPendente(null);
+    notify("Não salvei. A carga continua guardada no aparelho: abra o app de novo pra salvar.", "info");
+  }, [compartilhamentoPendente, notify]);
 
   // A BARRA DE ABAS ROLA ATÉ ONDE VOCÊ ESTÁ. São 10 abas e só 5 cabem num celular de 375px — Compras,
   // A pagar, Profissionais, Clientes e Fornecedores nascem fora da tela. O pior não era estarem escondidas,
@@ -4721,7 +4751,7 @@ function Home() {
           `key={tab}` zera a barreira na troca de aba — sem ele, a aba quebrada contaminaria a próxima. */}
       <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}><div className={`aba-entra${abaAnterior.current.classe}`}>
       {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} atividadeAgente={atividadeAgente} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
-      {tab === "caixa" && <CaixaView inbox={inbox} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
+      {tab === "caixa" && <CaixaView inbox={inbox} abrirId={caixaAbrirId} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
       {/* `addInbox` VOLTOU pro Painel (Painel único, etapa 2, 11/10/2026): o card "Anotar agora" tinha saído
           porque o Diego não lançava mais pelo app; agora ele é o botão flutuante "+ Anotar", que salva na
           fila da Caixa pro Claude organizar. Sem a prop o botão não aparece. */}
@@ -4745,6 +4775,7 @@ function Home() {
     </div></div>}
     {/* As janelas por cima também têm barreira própria: ficha com dado ruim fecha sozinha, não o app. */}
     {showGuia && <BarreiraDaAba nome="O guia da IA" onFechar={() => setShowGuia(false)}><GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} /></BarreiraDaAba>}
+    {compartilhamentoPendente && <ConfirmarCompartilhamento pendente={compartilhamentoPendente} customers={customers} onSalvar={salvarCompartilhamento} onFechar={fecharCompartilhamento} notify={notify} />}
     {fichaId && <BarreiraDaAba nome="A ficha do cliente" onFechar={() => setFichaId(null)}><FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} /></BarreiraDaAba>}
     {explicar && <BarreiraDaAba nome="A explicação" onFechar={() => setExplicar(null)}><ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
     {concluirAppt && <BarreiraDaAba nome="A conclusão do compromisso" onFechar={() => setConcluirAppt(null)}><ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} services={services} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
@@ -6770,10 +6801,11 @@ function remarcarDaCaixa(db, item, { data, hora, tipo, cidade, titulo }) {
   });
 }
 
-function CaixaView({ inbox, customers, services, agenda, agendaBruta, db, demo, notify, onChanged, onDemoProcessado }) {
+function CaixaView({ inbox, abrirId, customers, services, agenda, agendaBruta, db, demo, notify, onChanged, onDemoProcessado }) {
   const [agora, setAgora] = useState(() => Date.now());
   const fila = useMemo(() => itensDaFilaDaCaixa(inbox, agora), [inbox, agora]);
-  const [atualId, setAtualId] = useState(null);
+  const [atualId, setAtualId] = useState(abrirId || null);
+  useEffect(() => { if (abrirId) setAtualId(abrirId); }, [abrirId]);
   const [acao, setAcao] = useState(null);
   const achado = fila.findIndex((i) => i.id === atualId);
   const indice = achado >= 0 ? achado : 0;
@@ -6823,8 +6855,8 @@ function CaixaView({ inbox, customers, services, agenda, agendaBruta, db, demo, 
         {mensagens.map((m, i) => <p key={i}><b>{m.de || "?"}</b>{m.em ? " · " + new Date(m.em).toLocaleDateString("pt-BR") : ""}: {parseInbox(String(m.texto)).text || "(arquivo)"}</p>)}
       </details>}
       {statusAntigo && <p className="ficha-note" style={{ margin: 0 }}>Status antigo: {statusAntigo}</p>}
-      {!acao && <div className="caixa-acoes">{botoes}</div>}
       {!acao && <CaixaRecado item={item} customers={customers} db={db} demo={demo} notify={notify} onSalvo={() => { if (!demo) onChanged(); }} />}
+      {!acao && <div className="caixa-acoes">{botoes}</div>}
       {acao === "compromisso" && <CaixaFormCompromisso {...comum} customers={customers} services={services} agenda={agenda} />}
       {acao === "lead" && <CaixaFormLead {...comum} customers={customers} agenda={agenda} />}
       {acao === "remarcar" && <CaixaFormRemarcar {...comum} agenda={agenda} />}
@@ -6839,6 +6871,42 @@ function CaixaView({ inbox, customers, services, agenda, agendaBruta, db, demo, 
 // "de quem é" (ficha do cliente) e "o que é" (comprovante do Pix da Suzany, conversa do sofá do Hugo…).
 // Grava como mensagem dele em conversa[] (o mesmo canal que o Claude lê) com meta.cliente_id; o item fica
 // na fila como está (processado=false, status igual). Não é triagem: não cria cliente, serviço nem lançamento.
+// TELA DE CONFIRMAÇÃO DO COMPARTILHAMENTO (12/10/2026). Mostra o que chegou do WhatsApp (print, comprovante,
+// conversa exportada), pergunta "de quem é / o que é" e só salva no "Salvar na Caixa". É a mesma pergunta do
+// CaixaRecado, feita na hora certa: quando ele ainda lembra de que cliente é aquele comprovante.
+function ConfirmarCompartilhamento({ pendente, customers, onSalvar, onFechar, notify }) {
+  const [clienteId, setClienteId] = useState("");
+  const [texto, setTexto] = useState("");
+  const [busy, setBusy] = useState(false);
+  const clientes = useMemo(() => [...(customers || [])].sort((a, b) => nomeDoCliente(a).localeCompare(nomeDoCliente(b), "pt-BR")), [customers]);
+  const textoCompartilhado = String(pendente.carga?.texto || "").trim();
+  const conversaExportada = String(pendente.textoDeArquivos || "").trim();
+  const salvar = async () => {
+    setBusy(true);
+    try { await onSalvar({ clienteId, texto }); }
+    catch (e) { notify("Não consegui salvar na Caixa: " + e.message + " — a carga continua guardada no aparelho.", "error"); }
+    finally { setBusy(false); }
+  };
+  return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onFechar(); }}>
+    <div className="modal-card small">
+      <div className="modal-head"><div><p className="kicker">CHEGOU DO COMPARTILHAR</p><h2>O que é isso?</h2></div><button className="ghost" onClick={onFechar} disabled={busy}>Fechar</button></div>
+      <div className="form-grid">
+        {!!pendente.previas.length && <div className="caixa-prints">{pendente.previas.map((pv) => pv.url
+          ? <img key={pv.nome} src={pv.url} alt={pv.nome} />
+          : <span key={pv.nome} className="caixa-arquivo">📎 {pv.nome}</span>)}</div>}
+        {!!textoCompartilhado && <p className="caixa-texto">{textoCompartilhado.slice(0, 600)}{textoCompartilhado.length > 600 ? "…" : ""}</p>}
+        {!!conversaExportada && <p className="ficha-note" style={{ margin: 0 }}>Conversa exportada: {conversaExportada.length.toLocaleString("pt-BR")} caracteres lidos do arquivo.</p>}
+        <label>De quem é<select value={clienteId} onChange={(e) => setClienteId(e.target.value)}><option value="">Ainda não sei / não é de cliente</option>{clientes.map((c) => <option key={c.id} value={c.id}>{nomeDoCliente(c)}{c.telefone ? ` · ${c.telefone}` : ""}</option>)}</select></label>
+        <label>O que é<textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ex.: comprovante do Pix da entrada do sofá; conversa inteira do orçamento; print do endereço" /></label>
+        <div className="ficha-actions">
+          <button className="primary" onClick={salvar} disabled={busy}>{busy ? "Salvando…" : (texto.trim() || clienteId) ? "Salvar na Caixa com o recado" : "Salvar na Caixa sem anotar"}</button>
+        </div>
+        <p className="ficha-note" style={{ margin: 0 }}>Nada é lançado sozinho: fica na Caixa até o Claude processar com o seu recado.</p>
+      </div>
+    </div>
+  </div>;
+}
+
 function CaixaRecado({ item, customers, db, demo, notify, onSalvo }) {
   const ultimo = [...comoLista(item.conversa)].reverse().find((m) => m?.meta?.tipo_operacional === "recado_caixa");
   const [clienteId, setClienteId] = useState(ultimo?.meta?.cliente_id || "");
