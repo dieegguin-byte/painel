@@ -896,6 +896,7 @@ button.sutil{opacity:.55;font-size:12px}
 .compromisso-obs summary{cursor:pointer;list-style:none;font-size:12px;color:var(--muted);min-height:32px;display:flex;align-items:center}
 .compromisso-obs summary::-webkit-details-marker{display:none}
 .compromisso-obs p{margin:4px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
+.compromisso-obs .compromisso-obs-texto{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--text)}
 .compromisso-botoes{display:grid;grid-template-columns:1fr 1fr 52px;gap:6px}
 .compromisso-botoes.sem-rota{grid-template-columns:1fr 52px}
 .compromisso-botoes.sem-wpp{grid-template-columns:1fr 52px}
@@ -6077,7 +6078,14 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         {!sugestao && quem.destino === "cliente" && semServico && !ehEnvelopeDeTriagem(a) && cli && <p className="compromisso-material">
           ✎ Compromisso ligado ao cliente, mas ainda sem serviço — o WhatsApp abre vazio de propósito. Nada foi combinado no app pra ele repetir.
         </p>}
-        {obsFicha && <details className="compromisso-obs"><summary>Observação da ficha ›</summary><p>{obsFicha}</p></details>}
+        {/* SOBRE O CLIENTE, recolhido no próprio card (Diego, 12/10/2026: "pensei em algo recolhível dentro dos próprios
+            cards"): telefone, endereço, ponto no mapa, profissional e a observação da ficha, sem precisar abrir a ficha. */}
+        {cli && <details className="compromisso-obs"><summary>Sobre {cli.nome ? cli.nome.split(" ")[0] : "o cliente"} ›</summary>
+          <p>📞 {cli.telefone || "sem telefone"}{tel && !cli.telefone ? " (da triagem)" : ""}</p>
+          <p>📍 {[cli.cidade, cli.endereco].filter(Boolean).join(" · ") || "sem endereço"}{cli.latitude != null ? " · ⌖ ponto no mapa" : " · sem ponto no mapa"}</p>
+          {svc?.responsavel && <p>👤 {svc.responsavel}</p>}
+          {obsFicha && <p className="compromisso-obs-texto">{obsFicha}</p>}
+        </details>}
         {(() => {
           // RÉGUA DE BOTÕES IGUAL À DA FICHA (12/10/2026): WhatsApp grande, Rota ao lado, "⋯" abre Maps e ChatGPT.
           // Sem `target="_blank"` no Android, igual ao Waze: aba nova não sabe abrir intent:// e ficaria em branco.
