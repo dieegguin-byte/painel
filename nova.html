@@ -4678,6 +4678,7 @@ function Home() {
           <div className="menu-topo-fundo" onClick={() => setMenuTopo(false)} />
           <div className="menu-topo" onClick={() => setMenuTopo(false)}>
             <BotaoNotificacao db={db} demo={demo} notify={notify} />
+            <button className="ghost" onClick={() => setAddAgendaOpen(true)}>📅 Novo compromisso</button>
             <button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button>
             <button className="ghost" onClick={copyContext}>Copiar contexto</button>
             {!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}
@@ -7351,7 +7352,9 @@ function MateriaisCard({ services, today, estoque, onVerCompras }) {
   </CardRecolhivel>;
 }
 
-const NAV_BARRA = ["painel", "agenda", "caixa"];
+// AGENDA SAIU DA BARRA (Diego, 12/10/2026: "é um dos poucos lugares que eu menos uso"): Leads entra no lugar;
+// a Agenda continua no "Mais". O "+ Adicionar" foi pro menu "⋯" e as cobranças sem hora pro Painel (Pendências).
+const NAV_BARRA = ["painel", "leads", "caixa"];
 const PAINEL_TIPO_FILTROS = [{ id: "todos", label: "Todos" }, { id: "presencial", label: "⌖ Presencial" }, { id: "remoto", label: "◌ Remoto" }];
 // Dias civis da agenda: UTC apenas para subtrair datas, sem depender de horário de verão.
 function diasDeAtraso(data, hoje) {
@@ -7749,6 +7752,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   // estourou. Compromisso sem hora marcada não conta como estourado — ainda cabe no dia.
   const hojePassouDaHora = hoje.filter((entry) => !!entry.hora && String(entry.hora).slice(0, 5) < agoraHHMM).length;
   const irParaVencendo = () => { if (!atrasos.recentes.length) return; setFiltroTipo("todos"); requestAnimationFrame(() => document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" })); };
+  const semHora = cobrancasAll;
   const cardAtrasado = (a) => <CompromissoCard key={a.id} a={a} svc={svcDe(a)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} revisaoData={idsRemarcacao.has(a.id)} sucessor={sucessorMaisNovoNoServico(a, agendaPlanejada)} />;
   // QUEM ESPERA HÁ MAIS TEMPO, NO CABEÇALHO FECHADO (19/09/2026, caso Cacau). O bloco "PRECISA
   // RESOLVER" nasce recolhido e dizia só a contagem: "1 compromisso(s) com atraso recente". Em 18/09
@@ -7889,6 +7893,12 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{antigosAcima30.length} com mais de 30 dias · histórico preservado para revisão</span></>}>
       {[...antigos].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
+    {/* COBRANÇAS SEM HORA (12/10/2026): vieram da aba Agenda, que saiu da barra. Remoto sem hora não é rota, então
+        não entra em Hoje/Próximos; aqui ficam recolhidas, como lá. */}
+    {semHora.length > 0 && <CardRecolhivel id="secao-sem-hora" className="content-card" selo={semHora.length} tom="azul" icone="◌"
+      cabecalho={<><p className="kicker">ESPERANDO CONTATO</p><h3>{semHora.length} cobrança(s) sem hora marcada</h3>
+      <span className="ficha-note" style={{ margin: 0 }}>remoto, não ocupa rota</span></>}>
+      {[...semHora].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {/* A linha "PESSOAIS · N item(ns) com data vencida" saiu daqui (12/10/2026): pessoal vencido agora mora em Atrasados. */}
       {(() => { const perguntas = (inbox || []).filter((item) => item.status === "aguardando_voce"); if (!perguntas.length || !onAbrirCaixa) return null;
         return <button type="button" className="pend-linha com-selo tom-azul" onClick={onAbrirCaixa}><span className="selo-num" aria-hidden="true"><b>{perguntas.length}</b><small>❓</small></span><h3>{perguntas.length} pergunta(s) aguardando você na Caixa</h3><i>abrir ›</i></button>; })()}
