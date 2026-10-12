@@ -3907,15 +3907,20 @@ function Home() {
   // físico tira essa entrada (popstate) e o app decide o que fechar, em vez de o Android fechar o app. Quando
   // volta ao Painel limpo, a guarda é retirada, pra que o voltar seguinte saia de verdade — sem toque "perdido".
   // Fechar o que está aberto é feito pelo próprio pano de fundo de cada modal (todos fecham ao tocar fora), então
-  // nenhum modal precisou ser reescrito; o que não tem pano de fundo não entra na conta.
+  // nenhum modal precisou ser reescrito.
+  // GRUPOS E CARDS ABERTOS TAMBÉM (Diego, 12/10/2026: "abri algo no painel, ele recolhe automaticamente e fica
+  // tudo fechado; cliquei mais uma vez, sai do app"). No Painel, qualquer grupo/card expandido (aria-expanded=true)
+  // conta como "algo aberto": o voltar recolhe TODOS de uma vez e fica no Painel; só o próximo voltar sai.
   const tabRef = React.useRef(tab); tabRef.current = tab;
   const ignorarPop = React.useRef(false);
   useEffect(() => {
     const GUARDA = { tbGuarda: true };
     const armado = () => { try { return !!(window.history.state && window.history.state.tbGuarda); } catch (e) { return false; } };
     const abertoPorCima = () => document.querySelector(".modal-overlay, .menu-topo-fundo");
+    const expandidos = () => Array.from(document.querySelectorAll('[aria-expanded="true"]:not(.menu-topo-botao), details[open]'));
+    const precisaGuarda = () => tabRef.current !== "painel" || !!abertoPorCima() || expandidos().length > 0;
     const sincronizar = () => {
-      const precisa = tabRef.current !== "painel" || !!abertoPorCima();
+      const precisa = precisaGuarda();
       try {
         if (precisa && !armado()) window.history.pushState(GUARDA, "");
         else if (!precisa && armado()) { ignorarPop.current = true; window.history.back(); }
@@ -3932,18 +3937,26 @@ function Home() {
         return;
       }
       if (tabRef.current !== "painel") { vibrar(8); setTab("painel"); setSelectedId(null); return; }
+      const abertos = expandidos();
+      if (abertos.length) {
+        // Recolhe tudo de uma vez, de dentro pra fora (o filho fecha antes de o pai sumir da tela).
+        vibrar(8);
+        abertos.reverse().forEach((el) => { if (el.tagName === "DETAILS") el.open = false; else el.click(); });
+        setTimeout(sincronizar, 50);
+        return;
+      }
       // Painel limpo e sem guarda: nada a fazer; o Android fecha o app no próximo voltar.
     };
     let agendado = null;
     const obs = new MutationObserver(() => { if (agendado) return; agendado = requestAnimationFrame(() => { agendado = null; sincronizar(); }); });
-    obs.observe(document.body, { childList: true, subtree: true });
+    obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-expanded", "open"] });
     window.addEventListener("popstate", onPop);
     sincronizar();
     return () => { obs.disconnect(); window.removeEventListener("popstate", onPop); if (agendado) cancelAnimationFrame(agendado); };
   }, []);
   useEffect(() => {
     // Mudou de aba: arma (saiu do Painel) ou desarma (voltou pro Painel limpo).
-    const precisa = tab !== "painel" || !!document.querySelector(".modal-overlay, .menu-topo-fundo");
+    const precisa = tab !== "painel" || !!document.querySelector('.modal-overlay, .menu-topo-fundo, [aria-expanded="true"]:not(.menu-topo-botao), details[open]');
     const armado = !!(window.history.state && window.history.state.tbGuarda);
     try { if (precisa && !armado) window.history.pushState({ tbGuarda: true }, ""); else if (!precisa && armado) { ignorarPop.current = true; window.history.back(); } } catch (e) { /* segue */ }
   }, [tab]);
