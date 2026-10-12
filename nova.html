@@ -898,9 +898,9 @@ button.sutil{opacity:.55;font-size:12px}
 .compromisso-obs p{margin:4px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
 .compromisso-obs .compromisso-obs-texto{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--text)}
 .compromisso-botoes{display:grid;grid-template-columns:1fr 1fr 52px;gap:6px}
-.compromisso-botoes.sem-rota{grid-template-columns:1fr 52px}
+.compromisso-botoes.sem-rota{grid-template-columns:1fr}
 .compromisso-botoes.sem-wpp{grid-template-columns:1fr 52px}
-.compromisso-botoes.sem-wpp.sem-rota{grid-template-columns:52px}
+.compromisso-botoes.sem-wpp.sem-rota{display:none}
 .compromisso-botoes .btn-wpp,.compromisso-botoes .btn-rota{min-width:0;padding:12px 8px;font-size:13px;display:flex;align-items:center;justify-content:center;min-height:48px}
 .btn-mais{background:#1f1714;border:1px solid var(--line2);color:var(--muted);font-size:20px;line-height:1;cursor:pointer;font-family:inherit}
 .btn-mais.aberto{background:var(--orange);color:#1a1210;border-color:var(--orange)}
@@ -6090,24 +6090,15 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
           // RÉGUA DE BOTÕES IGUAL À DA FICHA (12/10/2026): WhatsApp grande, Rota ao lado, "⋯" abre Maps e ChatGPT.
           // Sem `target="_blank"` no Android, igual ao Waze: aba nova não sabe abrir intent:// e ficaria em branco.
           const temRota = a.tipo !== "remoto" && !!destinoRota;
-          const payload = () => payloadGPT([
-            ["cliente_id", svc?.cliente_id || a.cliente_id],
-            ["servico_id", svc?.id],
-            ["agenda_id", a.id],
-            ["nome", cli?.nome],
-            ["cidade", cli?.cidade || a.cidade],
-            ["compromisso", a.titulo],
-            ["situacao_data", revisaoData ? "Remarcação pendente: a data exibida é a original e precisa de revisão." : null],
-          ]);
           return <>
             <div className={`compromisso-botoes${tel ? "" : " sem-wpp"}${temRota ? "" : " sem-rota"}`}>
               {tel && <a className="btn-wpp" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">Abrir WhatsApp{sugestao ? " com resposta" : ""}</a>}
               {temRota && <a className="btn-rota btn-waze" href={linkWaze} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Rota{selo}</a>}
-              <button type="button" className={`btn-rota btn-mais${maisBotoes ? " aberto" : ""}`} aria-label="Mais opções" aria-expanded={maisBotoes} onClick={() => { vibrar(6); setMaisBotoes((v) => !v); }}>⋯</button>
+              {temRota && <button type="button" className={`btn-rota btn-mais${maisBotoes ? " aberto" : ""}`} aria-label="Mais opções" aria-expanded={maisBotoes} onClick={() => { vibrar(6); setMaisBotoes((v) => !v); }}>⋯</button>}
             </div>
-            {maisBotoes && <div className="compromisso-acoes compromisso-extra">
-              {temRota && <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>}
-              <button type="button" className="btn-rota btn-gpt" onClick={() => compartilharGPT(payload(), (msg) => setAvisoGPT(msg))}>💬 ChatGPT</button>
+            {/* 💬 ChatGPT saiu dos cards (Diego, 12/10/2026: "o GPT não está mais no negócio por dentro"). */}
+            {maisBotoes && temRota && <div className="compromisso-acoes compromisso-extra">
+              <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>
             </div>}
           </>;
         })()}
@@ -6369,9 +6360,6 @@ function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
         <button className="ghost" disabled={busy === p.id} onClick={() => { setRemarcando(remarcando === p.id ? null : p.id); setDataDraft(p.data_alvo || ""); }}>{remarcando === p.id ? "Cancelar" : "↻ Remarcar"}</button>
         {/* Mesmo princípio do botão do cliente: leva IDENTIDADE, não detalhe. Nada de descrição, motivo
             médico, nome de escola ou histórico — só o id, o título e a data. */}
-        <button className="ghost" onClick={() => compartilharGPT(payloadGPT([
-          ["pessoal_id", p.id], ["titulo", p.titulo], ["data_alvo", p.data_alvo], ["impacto_operacao", p.impacto_operacao],
-        ], PESSOAL_ASSINATURA_GPT, PESSOAL_INSTRUCAO_GPT), (msg) => setAvisoGPT(msg))}>💬 ChatGPT</button>
       </div>}
       {remarcando === p.id && <div className="responsavel-edit-row" style={{ width: "100%" }}>
         <input type="date" value={dataDraft} onChange={(e) => setDataDraft(e.target.value)} autoFocus />
@@ -7106,13 +7094,6 @@ function RetornosVencidosCard({ services, today, onVerLeads, onOpenFicha, notify
               `stopPropagation` nos dois porque o cartão inteiro abre a ficha no clique. */}
           <div className="ficha-servico-acoes">
             {tel && <a className="ghost" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={(e) => e.stopPropagation()}>WhatsApp</a>}
-            <button className="ghost" onClick={(e) => { e.stopPropagation(); compartilharGPT(payloadGPT([
-              ["cliente_id", s.cliente_id],
-              ["servico_id", s.id],
-              ["nome", s.clientes?.nome],
-              ["cidade", s.clientes?.cidade],
-              ["servico", s.titulo],
-            ]), notify || (() => {})); }}>💬 ChatGPT</button>
           </div>
         </div>
       </article>;
@@ -11030,7 +11011,6 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
             {cliente.latitude != null && <a className="ghost" href={`https://www.google.com/maps/search/?api=1&query=${cliente.latitude},${cliente.longitude}`} target="_blank" rel="noreferrer">📍 Maps</a>}
             {/* Ficha é nível CLIENTE: aqui o cliente pode ter vários serviços, então `servico_id`
                 fica de fora. Escolher um seria adivinhar, e adivinhar é o que gera atendimento errado. */}
-            <button className="ghost" onClick={() => compartilharGPT(payloadGPT([["cliente_id", cliente.id], ["nome", cliente.nome], ["cidade", cliente.cidade]]), notify)}>💬 ChatGPT</button>
           </div>}
           {colarLink && <div className="responsavel-edit-row"><input value={linkDraft} onChange={(e) => setLinkDraft(e.target.value)} placeholder="Cole o link do Google Maps já aberto" autoFocus /><button className="ghost" onClick={usarLinkMaps}>Salvar ponto</button></div>}
         </div> : <div className="ficha-edit form-grid">
