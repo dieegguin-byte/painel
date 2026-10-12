@@ -24,6 +24,9 @@ create table if not exists public.duvidas_agente (
   respondido_em timestamptz,
   aplicado_em timestamptz
 );
+-- plano (12/10, mesmo dia): o que fazer em cada opção, escrito por quem perguntou (ex.: a auditoria):
+-- {"Feito":"agenda <id> → feito","Remarcar":"pedir data e remarcar"}. O agente da hora executa o plano da opção escolhida.
+alter table public.duvidas_agente add column if not exists plano jsonb not null default '{}'::jsonb;
 create index if not exists duvidas_agente_abertas_idx on public.duvidas_agente (criado_em) where status in ('aberta','respondida');
 alter table public.duvidas_agente enable row level security;
 drop policy if exists operador_autorizado on public.duvidas_agente;
