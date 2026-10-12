@@ -897,15 +897,12 @@ button.sutil{opacity:.55;font-size:12px}
 .compromisso-obs summary::-webkit-details-marker{display:none}
 .compromisso-obs p{margin:4px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
 .compromisso-obs .compromisso-obs-texto{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--text)}
-.compromisso-botoes{display:grid;grid-template-columns:1fr 1fr 52px;gap:6px}
+.compromisso-botoes{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px}
 .compromisso-botoes.sem-rota{grid-template-columns:1fr}
-.compromisso-botoes.sem-wpp{grid-template-columns:1fr 52px}
+.compromisso-botoes.sem-wpp{grid-template-columns:1fr 1fr}
 .compromisso-botoes.sem-wpp.sem-rota{display:none}
+.compromisso-botoes .btn-maps{background:#1f1714;border:1px solid var(--line2);color:var(--text)}
 .compromisso-botoes .btn-wpp,.compromisso-botoes .btn-rota{min-width:0;padding:12px 8px;font-size:13px;display:flex;align-items:center;justify-content:center;min-height:48px}
-.btn-mais{background:#1f1714;border:1px solid var(--line2);color:var(--muted);font-size:20px;line-height:1;cursor:pointer;font-family:inherit}
-.btn-mais.aberto{background:var(--orange);color:#1a1210;border-color:var(--orange)}
-.compromisso-extra{margin-top:6px}
-.compromisso-extra .btn-rota{flex:1;min-height:44px;padding:10px 8px}
 .card-acoes-botoes.linha{grid-template-columns:1fr 1.25fr 1.2fr 44px}
 .card-acoes-botoes.linha button{padding:0 4px;font-size:11px;letter-spacing:0;white-space:nowrap;min-width:0;overflow:hidden}
 .card-acoes-botoes button.ativo{border-color:var(--orange);color:var(--orange2)}
@@ -6025,7 +6022,6 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   if (Number(svc?.valor_orcamento)) instrucoes.push(["VALOR DO SERVIÇO",
     money(svc.valor_orcamento) + (svc?.prazo ? " · prazo " + compactDate(svc.prazo) : "")]);
   const obsFicha = cli?.obs ? String(cli.obs).trim() : "";
-  const [maisBotoes, setMaisBotoes] = useState(false);
   return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehFollowUpZapia(a) ? " followup-zapia" : ""}`}>
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
@@ -6087,20 +6083,16 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
           {obsFicha && <p className="compromisso-obs-texto">{obsFicha}</p>}
         </details>}
         {(() => {
-          // RÉGUA DE BOTÕES IGUAL À DA FICHA (12/10/2026): WhatsApp grande, Rota ao lado, "⋯" abre Maps e ChatGPT.
-          // Sem `target="_blank"` no Android, igual ao Waze: aba nova não sabe abrir intent:// e ficaria em branco.
+          // RÉGUA DE BOTÕES (12/10/2026, Diego: "coloca os dois"): WhatsApp, Waze e Maps lado a lado, sem "⋯".
+          // Os dois links usam o mesmo destino: ponto da agenda > ponto do cliente (latitude/longitude) > endereço > cidade.
+          // Sem `target="_blank"` no Android no Waze: aba nova não sabe abrir intent:// e ficaria em branco.
+          // 💬 ChatGPT saiu dos cards (Diego, 12/10/2026: "o GPT não está mais no negócio por dentro").
           const temRota = a.tipo !== "remoto" && !!destinoRota;
-          return <>
-            <div className={`compromisso-botoes${tel ? "" : " sem-wpp"}${temRota ? "" : " sem-rota"}`}>
-              {tel && <a className="btn-wpp" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">Abrir WhatsApp{sugestao ? " com resposta" : ""}</a>}
-              {temRota && <a className="btn-rota btn-waze" href={linkWaze} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Rota{selo}</a>}
-              {temRota && <button type="button" className={`btn-rota btn-mais${maisBotoes ? " aberto" : ""}`} aria-label="Mais opções" aria-expanded={maisBotoes} onClick={() => { vibrar(6); setMaisBotoes((v) => !v); }}>⋯</button>}
-            </div>
-            {/* 💬 ChatGPT saiu dos cards (Diego, 12/10/2026: "o GPT não está mais no negócio por dentro"). */}
-            {maisBotoes && temRota && <div className="compromisso-acoes compromisso-extra">
-              <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>
-            </div>}
-          </>;
+          return <div className={`compromisso-botoes${tel ? "" : " sem-wpp"}${temRota ? "" : " sem-rota"}`}>
+            {tel && <a className="btn-wpp" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp{sugestao ? " · resposta" : ""}</a>}
+            {temRota && <a className="btn-rota btn-waze" href={linkWaze} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Waze{selo}</a>}
+            {temRota && <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>}
+          </div>;
         })()}
         {avisoGPT && <p className="compromisso-material">{avisoGPT}</p>}
       </div>
