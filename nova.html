@@ -179,7 +179,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-info{background:#0f0d0c;border:1px solid var(--line);border-radius:12px;padding:12px}
 .ci-label{display:block;font-size:9px;font-weight:800;letter-spacing:1.1px;color:var(--orange2);margin-bottom:3px}
 .compromisso-info strong{display:block;font-size:13px;margin-bottom:10px;line-height:1.45}
-.compromisso-msg{display:block;font-style:italic;color:var(--cream);font-size:12px;line-height:1.55;background:#1a1512;border-left:2px solid #5a3b2b;padding:9px 11px;border-radius:8px;margin:0 0 12px;quotes:none}
+.dica-enter{display:block;font-size:11px;color:var(--dim);margin-top:4px}.compromisso-msg .copiar-sugestao{display:inline-block;margin-left:8px;font-style:normal;font-size:11px;min-height:28px;padding:3px 9px;border-radius:999px;background:var(--surface2);border:1px solid var(--line2);color:var(--muted);vertical-align:middle}.compromisso-msg{display:block;font-style:italic;color:var(--cream);font-size:12px;line-height:1.55;background:#1a1512;border-left:2px solid #5a3b2b;padding:9px 11px;border-radius:8px;margin:0 0 12px;quotes:none}
 .compromisso-acoes{display:flex;gap:7px;flex-wrap:wrap}
 .btn-wpp{flex:1;min-width:170px;text-align:center;text-decoration:none;background:linear-gradient(135deg,#2f7d4f,#1f5a38);color:#eafff0;border-radius:10px;padding:12px 14px;font-size:12px;font-weight:750;border:1px solid #3f9160}
 /* ROTA (23/08/2026). Mesma altura do WhatsApp pra linha não ficar torta, mas sem flex:1 —
@@ -3318,6 +3318,18 @@ function tempoEstradaMin(c1, c2) {
 //
 // SEM `target=_blank` no Android de propósito: com intent, o sistema troca pro Waze e o PWA continua vivo
 // atrás. Abrir em aba nova é justamente o que devolvia o toque pro navegador.
+// ENTER SALVA O RECADO (Diego, 12/10/2026, na web: "arrume salvar recados com enter"). Só com teclado físico
+// (pointer: fine): no celular o Enter continua quebrando linha, e lá ele fala pelo 🎤. Shift+Enter quebra linha.
+function ehTecladoFisico() { try { return !!(window.matchMedia && window.matchMedia("(pointer: fine)").matches); } catch (e) { return false; } }
+function salvarComEnter(acao) {
+  return (e) => {
+    if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.nativeEvent?.isComposing) return;
+    if (!ehTecladoFisico()) return;
+    e.preventDefault();
+    acao();
+  };
+}
+function DicaEnter() { return ehTecladoFisico() ? <small className="dica-enter">Enter salva · Shift+Enter quebra linha</small> : null; }
 function ehAndroid() { return /android/i.test((typeof navigator !== "undefined" && navigator.userAgent) || ""); }
 function urlWaze(destino) {
   const qs = destino.google_place_id ? `google_place_id=${encodeURIComponent(destino.google_place_id)}&navigate=yes`
@@ -4006,8 +4018,16 @@ function Home() {
   // GRUPOS E CARDS ABERTOS TAMBÉM (Diego, 12/10/2026: "abri algo no painel, ele recolhe automaticamente e fica
   // tudo fechado; cliquei mais uma vez, sai do app"). No Painel, qualquer grupo/card expandido (aria-expanded=true)
   // conta como "algo aberto": o voltar recolhe TODOS de uma vez e fica no Painel; só o próximo voltar sai.
+  // PÁGINA EM BRANCO AO TROCAR DE ABA (Diego, 12/10/2026, na web: "quando clico nas abas algumas vezes vem abrindo
+  // uma página em branco saindo do app"). Causa: dois caminhos (o observador do DOM e o efeito da aba) pediam
+  // history.back() quase ao mesmo tempo; como o back() é assíncrono, o segundo ainda via a guarda armada e voltava
+  // DUAS entradas — a segunda era a página anterior ao app (em branco / outro site). Agora um só back() fica
+  // pendente até o popstate chegar (voltando), e uma guarda esquecida de um carregamento anterior é trocada por
+  // replaceState em vez de "voltada", porque voltar dela seria sair do documento.
   const tabRef = React.useRef(tab); tabRef.current = tab;
   const ignorarPop = React.useRef(false);
+  const voltando = React.useRef(null);
+  const sincronizarRef = React.useRef(null);
   useEffect(() => {
     const GUARDA = { tbGuarda: true };
     const armado = () => { try { return !!(window.history.state && window.history.state.tbGuarda); } catch (e) { return false; } };
@@ -4015,14 +4035,22 @@ function Home() {
     const expandidos = () => Array.from(document.querySelectorAll('[aria-expanded="true"]:not(.menu-topo-botao), details[open]'));
     const precisaGuarda = () => tabRef.current !== "painel" || !!abertoPorCima() || expandidos().length > 0;
     const sincronizar = () => {
+      if (voltando.current) return; // já pedimos um back(); esperar o popstate antes de decidir de novo
       const precisa = precisaGuarda();
       try {
         if (precisa && !armado()) window.history.pushState(GUARDA, "");
-        else if (!precisa && armado()) { ignorarPop.current = true; window.history.back(); }
+        else if (!precisa && armado()) {
+          ignorarPop.current = true;
+          // Se o popstate não vier (navegador que ignorou o back), destrava em 1s pra não ficar surdo pra sempre.
+          voltando.current = setTimeout(() => { voltando.current = null; ignorarPop.current = false; }, 1000);
+          window.history.back();
+        }
       } catch (e) { /* navegador sem histórico: segue sem a guarda */ }
     };
+    sincronizarRef.current = sincronizar;
     const onPop = () => {
-      if (ignorarPop.current) { ignorarPop.current = false; return; }
+      if (voltando.current) { clearTimeout(voltando.current); voltando.current = null; }
+      if (ignorarPop.current) { ignorarPop.current = false; setTimeout(sincronizar, 50); return; }
       const topo = (() => { const todos = document.querySelectorAll(".modal-overlay, .menu-topo-fundo"); return todos[todos.length - 1]; })();
       if (topo) {
         // Mesmo gesto de "tocar fora": os modais ouvem mousedown ou click no próprio pano de fundo.
@@ -4046,14 +4074,16 @@ function Home() {
     const obs = new MutationObserver(() => { if (agendado) return; agendado = requestAnimationFrame(() => { agendado = null; sincronizar(); }); });
     obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-expanded", "open"] });
     window.addEventListener("popstate", onPop);
+    // Guarda herdada de um carregamento anterior (F5, reabrir a aba): a entrada de trás pode ser outro site.
+    // Trocar o estado é seguro; "voltar" dela não.
+    try { if (armado()) window.history.replaceState(null, ""); } catch (e) { /* segue */ }
     sincronizar();
-    return () => { obs.disconnect(); window.removeEventListener("popstate", onPop); if (agendado) cancelAnimationFrame(agendado); };
+    return () => { obs.disconnect(); window.removeEventListener("popstate", onPop); if (agendado) cancelAnimationFrame(agendado); if (voltando.current) clearTimeout(voltando.current); sincronizarRef.current = null; };
   }, []);
   useEffect(() => {
-    // Mudou de aba: arma (saiu do Painel) ou desarma (voltou pro Painel limpo).
-    const precisa = tab !== "painel" || !!document.querySelector('.modal-overlay, .menu-topo-fundo, [aria-expanded="true"]:not(.menu-topo-botao), details[open]');
-    const armado = !!(window.history.state && window.history.state.tbGuarda);
-    try { if (precisa && !armado) window.history.pushState({ tbGuarda: true }, ""); else if (!precisa && armado) { ignorarPop.current = true; window.history.back(); } } catch (e) { /* segue */ }
+    // Mudou de aba: arma (saiu do Painel) ou desarma (voltou pro Painel limpo). Mesma função do observador,
+    // pra nunca haver dois back() em voo.
+    if (sincronizarRef.current) sincronizarRef.current();
   }, [tab]);
 
   useEffect(() => { if (demo || session) loadAll(); }, [demo, session, loadAll]);
@@ -5371,7 +5401,7 @@ function TriagePanel(props) {
     {editing ? <article className="source-card"><p className="kicker">EDITAR ANOTAÇÃO</p><textarea className="edit-note" value={editText} onChange={(e) => setEditText(e.target.value)} />{!!parsed.images.length && <div className="source-gallery">{parsed.images.map((img, i) => <a key={i} href={img.url} target="_blank" rel="noreferrer"><img src={img.url} alt={img.fileName} /></a>)}</div>}<div className="ficha-actions"><button className="primary" onClick={() => { props.onEdit(editText); setEditing(false); }}>Salvar</button><button className="ghost" onClick={() => { setEditText(parsed.text); setEditing(false); }}>Cancelar</button></div></article>
     : <article className="source-card"><p className="kicker">CONTEÚDO ORIGINAL{parsed.images.length > 1 ? ` · ${parsed.images.length} imagens` : ""}</p><p>{parsed.text || "Print sem texto adicional."}</p>{!!parsed.images.length && <div className="source-gallery">{parsed.images.map((img, i) => <a key={i} href={img.url} target="_blank" rel="noreferrer"><img src={img.url} alt={img.fileName} /></a>)}</div>}</article>}
     {!!item.conversa?.length && <div className="conversation">{item.conversa.map((message, index) => <div key={`${message.em}-${index}`} className={`bubble ${message.de} ${message.tipo || ""}`}><span>{message.de === "ia" ? "Claude" : message.de === "sistema" ? "Sistema" : "Diego"}</span>{message.texto}</div>)}</div>}
-    {status === "aguardando_voce" && <div className="answer-box"><label>Sua resposta para o Claude<textarea value={reply} onChange={(event) => setReply(event.target.value)} placeholder="Responda aqui; a entrada voltará automaticamente para a fila do Claude." /></label><button className="primary" onClick={props.onAnswer} disabled={!reply.trim()}>Enviar resposta</button></div>}
+    {status === "aguardando_voce" && <div className="answer-box"><label>Sua resposta para o Claude<textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={salvarComEnter(() => { if (reply.trim()) props.onAnswer(); })} placeholder="Responda aqui; a entrada voltará automaticamente para a fila do Claude." /></label><GravadorAudio audio={null} onAudio={() => {}} somenteDitado rotulo="🎤 Gravar" onTexto={(t) => setReply((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} /><DicaEnter /><button className="primary" onClick={props.onAnswer} disabled={!reply.trim()}>Enviar resposta</button></div>}
     {["novo", "respondido"].includes(status) && <div className="claim-box"><h3>Esta entrada ainda não está travada.</h3><p>Assuma antes de alterar dados. Se outra sessão já pegou, esta operação será recusada.</p><button className="primary" onClick={props.onClaim} disabled={busy}>Iniciar triagem segura</button></div>}
     {status === "em_processamento" && <>
       <div className="classify"><p className="kicker">1 · CLASSIFICAR RESULTADO</p>{[['cliente','Cliente e serviço'],['agenda','Compromisso'],['financeiro','Financeiro avulso']].map(([id, label]) => <button key={id} className={form.kind === id ? "active" : ""} onClick={() => updateForm("kind", id)}>{label}</button>)}</div>
@@ -5456,7 +5486,9 @@ function quandoFalado(data, hora, hoje) {
   const horaTxt = horaFalada(hora);
   return ` ${dia}${horaTxt ? " às " + horaTxt : ""}`;
 }
-// Sempre gera uma mensagem pronta (mesmo sem sugestao_resposta salva) pra o botão do WhatsApp nunca abrir vazio.
+// Sempre gera uma mensagem pronta (mesmo sem sugestao_resposta salva) pra mostrar no card como sugestão.
+// Desde 12/10/2026 o botão do WhatsApp abre VAZIO (Diego: "quando eu clicar no WhatsApp ele está limpo"); a sugestão
+// fica no card, só pra ler ou copiar.
 // NUNCA colar a anotação interna dentro da mensagem do cliente. A versão antiga fazia
 // `Passando pra confirmar: ${proxima_acao}` e saiu no WhatsApp de uma cliente como "Passando pra
 // confirmar: Cobrar retorno — ia decidir com o marido" — recado do Diego pra ele mesmo, mandado
@@ -5781,7 +5813,7 @@ function SelosClaudeDoCard({ a, acoes, onMudar }) {
 // o Android não deixa o gravador e o reconhecimento de voz usarem o microfone ao mesmo tempo, e o Claude não
 // escuta áudio. Agora o 🎤 é DITADO: o texto aparece na caixinha enquanto ele fala, e é o texto que a rotina
 // lê. Só se o aparelho não tiver reconhecimento de voz (ou ele falhar) o botão cai para gravar o áudio.
-function GravadorAudio({ audio, onAudio, onTexto, disabled }) {
+function GravadorAudio({ audio, onAudio, onTexto, disabled, somenteDitado = false, rotulo = "🎤 Falar o recado" }) {
   const [modo, setModo] = useState(null); // null | "ditado" | "gravando"
   const [parcial, setParcial] = useState("");
   const [aviso, setAviso] = useState("");
@@ -5794,6 +5826,8 @@ function GravadorAudio({ audio, onAudio, onTexto, disabled }) {
   }, []);
   useEffect(() => () => { parar(); try { ref.current.stream?.getTracks().forEach((t) => t.stop()); } catch (e) { /* nada */ } }, [parar]);
   const gravarAudio = async () => {
+    // Na Caixa só o ditado serve: o Claude não escuta áudio e a fila não guarda gravação (Diego, 12/10/2026).
+    if (somenteDitado) { setAviso("Este aparelho não transcreve a fala. Use o microfone do teclado."); setModo(null); return; }
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { setAviso("Este aparelho não grava áudio aqui. Use o microfone do teclado."); setModo(null); return; }
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
@@ -5852,7 +5886,7 @@ function GravadorAudio({ audio, onAudio, onTexto, disabled }) {
   };
   return <div className="gravador">
     {!modo
-      ? <button type="button" className="ghost" onClick={comecar} disabled={disabled}>🎤 Falar o recado</button>
+      ? <button type="button" className="ghost" onClick={comecar} disabled={disabled}>{rotulo}</button>
       : <button type="button" className="primary gravando" onClick={parar}>⏹ Parar</button>}
     {audio && !modo && <><audio controls src={audio.url} /><button type="button" className="ghost" onClick={() => onAudio(null)}>Apagar áudio</button></>}
     {modo === "ditado" && <small>{parcial ? "… " + parcial : "Pode falar: o texto vai entrando na caixinha."}</small>}
@@ -5927,7 +5961,8 @@ function AcoesDoCompromisso({ a, acoes, today }) {
     </div>
     {modo && <div className="card-recado">
       <p className="kicker" style={{ margin: 0 }}>RECADO PRO CLAUDE · {ROTULO[modo]}</p>
-      <textarea autoFocus value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={modo === "remarcar" ? "Ex.: cliente pediu pra passar depois das 14h" : modo === "cancelar" ? "Motivo do cancelamento" : "O que o Claude precisa saber"} />
+      <textarea autoFocus value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy) enviar(modo); })} placeholder={modo === "remarcar" ? "Ex.: cliente pediu pra passar depois das 14h" : modo === "cancelar" ? "Motivo do cancelamento" : "O que o Claude precisa saber"} />
+      <DicaEnter />
       <GravadorAudio audio={audio} onAudio={setAudio} onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={!!busy} />
       <div className="card-acoes-botoes">
         <button type="button" className="primary" onClick={() => enviar(modo)} disabled={!!busy}>{busy === modo ? "…" : `Enviar ${ROTULO[modo].toLowerCase()}`}</button>
@@ -6138,7 +6173,9 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         {instrucoes.map(([rotulo, texto]) => <React.Fragment key={rotulo}>
           <span className="ci-label">{rotulo}</span><strong>{texto}</strong>
         </React.Fragment>)}
-        {sugestao && <q className="compromisso-msg">{sugestao}</q>}
+        {/* SUGESTÃO SÓ PRA LER/COPIAR (Diego, 12/10/2026): o WhatsApp abre LIMPO, sem texto pré-preenchido — ele decide
+            se manda áudio ou texto. A sugestão fica aqui como instrução, com um botão de copiar. */}
+        {sugestao && <q className="compromisso-msg">{sugestao}<button type="button" className="copiar-sugestao" title="Copiar sugestão" onClick={async (e) => { e.preventDefault(); try { await navigator.clipboard.writeText(sugestao); vibrar(6); } catch (err) { /* segure no texto pra copiar */ } }}>📋 Copiar</button></q>}
         {/* Sem sugestão porque o app não pôde provar que a conversa é com o cliente. Dizer o
             motivo importa: card mudo faz ele achar que quebrou. O WhatsApp abaixo continua
             abrindo — só que vazio, pra ele escrever. */}
@@ -6166,7 +6203,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
           // 💬 ChatGPT saiu dos cards (Diego, 12/10/2026: "o GPT não está mais no negócio por dentro").
           const temRota = a.tipo !== "remoto" && !!destinoRota;
           return <div className={`compromisso-botoes${tel ? "" : " sem-wpp"}${temRota ? "" : " sem-rota"}`}>
-            {tel && <a className="btn-wpp" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp{sugestao ? " · resposta" : ""}</a>}
+            {tel && <a className="btn-wpp" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}
             {temRota && <a className="btn-rota btn-waze" href={linkWaze} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Waze{selo}</a>}
             {temRota && <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>}
           </div>;
@@ -6219,7 +6256,7 @@ function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar,
           </div>
         </div>
       : <div className="cobranca-dir">
-          {tel && <a className="btn-wpp" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => onCobrou(a, svc)}>{cobradaEm ? "Cobrar de novo" : "Cobrar no WhatsApp"}</a>}
+          {tel && <a className="btn-wpp" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => onCobrou(a, svc)}>{cobradaEm ? "Cobrar de novo" : "Cobrar no WhatsApp"}</a>}
           {sugestao && <button className="ghost" title="Copiar mensagem" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}
           <button className={cobradaEm ? "primary" : "ghost"} disabled={busy} onClick={() => setMarcando(true)}>✓ Respondeu</button>
           {noTeto && <button className="ghost" disabled={busy} onClick={() => onInsistirMais(a, svc)}>Insistir mais</button>}
@@ -6235,7 +6272,11 @@ function CobrancaCard({ a, svc, today, tentativas, noTeto, onCobrou, onEncerrar,
 // aba Caixa: um lugar só pra manter, e o que ele digita cai na mesma fila.
 function ComposerCaixa({ composer, setComposer, files, setFiles, addInbox, busy, placeholder }) {
   return <div className="composer">
-    <textarea value={composer} onChange={(event) => setComposer(event.target.value)} placeholder={placeholder || "Cole uma mensagem, descreva o atendimento ou acrescente uma orientação…"} />
+    <textarea value={composer} onChange={(event) => setComposer(event.target.value)} onKeyDown={salvarComEnter(() => { if (!busy && (composer.trim() || files.length)) addInbox(); })} placeholder={placeholder || "Cole uma mensagem, descreva o atendimento ou acrescente uma orientação…"} />
+    {/* 🎤 GRAVAR (Diego, 12/10/2026: "e botão de gravar áudio aqui"): mesmo ditado dos cards da agenda — a fala vira
+        texto na caixinha. Não guarda áudio: o Claude não escuta áudio. */}
+    <GravadorAudio audio={null} onAudio={() => {}} somenteDitado rotulo="🎤 Gravar" onTexto={(t) => setComposer((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={busy} />
+    <DicaEnter />
     {files.length > 0 && <div className="composer-files">{files.map((f, i) => <span key={i} className="composer-file-chip">{f.name}<button type="button" onClick={() => setFiles((fs) => fs.filter((_, idx) => idx !== i))}>✕</button></span>)}</div>}
     <div className="composer-actions">
       <label className="file-button">{files.length ? `${files.length} print(s)` : "Adicionar print(s)"}<input type="file" accept="image/*" multiple onChange={(event) => setFiles((fs) => [...fs, ...Array.from(event.target.files || [])])} /></label>
@@ -6980,7 +7021,9 @@ function CaixaRecado({ item, customers, db, demo, notify, onSalvo }) {
   return <div className="caixa-form form-grid caixa-recado">
     <p className="kicker">RECADO PRO CLAUDE · DE QUEM É / O QUE É</p>
     <label>De quem é<select value={clienteId} onChange={(e) => setClienteId(e.target.value)}><option value="">Ainda não sei / não é de cliente</option>{clientes.map((c) => <option key={c.id} value={c.id}>{nomeDoCliente(c)}{c.telefone ? ` · ${c.telefone}` : ""}</option>)}</select></label>
-    <label>O que é<textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ex.: comprovante do Pix da entrada do sofá; conversa inteira do orçamento; print do endereço" /></label>
+    <label>O que é<textarea value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy) salvar(); })} placeholder="Ex.: comprovante do Pix da entrada do sofá; conversa inteira do orçamento; print do endereço" /></label>
+    <GravadorAudio audio={null} onAudio={() => {}} somenteDitado rotulo="🎤 Gravar" onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={busy} />
+    <DicaEnter />
     <div className="ficha-actions"><button className="primary" onClick={salvar} disabled={busy}>{busy ? "Gravando…" : "Gravar recado"}</button></div>
   </div>;
 }
@@ -7008,7 +7051,8 @@ function CaixaFormBaixa({ item, modo, origem, meta, db, demo, notify, onFeito, o
   };
   return <div className="caixa-form form-grid">
     {aviso && <div className="duplicate-warning"><b>{aviso}</b></div>}
-    <label>{resposta ? "Sua resposta*" : "Anotação (opcional)"}<textarea value={nota} onChange={(e) => setNota(e.target.value)} placeholder={resposta ? "O que você responde pra quem perguntou" : "O que foi feito, se valer registrar"} /></label>
+    <label>{resposta ? "Sua resposta*" : "Anotação (opcional)"}<textarea value={nota} onChange={(e) => setNota(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy) confirmar(); })} placeholder={resposta ? "O que você responde pra quem perguntou" : "O que foi feito, se valer registrar"} /></label>
+    <DicaEnter />
     <div className="ficha-actions">
       <button className="primary" onClick={confirmar} disabled={busy}>{busy ? "Salvando…" : resposta ? "Responder e concluir" : acao === "descartado" ? "Confirmar descarte" : "Confirmar resolvido"}</button>
       <button className="ghost" onClick={onCancelar} disabled={busy}>Voltar</button>
@@ -7732,7 +7776,7 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, onOpen
     {d.cliente_id && onOpenFicha && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onOpenFicha(d.cliente_id); }}>Abrir ficha{nome ? ` de ${nome.split(" ")[0]}` : ""} ›</button>}
     {caixaItem && onAbrirCaixa && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onAbrirCaixa(); }}>Ver na Caixa ›</button>}
     {opcoes.length > 0 && <div className="duvida-opcoes">{opcoes.map((o) => <button type="button" key={o} className={opcao === o ? "ativo" : ""} onClick={() => { vibrar(6); setOpcao(opcao === o ? null : o); }}>{o}</button>)}</div>}
-    <textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={opcoes.length ? "Quer explicar mais? (opcional)" : "Sua resposta pra Manu"} />
+    <textarea value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy && resposta) gravar("respondida"); })} placeholder={opcoes.length ? "Quer explicar mais? (opcional)" : "Sua resposta pra Manu"} />
     <GravadorAudio audio={null} onAudio={() => {}} onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={busy} />
     {!caixaItem && <label className="duvida-sempre"><input type="checkbox" checked={sempre} onChange={(e) => setSempre(e.target.checked)} />Vale sempre: a Manu guarda como regra e não pergunta de novo</label>}
     <div className="duvida-botoes">
@@ -11379,7 +11423,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
                 <div className="ficha-actions"><button className="primary" onClick={() => confirmarEntrega(s.id)}>{overrideMat === s.id ? "Entregar mesmo com material em aberto" : "Confirmar entrega"}</button><button className="ghost" onClick={() => { setEntregando(null); setOverrideMat(null); }}>Cancelar</button></div>
               </div>
             : <button type="button" className={principal === "entrega" ? "primary ficha-principal" : "responsavel-badge"} onClick={() => { setEntregando(s.id); setOverrideMat(null); setValorEntregaDraft(s.valor_orcamento ? String(s.valor_orcamento) : ""); setRecebidoFichaDraft(""); }}>✅ Marcar como entregue</button>)}
-          {tel && <a className={principal === "whatsapp" ? "primary ficha-principal" : "responsavel-badge"} href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">💬 WhatsApp</a>}
+          {tel && <a className={principal === "whatsapp" ? "primary ficha-principal" : "responsavel-badge"} href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">💬 WhatsApp</a>}
           {sugestao && <button type="button" className="responsavel-badge" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋 Copiar sugestão</button>}
           {/* CONFIRMAÇÃO DE SERVIÇO — só em trabalho FECHADO. Lead e orçamento não têm acordo pra confirmar,
               e emitir documento comercial em cima de proposta viraria "condição oferecida" virando aceite. */}
