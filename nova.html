@@ -729,7 +729,7 @@ button.sutil{opacity:.55;font-size:12px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 
 /* CARDS DA AGENDA COM AÇÕES (11/10/2026): Feito / Remarcar / Cancelar / recado com áudio. */
-.card-acoes{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}.card-acoes textarea{width:100%;min-height:64px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:14px;line-height:1.45}.card-acoes textarea:focus{border-color:#d37742}.card-acoes-botoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.card-acoes-botoes button{min-height:44px;font-size:12px}.card-acoes-botoes .perigo{color:#f08a7a;border-color:#7a3a30}.gravador{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.gravador button{min-height:40px;font-size:12px}.gravador audio{height:36px;max-width:100%;flex:1 1 180px}.gravador small,.card-acoes small{font-size:11px;color:var(--dim)}.gravador .gravando{animation:pulsoGravando 1.2s ease-in-out infinite}@keyframes pulsoGravando{50%{opacity:.55}}.selo-claude{margin:8px 12px 0;padding:10px 12px;border-radius:12px;background:#d4a64e17;border:1px solid #d4a64e66;font-size:13px;line-height:1.45}.selo-claude b{display:block;color:#e8c06d;margin-bottom:3px}.selo-claude .selo-botoes{display:flex;gap:6px;margin-top:8px}.selo-claude .selo-botoes button{min-height:40px;font-size:12px;flex:1}.selo-recado{margin:8px 12px 0;padding:8px 12px;border-radius:12px;background:#6097c014;border:1px solid #6097c055;color:#a9c8e2;font-size:12px;line-height:1.45}.recados-do-card{display:flex;flex-direction:column;gap:6px}.recados-do-card div{font-size:12px;line-height:1.45;padding:8px 10px;border-radius:10px;background:var(--surface2);border:1px solid var(--line)}.recados-do-card em{display:block;font-style:normal;color:var(--dim);font-size:11px}.recados-do-card button{margin-top:4px;min-height:36px;font-size:11px}
+.card-acoes{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}.card-acoes textarea{width:100%;min-height:64px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:14px;line-height:1.45}.card-acoes textarea:focus{border-color:#d37742}.card-acoes-botoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.card-acoes-botoes button{min-height:44px;font-size:12px}.card-acoes-botoes .perigo{color:#f08a7a;border-color:#7a3a30}.gravador{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.gravador button{min-height:40px;font-size:12px}.gravador audio{height:36px;max-width:100%;flex:1 1 180px}.gravador small,.card-acoes small{font-size:11px;color:var(--dim)}.gravador .gravando{animation:pulsoGravando 1.2s ease-in-out infinite}@keyframes pulsoGravando{50%{opacity:.55}}.compromisso-card.card-escuro{filter:brightness(.55) saturate(.5)}.compromisso-card.card-escuro .selo-recado{filter:brightness(1.6)}.selo-claude{margin:8px 12px 0;padding:10px 12px;border-radius:12px;background:#d4a64e17;border:1px solid #d4a64e66;font-size:13px;line-height:1.45}.selo-claude b{display:block;color:#e8c06d;margin-bottom:3px}.selo-claude .selo-botoes{display:flex;gap:6px;margin-top:8px}.selo-claude .selo-botoes button{min-height:40px;font-size:12px;flex:1}.selo-recado{margin:8px 12px 0;padding:8px 12px;border-radius:12px;background:#6097c014;border:1px solid #6097c055;color:#a9c8e2;font-size:12px;line-height:1.45}.recados-do-card{display:flex;flex-direction:column;gap:6px}.recados-do-card div{font-size:12px;line-height:1.45;padding:8px 10px;border-radius:10px;background:var(--surface2);border:1px solid var(--line)}.recados-do-card em{display:block;font-style:normal;color:var(--dim);font-size:11px}.recados-do-card button{margin-top:4px;min-height:36px;font-size:11px}
 </style>
 </head>
 <body>
@@ -5273,7 +5273,6 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
       notify("Anotado (demo).", "ok");
       return true;
     }
-    if (acao === "feito" && a.data > hojeISO()) throw new Error("Esse compromisso ainda não chegou. Use Remarcar ou mande um recado.");
     let audioPath = null;
     if (audio?.blob) {
       const ext = /mp4|aac|m4a/.test(audio.tipo) ? "m4a" : /ogg/.test(audio.tipo) ? "ogg" : "webm";
@@ -5285,7 +5284,9 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     // depois da mudança, o card sumiria sem a rotina saber que precisa arrumar o resto.
     const { data: rec, error: recErr } = await db.from("agenda_recados").insert({ agenda_id: a.id, acao, texto: limpo, audio_path: audioPath }).select("*").single();
     if (recErr) throw recErr;
-    const patch = acao === "feito" ? { status: "feito" } : acao === "cancelar" ? { status: "cancelado" } : null;
+    // Feito ANTES do dia (Diego, 11/10: "o concluir não aceita apertar"): resolveu antes da hora, então a data
+    // vira hoje — é o que o próprio banco manda fazer, e o mesmo que o Concluir antigo fazia.
+    const patch = acao === "feito" ? (a.data > hojeISO() ? { status: "feito", data: hojeISO() } : { status: "feito" }) : acao === "cancelar" ? { status: "cancelado" } : null;
     const conferir = a.nota_claude && a.nota_claude_conferida === false ? { nota_claude_conferida: true } : null;
     if (patch || conferir) {
       const { error: agErr } = await db.from("agenda").update({ ...(patch || {}), ...(conferir || {}) }).eq("id", a.id).eq("status", "planejado");
@@ -5338,8 +5339,13 @@ function SelosClaudeDoCard({ a, acoes, onMudar }) {
   </>;
 }
 
+// DITADO PRIMEIRO (teste do Diego, 11/10 21h): no celular dele o áudio gravou, mas a transcrição veio vazia —
+// o Android não deixa o gravador e o reconhecimento de voz usarem o microfone ao mesmo tempo, e o Claude não
+// escuta áudio. Agora o 🎤 é DITADO: o texto aparece na caixinha enquanto ele fala, e é o texto que a rotina
+// lê. Só se o aparelho não tiver reconhecimento de voz (ou ele falhar) o botão cai para gravar o áudio.
 function GravadorAudio({ audio, onAudio, onTexto, disabled }) {
-  const [gravando, setGravando] = useState(false);
+  const [modo, setModo] = useState(null); // null | "ditado" | "gravando"
+  const [parcial, setParcial] = useState("");
   const [aviso, setAviso] = useState("");
   const ref = React.useRef({});
   const parar = useCallback(() => {
@@ -5349,12 +5355,11 @@ function GravadorAudio({ audio, onAudio, onTexto, disabled }) {
     try { if (r.rec && r.rec.state !== "inactive") r.rec.stop(); } catch (e) { /* já parou */ }
   }, []);
   useEffect(() => () => { parar(); try { ref.current.stream?.getTracks().forEach((t) => t.stop()); } catch (e) { /* nada */ } }, [parar]);
-  const comecar = async () => {
-    setAviso("");
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { setAviso("Este aparelho não grava áudio aqui. Use o microfone do teclado."); return; }
+  const gravarAudio = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { setAviso("Este aparelho não grava áudio aqui. Use o microfone do teclado."); setModo(null); return; }
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-    catch (e) { setAviso("O microfone não foi liberado para o app."); return; }
+    catch (e) { setAviso("O microfone não foi liberado para o app."); setModo(null); return; }
     const tipos = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
     const mime = tipos.find((m) => window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported(m)) || "";
     const rec = new window.MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
@@ -5365,32 +5370,54 @@ function GravadorAudio({ audio, onAudio, onTexto, disabled }) {
       const tipo = (rec.mimeType || mime || "audio/webm").split(";")[0];
       const blob = new Blob(partes, { type: tipo });
       if (blob.size) onAudio({ blob, tipo, url: URL.createObjectURL(blob) });
-      setGravando(false);
+      setModo(null);
     };
-    ref.current = { rec, stream, ativo: true, transcreveu: false };
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SR) {
-      try {
-        const fala = new SR();
-        fala.lang = "pt-BR"; fala.continuous = true; fala.interimResults = false;
-        fala.onresult = (ev) => { for (let i = ev.resultIndex; i < ev.results.length; i++) if (ev.results[i].isFinal) { const t = ev.results[i][0].transcript.trim(); if (t) { ref.current.transcreveu = true; onTexto(t); } } };
-        fala.onerror = () => { /* o áudio continua gravando */ };
-        // No Android o reconhecimento para sozinho no silêncio; enquanto estiver gravando, religa.
-        fala.onend = () => { if (ref.current.ativo) { try { fala.start(); } catch (e) { /* desistiu */ } } };
-        fala.start();
-        ref.current.fala = fala;
-      } catch (e) { /* sem transcrição */ }
-    } else setAviso("Este aparelho não transcreve: o áudio vai, mas escreva um resumo na caixinha.");
+    ref.current = { rec, stream, ativo: true };
     ref.current.limite = window.setTimeout(parar, 3 * 60 * 1000);
     rec.start(1000);
-    setGravando(true);
+    setModo("gravando");
+  };
+  const comecar = () => {
+    setAviso(""); setParcial("");
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setAviso("Este aparelho não transcreve. Vou gravar o áudio, mas escreva um resumo na caixinha: o Claude não escuta áudio."); gravarAudio(); return; }
+    let fala;
+    try { fala = new SR(); } catch (e) { gravarAudio(); return; }
+    fala.lang = "pt-BR"; fala.continuous = true; fala.interimResults = true;
+    let ouviuAlgo = false;
+    fala.onresult = (ev) => {
+      let tmp = "";
+      for (let i = ev.resultIndex; i < ev.results.length; i++) {
+        const t = ev.results[i][0].transcript;
+        if (ev.results[i].isFinal) { if (t.trim()) { ouviuAlgo = true; onTexto(t.trim()); } }
+        else tmp += t;
+      }
+      setParcial(tmp);
+    };
+    fala.onerror = (ev) => {
+      if (ev.error === "no-speech" || ev.error === "aborted") return;
+      ref.current.ativo = false;
+      setAviso(ev.error === "not-allowed" || ev.error === "service-not-allowed"
+        ? "O microfone não foi liberado para o ditado. Libere nas permissões do app ou use o microfone do teclado."
+        : "O ditado falhou (" + ev.error + "). Use o microfone do teclado.");
+    };
+    // No Android o reconhecimento para sozinho no silêncio; enquanto ele não tocar em Parar, religa.
+    fala.onend = () => {
+      if (ref.current.ativo) { try { fala.start(); return; } catch (e) { /* desistiu */ } }
+      setParcial(""); setModo(null);
+      if (!ouviuAlgo && !ref.current.avisou) { ref.current.avisou = true; setAviso((v) => v || "Não ouvi nada. Fale mais perto ou use o microfone do teclado."); }
+    };
+    ref.current = { fala, ativo: true };
+    ref.current.limite = window.setTimeout(parar, 3 * 60 * 1000);
+    try { fala.start(); setModo("ditado"); } catch (e) { gravarAudio(); }
   };
   return <div className="gravador">
-    {!gravando
-      ? <button type="button" className="ghost" onClick={comecar} disabled={disabled}>🎤 {audio ? "Gravar de novo" : "Gravar áudio"}</button>
+    {!modo
+      ? <button type="button" className="ghost" onClick={comecar} disabled={disabled}>🎤 Falar o recado</button>
       : <button type="button" className="primary gravando" onClick={parar}>⏹ Parar</button>}
-    {audio && !gravando && <><audio controls src={audio.url} /><button type="button" className="ghost" onClick={() => onAudio(null)}>Apagar áudio</button></>}
-    {gravando && <small>Gravando… fale normalmente; o texto aparece na caixinha.</small>}
+    {audio && !modo && <><audio controls src={audio.url} /><button type="button" className="ghost" onClick={() => onAudio(null)}>Apagar áudio</button></>}
+    {modo === "ditado" && <small>{parcial ? "… " + parcial : "Pode falar: o texto vai entrando na caixinha."}</small>}
+    {modo === "gravando" && <small>Gravando o áudio…</small>}
     {aviso && <small>{aviso}</small>}
   </div>;
 }
@@ -5417,7 +5444,7 @@ function AcoesDoCompromisso({ a, acoes, today }) {
     if (acao === "cancelar" && !texto.trim() && !audio) { acoes.notify("Diga o motivo do cancelamento (texto ou áudio).", "error"); return; }
     if (acao === "recado" && !texto.trim() && !audio) { acoes.notify("Escreva ou grave o recado primeiro.", "error"); return; }
     if (acao === "cancelar" && !window.confirm(`Cancelar “${a.titulo_visivel || a.titulo}”?`)) return;
-    if (acao === "feito" && !window.confirm(`Marcar “${a.titulo_visivel || a.titulo}” como feito?`)) return;
+    if (acao === "feito" && !window.confirm(`Marcar “${a.titulo_visivel || a.titulo}” como feito${futuro ? " hoje" : ""}?`)) return;
     setBusy(acao);
     try {
       await acoes.enviar(a, { acao, texto, audio });
@@ -5431,12 +5458,12 @@ function AcoesDoCompromisso({ a, acoes, today }) {
     <textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ex.: cliente pediu pra passar depois das 14h" />
     <GravadorAudio audio={audio} onAudio={setAudio} onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={!!busy} />
     <div className="card-acoes-botoes">
-      <button type="button" className="primary" onClick={() => enviar("feito")} disabled={!!busy || futuro}>{busy === "feito" ? "…" : "✅ Feito"}</button>
+      <button type="button" className="primary" onClick={() => enviar("feito")} disabled={!!busy}>{busy === "feito" ? "…" : "✅ Feito"}</button>
       <button type="button" className="secondary" onClick={() => enviar("remarcar")} disabled={!!busy}>{busy === "remarcar" ? "…" : "🔁 Remarcar"}</button>
       <button type="button" className="ghost perigo" onClick={() => enviar("cancelar")} disabled={!!busy}>{busy === "cancelar" ? "…" : "✖ Cancelar"}</button>
       <button type="button" className="ghost" onClick={() => enviar("recado")} disabled={!!busy}>{busy === "recado" ? "…" : "💬 Só recado"}</button>
     </div>
-    <small>{futuro ? "Feito só a partir do dia marcado. " : ""}No Remarcar você só explica: o Claude escolhe o dia e a hora ({HORARIOS_ROTINA_RECADOS}) e move o card.</small>
+    <small>{futuro ? "Feito antes do dia: a data vira hoje. " : ""}No Remarcar você só explica: o Claude escolhe o dia e a hora ({HORARIOS_ROTINA_RECADOS}) e move o card.</small>
   </div>;
 }
 
@@ -5598,7 +5625,10 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   if (Number(svc?.valor_orcamento)) instrucoes.push(["VALOR DO SERVIÇO",
     money(svc.valor_orcamento) + (svc?.prazo ? " · prazo " + compactDate(svc.prazo) : "")]);
   if (cli?.obs) instrucoes.push(["OBSERVAÇÃO DA FICHA", cli.obs]);
-  return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehFollowUpZapia(a) ? " followup-zapia" : ""}`}>
+  // CARD ESCURO (Diego, 11/10): pediu Remarcar e o Claude ainda não moveu — o card fica apagado até a rotina
+  // passar, pra ele bater o olho e saber que aquilo já está nas mãos do Claude.
+  const esperandoClaude = !!acoes && acoes.recados.some((r) => r.agenda_id === a.id && !r.processado_em && r.acao === "remarcar");
+  return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehFollowUpZapia(a) ? " followup-zapia" : ""}${esperandoClaude ? " card-escuro" : ""}`}>
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
