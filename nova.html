@@ -801,12 +801,25 @@ button.sutil{opacity:.55;font-size:12px}
 .pessoal-item .ficha-actions{width:100%;margin-top:2px}
 .pessoal-item .ficha-actions .ghost{min-height:34px;padding:6px 11px;font-size:11px}
 .pessoal-item .responsavel-edit-row{width:100%}
+/* TOPO ENXUTO (12/10/2026): menu "⋯" no lugar dos seis botões */
+.header-actions{position:relative}
+.menu-topo-botao{min-width:44px;min-height:44px;padding:6px 12px;font-size:20px;line-height:1;border-radius:12px}
+.menu-topo-botao.aberto{background:var(--orange);color:#1a1210;border-color:var(--orange)}
+.menu-topo-fundo{position:fixed;inset:0;z-index:40;background:#0006}
+.menu-topo{position:absolute;right:0;top:calc(100% + 6px);z-index:41;min-width:220px;display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:14px;background:#1d1613;border:1px solid var(--line2);box-shadow:var(--shadow);animation:noticeIn .15s ease}
+.menu-topo .ghost{width:100%;text-align:left;min-height:44px;font-size:13px}
+@media(max-width:560px){.workspace-header{display:flex;align-items:center;justify-content:space-between}.header-actions{margin-top:0}}
+/* FILTROS DENTRO DOS CARDS (12/10/2026) */
+.filtro-faixa{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:0 0 10px;padding:0 0 10px;border-bottom:1px dashed var(--line)}
+.filtro-faixa button{background:var(--surface2);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:5px 11px;font-size:11px;min-height:30px;cursor:pointer}
+.filtro-faixa button.active{background:var(--orange);border-color:var(--orange);color:#1a1210;font-weight:700}
+.filtro-faixa .filtro-selo-select{font-size:11px;padding:5px 10px;min-height:30px;flex:1 1 120px;min-width:0}
+.filtro-faixa.ativa{border-bottom-color:#d4a64e80}
 /* PAGUEI NO PAINEL (12/10/2026): botão por conta dentro do card Dinheiro, dois toques pra confirmar */
 .contas-card .conta-linha-paguei{position:relative}
 .contas-card .paguei-btn{flex:1 0 100%;margin-top:6px;min-height:42px;border-radius:12px;border:1px solid #6fcf9780;background:#6fcf9722;color:var(--green,#6fcf97);font-weight:800;font-size:14px;letter-spacing:.02em;cursor:pointer;transition:background .15s,transform .1s}
 .contas-card .paguei-btn:active{transform:scale(.98)}
 .contas-card .paguei-btn.armado{background:var(--green,#6fcf97);color:#0f1a12;border-color:transparent;animation:pagueiPisca .9s ease-in-out infinite}
-.contas-card .paguei-btn:disabled{opacity:.6;cursor:default;animation:none}
 @keyframes pagueiPisca{0%,100%{box-shadow:0 0 0 0 #6fcf9766}50%{box-shadow:0 0 0 6px #6fcf9700}}
 /* Contas vencida: brilho pulsando mais forte */
 .contas-card::after{animation:contaPulsa 1.8s ease-in-out infinite}
@@ -3617,6 +3630,7 @@ function Home() {
   const [fornecedores, setFornecedores] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [avisos, setAvisos] = useState([]);
+  const [menuTopo, setMenuTopo] = useState(false);
   // DÍVIDAS (recado de 13/09/2026, caso Raquel R$ 1.489,89). Obrigação viva sem vencimento — não é linha de
   // financeiro. Até aqui o app nunca lia a tabela: a dívida existia certa no banco e invisível na tela.
   const [dividas, setDividas] = useState([]);
@@ -4465,7 +4479,22 @@ function Home() {
     </aside>
     <main className="workspace">
       <div className={`barra-compacta${rolou ? " visivel" : ""}`} aria-hidden="true">{nav.find((item) => item.id === tab)?.label}</div>
-      <header ref={cabecalhoRef} className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><BotaoNotificacao db={db} demo={demo} notify={notify} /><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
+      <header ref={cabecalhoRef} className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions">
+        {/* TOPO ENXUTO (Diego, 12/10/2026, foto: "diminuir ou remover"). Os seis botões viraram um menu "⋯";
+            nenhum sumiu, só saíram da frente dos cards. */}
+        <button type="button" className={`ghost menu-topo-botao${menuTopo ? " aberto" : ""}`} aria-label="Mais opções" aria-expanded={menuTopo} onClick={() => { vibrar(6); setMenuTopo((v) => !v); }}>{loading ? "⟳" : "⋯"}</button>
+        {menuTopo && <>
+          <div className="menu-topo-fundo" onClick={() => setMenuTopo(false)} />
+          <div className="menu-topo" onClick={() => setMenuTopo(false)}>
+            <BotaoNotificacao db={db} demo={demo} notify={notify} />
+            <button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button>
+            <button className="ghost" onClick={copyContext}>Copiar contexto</button>
+            {!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}
+            <button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "↻ Atualizar"}</button>
+            {demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}
+          </div>
+        </>}
+      </div></header>
 
       {/* A TELA DA CAIXA DE ENTRADA FOI REMOVIDA EM 23/08/2026, a pedido do Diego.
           Ela era a porta de digitação do app — colar mensagem, triar, virar cliente/agenda/
@@ -7486,14 +7515,25 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   const vencidoAPagar = aPagarAbertas.filter((f) => (f.data || "") < today).reduce((soma, f) => soma + Number(f.valor || 0), 0);
   const proximos30APagar = aPagarAbertas.filter((f) => (f.data || "") >= today && (f.data || "") <= em30).reduce((soma, f) => soma + Number(f.valor || 0), 0);
   const resumoDinheiro = vencidoAPagar > 0 ? `${money(vencidoAPagar)} vencido` : proximos30APagar > 0 ? `${money(proximos30APagar)} em 30 dias` : null;
+  const filtroAtivo = filtroTipo !== "todos" || !!filtroSelo;
+  const rotuloFiltro = [filtroTipo !== "todos" ? (filtroTipo === "remoto" ? "Só remoto" : "Só presencial") : null, filtroSelo ? `só “${filtroSelo}”` : null].filter(Boolean).join(" · ");
+  const totalAgenda = atrasadosAll.length + pessoaisAtrasadosAll.length + hojeAll.length + futurosAll.length;
+  const escondidosPorFiltro = filtroAtivo ? Math.max(0, totalAgenda - (atrasados.length + hoje.length + futuros.length)) : 0;
+  const seloFiltro = filtroAtivo ? <em className="filtro-chip">⚲ {rotuloFiltro}</em> : null;
+  const faixaFiltro = totalAgenda > 0 ? <div className={`filtro-faixa${filtroAtivo ? " ativa" : ""}`}>
+    {PAINEL_TIPO_FILTROS.map((f) => <button type="button" key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => { vibrar(4); setFiltroTipo(f.id); }}>{f.label}</button>)}
+    {todosDoTipo.length > 0 && <select className={`filtro-selo-select${filtroSelo ? " ativo" : ""}`} value={filtroSelo || ""} onChange={(e) => setFiltroSelo(e.target.value || null)} aria-label="Filtrar por etiqueta">
+      <option value="">Etiqueta: todas ▾</option>
+      {Object.entries(contagemSelos).sort((x, y) => y[1] - x[1]).map(([r, n]) => <option key={r} value={r}>{r} ({n})</option>)}
+    </select>}
+  </div> : null;
   return <div className="page-grid painel-rolagem">
-    {(atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}
-      {/* ETIQUETA NUM CONTROLE SÓ (Diego, 11/10/2026: a linha de 14 botões empurrava os cards pra baixo). */}
-      {todosDoTipo.length > 0 && <select className={`filtro-selo-select${filtroSelo ? " ativo" : ""}`} value={filtroSelo || ""} onChange={(e) => setFiltroSelo(e.target.value || null)} aria-label="Filtrar por etiqueta">
-        <option value="">Etiqueta: todas ▾</option>
-        {Object.entries(contagemSelos).sort((x, y) => y[1] - x[1]).map(([r, n]) => <option key={r} value={r}>{r} ({n})</option>)}
-      </select>}</div>}
-    {filtroSelo && escondidosPorSelo > 0 && <p className="filtro-aviso">Só “{filtroSelo}” · {escondidosPorSelo} escondido(s) · <button type="button" onClick={() => setFiltroSelo(null)}>Mostrar todos</button></p>}
+    {/* FILTROS DENTRO DOS CARDS (Diego, 12/10/2026, foto do topo: "presencial, remoto e coisa do tipo poderia ir
+        para dentro dos cards"). A linha Todos/Presencial/Remoto + Etiqueta saiu do topo e virou uma faixa
+        pequena dentro de Atrasados, Hoje e Próximos (os três compartilham o mesmo filtro). Quando algum filtro
+        está ligado, o cabeçalho de cada card mostra um selinho laranja — compromisso "sumido" é o primeiro
+        sintoma de filtro esquecido, então o aviso fica na cara, mesmo com o card fechado. */}
+    {filtroAtivo && <p className="filtro-aviso">{rotuloFiltro}{escondidosPorFiltro > 0 ? ` · ${escondidosPorFiltro} escondido(s)` : ""} · <button type="button" onClick={() => { setFiltroTipo("todos"); setFiltroSelo(null); }}>Mostrar todos</button></p>}
     {/* TOPO DO PAINEL (Diego, 11/10/2026: "compromisso atrasado, Hoje e próximos compromissos são os mais
         importantes"): os três ficam no alto, como cards grandes, fora do grupo Pendências. */}
     <ResumoManhaCard avisos={avisos} today={today} db={db} demo={demo} notify={notify} onOpenFicha={onOpenFicha} onChanged={onServicoChanged} />
@@ -7501,7 +7541,8 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
         ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasDeAtraso(atrasadoMaisAntigo.data, today)} dia(s)`
-        : "De 1 a 14 dias de atraso"}</span></>}>
+        : "De 1 a 14 dias de atraso"}</span>{seloFiltro}</>}>
+      {faixaFiltro}
       {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
@@ -7510,8 +7551,9 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     <CardRecolhivel className="content-card hoje-card"
       cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
       <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${rotinasPendentesHoje} rotina(s)` : ""}</h3>
-      {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora</span>}</>}
+      {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora</span>}{seloFiltro}</>}
       resumo={<AvisoRota compromissos={hojeAll} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />}>
+      {faixaFiltro}
       {hoje.length > 0
         ? [...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)
         : <div className="empty-state"><b>O dia está livre.</b><span>Nada marcado para {compactDate(today)}.</span></div>}
@@ -7524,7 +7566,8 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {/* Só data POSTERIOR a hoje. O "N ainda hoje" saiu daqui: hoje tem card próprio, e repetir o mesmo
         compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
     {futuros.length > 0 && <CardRecolhivel className="content-card topo-card tom-laranja" selo={futuros.length} tom="laranja" icone="📅"
-      cabecalho={<><p className="kicker">PRÓXIMOS COMPROMISSOS</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
+      cabecalho={<><p className="kicker">PRÓXIMOS COMPROMISSOS</p><h3>{futuros.length} próximo(s) compromisso(s)</h3>{seloFiltro}</>}>
+      {faixaFiltro}
       {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
     {/* ENVIADO AO CLAUDE vem DEPOIS de Atrasados, Hoje e Próximos (Diego, 12/10: "os compromissos de hoje,
         atrasados precisam ser os primeiros, não o recado que vai pro Claude"). Fica recolhido, só com o selo. */}
