@@ -3961,7 +3961,7 @@ function Home() {
         // `por` agente/auditoria/claude nos últimos 7 dias. Tabela que já existia; nada de schema novo.
         // `historico_por_check` só aceita 'diego' e 'claude', então as rotinas gravam por='claude' e dizem quem
         // são no começo do `o_que`: "Agente: …" ou "Auditoria: …". O filtro de prefixo fica no JS (AgenteCard).
-        db.from("historico").select("id,o_que,por,detalhe,quando").eq("por", "claude").ilike("o_que","Agente:%").gte("quando", new Date(Date.now() - 7 * 86400000).toISOString()).order("quando", { ascending: false }).limit(80),
+        db.from("historico").select("id,o_que,por,detalhe,quando").eq("por", "claude").or("o_que.ilike.Agente:%,o_que.ilike.Manu:%").gte("quando", new Date(Date.now() - 7 * 86400000).toISOString()).order("quando", { ascending: false }).limit(80),
         // DÚVIDAS DO AGENTE (Diego, 12/10/2026): as abertas (ele responde no Painel), as respondidas que o
         // agente ainda não aplicou, e as que viraram regra (vale_sempre). Camada de apoio como `av`/`hs`.
         db.from("duvidas_agente").select("*").or("status.in.(aberta,respondida),vale_sempre.eq.true").order("criado_em", { ascending: false }).limit(80),
@@ -7551,11 +7551,11 @@ function GrupoRecolhivel({ titulo, resumo = null, contagem = null, semContador =
 // 7 dias. Só linhas "Agente:" entram no card (12/10: "Auditoria nem precisa"). Fechado mostra a última rodada e quantas ações hoje;
 // aberto, a lista por dia. "Agente: Rodou — nada novo" é a batida de presença de cada hora: entra na conta
 // da última vez e fica de fora da lista.
-const AGENTE_PREFIXO = /^(agente|auditoria)\s*:\s*/i;
+const AGENTE_PREFIXO = /^(agente|manu|auditoria)\s*:\s*/i;
 const AGENTE_BATIDA = /^rodou\b/i;
 function separarFonteAgente(h) {
   const m = AGENTE_PREFIXO.exec(String(h.o_que || "")); if (!m) return null;
-  return { ...h, fonte: m[1].toLowerCase(), texto: String(h.o_que).slice(m[0].length).trim() };
+  return { ...h, fonte: m[1].toLowerCase() === "manu" ? "agente" : m[1].toLowerCase(), texto: String(h.o_que).slice(m[0].length).trim() };
 }
 // O DETALHE DIZ O QUE MUDOU (Diego, 12/10/2026: "não dá para saber as mudanças que ele fez"). As rotinas gravam no
 // `detalhe` referências ("cliente <id>", "servico <id>", "agenda <id>", "financeiro <id>") e, quando alteraram algo,
