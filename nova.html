@@ -729,7 +729,7 @@ button.sutil{opacity:.55;font-size:12px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 
 /* CARDS DA AGENDA COM AÇÕES (11/10/2026): Feito / Remarcar / Cancelar / recado com áudio. */
-.card-acoes{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}.card-acoes textarea{width:100%;min-height:64px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:14px;line-height:1.45}.card-acoes textarea:focus{border-color:#d37742}.card-acoes-botoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.card-acoes-botoes button{min-height:44px;font-size:12px}.card-acoes-botoes .perigo{color:#f08a7a;border-color:#7a3a30}.gravador{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.gravador button{min-height:40px;font-size:12px}.gravador audio{height:36px;max-width:100%;flex:1 1 180px}.gravador small,.card-acoes small{font-size:11px;color:var(--dim)}.gravador .gravando{animation:pulsoGravando 1.2s ease-in-out infinite}@keyframes pulsoGravando{50%{opacity:.55}}.compromisso-card.card-escuro{filter:brightness(.55) saturate(.5)}.compromisso-card.card-escuro .selo-recado{filter:brightness(1.6)}.selo-claude{margin:8px 12px 0;padding:10px 12px;border-radius:12px;background:#d4a64e17;border:1px solid #d4a64e66;font-size:13px;line-height:1.45}.selo-claude b{display:block;color:#e8c06d;margin-bottom:3px}.selo-claude .selo-botoes{display:flex;gap:6px;margin-top:8px}.selo-claude .selo-botoes button{min-height:40px;font-size:12px;flex:1}.selo-recado{margin:8px 12px 0;padding:8px 12px;border-radius:12px;background:#6097c014;border:1px solid #6097c055;color:#a9c8e2;font-size:12px;line-height:1.45}.recados-do-card{display:flex;flex-direction:column;gap:6px}.recados-do-card div{font-size:12px;line-height:1.45;padding:8px 10px;border-radius:10px;background:var(--surface2);border:1px solid var(--line)}.recados-do-card em{display:block;font-style:normal;color:var(--dim);font-size:11px}.recados-do-card button{margin-top:4px;min-height:36px;font-size:11px}
+.card-acoes{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}.card-acoes textarea{width:100%;min-height:64px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:14px;line-height:1.45}.card-acoes textarea:focus{border-color:#d37742}.card-acoes-botoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.card-acoes-botoes button{min-height:44px;font-size:12px}.card-acoes-botoes .perigo{color:#f08a7a;border-color:#7a3a30}.gravador{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.gravador button{min-height:40px;font-size:12px}.gravador audio{height:36px;max-width:100%;flex:1 1 180px}.gravador small,.card-acoes small{font-size:11px;color:var(--dim)}.gravador .gravando{animation:pulsoGravando 1.2s ease-in-out infinite}@keyframes pulsoGravando{50%{opacity:.55}}.desfazer-faixa{display:flex;flex-direction:column;gap:6px;padding:12px 14px;margin-bottom:12px;border-radius:14px;background:#6097c012;border:1px solid #6097c055}.desfazer-linha{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;line-height:1.4}.desfazer-linha span{min-width:0;overflow-wrap:anywhere}.desfazer-linha small{display:block;font-size:11px;color:var(--dim)}.desfazer-linha button{min-height:40px;font-size:12px;flex:none}.selo-claude{margin:8px 12px 0;padding:10px 12px;border-radius:12px;background:#d4a64e17;border:1px solid #d4a64e66;font-size:13px;line-height:1.45}.selo-claude b{display:block;color:#e8c06d;margin-bottom:3px}.selo-claude .selo-botoes{display:flex;gap:6px;margin-top:8px}.selo-claude .selo-botoes button{min-height:40px;font-size:12px;flex:1}.selo-recado{margin:8px 12px 0;padding:8px 12px;border-radius:12px;background:#6097c014;border:1px solid #6097c055;color:#a9c8e2;font-size:12px;line-height:1.45}.recados-do-card{display:flex;flex-direction:column;gap:6px}.recados-do-card div{font-size:12px;line-height:1.45;padding:8px 10px;border-radius:10px;background:var(--surface2);border:1px solid var(--line)}.recados-do-card em{display:block;font-style:normal;color:var(--dim);font-size:11px}.recados-do-card button{margin-top:4px;min-height:36px;font-size:11px}
 </style>
 </head>
 <body>
@@ -3841,7 +3841,13 @@ function Home() {
   // bruto `appointments` diretamente. Correção de 25/07/2026: antes só o Painel escondia o card de um
   // compromisso com pendência de remarcação aberta; Agenda, rota, Compras e o seletor de horário do
   // "+ Adicionar" continuavam mostrando/permitindo agendar em cima de um compromisso fantasma.
-  const agendaVisivel = useMemo(() => compromissosOperacionais(appointments, inbox), [appointments, inbox]);
+  const acoesAgenda = useRecadosAgenda({ db, demo, session, notify, onChanged: loadAll, setAppointments });
+  // REMARCAR SOME DA TELA (Diego, 11/10: "no remarcar também pode sumir... só não pode sumir das suas vistas").
+  // O card continua planejado no banco e o recado aberto em agenda_recados: a rotina do Claude acha os dois e
+  // move. Até lá ele sai de toda tela, como a pendência da Regra Nº 12 — por isso o filtro é aqui, na coleção
+  // central, e não no card: contador, rota e seletores de horário também deixam de contar com ele.
+  const remarcarAbertos = useMemo(() => new Set(acoesAgenda.recados.filter((r) => !r.processado_em && r.acao === "remarcar").map((r) => r.agenda_id)), [acoesAgenda.recados]);
+  const agendaVisivel = useMemo(() => compromissosOperacionais(appointments, inbox).filter((a) => !remarcarAbertos.has(a.id)), [appointments, inbox, remarcarAbertos]);
   const claudeQueue = useMemo(() => inbox.filter((item) => ["respondido", "novo"].includes(statusDaCaixa(item))).sort((a, b) => {
     const priority = (value) => value === "respondido" ? 0 : 1;
     return priority(a.status) - priority(b.status) || new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
@@ -4306,7 +4312,6 @@ function Home() {
     if (patch.agendaId && patch.removerAgenda !== false) setAppointments((prev) => prev.filter((a) => a.id !== patch.agendaId));
   }, []);
 
-  const acoesAgenda = useRecadosAgenda({ db, demo, session, notify, onChanged: loadAll, setAppointments });
 
   if (booting) return <div className="loading-screen"><div className="brand-seal">TB</div><p>Preparando a central…</p></div>;
   if (!session && !demo) return <div className="login-screen"><div className="login-card"><div className="brand-seal">TB</div><p className="kicker">NOVA CENTRAL OPERACIONAL</p><h1>Tapeçaria Bahia</h1><p>Um ambiente separado para Diego e Claude trabalharem na mesma fila, sem apagar, duplicar ou perder o próximo passo.</p>{compartilhamentoGuardado && <div className="success-box" style={{ marginBottom: 14, textAlign: "left" }}><b>Chegou um compartilhamento.</b><br />Está <b>guardado no aparelho</b> e ainda NÃO foi salvo na Caixa. Entre na sua conta que ele sobe sozinho.</div>}{loginSent ? <div className="success-box">Link enviado. Abra seu e-mail neste aparelho.</div> : <><label>E-mail de acesso<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="seu@email.com" onKeyDown={(event) => event.key === "Enter" && sendMagicLink()} /></label><button className="primary" onClick={sendMagicLink} disabled={busy || !email.trim()}>Enviar link de acesso</button></>}<button className="ghost demo-button" onClick={() => setDemo(true)}>Ver demonstração do novo site</button></div></div>;
@@ -5260,7 +5265,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     if (demo || !db || !session) return;
     // Abertos + o que a rotina respondeu nos últimos 3 dias (pra ele ver o que o Claude fez).
     const desde = new Date(Date.now() - 3 * 864e5).toISOString();
-    const { data, error } = await db.from("agenda_recados").select("*").or(`processado_em.is.null,processado_em.gte.${desde}`).order("criado_em", { ascending: true });
+    const { data, error } = await db.from("agenda_recados").select("*, agenda(titulo,data,hora,status)").or(`processado_em.is.null,processado_em.gte.${desde}`).order("criado_em", { ascending: true });
     if (!error) setRecados(data || []);
   }, [db, demo, session]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -5268,7 +5273,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
   const enviar = useCallback(async (a, { acao, texto, audio }) => {
     const limpo = (texto || "").trim() || null;
     if (demo) {
-      setRecados((prev) => [...prev, { id: "demo-" + Date.now(), agenda_id: a.id, acao, texto: limpo, audio_path: audio ? "demo" : null, criado_em: new Date().toISOString(), processado_em: null }]);
+      setRecados((prev) => [...prev, { id: "demo-" + Date.now(), agenda_id: a.id, agenda: { titulo: a.titulo, data: a.data, hora: a.hora }, acao, texto: limpo, audio_path: audio ? "demo" : null, criado_em: new Date().toISOString(), processado_em: null }]);
       if (acao === "feito" || acao === "cancelar") setAppointments((prev) => prev.filter((x) => x.id !== a.id));
       notify("Anotado (demo).", "ok");
       return true;
@@ -5280,13 +5285,17 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
       const { error: upErr } = await db.storage.from("fotos-servicos").upload(audioPath, audio.blob, { contentType: audio.tipo || "audio/webm" });
       if (upErr) throw new Error("O áudio não subiu: " + upErr.message);
     }
+    // Feito antecipado muda a data pra hoje; a data e a hora de antes ficam marcadas no texto, que é por onde o
+    // Desfazer devolve o card ao lugar certo (e a rotina também enxerga que foi resolvido antes da hora).
+    const antecipado = acao === "feito" && a.data > hojeISO();
+    const textoGravado = antecipado ? [limpo, `[marcado para ${a.data}${a.hora ? " " + a.hora.slice(0, 5) : ""}]`].filter(Boolean).join(" ") : limpo;
     // O recado nasce ANTES da mudança na agenda: se a mudança falhar, ele é apagado; se o recado falhasse
     // depois da mudança, o card sumiria sem a rotina saber que precisa arrumar o resto.
-    const { data: rec, error: recErr } = await db.from("agenda_recados").insert({ agenda_id: a.id, acao, texto: limpo, audio_path: audioPath }).select("*").single();
+    const { data: rec, error: recErr } = await db.from("agenda_recados").insert({ agenda_id: a.id, acao, texto: textoGravado, audio_path: audioPath }).select("*, agenda(titulo,data,hora,status)").single();
     if (recErr) throw recErr;
     // Feito ANTES do dia (Diego, 11/10: "o concluir não aceita apertar"): resolveu antes da hora, então a data
     // vira hoje — é o que o próprio banco manda fazer, e o mesmo que o Concluir antigo fazia.
-    const patch = acao === "feito" ? (a.data > hojeISO() ? { status: "feito", data: hojeISO() } : { status: "feito" }) : acao === "cancelar" ? { status: "cancelado" } : null;
+    const patch = acao === "feito" ? (antecipado ? { status: "feito", data: hojeISO() } : { status: "feito" }) : acao === "cancelar" ? { status: "cancelado" } : null;
     const conferir = a.nota_claude && a.nota_claude_conferida === false ? { nota_claude_conferida: true } : null;
     if (patch || conferir) {
       const { error: agErr } = await db.from("agenda").update({ ...(patch || {}), ...(conferir || {}) }).eq("id", a.id).eq("status", "planejado");
@@ -5298,7 +5307,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     if (patch) setAppointments((prev) => prev.filter((x) => x.id !== a.id));
     notify(acao === "feito" ? "Feito. Saiu da agenda."
       : acao === "cancelar" ? "Cancelado. Saiu da agenda."
-      : acao === "remarcar" ? `Anotado. O Claude escolhe a nova data na próxima rodada (${HORARIOS_ROTINA_RECADOS}).`
+      : acao === "remarcar" ? `Anotado. O card sai da tela e volta na data nova que o Claude escolher (${HORARIOS_ROTINA_RECADOS}).`
       : `Recado guardado. O Claude lê na próxima rodada (${HORARIOS_ROTINA_RECADOS}).`, "ok");
     if (onChanged) onChanged();
     return true;
@@ -5312,6 +5321,29 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     notify("Mantido.", "ok");
   }, [db, demo, notify, setAppointments]);
 
+  const desfazer = useCallback(async (r) => {
+    if (demo) { setRecados((prev) => prev.filter((x) => x.id !== r.id)); notify("Desfeito (demo).", "ok"); return; }
+    try {
+      // Confere no banco: se a rotina já processou, desfazer aqui deixaria o Claude e a agenda discordando.
+      const { data: atual, error: lerErr } = await db.from("agenda_recados").select("id,processado_em").eq("id", r.id).maybeSingle();
+      if (lerErr) throw lerErr;
+      if (!atual) { setRecados((prev) => prev.filter((x) => x.id !== r.id)); return; }
+      if (atual.processado_em) { notify("O Claude já processou esse. Mande um recado no card dizendo que foi engano.", "error"); if (onChanged) onChanged(); return; }
+      if (r.acao === "feito" || r.acao === "cancelar") {
+        const m = /\[marcado para (\d{4}-\d{2}-\d{2})(?: (\d{2}:\d{2}))?\]/.exec(r.texto || "");
+        const volta = { status: "planejado", ...(m ? { data: m[1], ...(m[2] ? { hora: m[2] } : {}) } : {}) };
+        const { error: agErr } = await db.from("agenda").update(volta).eq("id", r.agenda_id).eq("status", r.acao === "feito" ? "feito" : "cancelado");
+        if (agErr) throw agErr;
+      }
+      const { error: delErr } = await db.from("agenda_recados").delete().eq("id", r.id).is("processado_em", null);
+      if (delErr) throw delErr;
+      try { await db.from("historico").insert({ o_que: `Desfeito: ${ACAO_RECADO_ROTULO[r.acao]} — ${r.agenda?.titulo || ""}`, por: "diego", detalhe: "Toque errado, desfeito no app." }); } catch (e) { /* segue */ }
+      setRecados((prev) => prev.filter((x) => x.id !== r.id));
+      notify("Desfeito. O card voltou pra agenda.", "ok");
+      if (onChanged) onChanged();
+    } catch (e) { notify("Não desfez: " + (e.message || e), "error"); }
+  }, [db, demo, notify, onChanged]);
+
   const ouvir = useCallback(async (path) => {
     if (demo || !path) return null;
     const { data, error } = await db.storage.from("fotos-servicos").createSignedUrl(path, 60 * 60);
@@ -5319,7 +5351,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     return data?.signedUrl || null;
   }, [db, demo, notify]);
 
-  return useMemo(() => ({ recados, enviar, manter, ouvir, notify }), [recados, enviar, manter, ouvir, notify]);
+  return useMemo(() => ({ recados, enviar, manter, ouvir, desfazer, notify }), [recados, enviar, manter, ouvir, desfazer, notify]);
 }
 
 // Selo SEMPRE visível (fora do corpo recolhido): remarcação do Claude esperando conferência e recados que a
@@ -5419,6 +5451,26 @@ function GravadorAudio({ audio, onAudio, onTexto, disabled }) {
     {modo === "ditado" && <small>{parcial ? "… " + parcial : "Pode falar: o texto vai entrando na caixinha."}</small>}
     {modo === "gravando" && <small>Gravando o áudio…</small>}
     {aviso && <small>{aviso}</small>}
+  </div>;
+}
+
+// DESFAZER (Diego, 11/10: "tem que ter uma opção se caso eu apertar um botão errado"). Todo toque some da tela,
+// então o caminho de volta não pode depender do card: esta faixa lista o que ele mandou e o Claude ainda não
+// processou, cada um com Desfazer. Depois que a rotina processa, desfazer vira recado ("era engano").
+function DesfazerRecados() {
+  const acoes = React.useContext(AcoesAgendaCtx);
+  const [busyId, setBusyId] = useState(null);
+  if (!acoes) return null;
+  const abertos = acoes.recados.filter((r) => !r.processado_em).sort((x, y) => (y.criado_em || "").localeCompare(x.criado_em || ""));
+  if (!abertos.length) return null;
+  const icone = { feito: "✅", cancelar: "✖", remarcar: "🔁", recado: "💬" };
+  return <div className="desfazer-faixa">
+    <p className="kicker" style={{ margin: 0 }}>ENVIADO AO CLAUDE · {abertos.length}</p>
+    {abertos.slice(0, 6).map((r) => <div key={r.id} className="desfazer-linha">
+      <span>{icone[r.acao] || "•"} <b>{ACAO_RECADO_ROTULO[r.acao] || r.acao}</b> · {r.agenda?.titulo || "compromisso"}<small>{new Date(r.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small></span>
+      <button type="button" className="ghost" disabled={busyId === r.id} onClick={async () => { setBusyId(r.id); try { await acoes.desfazer(r); } finally { setBusyId(null); } }}>{busyId === r.id ? "…" : "↶ Desfazer"}</button>
+    </div>)}
+    {abertos.length > 6 && <small>+{abertos.length - 6} mais</small>}
   </div>;
 }
 
@@ -5625,10 +5677,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   if (Number(svc?.valor_orcamento)) instrucoes.push(["VALOR DO SERVIÇO",
     money(svc.valor_orcamento) + (svc?.prazo ? " · prazo " + compactDate(svc.prazo) : "")]);
   if (cli?.obs) instrucoes.push(["OBSERVAÇÃO DA FICHA", cli.obs]);
-  // CARD ESCURO (Diego, 11/10): pediu Remarcar e o Claude ainda não moveu — o card fica apagado até a rotina
-  // passar, pra ele bater o olho e saber que aquilo já está nas mãos do Claude.
-  const esperandoClaude = !!acoes && acoes.recados.some((r) => r.agenda_id === a.id && !r.processado_em && r.acao === "remarcar");
-  return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehFollowUpZapia(a) ? " followup-zapia" : ""}${esperandoClaude ? " card-escuro" : ""}`}>
+  return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehFollowUpZapia(a) ? " followup-zapia" : ""}`}>
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
@@ -7202,6 +7251,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   const rotinasPendentesHoje = (rotinas || []).filter((r) => statusRotina(r, today).estado !== "futura").length;
   const atrasadoMaisAntigo = atrasados.length ? [...atrasados].sort((x, y) => String(x.data).localeCompare(String(y.data)))[0] : null;
   return <div className="page-grid painel-rolagem">
+    <DesfazerRecados />
     {(atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}
       {/* ETIQUETA NUM CONTROLE SÓ (Diego, 11/10/2026: a linha de 14 botões empurrava os cards pra baixo). */}
       {todosDoTipo.length > 0 && <select className={`filtro-selo-select${filtroSelo ? " ativo" : ""}`} value={filtroSelo || ""} onChange={(e) => setFiltroSelo(e.target.value || null)} aria-label="Filtrar por etiqueta">
@@ -7501,6 +7551,7 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
   const groups = daRota.reduce((acc, item) => { (acc[item.data] ||= []).push(item); return acc; }, {});
   const dias = Object.keys(groups).sort();
   return <section className="content-card full">
+    <DesfazerRecados />
     <div className="card-head"><div><p className="kicker">ROTINA E DESLOCAMENTO</p><h3>Agenda planejada</h3></div><button className="primary" onClick={onAdd}>+ Adicionar</button></div>
     {!dias.length && !semHora.length && <div className="empty-state"><b>Sem compromissos planejados.</b><span>Toque em “+ Adicionar” para criar.</span></div>}
     <div className="agenda-dias">{dias.map((date) => {
