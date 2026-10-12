@@ -811,6 +811,7 @@ button.sutil{opacity:.55;font-size:12px}
 .agente-item strong{display:block;font-size:14px;font-weight:600;color:var(--text);overflow-wrap:anywhere}
 .agente-item span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
 .agente-item.por-auditoria time{color:var(--orange2)}
+.agente-fonte{display:inline-block;font-style:normal;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--orange2);margin-right:6px}
 .agente-vazio{margin:0;padding:6px 0 2px}
 /* Contas vencida: brilho pulsando mais forte */
 .contas-card::after{animation:contaPulsa 1.8s ease-in-out infinite}
@@ -1357,14 +1358,14 @@ const demoPessoais = [
 // O QUE O AGENTE FEZ — demo. Linhas de `historico` como as rotinas gravam: `o_que` curto, `por` agente ou
 // auditoria, `detalhe` opcional. "Rodou — nada novo" é a batida de presença: conta pra "última vez", não aparece na lista.
 const demoAtividadeAgente = (() => {
-  const h = (horasAtras, o_que, por, detalhe = null) => ({ id: "h" + horasAtras + por, o_que, por, detalhe, quando: new Date(Date.now() - horasAtras * 3600000).toISOString() });
+  const h = (horasAtras, o_que, fonte, detalhe = null) => ({ id: "h" + horasAtras + fonte, o_que: (fonte === "auditoria" ? "Auditoria: " : "Agente: ") + o_que, por: "claude", detalhe, quando: new Date(Date.now() - horasAtras * 3600000).toISOString() });
   return [
     h(1, "Rodou — nada novo", "agente"),
     h(2, "Lead novo: Bruna Bueno — poltrona", "agente", "Da coleta do WhatsApp. Ficou em Leads aguardando a auditoria."),
     h(2, "Card criado: Follow-up — Bruna Bueno — poltrona R$ 600", "agente", "Amanhã 10h, remoto."),
     h(5, "Conta lançada: Energia — Equatorial R$ 191,23", "agente", "Vence em 2 dias. Entrou em A pagar."),
     h(9, "Rodou — nada novo", "agente"),
-    h(23, "Auditoria: 2 cards conferidos, 1 lead marcado perdido (Wanderson)", "auditoria", "Sem resposta há 9 dias."),
+    h(23, "2 cards conferidos, 1 lead marcado perdido (Wanderson)", "auditoria", "Sem resposta há 9 dias."),
     h(23, "Resumo da manhã gravado", "auditoria"),
     h(31, "Follow-up 1 enviado pela Zapia: Hugo", "agente", "Sem resposta ainda."),
     h(50, "Card marcado CONFERIR — Pegar medida com Marlom Júnior — Suzany", "agente", "Diego já fez; a auditoria pergunta."),
@@ -3781,7 +3782,9 @@ function Home() {
         db.from("profissionais").select("id,nome,ativo").order("nome", { ascending: true }),
         // O QUE O AGENTE FEZ: camada de apoio como `av`. Só o que as rotinas gravaram em `historico` com
         // `por` agente/auditoria/claude nos últimos 7 dias. Tabela que já existia; nada de schema novo.
-        db.from("historico").select("id,o_que,por,detalhe,quando").in("por", ["agente", "auditoria", "claude"]).gte("quando", new Date(Date.now() - 7 * 86400000).toISOString()).order("quando", { ascending: false }).limit(80),
+        // `historico_por_check` só aceita 'diego' e 'claude', então as rotinas gravam por='claude' e dizem quem
+        // são no começo do `o_que`: "Agente: …" ou "Auditoria: …". O filtro de prefixo fica no JS (AgenteCard).
+        db.from("historico").select("id,o_que,por,detalhe,quando").eq("por", "claude").or("o_que.ilike.Agente:%,o_que.ilike.Auditoria:%").gte("quando", new Date(Date.now() - 7 * 86400000).toISOString()).order("quando", { ascending: false }).limit(80),
       ]);
       // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
       // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
@@ -7168,19 +7171,26 @@ function GrupoRecolhivel({ titulo, resumo = null, contagem = null, semContador =
   </section>;
 }
 // ===== O QUE O AGENTE FEZ (Diego, 12/10/2026: "acompanhamento do que o Agente está fazendo") =====
-// Fonte: `historico` com `por` agente/auditoria/claude (últimos 7 dias). O card fica recolhido como os outros;
-// fechado mostra quando foi a última vez e quantas ações hoje; aberto, a lista por dia. "Rodou — nada novo"
-// é a batida de presença de cada hora: entra na conta da última vez e fica de fora da lista.
+// Fonte: `historico`, por='claude', `o_que` começando com "Agente: " (rotina de hora em hora) ou "Auditoria: "
+// (02h20) — o check `historico_por_check` só deixa 'diego' e 'claude', então quem fez vai no prefixo. Últimos
+// 7 dias. O card fica recolhido como os outros; fechado mostra quando foi a última vez e quantas ações hoje;
+// aberto, a lista por dia. "Agente: Rodou — nada novo" é a batida de presença de cada hora: entra na conta
+// da última vez e fica de fora da lista.
+const AGENTE_PREFIXO = /^(agente|auditoria)\s*:\s*/i;
 const AGENTE_BATIDA = /^rodou\b/i;
+function separarFonteAgente(h) {
+  const m = AGENTE_PREFIXO.exec(String(h.o_que || "")); if (!m) return null;
+  return { ...h, fonte: m[1].toLowerCase(), texto: String(h.o_que).slice(m[0].length).trim() };
+}
 function AgenteCard({ itens, today }) {
-  const linhas = (itens || []).filter((h) => h && h.quando).sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+  const linhas = (itens || []).filter((h) => h && h.quando).map(separarFonteAgente).filter(Boolean).sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
   if (!linhas.length) return <GrupoRecolhivel titulo="Agente" className="grupo-agente" semContador resumo="ainda não registrou nada aqui">
     <p className="ficha-note agente-vazio">Quando o Agente de hora em hora ou a auditoria gravarem uma ação, ela aparece aqui.</p>
   </GrupoRecolhivel>;
   const ultima = new Date(linhas[0].quando);
   const minutos = Math.max(0, Math.round((Date.now() - ultima.getTime()) / 60000));
   const haQuanto = minutos < 2 ? "agora" : minutos < 60 ? `há ${minutos} min` : minutos < 36 * 60 ? `há ${Math.round(minutos / 60)} h` : `${compactDate(ultima.toISOString().slice(0, 10))}`;
-  const acoes = linhas.filter((h) => !AGENTE_BATIDA.test(h.o_que || ""));
+  const acoes = linhas.filter((h) => !AGENTE_BATIDA.test(h.texto));
   const diaDe = (h) => { const d = new Date(h.quando); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const hojeN = acoes.filter((h) => diaDe(h) === today).length;
   const resumo = `última vez ${haQuanto}${hojeN ? ` · ${hojeN} ${hojeN === 1 ? "ação hoje" : "ações hoje"}` : ""}`;
@@ -7191,9 +7201,9 @@ function AgenteCard({ itens, today }) {
   return <GrupoRecolhivel titulo="Agente" className="grupo-agente" semContador resumo={resumo}>
     {grupos.slice(0, 7).map((g) => <div className="agente-dia" key={g.dia}>
       <p className="agente-dia-titulo">{rotuloDia(g.dia)}</p>
-      {g.itens.map((h) => <div className={`agente-item por-${h.por}`} key={h.id}>
+      {g.itens.map((h) => <div className={`agente-item por-${h.fonte}`} key={h.id}>
         <time>{hora(h)}</time>
-        <div><strong>{h.o_que}</strong>{h.detalhe && <span>{String(h.detalhe).length > 120 ? String(h.detalhe).slice(0, 117).trimEnd() + "…" : h.detalhe}</span>}</div>
+        <div><strong>{h.fonte === "auditoria" && <i className="agente-fonte">auditoria</i>}{h.texto}</strong>{h.detalhe && <span>{String(h.detalhe).length > 120 ? String(h.detalhe).slice(0, 117).trimEnd() + "…" : h.detalhe}</span>}</div>
       </div>)}
     </div>)}
     {!acoes.length && <p className="ficha-note agente-vazio">Só batidas de presença nos últimos dias — nenhuma ação registrada.</p>}
