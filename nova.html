@@ -778,6 +778,29 @@ button.sutil{opacity:.55;font-size:12px}
 .ficha-actions{flex-wrap:wrap;gap:6px;margin-top:4px}
 .ficha-actions .ghost{flex:0 1 auto;min-height:40px;padding:8px 13px;font-size:12px;font-weight:700;border-radius:999px;letter-spacing:.2px;white-space:nowrap;line-height:1.2}
 .ficha-actions+.ficha-actions{margin-top:0}
+/* PESSOAIS reformulado (Diego, 12/10/2026): data em quadradinho, atrasado em vermelho e no topo */
+.pessoais-card .card-toggle{gap:12px}
+.pessoais-card .card-toggle h3{font-size:16px;font-weight:600}
+.pessoal-alerta{color:#ff9d8f!important;font-weight:600}
+.pessoais-lista{display:flex;flex-direction:column;gap:8px}
+.pessoal-item{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;background:linear-gradient(150deg,#ffffff0c,#ffffff02 50%),var(--surface);border:1px solid var(--line);border-left:3px solid #8fb8dc;border-radius:14px;padding:11px 12px;box-shadow:inset 0 1px 0 #ffffff10,0 1px 2px #0000004d}
+.pessoal-item.atrasado{border-left-color:var(--red);border-color:#d9534f55;background:linear-gradient(150deg,#d9534f1f,#d9534f08 60%),var(--surface)}
+.pessoal-item.encerrado{opacity:.6}
+.pessoal-data{flex:none;width:48px;padding:6px 0 5px;border-radius:11px;text-align:center;line-height:1;background:#8fb8dc22;border:1px solid #8fb8dc44;color:#bcd9ef}
+.pessoal-data b{display:block;font:800 19px/1 Inter,system-ui,sans-serif}
+.pessoal-data small{display:block;font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;margin-top:3px}
+.pessoal-item.atrasado .pessoal-data{background:linear-gradient(145deg,#e46a62,#b3302a);border-color:#ff9d8f66;color:#fff6f4;box-shadow:0 6px 14px -6px #d9534fcc}
+.pessoal-txt{flex:1;min-width:0}
+.pessoal-txt strong{display:block;font-size:15px;line-height:1.3;color:var(--cream)}
+.pessoal-txt>span{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:4px}
+.pessoal-txt em{display:block;font-style:normal;font-size:11px;color:var(--dim);margin-top:3px;line-height:1.35}
+.pessoal-tag{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:#8fb8dc22;border:1px solid #8fb8dc44;color:#bcd9ef}
+.pessoal-tag.vermelha{background:var(--red);border-color:var(--red);color:#fff}
+.pessoais-card .funil-filtros{margin-bottom:10px}
+.pessoais-card .funil-filtros button{min-height:34px;padding:6px 12px;font-size:11px}
+.pessoal-item .ficha-actions{width:100%;margin-top:2px}
+.pessoal-item .ficha-actions .ghost{min-height:34px;padding:6px 11px;font-size:11px}
+.pessoal-item .responsavel-edit-row{width:100%}
 /* Contas vencida: brilho pulsando mais forte */
 .contas-card::after{animation:contaPulsa 1.8s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
@@ -6043,20 +6066,22 @@ function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
     } catch (e) { notify("Não remarquei: " + e.message, "error"); } finally { setBusy(null); }
   };
 
+  // VISUAL NOVO (Diego, 12/10/2026: "sete pendentes, tudo muito confuso, um atrasado, nem sei qual"). Cada item
+  // tem a data em quadradinho à esquerda (vermelho quando atrasou, com "há N dias"), e os atrasados vêm primeiro.
+  const diasAtraso = (p) => Math.round((new Date(hoje + "T12:00:00") - new Date(p.data_alvo + "T12:00:00")) / 86400000);
+  const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
   const linha = (p) => {
     const atrasado = pessoalAtrasado(p, hoje);
-    return <article className={`funil-item${atrasado ? " st-lead" : ""}`} key={p.id}>
-      <div className="funil-esq">
+    const d = p.data_alvo ? new Date(p.data_alvo + "T12:00:00") : null;
+    return <article className={`pessoal-item${atrasado ? " atrasado" : ""}${p.status !== "PENDENTE" ? " encerrado" : ""}`} key={p.id}>
+      <div className="pessoal-data" aria-hidden="true">{d ? <><b>{d.getDate()}</b><small>{MESES[d.getMonth()]}</small></> : <><b>?</b><small>sem data</small></>}</div>
+      <div className="pessoal-txt">
         <strong>{p.titulo}</strong>
         {/* Horário só aparece quando existe. Compromisso sem hora marcada não ganha hora inventada. */}
-        <span>{p.data_alvo ? compactDate(p.data_alvo) : "Sem data marcada"}{p.hora ? " · " + String(p.hora).slice(0, 5) : " · sem horário"}{p.cidade ? " · " + p.cidade : ""}</span>
+        <span>{atrasado ? <i className="pessoal-tag vermelha">atrasado há {diasAtraso(p)} dia(s)</i> : null}{p.hora ? String(p.hora).slice(0, 5) : "sem horário"}{p.cidade ? " · " + p.cidade : ""}{p.status !== "PENDENTE" ? " · " + String(p.status).toLowerCase() : ""}</span>
         {p.descricao && <em>{p.descricao}</em>}
         {p.remarcacoes > 0 && <em>Já remarcado {p.remarcacoes}x{p.remarcado_de ? " · antes era " + compactDate(p.remarcado_de) : ""}</em>}
-      </div>
-      <div className="funil-dir">
-        <span className="status-pill">{atrasado ? "⚠ ATRASADO" : p.status}</span>
-        {p.impacto_operacao === "BLOQUEIA_DISPONIBILIDADE" && <span className="responsavel-badge">⛔ Bloqueia agenda</span>}
-        {p.impacto_operacao === "A_CONFIRMAR" && p.status === "PENDENTE" && <span className="responsavel-badge">? Impacto a confirmar</span>}
+        {(p.impacto_operacao === "BLOQUEIA_DISPONIBILIDADE" || (p.impacto_operacao === "A_CONFIRMAR" && p.status === "PENDENTE")) && <span><i className="pessoal-tag">{p.impacto_operacao === "BLOQUEIA_DISPONIBILIDADE" ? "⛔ bloqueia a agenda" : "? impacto a confirmar"}</i></span>}
       </div>
       {p.status === "PENDENTE" && <div className="ficha-actions" style={{ width: "100%" }}>
         <button className="ghost" disabled={busy === p.id} onClick={() => concluir(p)}>{busy === p.id ? "..." : "✓ Concluir"}</button>
@@ -6075,18 +6100,24 @@ function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
   };
 
   const lista = verConcluidos ? encerrados : ativos;
+  const porData = (a, b) => String(a.data_alvo || "9999").localeCompare(String(b.data_alvo || "9999"));
+  // Atrasados primeiro (o mais antigo no topo), depois o resto por data.
+  const ordenada = [...lista.filter((p) => pessoalAtrasado(p, hoje)).sort(porData), ...lista.filter((p) => !pessoalAtrasado(p, hoje)).sort(porData)];
+  const maisAtrasado = [...atrasados].sort(porData)[0];
   return <CardRecolhivel
-    className={atrasados.length ? "content-card warning-card" : "content-card"}
+    className="content-card pessoais-card" selo={ativos.length} tom={atrasados.length ? "vermelho" : "azul"} icone="🏠"
     cabecalho={<><p className="kicker">PESSOAIS</p>
       <h3>{ativos.length} pendente(s){atrasados.length ? ` · ${atrasados.length} atrasado(s)` : ""}</h3>
-      {proximo && <span className="ficha-note" style={{ margin: 0 }}>Próximo: {proximo.titulo}{proximo.data_alvo ? " · " + compactDate(proximo.data_alvo) : ""}</span>}</>}
+      {maisAtrasado
+        ? <span className="ficha-note pessoal-alerta" style={{ margin: 0 }}>⚠ Atrasado: {maisAtrasado.titulo} · era {compactDate(maisAtrasado.data_alvo)}{atrasados.length > 1 ? ` (e mais ${atrasados.length - 1})` : ""}</span>
+        : proximo && <span className="ficha-note" style={{ margin: 0 }}>Próximo: {proximo.titulo}{proximo.data_alvo ? " · " + compactDate(proximo.data_alvo) : ""}</span>}</>}
     resumo={avisoGPT ? <p className="ficha-note">{avisoGPT}</p> : null}>
     <div>
       <div className="funil-filtros">
         <button className={verConcluidos ? "" : "active"} onClick={() => setVerConcluidos(false)}>Ativos</button>
         <button className={verConcluidos ? "active" : ""} onClick={() => setVerConcluidos(true)}>Concluídos</button>
       </div>
-      {lista.length ? <div className="funil-lista">{[...lista].sort((a, b) => String(a.data_alvo || "9999").localeCompare(String(b.data_alvo || "9999"))).map(linha)}</div>
+      {lista.length ? <div className="pessoais-lista">{ordenada.map(linha)}</div>
         : <div className="empty-state"><b>{verConcluidos ? "Nada concluído ainda." : "Nenhuma pendência pessoal aberta."}</b></div>}
     </div>
   </CardRecolhivel>;
