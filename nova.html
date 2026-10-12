@@ -741,6 +741,24 @@ button.sutil{opacity:.55;font-size:12px}
 .hoje-card::before{content:"";position:absolute;top:-20%;bottom:-20%;left:0;width:34%;background:linear-gradient(90deg,transparent,#ffb07a14,transparent);pointer-events:none;animation:luzPassa 7s 1.2s ease-in-out infinite}
 .hoje-card .card-toggle .kicker{font-size:11px;letter-spacing:2px;color:#ffb07a}
 .hoje-card .card-toggle h3{font:500 25px Georgia,serif;color:#fff3e4}
+/* RESUMO DA MANHÃ (12/10/2026): card do topo, lido de avisos_operacionais (domínio resumo_manha) */
+.resumo-card{position:relative;overflow:hidden;background:linear-gradient(160deg,#1b2a2a 0,#17201e 40%,#141110 100%);border-color:#75a98755;box-shadow:inset 0 1px 0 #ffffff1a,0 1px 2px #0000004d,0 18px 40px -18px #000000cc}
+.resumo-card::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,#9bc7a7,#75a98700 70%)}
+.resumo-card .resumo-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px}
+.resumo-card .resumo-topo .kicker{color:#9bc7a7;letter-spacing:2px;font-size:11px}
+.resumo-card .resumo-topo h3{font:500 24px Georgia,serif;color:#f0f6ee;margin:2px 0 0}
+.resumo-card .resumo-topo .ghost{flex:none;min-height:40px;padding:8px 14px}
+.resumo-bloco{margin-top:12px}
+.resumo-bloco>b{display:block;font-size:11px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#9bc7a7;margin-bottom:6px}
+.resumo-bloco ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.resumo-bloco li{display:flex;align-items:flex-start;gap:9px;background:#ffffff08;border:1px solid #ffffff10;border-radius:11px;padding:9px 11px;font-size:14px;line-height:1.4;color:var(--cream)}
+.resumo-bloco li::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:#9bc7a7;margin-top:7px;box-shadow:0 0 8px #9bc7a7aa}
+.resumo-bloco li.com-ficha{cursor:pointer}
+.resumo-bloco li.com-ficha i{font-style:normal;color:var(--dim);margin-left:auto;font-size:18px;flex:none}
+.resumo-bloco.prioridades li{counter-increment:prio;border-color:#ed905740;background:#d86d3612}
+.resumo-bloco.prioridades ul{counter-reset:prio}
+.resumo-bloco.prioridades li::before{content:counter(prio);width:22px;height:22px;border-radius:7px;background:linear-gradient(145deg,#ed9057,#c8551f);color:#fff8f0;font:800 12px/22px Inter,system-ui,sans-serif;text-align:center;margin-top:0;box-shadow:none}
+.resumo-card p.resumo-livre{margin:6px 0 0;font-size:14px;line-height:1.5;color:var(--cream);white-space:pre-wrap}
 /* Contas vencida: brilho pulsando mais forte */
 .contas-card::after{animation:contaPulsa 1.8s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
@@ -1296,6 +1314,11 @@ const demoAvisos = [
   // pra consultar — o cartão tem que se virar com a linha da agenda e continuar útil.
   { id: "av3", dominio: "encaixe_rota", prioridade: "media", ativo: true, expira_em: null, referencia_id: "ah5",
     aviso: "Elizabeth: entrega não ocorreu. O encosto está com Diego em casa. Encaixar a entrega em uma próxima rota compatível para Valparaíso; não prometer horário ao cliente antes de definir a rota." },
+  // av4 = RESUMO DA MANHÃ (12/10/2026): a auditoria das 2h20 grava uma linha por dia neste domínio, vencendo
+  // no mesmo dia. Formato do texto: linha terminada em ":" abre um bloco; linha começando com "- " é item;
+  // um item pode terminar com {cliente:uuid} pra abrir a ficha no toque. Ver ResumoManhaCard.
+  { id: "av4", dominio: "resumo_manha", prioridade: "alta", ativo: true, expira_em: null, referencia_id: null,
+    aviso: "Entrou de madrugada:\n- Lead novo pelo site: Carla Mendes, sofá 3 lugares, Gama {cliente:c2}\n- Mariana Costa respondeu o orçamento: quer fechar na sexta {cliente:c1}\nA auditoria decidiu:\n- 2 cartões de retorno remarcados pra terça\n- Conta da Afibracom (R$ 598) marcada como vencendo dia 4\nPrioridades de hoje:\n- Confirmar visita da Mariana e levar amostra de veludo {cliente:c1}\n- Pedir espuma D33 na Afibracom até 16h (entrega quinta)\n- Cobrar o Marcão pelo encosto da Elizabeth" },
 ];
 // AGENDA QUE NÃO ESTÁ MAIS PLANEJADA — só o que explica por que um serviço parou. Aqui mora o caso
 // FABRÍCIO do item "painel de serviços fechados sem avanço": a retirada foi CANCELADA e ninguém
@@ -7043,6 +7066,46 @@ function separarAtrasadosPorIdade(appointments, hoje) {
   });
   return { recentes, antigos, acima30 };
 }
+// ===== RESUMO DA MANHÃ (Diego, 11/10/2026: "3 bacana") =====
+// A auditoria das 2h20 grava UMA linha em avisos_operacionais com dominio "resumo_manha" e expira_em = o dia,
+// e o Painel só mostra. Sem tabela nova: o pacote já traz os avisos ativos. Formato do texto, de propósito
+// simples pra qualquer rotina conseguir escrever: linha terminada em ":" abre um bloco; "- " é item; um item
+// pode terminar com {cliente:uuid} e vira toque pra ficha. O bloco cujo título contém "priorid" ganha números.
+// "Entendi" desativa a linha (ativo=false); de todo jeito ela vence sozinha no dia seguinte.
+function parseResumoManha(texto) {
+  const blocos = []; let atual = null; const soltas = [];
+  String(texto || "").split(/\r?\n/).forEach((linhaBruta) => {
+    const linha = linhaBruta.trim(); if (!linha) return;
+    if (/:$/.test(linha) && !/^[-•*]/.test(linha)) { atual = { titulo: linha.replace(/:$/, ""), itens: [] }; blocos.push(atual); return; }
+    const m = linha.match(/^[-•*]\s*(.*?)(?:\s*\{cliente:([\w-]+)\})?$/i);
+    const item = m ? { texto: m[1], clienteId: m[2] || null } : { texto: linha, clienteId: null };
+    if (atual) atual.itens.push(item); else soltas.push(item);
+  });
+  return { blocos, soltas };
+}
+function ResumoManhaCard({ avisos, today, db, demo, notify, onOpenFicha, onChanged }) {
+  const [escondido, setEscondido] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const resumo = useMemo(() => (avisos || [])
+    .filter((av) => av.dominio === "resumo_manha" && av.ativo !== false && (!av.expira_em || String(av.expira_em) >= today))
+    .sort((a, b) => String(b.expira_em || "").localeCompare(String(a.expira_em || "")))[0] || null, [avisos, today]);
+  if (!resumo || escondido === resumo.id) return null;
+  const { blocos, soltas } = parseResumoManha(resumo.aviso);
+  const entendi = async () => {
+    setBusy(true);
+    try {
+      if (!demo) { const { error } = await db.from("avisos_operacionais").update({ ativo: false }).eq("id", resumo.id); if (error) throw error; }
+      setEscondido(resumo.id); vibrar(12); if (onChanged && !demo) onChanged();
+    } catch (e) { notify("Erro ao fechar o resumo: " + e.message, "error"); } finally { setBusy(false); }
+  };
+  const Item = ({ it }) => <li className={it.clienteId && onOpenFicha ? "com-ficha" : ""} onClick={it.clienteId && onOpenFicha ? () => onOpenFicha(it.clienteId) : undefined}>{it.texto}{it.clienteId && onOpenFicha && <i>›</i>}</li>;
+  return <section className="content-card resumo-card">
+    <div className="resumo-topo"><div><p className="kicker">RESUMO DA MANHÃ · {compactDate(resumo.expira_em || today)}</p><h3>Bom dia, Diego</h3></div>
+      <button type="button" className="ghost" disabled={busy} onClick={entendi}>{busy ? "…" : "Entendi"}</button></div>
+    {soltas.length > 0 && <p className="resumo-livre">{soltas.map((it) => it.texto).join("\n")}</p>}
+    {blocos.map((b, i) => <div key={i} className={`resumo-bloco${/priorid/i.test(b.titulo) ? " prioridades" : ""}`}><b>{b.titulo}</b><ul>{b.itens.map((it, j) => <Item key={j} it={it} />)}</ul></div>)}
+  </section>;
+}
 function Dashboard({ inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, onVerLeads, onVerOrcamentos, onVerAgenda, onVerEstoque, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   // Gaveta do botão flutuante "Anotar" (Painel único, etapa 2, 11/10/2026).
@@ -7316,6 +7379,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {filtroSelo && escondidosPorSelo > 0 && <p className="filtro-aviso">Só “{filtroSelo}” · {escondidosPorSelo} escondido(s) · <button type="button" onClick={() => setFiltroSelo(null)}>Mostrar todos</button></p>}
     {/* TOPO DO PAINEL (Diego, 11/10/2026: "compromisso atrasado, Hoje e próximos compromissos são os mais
         importantes"): os três ficam no alto, como cards grandes, fora do grupo Pendências. */}
+    <ResumoManhaCard avisos={avisos} today={today} db={db} demo={demo} notify={notify} onOpenFicha={onOpenFicha} onChanged={onServicoChanged} />
     {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes topo-card tom-vermelho" selo={atrasados.length} tom="vermelho" icone="⏰"
       cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
