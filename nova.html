@@ -801,6 +801,13 @@ button.sutil{opacity:.55;font-size:12px}
 .pessoal-item .ficha-actions{width:100%;margin-top:2px}
 .pessoal-item .ficha-actions .ghost{min-height:34px;padding:6px 11px;font-size:11px}
 .pessoal-item .responsavel-edit-row{width:100%}
+/* PAGUEI NO PAINEL (12/10/2026): botão por conta dentro do card Dinheiro, dois toques pra confirmar */
+.contas-card .conta-linha-paguei{position:relative}
+.contas-card .paguei-btn{flex:1 0 100%;margin-top:6px;min-height:42px;border-radius:12px;border:1px solid #6fcf9780;background:#6fcf9722;color:var(--green,#6fcf97);font-weight:800;font-size:14px;letter-spacing:.02em;cursor:pointer;transition:background .15s,transform .1s}
+.contas-card .paguei-btn:active{transform:scale(.98)}
+.contas-card .paguei-btn.armado{background:var(--green,#6fcf97);color:#0f1a12;border-color:transparent;animation:pagueiPisca .9s ease-in-out infinite}
+.contas-card .paguei-btn:disabled{opacity:.6;cursor:default;animation:none}
+@keyframes pagueiPisca{0%,100%{box-shadow:0 0 0 0 #6fcf9766}50%{box-shadow:0 0 0 6px #6fcf9700}}
 /* Contas vencida: brilho pulsando mais forte */
 .contas-card::after{animation:contaPulsa 1.8s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
@@ -7178,6 +7185,26 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   const [filtroTipo, setFiltroTipo] = useState("todos");
   // Gaveta do botão flutuante "Anotar" (Painel único, etapa 2, 11/10/2026).
   const [anotarAberto, setAnotarAberto] = useState(false);
+  // PAGUEI DIRETO NO PAINEL (Diego 12/10/2026: "paguei Pix no Nubank... deixar marcado, fica mais rápido e diminui
+  // a auditoria"). Dois toques no mesmo botão: o primeiro arma ("Confirmar"), o segundo paga. Mesmo gateway e
+  // mesmo eventoId do botão "Marcar pago" da tela A pagar, então pagar aqui ou lá dá no mesmo registro.
+  const [pagandoId, setPagandoId] = useState(null);
+  const [armadoId, setArmadoId] = useState(null);
+  useEffect(() => { if (!armadoId) return; const t = setTimeout(() => setArmadoId(null), 5000); return () => clearTimeout(t); }, [armadoId]);
+  const pagarConta = async (item) => {
+    if (armadoId !== item.id) { vibrar(6); setArmadoId(item.id); return; }
+    setArmadoId(null);
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    if (!db) return;
+    setPagandoId(item.id);
+    try {
+      await processarEventoOperacaoBahia(db, { tipo: "financeiro", eventoId: "app-conta-paga-" + item.id, dados: { financeiroId: item.id, status: "pago", data: hojeISO() } });
+      try { await db.from("historico").insert({ o_que: `Pago pelo Painel: ${descricaoFinanceiraVisivel(item.descricao) || item.categoria || "conta"} · ${money(item.valor)}`, por: "diego", detalhe: "Botão Paguei no card Dinheiro." }); } catch (e) { /* segue */ }
+      vibrar([10, 40, 10]);
+      notify("Pago — saiu da lista e entrou no caixa.", "ok");
+      if (onServicoChanged) await onServicoChanged();
+    } catch (e) { notify("Não consegui marcar pago: " + e.message, "error"); } finally { setPagandoId(null); }
+  };
   // Filtro por etiqueta (Diego, 11/10/2026). Nunca guardado: o app sempre abre em "Todas", pra nenhum card
   // "sumir" por filtro esquecido (susto de 08/10).
   const [filtroSelo, setFiltroSelo] = useState(null);
@@ -7588,7 +7615,10 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         resumo={r.potencialCaixa > 0
           ? <span>💰 Dá pra levantar {money(r.potencialCaixa)}{r.prontosSemCobranca.length ? ` — ${r.prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")} sem pagamento registrado` : ""}</span>
           : <span>Nenhum serviço pronto pra cobrar no momento.</span>}>
-        {alerta.map(linhaConta)}
+        {alerta.map((f) => { const rv = rotuloVencimento(f, today); const armado = armadoId === f.id; const pagando = pagandoId === f.id; return <span className="conta-linha conta-linha-paguei" key={f.id}>
+          <em className={`conta-prazo ${rv.nivel}`}>{rv.texto}</em><strong>{curto(f)}</strong><b>{money(f.valor)}</b>
+          <button type="button" className={`paguei-btn${armado ? " armado" : ""}`} disabled={pagando} onClick={() => pagarConta(f)}>{pagando ? "Salvando…" : armado ? "Confirmar ✓" : "Paguei"}</button>
+        </span>; })}
         {onVerAPagar && <button type="button" className="ghost" onClick={onVerAPagar}>Ver todas em A pagar</button>}
         {/* SEM PRAZO fica no Painel de propósito: foi assim que a dívida do Ozair saiu da rotina — o lembrete
             irmão não nasceu e só o Financeiro guardou. Aqui ela não vence, não cobra e não some. */}
