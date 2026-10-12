@@ -764,7 +764,7 @@ button.sutil{opacity:.55;font-size:12px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 
 /* CARDS DA AGENDA COM AÇÕES (11/10/2026): Feito / Remarcar / Cancelar / recado com áudio. */
-.card-acoes{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}.card-acoes textarea{width:100%;min-height:64px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:14px;line-height:1.45}.card-acoes textarea:focus{border-color:#d37742}.card-acoes-botoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.card-acoes-botoes button{min-height:44px;font-size:12px}.card-acoes-botoes .perigo{color:#f08a7a;border-color:#7a3a30}.gravador{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.gravador button{min-height:40px;font-size:12px}.gravador audio{height:36px;max-width:100%;flex:1 1 180px}.gravador small,.card-acoes small{font-size:11px;color:var(--dim)}.gravador .gravando{animation:pulsoGravando 1.2s ease-in-out infinite}@keyframes pulsoGravando{50%{opacity:.55}}.desfazer-faixa{display:flex;flex-direction:column;gap:6px;padding:12px 14px;margin-bottom:12px;border-radius:14px;background:#6097c012;border:1px solid #6097c055}.desfazer-linha{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;line-height:1.4}.desfazer-linha span{min-width:0;overflow-wrap:anywhere}.desfazer-linha small{display:block;font-size:11px;color:var(--dim)}.desfazer-linha button{min-height:40px;font-size:12px;flex:none}.selo-claude{margin:8px 12px 0;padding:10px 12px;border-radius:12px;background:#d4a64e17;border:1px solid #d4a64e66;font-size:13px;line-height:1.45}.selo-claude b{display:block;color:#e8c06d;margin-bottom:3px}.selo-claude .selo-botoes{display:flex;gap:6px;margin-top:8px}.selo-claude .selo-botoes button{min-height:40px;font-size:12px;flex:1}.selo-recado{margin:8px 12px 0;padding:8px 12px;border-radius:12px;background:#6097c014;border:1px solid #6097c055;color:#a9c8e2;font-size:12px;line-height:1.45}.recados-do-card{display:flex;flex-direction:column;gap:6px}.recados-do-card div{font-size:12px;line-height:1.45;padding:8px 10px;border-radius:10px;background:var(--surface2);border:1px solid var(--line)}.recados-do-card em{display:block;font-style:normal;color:var(--dim);font-size:11px}.recados-do-card button{margin-top:4px;min-height:36px;font-size:11px}
+.card-acoes{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}.card-acoes textarea{width:100%;min-height:64px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:14px;line-height:1.45}.card-acoes textarea:focus{border-color:#d37742}.card-acoes-botoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.card-acoes-botoes button{min-height:44px;font-size:12px}.card-acoes-botoes .perigo{color:#f08a7a;border-color:#7a3a30}.gravador{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.gravador button{min-height:40px;font-size:12px}.gravador audio{height:36px;max-width:100%;flex:1 1 180px}.gravador small,.card-acoes small{font-size:11px;color:var(--dim)}.gravador .gravando{animation:pulsoGravando 1.2s ease-in-out infinite}@keyframes pulsoGravando{50%{opacity:.55}}.desfazer-linha{padding:6px 0;border-bottom:1px solid var(--line)}.desfazer-linha:last-child{border-bottom:0}.desfazer-linha{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;line-height:1.4}.desfazer-linha span{min-width:0;overflow-wrap:anywhere}.desfazer-linha small{display:block;font-size:11px;color:var(--dim)}.desfazer-linha button{min-height:40px;font-size:12px;flex:none}.selo-claude{margin:8px 12px 0;padding:10px 12px;border-radius:12px;background:#d4a64e17;border:1px solid #d4a64e66;font-size:13px;line-height:1.45}.selo-claude b{display:block;color:#e8c06d;margin-bottom:3px}.selo-claude .selo-botoes{display:flex;gap:6px;margin-top:8px}.selo-claude .selo-botoes button{min-height:40px;font-size:12px;flex:1}.selo-recado{margin:8px 12px 0;padding:8px 12px;border-radius:12px;background:#6097c014;border:1px solid #6097c055;color:#a9c8e2;font-size:12px;line-height:1.45}.recados-do-card{display:flex;flex-direction:column;gap:6px}.recados-do-card div{font-size:12px;line-height:1.45;padding:8px 10px;border-radius:10px;background:var(--surface2);border:1px solid var(--line)}.recados-do-card em{display:block;font-style:normal;color:var(--dim);font-size:11px}.recados-do-card button{margin-top:4px;min-height:36px;font-size:11px}
 </style>
 </head>
 <body>
@@ -5455,16 +5455,17 @@ function GravadorAudio({ audio, onAudio, onTexto, disabled }) {
     if (!SR) { setAviso("Este aparelho não transcreve. Vou gravar o áudio, mas escreva um resumo na caixinha: o Claude não escuta áudio."); gravarAudio(); return; }
     let fala;
     try { fala = new SR(); } catch (e) { gravarAudio(); return; }
-    fala.lang = "pt-BR"; fala.continuous = true; fala.interimResults = true;
-    let ouviuAlgo = false;
+    // UMA FRASE POR VEZ (teste do Diego, 12/10): com continuous=true o Chrome do Android devolve o texto
+    // acumulado em cada resultado "final", e a caixinha ficava "só que o áudio tá só que o áudio tá tá...".
+    // Agora cada rodada ouve uma frase, entrega UM final, e o onend religa para a próxima.
+    fala.lang = "pt-BR"; fala.continuous = false; fala.interimResults = true;
+    let ouviuAlgo = false, entregue = false;
+    fala.onstart = () => { entregue = false; };
     fala.onresult = (ev) => {
-      let tmp = "";
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const t = ev.results[i][0].transcript;
-        if (ev.results[i].isFinal) { if (t.trim()) { ouviuAlgo = true; onTexto(t.trim()); } }
-        else tmp += t;
-      }
-      setParcial(tmp);
+      const ultimo = ev.results[ev.results.length - 1];
+      const t = (ultimo && ultimo[0].transcript || "").trim();
+      if (ultimo && ultimo.isFinal) { if (t && !entregue) { entregue = true; ouviuAlgo = true; onTexto(t); } setParcial(""); }
+      else setParcial(t);
     };
     fala.onerror = (ev) => {
       if (ev.error === "no-speech" || ev.error === "aborted") return;
@@ -5504,14 +5505,14 @@ function DesfazerRecados() {
   const abertos = acoes.recados.filter((r) => !r.processado_em).sort((x, y) => (y.criado_em || "").localeCompare(x.criado_em || ""));
   if (!abertos.length) return null;
   const icone = { feito: "✅", cancelar: "✖", remarcar: "🔁", recado: "💬" };
-  return <div className="desfazer-faixa">
-    <p className="kicker" style={{ margin: 0 }}>ENVIADO AO CLAUDE · {abertos.length}</p>
+  return <CardRecolhivel className="content-card desfazer-faixa" selo={abertos.length} tom="azul" icone="↶"
+    cabecalho={<><p className="kicker">ENVIADO AO CLAUDE</p><h3>{abertos.length} aguardando o Claude · dá pra desfazer</h3></>}>
     {abertos.slice(0, 6).map((r) => <div key={r.id} className="desfazer-linha">
       <span>{icone[r.acao] || "•"} <b>{ACAO_RECADO_ROTULO[r.acao] || r.acao}</b> · {r.agenda?.titulo || "compromisso"}<small>{new Date(r.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small></span>
       <button type="button" className="ghost" disabled={busyId === r.id} onClick={async () => { setBusyId(r.id); try { await acoes.desfazer(r); } finally { setBusyId(null); } }}>{busyId === r.id ? "…" : "↶ Desfazer"}</button>
     </div>)}
     {abertos.length > 6 && <small>+{abertos.length - 6} mais</small>}
-  </div>;
+  </CardRecolhivel>;
 }
 
 function RecadoEnviado({ r, acoes }) {
@@ -7369,7 +7370,6 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       </section>;
     })();
   return <div className="page-grid painel-rolagem">
-    <DesfazerRecados />
     {(atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}
       {/* ETIQUETA NUM CONTROLE SÓ (Diego, 11/10/2026: a linha de 14 botões empurrava os cards pra baixo). */}
       {todosDoTipo.length > 0 && <select className={`filtro-selo-select${filtroSelo ? " ativo" : ""}`} value={filtroSelo || ""} onChange={(e) => setFiltroSelo(e.target.value || null)} aria-label="Filtrar por etiqueta">
@@ -7409,6 +7409,9 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {futuros.length > 0 && <CardRecolhivel className="content-card topo-card tom-laranja" selo={futuros.length} tom="laranja" icone="📅"
       cabecalho={<><p className="kicker">PRÓXIMOS COMPROMISSOS</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
       {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
+    {/* ENVIADO AO CLAUDE vem DEPOIS de Atrasados, Hoje e Próximos (Diego, 12/10: "os compromissos de hoje,
+        atrasados precisam ser os primeiros, não o recado que vai pro Claude"). Fica recolhido, só com o selo. */}
+    <DesfazerRecados />
     {/* PAINEL ORGANIZADO (11/10/2026, Diego: "Está muito carregado"). Os blocos viraram grupos: Pendências,
         Contas, Produção, Próximos, Anotar, Pessoais. Nada foi apagado — cada card de antes continua inteiro,
         só que como uma linha dentro do grupo (ver CSS `.grupo-card`). Os dois quadrados de número saíram
@@ -7673,7 +7676,6 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
   const groups = daRota.reduce((acc, item) => { (acc[item.data] ||= []).push(item); return acc; }, {});
   const dias = Object.keys(groups).sort();
   return <section className="content-card full">
-    <DesfazerRecados />
     <div className="card-head"><div><p className="kicker">ROTINA E DESLOCAMENTO</p><h3>Agenda planejada</h3></div><button className="primary" onClick={onAdd}>+ Adicionar</button></div>
     {!dias.length && !semHora.length && <div className="empty-state"><b>Sem compromissos planejados.</b><span>Toque em “+ Adicionar” para criar.</span></div>}
     <div className="agenda-dias">{dias.map((date) => {
@@ -7716,6 +7718,7 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
         {aberto && <div className="agenda-dia-corpo">{[...semHora].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
       </div>;
     })()}</div>
+    <DesfazerRecados />
   </section>;
 }
 
