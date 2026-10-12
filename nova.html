@@ -7594,15 +7594,15 @@ function AgenteCard({ itens, today, services, appointments, customers, finances,
   const rotuloDia = (dia) => dia === today ? "Hoje" : dia === ontem ? "Ontem" : compactDate(dia);
   const hora = (h) => { const d = new Date(h.quando); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
   const haQuanto = (h) => { const minutos = Math.max(0, Math.round((Date.now() - new Date(h.quando).getTime()) / 60000)); return minutos < 2 ? "agora" : minutos < 60 ? `há ${minutos} min` : minutos < 36 * 60 ? `há ${Math.round(minutos / 60)} h` : compactDate(diaDe(h)); };
-  if (!linhas.length) return <GrupoRecolhivel titulo="Agente" className="grupo-agente" semContador resumo="ainda não rodou">
-    <p className="ficha-note agente-vazio">Quando o Agente de hora em hora fizer algo sozinho, aparece aqui.</p>
+  if (!linhas.length) return <GrupoRecolhivel titulo="Manu" className="grupo-agente" semContador resumo="ainda não rodou">
+    <p className="ficha-note agente-vazio">Quando a Manu (o agente de hora em hora) fizer algo sozinha, aparece aqui.</p>
   </GrupoRecolhivel>;
   const acoes = linhas.filter((h) => !AGENTE_BATIDA.test(h.texto));
   const rodada = linhas.find((h) => AGENTE_BATIDA.test(h.texto));
   const hojeN = acoes.filter((h) => diaDe(h) === today).length;
   const resumo = `última rodada ${haQuanto(linhas[0])} · ${hojeN ? `${hojeN} ${hojeN === 1 ? "ação" : "ações"} hoje` : "nada hoje"}`;
   const grupos = []; acoes.forEach((h) => { const dia = diaDe(h); const g = grupos[grupos.length - 1]; if (g && g.dia === dia) g.itens.push(h); else grupos.push({ dia, itens: [h] }); });
-  return <GrupoRecolhivel titulo="Agente" className="grupo-agente" semContador resumo={resumo}>
+  return <GrupoRecolhivel titulo="Manu" className="grupo-agente" semContador resumo={resumo}>
     {rodada && <p className="agente-rodada">Última rodada {hora(rodada)} ({haQuanto(rodada)}): {rodada.texto.replace(AGENTE_BATIDA, "").replace(/^\s*[—-]\s*/, "")}{rodada.detalhe ? ` · ${parseDetalheAgente(rodada.detalhe).texto}` : ""}</p>}
     {!acoes.length && <p className="ficha-note agente-vazio">Nenhuma ação automática nos últimos 7 dias, só rodadas sem novidade.</p>}
     {grupos.slice(0, 7).map((g) => <div className="agente-dia" key={g.dia}>
@@ -7667,7 +7667,8 @@ function ResumoManhaCard({ avisos, today, db, demo, notify, onOpenFicha, onChang
 // a resposta serve pra todo caso parecido. A linha vira `respondida`; na rodada seguinte o agente lê, aplica no
 // caso, marca `aplicada` e, se vale sempre, escreve em `regra` a versão geral — que ele relê em toda rodada.
 // Não é a Caixa: a Caixa é item que chegou (print, comprovante); isto é o agente pedindo uma decisão.
-const ORIGEM_CARTAO = { agente: "Agente", auditoria: "Auditoria 02h20", pix: "Pix", caixa: "Caixa", claude: "Claude" };
+// MANU (Diego 12/10/2026: "meu agente chama Manu, igual lá no GPT"): o agente de hora em hora é a Manu.
+const ORIGEM_CARTAO = { agente: "Manu", manu: "Manu", auditoria: "Auditoria 02h20", pix: "Pix", caixa: "Caixa", claude: "Claude" };
 const rotuloOrigem = (o) => ORIGEM_CARTAO[String(o || "agente").toLowerCase()] || String(o);
 // A Caixa já tinha o seu canal de pergunta (item em `aguardando_voce` com a pergunta em conversa[], Regra Nº 13/15).
 // Aqui ela só é MOSTRADA no mesmo card: responder grava do mesmo jeito que a tela da Caixa grava.
@@ -7685,7 +7686,7 @@ function DuvidasAgenteCard({ duvidas, inbox = [], today, db, demo, notify, custo
   return <section className="content-card resumo-card duvidas-card">
     <div className="resumo-topo"><div><p className="kicker">CARTÕES PRA VOCÊ</p>
       <h3>{total} pergunta{total === 1 ? "" : "s"} pra você</h3>
-      <small>Toque numa opção ou fale no 🎤. Respondeu, some daqui e o Claude aplica na próxima rodada.</small></div></div>
+      <small>Toque numa opção ou fale no 🎤. Respondeu, some daqui e a Manu aplica na próxima rodada.</small></div></div>
     {abertas.map((d) => <DuvidaItem key={d.id} d={d} today={today} db={db} demo={demo} notify={notify} nome={d.cliente_id ? nomeDe(d.cliente_id) : null} onOpenFicha={onOpenFicha} onChanged={onChanged} />)}
     {caixa.map((it) => <DuvidaItem key={"cx-" + it.id} d={{ id: it.id, origem: "caixa", pergunta: perguntaDaCaixa(it), contexto: null, opcoes: /lan[cç]o assim/i.test(perguntaDaCaixa(it)) ? ["Sim, lança assim", "Não"] : [], criado_em: it.criado_em, cliente_id: null }} caixaItem={it} today={today} db={db} demo={demo} notify={notify} nome={null} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />)}
   </section>;
@@ -7719,7 +7720,7 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, onOpen
         try { await db.from("historico").insert({ o_que: status === "respondida" ? `Respondeu ao Claude: ${String(d.pergunta).slice(0, 80)}` : `Pulou pergunta do Claude: ${String(d.pergunta).slice(0, 80)}`, por: "diego", detalhe: status === "respondida" ? `${resposta}${sempre ? " · vale sempre" : ""}${d.cliente_id ? ` · cliente ${d.cliente_id}` : ""}${caixaItem ? ` · caixa ${caixaItem.id}` : ""}` : null }); } catch (e) { /* segue */ }
       }
       vibrar(status === "respondida" ? [10, 40, 10] : 8);
-      notify(status === "respondida" ? (sempre ? "Respondido — vira regra na próxima rodada." : "Respondido — o Claude aplica na próxima rodada. Dá pra desfazer na faixa azul.") : "Pergunta descartada.", "ok");
+      notify(status === "respondida" ? (sempre ? "Respondido — vira regra na próxima rodada." : "Respondido — a Manu aplica na próxima rodada. Dá pra desfazer na faixa azul.") : "Pergunta descartada.", "ok");
       if (onChanged && !demo) onChanged();
     } catch (e) { notify("Erro ao responder: " + e.message, "error"); } finally { setBusy(false); }
   };
@@ -7731,9 +7732,9 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, onOpen
     {d.cliente_id && onOpenFicha && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onOpenFicha(d.cliente_id); }}>Abrir ficha{nome ? ` de ${nome.split(" ")[0]}` : ""} ›</button>}
     {caixaItem && onAbrirCaixa && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onAbrirCaixa(); }}>Ver na Caixa ›</button>}
     {opcoes.length > 0 && <div className="duvida-opcoes">{opcoes.map((o) => <button type="button" key={o} className={opcao === o ? "ativo" : ""} onClick={() => { vibrar(6); setOpcao(opcao === o ? null : o); }}>{o}</button>)}</div>}
-    <textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={opcoes.length ? "Quer explicar mais? (opcional)" : "Sua resposta pro Claude"} />
+    <textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={opcoes.length ? "Quer explicar mais? (opcional)" : "Sua resposta pra Manu"} />
     <GravadorAudio audio={null} onAudio={() => {}} onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={busy} />
-    {!caixaItem && <label className="duvida-sempre"><input type="checkbox" checked={sempre} onChange={(e) => setSempre(e.target.checked)} />Vale sempre: o Claude guarda como regra e não pergunta de novo</label>}
+    {!caixaItem && <label className="duvida-sempre"><input type="checkbox" checked={sempre} onChange={(e) => setSempre(e.target.checked)} />Vale sempre: a Manu guarda como regra e não pergunta de novo</label>}
     <div className="duvida-botoes">
       <button type="button" className="primary" disabled={busy || !resposta} onClick={() => gravar("respondida")}>{busy ? "…" : "Responder"}</button>
       {!caixaItem && <button type="button" className="ghost" disabled={busy} onClick={() => gravar("descartada")}>Pular</button>}
@@ -7756,7 +7757,7 @@ function RespondidasAoClaude({ duvidas, inbox = [], db, demo, notify, onChanged 
       if (!demo) {
         if (l.tipo === "duvida") {
           const { data, error } = await db.from("duvidas_agente").update({ status: "aberta", resposta: null, vale_sempre: false, respondido_em: null }).eq("id", l.id).eq("status", "respondida").select("id").maybeSingle(); if (error) throw error;
-          if (!data) { notify("O Claude já aplicou essa resposta. Responda de novo com a correção que ele ajusta.", "info"); return; }
+          if (!data) { notify("A Manu já aplicou essa resposta. Responda de novo com a correção que ela ajusta.", "info"); return; }
         } else {
           const atual = await lerRegistro(db, "caixa_entrada", l.id, "id,conversa,status,processado");
           if (!atual || atual.status !== "respondido" || atual.processado) { notify("O Claude já pegou esse item. Fale com ele pela Caixa.", "info"); return; }
@@ -7768,7 +7769,7 @@ function RespondidasAoClaude({ duvidas, inbox = [], db, demo, notify, onChanged 
     } catch (e) { notify("Erro ao desfazer: " + e.message, "error"); } finally { setBusyId(null); }
   };
   return <CardRecolhivel className="content-card desfazer-faixa" selo={linhas.length} tom="azul" icone="↶"
-    cabecalho={<><p className="kicker">RESPONDIDO AO CLAUDE</p><h3>{linhas.length} resposta{linhas.length === 1 ? "" : "s"} esperando o Claude · dá pra desfazer</h3></>}>
+    cabecalho={<><p className="kicker">RESPONDIDO À MANU</p><h3>{linhas.length} resposta{linhas.length === 1 ? "" : "s"} esperando a Manu · dá pra desfazer</h3></>}>
     {linhas.slice(0, 8).map((l) => <div key={l.tipo + l.id} className="desfazer-linha">
       <span>💬 <b>{String(l.resposta || "").slice(0, 60)}</b> · {String(l.pergunta).slice(0, 70)}<small>{new Date(l.quando).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small></span>
       <button type="button" className="ghost" disabled={busyId === l.id} onClick={() => desfazer(l)}>{busyId === l.id ? "…" : "↶ Desfazer"}</button>
@@ -7786,12 +7787,12 @@ function RegrasAprendidasCard({ duvidas, db, demo, notify, onChanged }) {
     setBusyId(d.id);
     try {
       if (!demo) { const { error } = await db.from("duvidas_agente").update({ vale_sempre: false }).eq("id", d.id); if (error) throw error; }
-      vibrar(8); notify("Regra retirada. O agente volta a perguntar se precisar.", "ok"); if (onChanged && !demo) onChanged();
+      vibrar(8); notify("Regra retirada. A Manu volta a perguntar se precisar.", "ok"); if (onChanged && !demo) onChanged();
     } catch (e) { notify("Erro ao retirar a regra: " + e.message, "error"); } finally { setBusyId(null); }
   };
-  return <GrupoRecolhivel titulo="Regras que o agente aprendeu" className="grupo-agente grupo-regras" semContador resumo={`${regras.length} regra${regras.length === 1 ? "" : "s"}`}>
+  return <GrupoRecolhivel titulo="Regras que a Manu aprendeu" className="grupo-agente grupo-regras" semContador resumo={`${regras.length} regra${regras.length === 1 ? "" : "s"}`}>
     {regras.map((d) => <div className="regra-item" key={d.id}>
-      <div><strong>{d.regra || d.resposta}</strong><span>{d.pergunta}{d.respondido_em ? ` · ${compactDate(String(d.respondido_em).slice(0, 10))}` : ""}{d.regra ? "" : " · o agente ainda vai escrever a regra geral"}</span></div>
+      <div><strong>{d.regra || d.resposta}</strong><span>{d.pergunta}{d.respondido_em ? ` · ${compactDate(String(d.respondido_em).slice(0, 10))}` : ""}{d.regra ? "" : " · a Manu ainda vai escrever a regra geral"}</span></div>
       <button type="button" className="ghost" disabled={busyId === d.id} onClick={() => tirar(d)}>Não vale mais</button>
     </div>)}
   </GrupoRecolhivel>;
