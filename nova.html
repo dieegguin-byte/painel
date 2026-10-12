@@ -4414,6 +4414,9 @@ function Home() {
   // e pergunta "de quem é / o que é". Upload e insert acontecem SÓ no "Salvar na Caixa". Fechar sem salvar
   // mantém a carga no aparelho: reabrir o app pergunta de novo. Nada é apagado antes do insert confirmado.
   const [compartilhamentoPendente, setCompartilhamentoPendente] = useState(null);
+  // Depois de salvar, a Caixa abre NO item recém-salvo — e não no mais antigo da fila (Diego, 12/10:
+  // "aparece na minha frente o comprovante que já estava antes").
+  const [caixaAbrirId, setCaixaAbrirId] = useState(null);
   useEffect(() => {
     const endereco = new URL(location.href);
     if (endereco.searchParams.get("compartilhado") !== "1") return;
@@ -4530,6 +4533,7 @@ function Home() {
     for (const item of listaArquivos) await cache.delete(item.url);
     p.previas.forEach((pv) => { if (pv.url) URL.revokeObjectURL(pv.url); });
     setCompartilhamentoPendente(null);
+    setCaixaAbrirId(id);
     setTab("caixa");
     await loadAll();
     notify(jaExistia ? "Esse compartilhamento já estava na Caixa."
@@ -4745,7 +4749,7 @@ function Home() {
           `key={tab}` zera a barreira na troca de aba — sem ele, a aba quebrada contaminaria a próxima. */}
       <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}><div className={`aba-entra${abaAnterior.current.classe}`}>
       {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} atividadeAgente={atividadeAgente} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
-      {tab === "caixa" && <CaixaView inbox={inbox} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
+      {tab === "caixa" && <CaixaView inbox={inbox} abrirId={caixaAbrirId} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
       {/* `addInbox` VOLTOU pro Painel (Painel único, etapa 2, 11/10/2026): o card "Anotar agora" tinha saído
           porque o Diego não lançava mais pelo app; agora ele é o botão flutuante "+ Anotar", que salva na
           fila da Caixa pro Claude organizar. Sem a prop o botão não aparece. */}
@@ -6795,10 +6799,11 @@ function remarcarDaCaixa(db, item, { data, hora, tipo, cidade, titulo }) {
   });
 }
 
-function CaixaView({ inbox, customers, services, agenda, agendaBruta, db, demo, notify, onChanged, onDemoProcessado }) {
+function CaixaView({ inbox, abrirId, customers, services, agenda, agendaBruta, db, demo, notify, onChanged, onDemoProcessado }) {
   const [agora, setAgora] = useState(() => Date.now());
   const fila = useMemo(() => itensDaFilaDaCaixa(inbox, agora), [inbox, agora]);
-  const [atualId, setAtualId] = useState(null);
+  const [atualId, setAtualId] = useState(abrirId || null);
+  useEffect(() => { if (abrirId) setAtualId(abrirId); }, [abrirId]);
   const [acao, setAcao] = useState(null);
   const achado = fila.findIndex((i) => i.id === atualId);
   const indice = achado >= 0 ? achado : 0;
@@ -6848,8 +6853,8 @@ function CaixaView({ inbox, customers, services, agenda, agendaBruta, db, demo, 
         {mensagens.map((m, i) => <p key={i}><b>{m.de || "?"}</b>{m.em ? " · " + new Date(m.em).toLocaleDateString("pt-BR") : ""}: {parseInbox(String(m.texto)).text || "(arquivo)"}</p>)}
       </details>}
       {statusAntigo && <p className="ficha-note" style={{ margin: 0 }}>Status antigo: {statusAntigo}</p>}
-      {!acao && <div className="caixa-acoes">{botoes}</div>}
       {!acao && <CaixaRecado item={item} customers={customers} db={db} demo={demo} notify={notify} onSalvo={() => { if (!demo) onChanged(); }} />}
+      {!acao && <div className="caixa-acoes">{botoes}</div>}
       {acao === "compromisso" && <CaixaFormCompromisso {...comum} customers={customers} services={services} agenda={agenda} />}
       {acao === "lead" && <CaixaFormLead {...comum} customers={customers} agenda={agenda} />}
       {acao === "remarcar" && <CaixaFormRemarcar {...comum} agenda={agenda} />}
