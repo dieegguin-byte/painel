@@ -924,6 +924,39 @@ button.sutil{opacity:.55;font-size:12px}
 .agente-mudanca b{color:#a9e7c2;font-weight:600}
 .agente-registro{font-size:12px!important;color:var(--text)!important;background:#ffffff08;border-radius:6px;padding:4px 8px;margin-top:5px!important;display:inline-block!important}
 .agente-abrir{display:inline-block;margin-top:7px;background:none;border:1px solid var(--line2);color:var(--orange2);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;min-height:34px;cursor:pointer}
+/* DÚVIDAS DO AGENTE (12/10/2026): o agente pergunta, o Diego responde no Painel, a resposta vira regra */
+.duvidas-card{position:relative;overflow:hidden;background:linear-gradient(160deg,#2a2416 0,#201c14 40%,#141110 100%);border-color:#d4a64e55;box-shadow:inset 0 1px 0 #ffffff1a,0 1px 2px #0000004d,0 18px 40px -18px #000000cc}
+.duvidas-card::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,#e8c56a,#d4a64e00 70%)}
+.duvidas-card .resumo-topo .kicker{color:#e8c56a}
+.duvidas-card .resumo-topo h3{font:500 22px Georgia,serif;color:#fbf3e2;margin:2px 0 0}
+.duvida{background:#ffffff08;border:1px solid #ffffff12;border-radius:13px;padding:12px;margin-top:10px}
+.duvida.respondida{opacity:.75}
+.duvida>strong{display:block;font-size:15px;line-height:1.4;color:var(--cream);overflow-wrap:anywhere}
+.duvida .duvida-contexto{display:block;font-size:12px;color:var(--muted);margin-top:5px;line-height:1.45;white-space:pre-wrap}
+.duvida-quando{display:block;font-size:11px;color:var(--dim);margin-top:4px}
+.duvida-opcoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.duvida-opcoes button{border:1px solid var(--line2);background:var(--surface2);color:var(--cream);border-radius:999px;padding:8px 13px;font-size:13px;min-height:38px}
+.duvida-opcoes button.ativo{background:#c95f2e;color:#fff;border-color:#db7542}
+.duvida textarea{display:block;width:100%;margin-top:9px;min-height:64px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:14px;line-height:1.45}
+.duvida textarea:focus{border-color:#d37742;box-shadow:0 0 0 3px #d86d3619}
+.duvida-sempre{display:flex;align-items:center;gap:8px;margin-top:9px;font-size:13px;color:var(--cream);background:#ffffff06;border-radius:10px;padding:9px 10px;cursor:pointer}
+.duvida-sempre input{width:18px;height:18px;margin:0;accent-color:var(--orange)}
+.duvida-botoes{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:9px}
+.duvida-botoes .primary{min-height:44px}
+.duvida-botoes .ghost{min-height:44px;padding:8px 14px}
+.duvida-resposta{display:block;margin-top:8px;font-size:13px;color:#a9e7c2;background:#75a98712;border:1px solid #75a98740;border-radius:10px;padding:8px 10px;white-space:pre-wrap}
+.duvida-resposta b{color:#d8f5e2}
+.duvida-origem{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 9px;font-size:10px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;background:#ffffff0d;border:1px solid #ffffff18;color:var(--muted);margin-bottom:7px}
+.duvida-origem.auditoria{color:#e8c56a;border-color:#d4a64e55}.duvida-origem.pix{color:#a9e7c2;border-color:#75a98755}.duvida-origem.caixa{color:#a9c8e2;border-color:#6097c055}
+.duvida .gravador{margin-top:8px}
+.duvidas-card .resumo-topo small{display:block;font-size:12px;color:var(--muted);margin-top:4px}
+.grupo-regras .grupo-titulo::before{content:"📌 ";font-size:12px}
+.regra-item{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.regra-item:last-child{border-bottom:0}
+.regra-item>div{flex:1;min-width:0}
+.regra-item strong{display:block;font-size:14px;font-weight:600;color:var(--text);line-height:1.4;overflow-wrap:anywhere}
+.regra-item span{display:block;font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4}
+.regra-item .ghost{flex:none;font-size:11px;padding:6px 10px;min-height:34px}
 /* TOPO ENXUTO (12/10/2026): menu "⋯" no lugar dos seis botões */
 .header-actions{position:relative}
 .menu-topo-botao{min-width:44px;min-height:44px;padding:6px 12px;font-size:20px;line-height:1;border-radius:12px}
@@ -1504,6 +1537,12 @@ const demoAtividadeAgente = (() => {
     h(50, "Card marcado CONFERIR — Pegar medida com Marlom Júnior — Suzany", "agente", "Diego já fez; a auditoria pergunta."),
   ];
 })();
+// DÚVIDAS DO AGENTE (demo): uma aberta com opções, uma já respondida que virou regra.
+const demoDuvidas = [
+  { id: "dv1", status: "aberta", origem: "agente", pergunta: "A Ana Paula pediu pra buscar o sofá sábado de manhã. Marco sábado 9h ou prefere outro horário?", contexto: "Ela disse no WhatsApp: \"sábado de manhã tá bom pra mim\". Sábado 9h está livre na agenda.", opcoes: ["Sábado 9h", "Outro horário", "Não marcar"], cliente_id: "c3", referencia: "servico s3", resposta: null, vale_sempre: false, regra: null, criado_em: new Date(Date.now() - 2 * 3600000).toISOString(), respondido_em: null, aplicado_em: null },
+  { id: "dv2", status: "aplicada", pergunta: "Cliente de Valparaíso pediu retirada depois das 18h. Posso marcar à noite?", contexto: null, opcoes: ["Sim", "Não"], cliente_id: null, referencia: null, resposta: "Sim, até 20h, menos segunda, quarta e sexta.", vale_sempre: true, regra: "Retirada ou entrega à noite pode até 20h; nunca às segundas, quartas e sextas (igreja).", criado_em: new Date(Date.now() - 3 * 86400000).toISOString(), respondido_em: new Date(Date.now() - 2 * 86400000).toISOString(), aplicado_em: new Date(Date.now() - 2 * 86400000).toISOString() },
+];
+demoDuvidas.push({ id: "dv3", status: "respondida", origem: "auditoria", pergunta: "O card Visita — Mariana de ontem 15h foi feito?", contexto: null, opcoes: ["Feito", "Não foi feito"], cliente_id: null, referencia: "agenda a1", resposta: "Feito", vale_sempre: false, regra: null, criado_em: new Date(Date.now() - 5 * 3600000).toISOString(), respondido_em: new Date(Date.now() - 20 * 60000).toISOString(), aplicado_em: null });
 const demoAvisos = [
   { id: "av1", dominio: "agenda", prioridade: "alta", ativo: true, expira_em: null, referencia_id: "a6",
     aviso: "Retirada ainda PROVISÓRIA, não confirmada com a cliente. Exige desmontagem do sofá — protege a janela da tarde: só encaixar outro presencial se for pequeno e couber com folga." },
@@ -3775,6 +3814,7 @@ function Home() {
   const [avisos, setAvisos] = useState([]);
   // O QUE O AGENTE FEZ (Diego 12/10/2026): linhas de `historico` escritas pelas rotinas (por agente/auditoria/claude).
   const [atividadeAgente, setAtividadeAgente] = useState([]);
+  const [duvidasAgente, setDuvidasAgente] = useState([]);
   const [menuTopo, setMenuTopo] = useState(false);
   // DÍVIDAS (recado de 13/09/2026, caso Raquel R$ 1.489,89). Obrigação viva sem vencimento — não é linha de
   // financeiro. Até aqui o app nunca lia a tabela: a dívida existia certa no banco e invisível na tela.
@@ -3856,6 +3896,7 @@ function Home() {
     // compromisso na rota acontece na estrada, muitas vezes sem sinal.
     setAvisos(p.avisos || []);
     setAtividadeAgente(p.atividadeAgente || []);
+    setDuvidasAgente(p.duvidasAgente || []);
     // Dívidas entram no pacote (e no cache offline): sem sinal, a dívida não pode sumir e parecer quitada.
     setDividas(p.dividas || []);
     setProfissionais(p.profissionais || []);
@@ -3866,13 +3907,13 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setAtividadeAgente(demoAtividadeAgente); setDividas(demoDividas); setProfissionais(demoProfissionais); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setAtividadeAgente(demoAtividadeAgente); setDuvidasAgente(demoDuvidas); setDividas(demoDividas); setProfissionais(demoProfissionais); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
-    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, firstError;
+    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da, firstError;
     try {
-      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs] = await Promise.all([
+      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
@@ -3920,7 +3961,10 @@ function Home() {
         // `por` agente/auditoria/claude nos últimos 7 dias. Tabela que já existia; nada de schema novo.
         // `historico_por_check` só aceita 'diego' e 'claude', então as rotinas gravam por='claude' e dizem quem
         // são no começo do `o_que`: "Agente: …" ou "Auditoria: …". O filtro de prefixo fica no JS (AgenteCard).
-        db.from("historico").select("id,o_que,por,detalhe,quando").eq("por", "claude").ilike("o_que","Agente:%").gte("quando", new Date(Date.now() - 7 * 86400000).toISOString()).order("quando", { ascending: false }).limit(80),
+        db.from("historico").select("id,o_que,por,detalhe,quando").eq("por", "claude").or("o_que.ilike.Agente:%,o_que.ilike.Manu:%").gte("quando", new Date(Date.now() - 7 * 86400000).toISOString()).order("quando", { ascending: false }).limit(80),
+        // DÚVIDAS DO AGENTE (Diego, 12/10/2026): as abertas (ele responde no Painel), as respondidas que o
+        // agente ainda não aplicou, e as que viraram regra (vale_sempre). Camada de apoio como `av`/`hs`.
+        db.from("duvidas_agente").select("*").or("status.in.(aberta,respondida),vale_sempre.eq.true").order("criado_em", { ascending: false }).limit(80),
       ]);
       // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
       // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
@@ -3939,7 +3983,7 @@ function Home() {
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
     setOfflineDesde(null);
-    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [] };
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [], duvidasAgente: da?.data || [] };
     aplicarPacote(pacote);
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
@@ -4047,7 +4091,7 @@ function Home() {
     // UM canal só para as sete: cada `.on()` é uma inscrição barata, mas cada CANAL é um socket a mais.
     // E como todas caem no mesmo `recarregarLogo` com debounce, uma escrita do Classic que toca serviço +
     // financeiro + agenda de uma vez vira UMA recarga, não três.
-    const TABELAS_VIVAS = ["agenda", "servicos", "financeiro", "caixa_entrada", "clientes", "pessoais", "avisos_operacionais"];
+    const TABELAS_VIVAS = ["agenda", "servicos", "financeiro", "caixa_entrada", "clientes", "pessoais", "avisos_operacionais", "duvidas_agente"];
     const canal = TABELAS_VIVAS.reduce(
       (ch, table) => ch.on("postgres_changes", { event: "*", schema: "public", table }, recarregarLogo),
       db.channel("operacao-viva")
@@ -4750,7 +4794,7 @@ function Home() {
       {/* Uma barreira por aba (ver BarreiraDaAba lá embaixo): erro numa aba não leva a barra de abas junto.
           `key={tab}` zera a barreira na troca de aba — sem ele, a aba quebrada contaminaria a próxima. */}
       <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}><div className={`aba-entra${abaAnterior.current.classe}`}>
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} atividadeAgente={atividadeAgente} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} atividadeAgente={atividadeAgente} duvidasAgente={duvidasAgente} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
       {tab === "caixa" && <CaixaView inbox={inbox} abrirId={caixaAbrirId} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
       {/* `addInbox` VOLTOU pro Painel (Painel único, etapa 2, 11/10/2026): o card "Anotar agora" tinha saído
           porque o Diego não lançava mais pelo app; agora ele é o botão flutuante "+ Anotar", que salva na
@@ -7507,11 +7551,11 @@ function GrupoRecolhivel({ titulo, resumo = null, contagem = null, semContador =
 // 7 dias. Só linhas "Agente:" entram no card (12/10: "Auditoria nem precisa"). Fechado mostra a última rodada e quantas ações hoje;
 // aberto, a lista por dia. "Agente: Rodou — nada novo" é a batida de presença de cada hora: entra na conta
 // da última vez e fica de fora da lista.
-const AGENTE_PREFIXO = /^(agente|auditoria)\s*:\s*/i;
+const AGENTE_PREFIXO = /^(agente|manu|auditoria)\s*:\s*/i;
 const AGENTE_BATIDA = /^rodou\b/i;
 function separarFonteAgente(h) {
   const m = AGENTE_PREFIXO.exec(String(h.o_que || "")); if (!m) return null;
-  return { ...h, fonte: m[1].toLowerCase(), texto: String(h.o_que).slice(m[0].length).trim() };
+  return { ...h, fonte: m[1].toLowerCase() === "manu" ? "agente" : m[1].toLowerCase(), texto: String(h.o_que).slice(m[0].length).trim() };
 }
 // O DETALHE DIZ O QUE MUDOU (Diego, 12/10/2026: "não dá para saber as mudanças que ele fez"). As rotinas gravam no
 // `detalhe` referências ("cliente <id>", "servico <id>", "agenda <id>", "financeiro <id>") e, quando alteraram algo,
@@ -7550,15 +7594,15 @@ function AgenteCard({ itens, today, services, appointments, customers, finances,
   const rotuloDia = (dia) => dia === today ? "Hoje" : dia === ontem ? "Ontem" : compactDate(dia);
   const hora = (h) => { const d = new Date(h.quando); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
   const haQuanto = (h) => { const minutos = Math.max(0, Math.round((Date.now() - new Date(h.quando).getTime()) / 60000)); return minutos < 2 ? "agora" : minutos < 60 ? `há ${minutos} min` : minutos < 36 * 60 ? `há ${Math.round(minutos / 60)} h` : compactDate(diaDe(h)); };
-  if (!linhas.length) return <GrupoRecolhivel titulo="Agente" className="grupo-agente" semContador resumo="ainda não rodou">
-    <p className="ficha-note agente-vazio">Quando o Agente de hora em hora fizer algo sozinho, aparece aqui.</p>
+  if (!linhas.length) return <GrupoRecolhivel titulo="Manu" className="grupo-agente" semContador resumo="ainda não rodou">
+    <p className="ficha-note agente-vazio">Quando a Manu (o agente de hora em hora) fizer algo sozinha, aparece aqui.</p>
   </GrupoRecolhivel>;
   const acoes = linhas.filter((h) => !AGENTE_BATIDA.test(h.texto));
   const rodada = linhas.find((h) => AGENTE_BATIDA.test(h.texto));
   const hojeN = acoes.filter((h) => diaDe(h) === today).length;
   const resumo = `última rodada ${haQuanto(linhas[0])} · ${hojeN ? `${hojeN} ${hojeN === 1 ? "ação" : "ações"} hoje` : "nada hoje"}`;
   const grupos = []; acoes.forEach((h) => { const dia = diaDe(h); const g = grupos[grupos.length - 1]; if (g && g.dia === dia) g.itens.push(h); else grupos.push({ dia, itens: [h] }); });
-  return <GrupoRecolhivel titulo="Agente" className="grupo-agente" semContador resumo={resumo}>
+  return <GrupoRecolhivel titulo="Manu" className="grupo-agente" semContador resumo={resumo}>
     {rodada && <p className="agente-rodada">Última rodada {hora(rodada)} ({haQuanto(rodada)}): {rodada.texto.replace(AGENTE_BATIDA, "").replace(/^\s*[—-]\s*/, "")}{rodada.detalhe ? ` · ${parseDetalheAgente(rodada.detalhe).texto}` : ""}</p>}
     {!acoes.length && <p className="ficha-note agente-vazio">Nenhuma ação automática nos últimos 7 dias, só rodadas sem novidade.</p>}
     {grupos.slice(0, 7).map((g) => <div className="agente-dia" key={g.dia}>
@@ -7616,7 +7660,144 @@ function ResumoManhaCard({ avisos, today, db, demo, notify, onOpenFicha, onChang
     {blocos.map((b, i) => <div key={i} className={`resumo-bloco${/priorid/i.test(b.titulo) ? " prioridades" : ""}`}><b>{b.titulo}</b><ul>{b.itens.map((it, j) => <Item key={j} it={it} />)}</ul></div>)}
   </section>;
 }
-function Dashboard({ inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, atividadeAgente = [], finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, onVerLeads, onVerOrcamentos, onVerAgenda, onVerEstoque, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+// ===== DÚVIDAS DO AGENTE (Diego, 12/10/2026: "um local onde se o Agente tiver dúvidas ele me perguntar e eu
+// responder lá, para a próxima vez ele pegar") =====
+// Tabela `duvidas_agente`. O agente de hora em hora grava a pergunta (status aberta, com opções curtas quando
+// cabe). O Diego responde AQUI, no Painel, do celular: toca numa opção ou escreve, e marca "Vale sempre" quando
+// a resposta serve pra todo caso parecido. A linha vira `respondida`; na rodada seguinte o agente lê, aplica no
+// caso, marca `aplicada` e, se vale sempre, escreve em `regra` a versão geral — que ele relê em toda rodada.
+// Não é a Caixa: a Caixa é item que chegou (print, comprovante); isto é o agente pedindo uma decisão.
+// MANU (Diego 12/10/2026: "meu agente chama Manu, igual lá no GPT"): o agente de hora em hora é a Manu.
+const ORIGEM_CARTAO = { agente: "Manu", manu: "Manu", auditoria: "Auditoria 02h20", pix: "Pix", caixa: "Caixa", claude: "Claude" };
+const rotuloOrigem = (o) => ORIGEM_CARTAO[String(o || "agente").toLowerCase()] || String(o);
+// A Caixa já tinha o seu canal de pergunta (item em `aguardando_voce` com a pergunta em conversa[], Regra Nº 13/15).
+// Aqui ela só é MOSTRADA no mesmo card: responder grava do mesmo jeito que a tela da Caixa grava.
+function perguntaDaCaixa(item) {
+  const falas = comoLista(item.conversa).filter((m) => m && m.de === "ia" && m.texto);
+  const pergunta = [...falas].reverse().find((m) => m.tipo === "pergunta") || falas[falas.length - 1];
+  return pergunta ? String(pergunta.texto) : "O Claude precisa de uma informação sua sobre este item.";
+}
+function DuvidasAgenteCard({ duvidas, inbox = [], today, db, demo, notify, customers, onOpenFicha, onAbrirCaixa, onChanged }) {
+  const abertas = (duvidas || []).filter((d) => d.status === "aberta").sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em)));
+  const caixa = (inbox || []).filter((it) => it && it.status === "aguardando_voce" && !it.processado).sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em)));
+  const total = abertas.length + caixa.length;
+  if (!total) return null;
+  const nomeDe = (id) => { const c = (customers || []).find((x) => x.id === id); return c ? nomeDoCliente(c) : null; };
+  return <section className="content-card resumo-card duvidas-card">
+    <div className="resumo-topo"><div><p className="kicker">CARTÕES PRA VOCÊ</p>
+      <h3>{total} pergunta{total === 1 ? "" : "s"} pra você</h3>
+      <small>Toque numa opção ou fale no 🎤. Respondeu, some daqui e a Manu aplica na próxima rodada.</small></div></div>
+    {abertas.map((d) => <DuvidaItem key={d.id} d={d} today={today} db={db} demo={demo} notify={notify} nome={d.cliente_id ? nomeDe(d.cliente_id) : null} onOpenFicha={onOpenFicha} onChanged={onChanged} />)}
+    {caixa.map((it) => <DuvidaItem key={"cx-" + it.id} d={{ id: it.id, origem: "caixa", pergunta: perguntaDaCaixa(it), contexto: null, opcoes: /lan[cç]o assim/i.test(perguntaDaCaixa(it)) ? ["Sim, lança assim", "Não"] : [], criado_em: it.criado_em, cliente_id: null }} caixaItem={it} today={today} db={db} demo={demo} notify={notify} nome={null} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />)}
+  </section>;
+}
+function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, onOpenFicha, onAbrirCaixa, onChanged }) {
+  const [texto, setTexto] = useState("");
+  const [opcao, setOpcao] = useState(null);
+  const [sempre, setSempre] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const opcoes = Array.isArray(d.opcoes) ? d.opcoes.map((o) => String(o)).filter(Boolean) : [];
+  const resposta = [opcao, texto.trim()].filter(Boolean).join(" — ");
+  const origem = String(d.origem || "agente").toLowerCase();
+  const haQuanto = () => { const minutos = Math.max(0, Math.round((Date.now() - new Date(d.criado_em).getTime()) / 60000)); return minutos < 2 ? "agora" : minutos < 60 ? `há ${minutos} min` : minutos < 36 * 60 ? `há ${Math.round(minutos / 60)} h` : compactDate(String(d.criado_em).slice(0, 10)); };
+  const gravar = async (status) => {
+    if (status === "respondida" && !resposta) return;
+    setBusy(true);
+    try {
+      if (!demo) {
+        if (caixaItem) {
+          // Mesma gravação da tela da Caixa: fala do Diego em conversa[] e status 'respondido'. "Pular" não existe
+          // pra item da Caixa: ele continua lá esperando (é um item real, não uma pergunta solta).
+          const atual = await lerRegistro(db, "caixa_entrada", caixaItem.id, "id,conversa,status");
+          const conversa = [...comoLista(atual?.conversa), { de: "diego", texto: resposta, em: new Date().toISOString() }];
+          const { error } = await db.from("caixa_entrada").update({ status: "respondido", conversa }).eq("id", caixaItem.id).eq("status", "aguardando_voce"); if (error) throw error;
+        } else {
+          const patch = status === "respondida"
+            ? { status, resposta, vale_sempre: sempre, respondido_em: new Date().toISOString() }
+            : { status, respondido_em: new Date().toISOString() };
+          const { error } = await db.from("duvidas_agente").update(patch).eq("id", d.id).eq("status", "aberta"); if (error) throw error;
+        }
+        try { await db.from("historico").insert({ o_que: status === "respondida" ? `Respondeu ao Claude: ${String(d.pergunta).slice(0, 80)}` : `Pulou pergunta do Claude: ${String(d.pergunta).slice(0, 80)}`, por: "diego", detalhe: status === "respondida" ? `${resposta}${sempre ? " · vale sempre" : ""}${d.cliente_id ? ` · cliente ${d.cliente_id}` : ""}${caixaItem ? ` · caixa ${caixaItem.id}` : ""}` : null }); } catch (e) { /* segue */ }
+      }
+      vibrar(status === "respondida" ? [10, 40, 10] : 8);
+      notify(status === "respondida" ? (sempre ? "Respondido — vira regra na próxima rodada." : "Respondido — a Manu aplica na próxima rodada. Dá pra desfazer na faixa azul.") : "Pergunta descartada.", "ok");
+      if (onChanged && !demo) onChanged();
+    } catch (e) { notify("Erro ao responder: " + e.message, "error"); } finally { setBusy(false); }
+  };
+  return <div className="duvida">
+    <span className={`duvida-origem ${origem}`}>{rotuloOrigem(origem)}</span>
+    <strong>{d.pergunta}</strong>
+    {d.contexto && <span className="duvida-contexto">{d.contexto}</span>}
+    <span className="duvida-quando">Perguntado {haQuanto()}{nome ? ` · ${nome}` : ""}</span>
+    {d.cliente_id && onOpenFicha && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onOpenFicha(d.cliente_id); }}>Abrir ficha{nome ? ` de ${nome.split(" ")[0]}` : ""} ›</button>}
+    {caixaItem && onAbrirCaixa && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onAbrirCaixa(); }}>Ver na Caixa ›</button>}
+    {opcoes.length > 0 && <div className="duvida-opcoes">{opcoes.map((o) => <button type="button" key={o} className={opcao === o ? "ativo" : ""} onClick={() => { vibrar(6); setOpcao(opcao === o ? null : o); }}>{o}</button>)}</div>}
+    <textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={opcoes.length ? "Quer explicar mais? (opcional)" : "Sua resposta pra Manu"} />
+    <GravadorAudio audio={null} onAudio={() => {}} onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={busy} />
+    {!caixaItem && <label className="duvida-sempre"><input type="checkbox" checked={sempre} onChange={(e) => setSempre(e.target.checked)} />Vale sempre: a Manu guarda como regra e não pergunta de novo</label>}
+    <div className="duvida-botoes">
+      <button type="button" className="primary" disabled={busy || !resposta} onClick={() => gravar("respondida")}>{busy ? "…" : "Responder"}</button>
+      {!caixaItem && <button type="button" className="ghost" disabled={busy} onClick={() => gravar("descartada")}>Pular</button>}
+    </div>
+  </div>;
+}
+// RESPONDIDO AO CLAUDE (Diego 12/10: "os cards vão aparecendo, desaparecendo, como resolvido"): o cartão some
+// ao responder e fica nesta faixa azul, com ↶ Desfazer, até o Claude processar (de hora em hora). Desfazer
+// só funciona enquanto a linha ainda está 'respondida' (ou o item da Caixa em 'respondido'): depois que o
+// Claude aplicou, o caminho é um recado novo. Mesmo desenho da faixa "Enviado ao Claude" da agenda.
+function RespondidasAoClaude({ duvidas, inbox = [], db, demo, notify, onChanged }) {
+  const [busyId, setBusyId] = useState(null);
+  const respondidas = (duvidas || []).filter((d) => d.status === "respondida").map((d) => ({ id: d.id, tipo: "duvida", pergunta: d.pergunta, resposta: d.resposta, quando: d.respondido_em || d.criado_em, d }));
+  const caixa = (inbox || []).filter((it) => it && it.status === "respondido" && !it.processado).map((it) => { const falas = comoLista(it.conversa); const ultima = [...falas].reverse().find((m) => m && m.de === "diego"); return { id: it.id, tipo: "caixa", pergunta: perguntaDaCaixa(it), resposta: ultima ? ultima.texto : "", quando: ultima?.em || it.criado_em, it }; });
+  const linhas = [...respondidas, ...caixa].sort((x, y) => String(y.quando).localeCompare(String(x.quando)));
+  if (!linhas.length) return null;
+  const desfazer = async (l) => {
+    setBusyId(l.id);
+    try {
+      if (!demo) {
+        if (l.tipo === "duvida") {
+          const { data, error } = await db.from("duvidas_agente").update({ status: "aberta", resposta: null, vale_sempre: false, respondido_em: null }).eq("id", l.id).eq("status", "respondida").select("id").maybeSingle(); if (error) throw error;
+          if (!data) { notify("A Manu já aplicou essa resposta. Responda de novo com a correção que ela ajusta.", "info"); return; }
+        } else {
+          const atual = await lerRegistro(db, "caixa_entrada", l.id, "id,conversa,status,processado");
+          if (!atual || atual.status !== "respondido" || atual.processado) { notify("O Claude já pegou esse item. Fale com ele pela Caixa.", "info"); return; }
+          const conversa = comoLista(atual.conversa); const idx = [...conversa].map((m) => m && m.de).lastIndexOf("diego"); if (idx >= 0) conversa.splice(idx, 1);
+          const { error } = await db.from("caixa_entrada").update({ status: "aguardando_voce", conversa }).eq("id", l.id).eq("status", "respondido"); if (error) throw error;
+        }
+      }
+      vibrar(8); notify("Desfeito — a pergunta voltou.", "ok"); if (onChanged && !demo) onChanged();
+    } catch (e) { notify("Erro ao desfazer: " + e.message, "error"); } finally { setBusyId(null); }
+  };
+  return <CardRecolhivel className="content-card desfazer-faixa" selo={linhas.length} tom="azul" icone="↶"
+    cabecalho={<><p className="kicker">RESPONDIDO À MANU</p><h3>{linhas.length} resposta{linhas.length === 1 ? "" : "s"} esperando a Manu · dá pra desfazer</h3></>}>
+    {linhas.slice(0, 8).map((l) => <div key={l.tipo + l.id} className="desfazer-linha">
+      <span>💬 <b>{String(l.resposta || "").slice(0, 60)}</b> · {String(l.pergunta).slice(0, 70)}<small>{new Date(l.quando).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small></span>
+      <button type="button" className="ghost" disabled={busyId === l.id} onClick={() => desfazer(l)}>{busyId === l.id ? "…" : "↶ Desfazer"}</button>
+    </div>)}
+    {linhas.length > 8 && <small>+{linhas.length - 8} mais</small>}
+  </CardRecolhivel>;
+}
+// REGRAS APRENDIDAS: tudo que o Diego respondeu com "vale sempre". O agente relê esta lista em toda rodada.
+// "Não vale mais" tira a regra (vale_sempre=false) sem apagar a linha — histórico fica.
+function RegrasAprendidasCard({ duvidas, db, demo, notify, onChanged }) {
+  const [busyId, setBusyId] = useState(null);
+  const regras = (duvidas || []).filter((d) => d.vale_sempre && d.status !== "descartada" && (d.regra || d.resposta)).sort((a, b) => String(b.respondido_em || b.criado_em).localeCompare(String(a.respondido_em || a.criado_em)));
+  if (!regras.length) return null;
+  const tirar = async (d) => {
+    setBusyId(d.id);
+    try {
+      if (!demo) { const { error } = await db.from("duvidas_agente").update({ vale_sempre: false }).eq("id", d.id); if (error) throw error; }
+      vibrar(8); notify("Regra retirada. A Manu volta a perguntar se precisar.", "ok"); if (onChanged && !demo) onChanged();
+    } catch (e) { notify("Erro ao retirar a regra: " + e.message, "error"); } finally { setBusyId(null); }
+  };
+  return <GrupoRecolhivel titulo="Regras que a Manu aprendeu" className="grupo-agente grupo-regras" semContador resumo={`${regras.length} regra${regras.length === 1 ? "" : "s"}`}>
+    {regras.map((d) => <div className="regra-item" key={d.id}>
+      <div><strong>{d.regra || d.resposta}</strong><span>{d.pergunta}{d.respondido_em ? ` · ${compactDate(String(d.respondido_em).slice(0, 10))}` : ""}{d.regra ? "" : " · a Manu ainda vai escrever a regra geral"}</span></div>
+      <button type="button" className="ghost" disabled={busyId === d.id} onClick={() => tirar(d)}>Não vale mais</button>
+    </div>)}
+  </GrupoRecolhivel>;
+}
+function Dashboard({ inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, atividadeAgente = [], duvidasAgente = [], finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, onVerLeads, onVerOrcamentos, onVerAgenda, onVerEstoque, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   // Gaveta do botão flutuante "Anotar" (Painel único, etapa 2, 11/10/2026).
   const [anotarAberto, setAnotarAberto] = useState(false);
@@ -7944,6 +8125,9 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {/* TOPO DO PAINEL (Diego, 11/10/2026: "compromisso atrasado, Hoje e próximos compromissos são os mais
         importantes"): os três ficam no alto, como cards grandes, fora do grupo Pendências. */}
     <ResumoManhaCard avisos={avisos} today={today} db={db} demo={demo} notify={notify} onOpenFicha={onOpenFicha} onChanged={onServicoChanged} />
+    {/* DÚVIDAS DO AGENTE no alto: é decisão do dia, não prestação de contas. Some quando não há pergunta. */}
+    <DuvidasAgenteCard duvidas={duvidasAgente} inbox={inbox} today={today} db={db} demo={demo} notify={notify} customers={customers} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onServicoChanged} />
+    <RespondidasAoClaude duvidas={duvidasAgente} inbox={inbox} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes topo-card tom-vermelho" selo={atrasados.length} tom="vermelho" icone="⏰"
       cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
@@ -8144,6 +8328,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     <PessoaisCard pessoais={pessoais} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     {/* O QUE O AGENTE FEZ fica por último: é prestação de contas, não decisão do dia. */}
     <AgenteCard itens={atividadeAgente} today={today} services={services} appointments={agendaPlanejada} customers={customers} finances={finances} onOpenFicha={onOpenFicha} />
+    <RegrasAprendidasCard duvidas={duvidasAgente} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
     {/* SAIU DO PAINEL em 30/07/2026 o card "N cliente(s) esperando remarcação". Diego: "achei desnecessário
         pra mim, se tem o aviso aqui para Claude". Ele estava certo: remarcar é trabalho que o Claude resolve
         pela caixa, e o item já conta no badge da aba Caixa — o card só repetia isso ocupando o topo da tela
