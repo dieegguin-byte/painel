@@ -506,7 +506,7 @@ button.sutil{opacity:.55;font-size:12px}
 .caixa-conversa b{color:var(--text)}
 .caixa-acoes{display:flex;flex-wrap:wrap;gap:8px}
 .caixa-acoes button{flex:1 1 150px}
-.caixa-form{border-top:1px solid var(--line);padding-top:10px}
+.caixa-form{border-top:1px solid var(--line);padding-top:10px}.caixa-recado{background:#d4a64e0f;border:1px solid #d4a64e44;border-radius:12px;padding:10px 12px}.caixa-recado .kicker{margin:0}
 /* EFEITOS VISUAIS (11/10/2026, Diego: "Sim os 6"). Só CSS, nada de biblioteca. Anima só transform e
    opacity, que o celular faz sem esforço. Quem liga "reduzir movimento" no celular fica sem nenhum. */
 @keyframes abaEntra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
@@ -6690,12 +6690,53 @@ function CaixaView({ inbox, customers, services, agenda, agendaBruta, db, demo, 
       </details>}
       {statusAntigo && <p className="ficha-note" style={{ margin: 0 }}>Status antigo: {statusAntigo}</p>}
       {!acao && <div className="caixa-acoes">{botoes}</div>}
+      {!acao && <CaixaRecado item={item} customers={customers} db={db} demo={demo} notify={notify} onSalvo={() => { if (!demo) onChanged(); }} />}
       {acao === "compromisso" && <CaixaFormCompromisso {...comum} customers={customers} services={services} agenda={agenda} />}
       {acao === "lead" && <CaixaFormLead {...comum} customers={customers} agenda={agenda} />}
       {acao === "remarcar" && <CaixaFormRemarcar {...comum} agenda={agenda} />}
       {["resolvido", "descartado", "respondido", "cancelar_remarcacao"].includes(acao) && <CaixaFormBaixa {...comum} modo={acao} origem={origem} meta={meta} />}
     </article>
   </section>;
+}
+
+// RECADO PRO CLAUDE (Diego, 12/10/2026: "exportei a imagem, foi pra caixa de entrada mas não aparece nada
+// para eu escrever o que é, de quem é"). Compartilhar do WhatsApp salva a carga BRUTA — conversa exportada,
+// print, comprovante — e o Diego só processa depois, pedindo ao Claude. Esta caixa deixa ele dizer na hora
+// "de quem é" (ficha do cliente) e "o que é" (comprovante do Pix da Suzany, conversa do sofá do Hugo…).
+// Grava como mensagem dele em conversa[] (o mesmo canal que o Claude lê) com meta.cliente_id; o item fica
+// na fila como está (processado=false, status igual). Não é triagem: não cria cliente, serviço nem lançamento.
+function CaixaRecado({ item, customers, db, demo, notify, onSalvo }) {
+  const ultimo = [...comoLista(item.conversa)].reverse().find((m) => m?.meta?.tipo_operacional === "recado_caixa");
+  const [clienteId, setClienteId] = useState(ultimo?.meta?.cliente_id || "");
+  const [texto, setTexto] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setClienteId(ultimo?.meta?.cliente_id || ""); setTexto(""); }, [item.id]);
+  const clientes = useMemo(() => [...(customers || [])].sort((a, b) => nomeDoCliente(a).localeCompare(nomeDoCliente(b), "pt-BR")), [customers]);
+  const cliente = clientes.find((c) => c.id === clienteId) || null;
+  const salvar = async () => {
+    if (!texto.trim() && !clienteId) { notify("Escolha o cliente ou escreva o que é.", "error"); return; }
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusy(true);
+    try {
+      // Relê antes de gravar: o Claude ou outra tela pode ter escrito em conversa[] enquanto isto ficou aberto.
+      const { data: atual, error: leituraErr } = await db.from("caixa_entrada").select("conversa").eq("id", item.id).single();
+      if (leituraErr) throw leituraErr;
+      const partes = [cliente ? `De quem é: ${nomeDoCliente(cliente)}${cliente.telefone ? " · " + cliente.telefone : ""}` : "", texto.trim() ? `O que é: ${texto.trim()}` : ""].filter(Boolean);
+      const mensagem = { de: "diego", texto: partes.join("\n"), em: new Date().toISOString(), meta: { tipo_operacional: "recado_caixa", cliente_id: clienteId || null, cliente_nome: cliente ? nomeDoCliente(cliente) : null } };
+      const { error } = await db.from("caixa_entrada").update({ conversa: [...comoLista(atual?.conversa), mensagem] }).eq("id", item.id);
+      if (error) throw error;
+      setTexto("");
+      notify("Recado gravado. O Claude lê quando você pedir pra processar a Caixa.", "ok");
+      onSalvo();
+    } catch (e) { notify("Não gravou o recado: " + e.message, "error"); }
+    finally { setBusy(false); }
+  };
+  return <div className="caixa-form form-grid caixa-recado">
+    <p className="kicker">RECADO PRO CLAUDE · DE QUEM É / O QUE É</p>
+    <label>De quem é<select value={clienteId} onChange={(e) => setClienteId(e.target.value)}><option value="">Ainda não sei / não é de cliente</option>{clientes.map((c) => <option key={c.id} value={c.id}>{nomeDoCliente(c)}{c.telefone ? ` · ${c.telefone}` : ""}</option>)}</select></label>
+    <label>O que é<textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ex.: comprovante do Pix da entrada do sofá; conversa inteira do orçamento; print do endereço" /></label>
+    <div className="ficha-actions"><button className="primary" onClick={salvar} disabled={busy}>{busy ? "Gravando…" : "Gravar recado"}</button></div>
+  </div>;
 }
 
 function CaixaFormBaixa({ item, modo, origem, meta, db, demo, notify, onFeito, onCancelar }) {
