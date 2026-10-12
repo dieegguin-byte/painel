@@ -801,6 +801,63 @@ button.sutil{opacity:.55;font-size:12px}
 .pessoal-item .ficha-actions{width:100%;margin-top:2px}
 .pessoal-item .ficha-actions .ghost{min-height:34px;padding:6px 11px;font-size:11px}
 .pessoal-item .responsavel-edit-row{width:100%}
+/* FICHA DO CLIENTE reformulada (Diego, 12/10/2026: "tudo") */
+.ficha-compacta{display:block}
+.ficha-contato{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:5px;margin-bottom:10px}
+.ficha-contato span{font-size:13px;color:var(--text);overflow-wrap:anywhere}
+.ficha-contato .ficha-loc{font-size:12px;color:var(--muted)}
+.ficha-contato .ficha-loc.falta{color:#e4bd72}
+.ficha-contato .ficha-obs{font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:6px;margin-top:2px}
+.ficha-botoes{display:grid;grid-template-columns:1fr 1fr 1fr 56px;gap:6px;margin-bottom:8px}
+.ficha-botao{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;border-radius:14px;background:#1f1714;border:1px solid var(--line2);color:var(--cream);font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;padding:6px 4px}
+.ficha-botao i{font-style:normal;font-size:18px;line-height:1}
+.ficha-botao:active{transform:scale(.97)}
+.ficha-botao.mais{color:var(--muted)}
+.ficha-botao.mais.aberto{background:var(--orange);color:#1a1210;border-color:var(--orange)}
+.ficha-botao:disabled{opacity:.6}
+.ficha-compacta .ficha-actions{margin-bottom:8px}
+.ficha-servico{display:block;padding:12px 13px}
+.ficha-servico-main{min-width:0}
+.ficha-servico-topo{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.ficha-servico-main .ficha-servico-topo strong{font-size:14px;font-weight:600;margin:0;flex:1 1 auto}
+.status-pill{flex:none;font-style:normal;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:4px 9px;border-radius:999px;background:var(--surface3);color:var(--muted);border:1px solid var(--line2);white-space:nowrap}
+.status-pill.st-lead{background:#8fb8dc22;color:#bcd9ef;border-color:#8fb8dc55}
+.status-pill.st-orcamento{background:#d4a64e22;color:#f0cf8a;border-color:#d4a64e66}
+.status-pill.st-agendado{background:#e17a4222;color:#ffb98a;border-color:#e17a4266}
+.status-pill.st-producao{background:#c08fdc22;color:#dfc2f0;border-color:#c08fdc55}
+.status-pill.st-pronto{background:#6fcf9722;color:#a9e7c2;border-color:#6fcf9766}
+.status-pill.st-entregue,.status-pill.st-pago{background:#6fcf9733;color:#c9f2d8;border-color:#6fcf9788}
+.status-pill.st-perdido{background:#d9534f22;color:#f3a8a3;border-color:#d9534f55}
+.ficha-servico-faixa{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:8px}
+.ficha-servico-faixa b{font-size:16px;color:var(--orange2)}
+.ficha-servico-faixa b.sem-valor{font-size:12px;color:var(--dim);font-weight:600}
+.ficha-servico-faixa time{font-size:12px;color:var(--muted)}
+.ficha-servico-faixa time.passou{color:#ff9d8f;font-weight:700}
+.ficha-prof{background:none;border:0;padding:0;font-size:12px;color:var(--muted);cursor:pointer;text-decoration:underline dotted}
+.ficha-proxima{margin:8px 0 0;font-size:13px;color:var(--text);background:#ffffff08;border-left:3px solid var(--orange);border-radius:6px;padding:7px 10px}
+.ficha-proxima.passou{border-left-color:var(--red);background:#d9534f14}
+.ficha-materiais{margin-top:8px}
+.ficha-materiais summary{cursor:pointer;font-size:12px;color:var(--muted);padding:6px 10px;border:1px solid var(--line);border-radius:999px;display:inline-block;list-style:none}
+.ficha-materiais summary::-webkit-details-marker{display:none}
+.ficha-materiais[open] summary{color:var(--cream);border-color:var(--line2)}
+.ficha-materiais ul{margin:6px 0 0;padding:0 0 0 6px;list-style:none;display:flex;flex-direction:column;gap:3px}
+.ficha-materiais li{font-size:12px;color:var(--muted)}
+.ficha-materiais li.ok{color:#a9e7c2}
+.ficha-servico-pills{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
+.ficha-servico-pills .responsavel-badge{margin:0;min-height:34px;padding:6px 11px;font-size:11px;text-decoration:none}
+.ficha-servico-pills .ficha-principal{flex:1 0 100%;min-height:44px;border-radius:12px;font-size:13px;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.ficha-servico-pills .prontidao-acao{flex:1 0 100%;display:flex;flex-wrap:wrap;gap:6px}
+.ficha-servico-pills .prontidao-acao p{flex:1 0 100%;margin:0;font-size:12px;color:var(--muted)}
+.ficha-servico-pills .prontidao-acao .ghost{min-height:40px;border-radius:12px;font-size:12px}
+.ficha-servico-pills.principal-pronto .prontidao-acao>.ghost:first-child,.ficha-servico-pills.principal-pronto .prontidao-acao>.ghost:nth-child(2){flex:1 0 100%;color:#fff;background:linear-gradient(135deg,#e17a42,#ad4d24);border-color:transparent;font-size:13px;min-height:44px}
+.ficha-servico-pills.principal-pronto .prontidao-acao>.ghost:last-child:not(:first-child){flex:0 1 auto;background:#1a1512;color:var(--muted);border-color:var(--line)}
+.ficha-servico .entrega-form,.ficha-servico .material-edit-block{flex:1 0 100%}
+.foto-grid{grid-template-columns:repeat(3,1fr);gap:6px}
+.foto{border-radius:10px}
+.foto video{width:100%;height:100%;object-fit:cover;display:block}
+.foto.video::after{content:"▶";position:absolute;inset:0;display:grid;place-items:center;font-size:26px;color:#fff;text-shadow:0 2px 8px #000c;pointer-events:none}
+.foto-add{aspect-ratio:1;border-radius:10px;font-size:11px;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center}
+.foto-add b{font-size:22px;line-height:1;color:var(--orange2)}
 /* O QUE O AGENTE FEZ (12/10/2026) */
 .grupo-agente .grupo-titulo::before{content:"🤖 ";font-size:12px}
 .agente-dia{margin:0 0 10px}
@@ -10520,6 +10577,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
   const [avisoDuplicado, setAvisoDuplicado] = useState(null);
   const [capturando, setCapturando] = useState(false);
   const [colarLink, setColarLink] = useState(false);
+  const [maisAcoes, setMaisAcoes] = useState(false); // linha extra da ficha (Capturar, Colar link, Maps, ChatGPT)
   const [linkDraft, setLinkDraft] = useState("");
 
   const load = useCallback(async () => {
@@ -10689,28 +10747,36 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
           <span>{corrigirTelefone(cliente.telefone) ? `Falta o 9 do celular — o certo é ${corrigirTelefone(cliente.telefone)}` : "O número não tem o tamanho de um celular brasileiro. Confira com o cliente."}</span>
           {corrigirTelefone(cliente.telefone) && <button onClick={() => { setForm((f) => ({ ...f, telefone: corrigirTelefone(cliente.telefone) })); setEditing(true); }}>Corrigir e revisar</button>}
         </div>}
-        {!editing ? <div className="ficha-fields">
-          {cliente.telefone && <div className="ficha-field"><small>TELEFONE</small><span>{cliente.telefone}</span></div>}
-          {cliente.cidade && <div className="ficha-field"><small>CIDADE</small><span>{cliente.cidade}</span></div>}
-          {cliente.endereco && <div className="ficha-field"><small>ENDEREÇO</small><span>{cliente.endereco}</span></div>}
-          {cliente.obs && <div className="ficha-field wide"><small>OBSERVAÇÕES</small><span>{cliente.obs}</span></div>}
-          {/* LOCALIZAÇÃO EXATA — aparece SEMPRE, inclusive quando falta. Cliente sem ponto continua
-              utilizável e a pendência fica dita com todas as letras, sem coordenada inventada. */}
-          <div className="ficha-field wide"><small>LOCALIZAÇÃO EXATA</small>
+        {!editing ? <div className="ficha-fields ficha-compacta">
+          {/* TOPO COMPACTO (Diego, 12/10/2026, item 1 da lista): telefone, cidade e endereço numa caixa só, uma
+              linha cada; os seis botões viraram três grandes (WhatsApp, Rota, Editar) e um "⋯" com o resto. */}
+          <div className="ficha-contato">
+            {cliente.telefone && <span>📞 {cliente.telefone}</span>}
+            {(cliente.cidade || cliente.endereco) && <span>📍 {[cliente.cidade, cliente.endereco].filter(Boolean).join(" · ")}</span>}
+            {/* LOCALIZAÇÃO EXATA — aparece SEMPRE, inclusive quando falta. Cliente sem ponto continua
+                utilizável e a pendência fica dita com todas as letras, sem coordenada inventada. */}
             {cliente.latitude != null
-              ? <span>⌖ {cliente.localizacao_confianca === "APROXIMADA" ? "Ponto aproximado" : "Ponto confirmado"} · {origemLocalizacaoLabel(cliente.origem_localizacao)}{cliente.localizacao_confirmada_em ? " · " + new Date(cliente.localizacao_confirmada_em).toLocaleDateString("pt-BR") : ""}</span>
-              : <span>⚠ Pendente — a rota para {cliente.endereco ? "no endereço escrito" : "na cidade"}</span>}
+              ? <span className="ficha-loc ok">⌖ {cliente.localizacao_confianca === "APROXIMADA" ? "Ponto aproximado" : "Ponto confirmado"} · {origemLocalizacaoLabel(cliente.origem_localizacao)}{cliente.localizacao_confirmada_em ? " · " + new Date(cliente.localizacao_confirmada_em).toLocaleDateString("pt-BR") : ""}</span>
+              : <span className="ficha-loc falta">⚠ Sem ponto no mapa — a rota vai {cliente.endereco ? "pelo endereço escrito" : "pela cidade"}</span>}
+            {cliente.obs && <span className="ficha-obs">📝 {cliente.obs}</span>}
           </div>
-          <div className="ficha-actions">
+          <div className="ficha-botoes">
+            {telefoneWhatsapp(cliente.telefone) && <a className="ficha-botao" href={urlWhatsapp(telefoneWhatsapp(cliente.telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer"><i>💬</i>WhatsApp</a>}
+            {cliente.latitude != null
+              ? <a className="ficha-botao" href={urlWaze({ ll: `${cliente.latitude},${cliente.longitude}` })} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer"><i>🧭</i>Rota</a>
+              : <button type="button" className="ficha-botao" onClick={capturarGPS} disabled={capturando}><i>⌖</i>{capturando ? "Buscando…" : "Capturar aqui"}</button>}
+            <button type="button" className="ficha-botao" onClick={() => setEditing(true)}><i>✎</i>Editar</button>
+            <button type="button" className={`ficha-botao mais${maisAcoes ? " aberto" : ""}`} aria-label="Mais ações" aria-expanded={maisAcoes} onClick={() => setMaisAcoes((v) => !v)}><i>⋯</i>mais</button>
+          </div>
+          {maisAcoes && <div className="ficha-actions">
             <button className="ghost" onClick={capturarGPS} disabled={capturando}>{capturando ? "Procurando sinal…" : cliente.latitude != null ? "⌖ Atualizar aqui" : "⌖ Capturar aqui"}</button>
             <button className="ghost" onClick={() => { setColarLink((v) => !v); setLinkDraft(""); }}>{colarLink ? "Cancelar" : "Colar link do Maps"}</button>
-            {cliente.latitude != null && <a className="ghost" href={urlWaze({ ll: `${cliente.latitude},${cliente.longitude}` })} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Waze</a>}
             {cliente.latitude != null && <a className="ghost" href={`https://www.google.com/maps/search/?api=1&query=${cliente.latitude},${cliente.longitude}`} target="_blank" rel="noreferrer">📍 Maps</a>}
-          </div>
+            {/* Ficha é nível CLIENTE: aqui o cliente pode ter vários serviços, então `servico_id`
+                fica de fora. Escolher um seria adivinhar, e adivinhar é o que gera atendimento errado. */}
+            <button className="ghost" onClick={() => compartilharGPT(payloadGPT([["cliente_id", cliente.id], ["nome", cliente.nome], ["cidade", cliente.cidade]]), notify)}>💬 ChatGPT</button>
+          </div>}
           {colarLink && <div className="responsavel-edit-row"><input value={linkDraft} onChange={(e) => setLinkDraft(e.target.value)} placeholder="Cole o link do Google Maps já aberto" autoFocus /><button className="ghost" onClick={usarLinkMaps}>Salvar ponto</button></div>}
-          {/* Ficha é nível CLIENTE: aqui o cliente pode ter vários serviços, então `servico_id`
-              fica de fora. Escolher um seria adivinhar, e adivinhar é o que gera atendimento errado. */}
-          <div className="ficha-actions"><button className="ghost" onClick={() => setEditing(true)}>Editar dados</button>{telefoneWhatsapp(cliente.telefone) && <a className="ghost" href={urlWhatsapp(telefoneWhatsapp(cliente.telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}<button className="ghost" onClick={() => compartilharGPT(payloadGPT([["cliente_id", cliente.id], ["nome", cliente.nome], ["cidade", cliente.cidade]]), notify)}>💬 ChatGPT</button></div>
         </div> : <div className="ficha-edit form-grid">
           <div className="row"><label>Nome*<input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} /></label><label>Telefone<input value={form.telefone} onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))} /></label></div>
           <div className="row"><label>Cidade<input value={form.cidade} onChange={(e) => setForm((f) => ({ ...f, cidade: e.target.value }))} /></label><label>Endereço<input value={form.endereco} onChange={(e) => setForm((f) => ({ ...f, endereco: e.target.value }))} /></label></div>
@@ -10723,7 +10789,21 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
         </div>}
 
         <h3 className="ficha-section">Histórico de serviços</h3>
-        {!servicos.length ? <div className="empty-state"><b>Nenhum serviço registrado.</b></div> : <div className="ficha-servicos">{servicos.map((s) => { const sugestao = s.sugestao_resposta || ""; const tel = telefoneWhatsapp(cliente.telefone); return <div className={`ficha-servico priority-${s.prioridade || "media"}`} key={s.id}><div className="ficha-servico-main"><strong>{s.titulo}</strong><span>{statusLabel[s.status] || s.status}{s.proxima_acao ? " · " + s.proxima_acao : ""}</span>
+        {!servicos.length ? <div className="empty-state"><b>Nenhum serviço registrado.</b></div> : <div className="ficha-servicos">{servicos.map((s) => { const sugestao = s.sugestao_resposta || ""; const tel = telefoneWhatsapp(cliente.telefone);
+          // CARD DO SERVIÇO reformulado (Diego, 12/10/2026, itens 2-4): status como selo colorido, próxima ação com
+          // a data em destaque (vermelha se passou), materiais recolhidos em "N itens · k ✓", UM botão principal
+          // por etapa e o resto como pílula pequena; "Atribuir profissional" só aparece se não tiver.
+          const mats = s.materiais_necessarios || []; const matsOk = mats.filter((m) => m.comprado).length;
+          const prazoPassou = !!s.prazo && s.prazo < hojeISO() && STATUS_VIVOS.includes(s.status);
+          const principal = s.status === "producao" ? "pronto" : ["agendado", "pronto"].includes(s.status) ? "entrega" : ["lead", "orcamento"].includes(s.status) && tel ? "whatsapp" : null;
+          return <div className={`ficha-servico st-${s.status} priority-${s.prioridade || "media"}`} key={s.id}><div className="ficha-servico-main">
+          <div className="ficha-servico-topo"><strong>{s.titulo}</strong><em className={`status-pill st-${s.status}`}>{statusLabel[s.status] || s.status}</em></div>
+          <div className="ficha-servico-faixa">
+            {s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <b className="sem-valor">sem valor</b>}
+            {s.prazo && <time className={prazoPassou ? "passou" : ""}>{prazoPassou ? "⚠ " : ""}{prazoComRotulo(s)}</time>}
+            {s.responsavel && (editandoResp === s.id ? null : <button type="button" className="ficha-prof" onClick={() => { setEditandoResp(s.id); setRespDraft(s.responsavel || ""); }}>👤 {s.responsavel}</button>)}
+          </div>
+          {s.proxima_acao && <p className={`ficha-proxima${prazoPassou ? " passou" : ""}`}>➜ {s.proxima_acao}</p>}
           {/* A DESCRIÇÃO ERA UM BURACO NEGRO. Auditoria de 04/08: `servicos.descricao` era gravada em 13
               serviços e não aparecia em NENHUMA tela — só o financeiro renderiza descrição. Era ali que o
               detalhe do que foi combinado (espuma, catraca, tecido) ia parar quando eu processava a ficha,
@@ -10731,16 +10811,18 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
               Campo que só recebe e nunca devolve não é registro, é perda de informação com passo extra. */}
           {onConferir && <button type="button" className="responsavel-badge agente-ficha-action" onClick={() => onConferir(s.id)}>✧ Conferir serviço</button>}
           {!!(s.descricao || "").trim() && <p className="ficha-servico-desc">{s.descricao}</p>}
-          {!!(s.materiais_necessarios || []).length && <p className="ficha-servico-desc">🧵 {(s.materiais_necessarios || []).map((m) => (m.comprado ? "✓ " : "☐ ") + m.item).join(" · ")}</p>}
+          {!!mats.length && <details className="ficha-materiais"><summary>🧵 Materiais: {mats.length} {mats.length === 1 ? "item" : "itens"} · {matsOk} ✓{matsOk < mats.length ? ` · ${mats.length - matsOk} falta${mats.length - matsOk === 1 ? "" : "m"}` : ""}</summary>
+            <ul>{mats.map((m, i) => <li key={i} className={m.comprado ? "ok" : ""}>{m.comprado ? "✓" : "☐"} {m.item}</li>)}</ul></details>}
           {editandoResp === s.id
             ? <div className="responsavel-edit-row"><input value={respDraft} onChange={(e) => setRespDraft(e.target.value)} placeholder="Nome do profissional" autoFocus /><button className="ghost" onClick={() => salvarResponsavel(s.id)}>Salvar</button><button className="ghost" onClick={() => setEditandoResp(null)}>✕</button></div>
-            : <button type="button" className="responsavel-badge" onClick={() => { setEditandoResp(s.id); setRespDraft(s.responsavel || ""); }}>{s.responsavel ? `👤 ${s.responsavel}` : "+ Atribuir profissional"}</button>}
+            : !s.responsavel && STATUS_VIVOS.includes(s.status) && <button type="button" className="responsavel-badge" onClick={() => { setEditandoResp(s.id); setRespDraft(s.responsavel || ""); }}>+ Atribuir profissional</button>}
           {["agendado", "producao"].includes(s.status) && (editandoMaterial === s.id
             ? <div className="material-edit-block">
                 <div className="responsavel-edit-row"><input value={materialDraft.loja} onChange={(e) => setMaterialDraft((m) => ({ ...m, loja: e.target.value }))} placeholder="Loja do material" /><input type="date" title="Previsão de chegada, se já foi informada" value={materialDraft.data} onChange={(e) => setMaterialDraft((m) => ({ ...m, data: e.target.value }))} /><button className="ghost" onClick={() => salvarMaterial(s.id)}>Salvar</button><button className="ghost" onClick={() => setEditandoMaterial(null)}>✕</button></div>
                 {!!(fornecedores || []).length && <div className="fornecedor-chips">{fornecedores.map((f) => <button type="button" key={f.id} className={materialDraft.loja.trim() === f.nome ? "active" : ""} onClick={() => setMaterialDraft({ loja: f.nome, data: proximaEntregaFornecedor(f.dias_entrega) || materialDraft.data })}>{f.nome}</button>)}</div>}
               </div>
             : <button type="button" className="responsavel-badge" onClick={() => { setEditandoMaterial(s.id); setMaterialDraft({ loja: s.loja_material || "", data: s.data_entrega_material || "" }); }}>{s.loja_material ? `🧵 ${s.loja_material}${s.data_entrega_material ? " · entrega " + compactDate(s.data_entrega_material) : ""}` : "+ Registrar loja/entrega do material"}</button>)}
+          <div className={`ficha-servico-pills${principal === "pronto" ? " principal-pronto" : ""}`}>
           <ProntidaoButton service={s} db={db} demo={demo} notify={notify} onChanged={async () => { await load(); onChanged?.(); }} />
           {["agendado", "producao", "pronto"].includes(s.status) && (entregando === s.id
             ? <div className="entrega-form">
@@ -10750,17 +10832,20 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
                 {overrideMat === s.id && <p className="picker-aviso">Ainda tem material em aberto neste serviço. Confirmando de novo, a entrega sai e a exceção fica no histórico.</p>}
                 <div className="ficha-actions"><button className="primary" onClick={() => confirmarEntrega(s.id)}>{overrideMat === s.id ? "Entregar mesmo com material em aberto" : "Confirmar entrega"}</button><button className="ghost" onClick={() => { setEntregando(null); setOverrideMat(null); }}>Cancelar</button></div>
               </div>
-            : <button type="button" className="responsavel-badge" onClick={() => { setEntregando(s.id); setOverrideMat(null); setValorEntregaDraft(s.valor_orcamento ? String(s.valor_orcamento) : ""); setRecebidoFichaDraft(""); }}>✅ Marcar como entregue</button>)}
-        </div><div className="ficha-servico-meta">{s.valor_orcamento ? <b>{money(s.valor_orcamento)}</b> : <span>—</span>}{s.prazo && <time>{prazoComRotulo(s)}</time>}{(sugestao || tel || ehServicoFechado(s)) && <div className="ficha-servico-acoes">{sugestao && <button className="ghost" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋</button>}{tel && <a className="ghost" href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}
+            : <button type="button" className={principal === "entrega" ? "primary ficha-principal" : "responsavel-badge"} onClick={() => { setEntregando(s.id); setOverrideMat(null); setValorEntregaDraft(s.valor_orcamento ? String(s.valor_orcamento) : ""); setRecebidoFichaDraft(""); }}>✅ Marcar como entregue</button>)}
+          {tel && <a className={principal === "whatsapp" ? "primary ficha-principal" : "responsavel-badge"} href={urlWhatsapp(tel, sugestao)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">💬 WhatsApp</a>}
+          {sugestao && <button type="button" className="responsavel-badge" title="Copiar sugestão" onClick={() => navigator.clipboard.writeText(sugestao)}>📋 Copiar sugestão</button>}
           {/* CONFIRMAÇÃO DE SERVIÇO — só em trabalho FECHADO. Lead e orçamento não têm acordo pra confirmar,
               e emitir documento comercial em cima de proposta viraria "condição oferecida" virando aceite. */}
-          {ehServicoFechado(s) && <button className="ghost" title="Gerar a Confirmação de Serviço em PDF" onClick={() => gerarConfirmacaoServico({ db, demo, cliente, servico: s, servicosDoCliente: servicos, notify })}>📄 Confirmação</button>}</div>}</div></div>; })}</div>}
+          {ehServicoFechado(s) && <button type="button" className="responsavel-badge" title="Gerar a Confirmação de Serviço em PDF" onClick={() => gerarConfirmacaoServico({ db, demo, cliente, servico: s, servicosDoCliente: servicos, notify })}>📄 Confirmação</button>}
+          </div>
+        </div></div>; })}</div>}
         <p className="ficha-note">Mudança de status e financeiro continuam no app atual por enquanto.</p>
 
         <h3 className="ficha-section">Fotos</h3>
         <div className="foto-grid">
-          {fotos.map((f) => <div className="foto" key={f.id}><img src={f.url} alt={f.tipo || "foto"} />{f.tipo && <span className="foto-tag">{f.tipo}</span>}{confirmPhoto === f.id ? <div className="foto-confirm"><button onClick={() => removeFoto(f.id)}>Remover</button><button onClick={() => setConfirmPhoto(null)}>Não</button></div> : <button className="foto-rm" onClick={() => setConfirmPhoto(f.id)}>✕</button>}</div>)}
-          <label className="foto-add">{uploading ? "Enviando…" : "+ Foto"}<input type="file" accept="image/*" capture="environment" onChange={(e) => addFoto(e.target.files?.[0])} /></label>
+          {fotos.map((f) => <div className={`foto${/\.(mp4|mov|webm|m4v)(\?|$)/i.test(f.url || "") ? " video" : ""}`} key={f.id}>{/\.(mp4|mov|webm|m4v)(\?|$)/i.test(f.url || "") ? <video src={f.url} muted playsInline preload="metadata" /> : <img src={f.url} alt={f.tipo || "foto"} loading="lazy" />}{f.tipo && <span className="foto-tag">{f.tipo}</span>}{confirmPhoto === f.id ? <div className="foto-confirm"><button onClick={() => removeFoto(f.id)}>Remover</button><button onClick={() => setConfirmPhoto(null)}>Não</button></div> : <button className="foto-rm" onClick={() => setConfirmPhoto(f.id)}>✕</button>}</div>)}
+          <label className="foto-add"><b>+</b>{uploading ? "Enviando…" : "Foto"}<input type="file" accept="image/*" capture="environment" onChange={(e) => addFoto(e.target.files?.[0])} /></label>
         </div>
       </>}
     </div>
