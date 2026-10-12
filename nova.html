@@ -7376,7 +7376,9 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   const todosDoTipo = soTipo([...atrasos.recentes, ...atrasos.antigos, ...pessoaisAtrasadosAll, ...hojeAll, ...futurosAll]);
   const contagemSelos = todosDoTipo.reduce((m, entry) => { const r = rotuloSelo(entry); m[r] = (m[r] || 0) + 1; return m; }, {});
   const escondidosPorSelo = filtroSelo ? todosDoTipo.length - (contagemSelos[filtroSelo] || 0) : 0;
-  const atrasados = porTipo(atrasos.recentes); const antigos = porTipo(atrasos.antigos);
+  // PESSOAL ATRASADO ENTRA EM ATRASADOS (Diego, 12/10/2026: "meu pessoal tem que entrar em compromissos
+  // normalmente"). Antes o pessoal sem bloqueio na agenda, quando vencia, ia pra uma linha à parte em Pendências.
+  const atrasados = porTipo([...atrasos.recentes, ...pessoaisAtrasadosAll]); const antigos = porTipo(atrasos.antigos);
   const antigosAcima30 = porTipo(atrasos.acima30);
   const pessoaisAtrasados = porTipo(pessoaisAtrasadosAll);
   const hoje = porTipo(hojeAll); const futuros = porTipo(futurosAll);
@@ -7441,7 +7443,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   // Contagens dos grupos recolhidos (12/10/2026): itens, não linhas, pra "Pendências · 7" dizer quantas coisas tem.
   const perguntasCaixa = (inbox || []).filter((item) => item.status === "aguardando_voce");
   const conversasSemDestino = triagensSemDestino(agendaHistorico, appointments, customers);
-  const contagemPendencias = antigos.length + pessoaisAtrasados.length + perguntasCaixa.length + conversasSemDestino.length;
+  const contagemPendencias = antigos.length + perguntasCaixa.length + conversasSemDestino.length;
   const orcamentosAbertos = services.filter((s) => s.status === "orcamento");
   const leadsNovos = services.filter((s) => s.status === "lead");
   const retornosVencidosN = services.filter((s) => retornoVencido(s, today)).length;
@@ -7449,7 +7451,14 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   const materiaisPendentesN = services.filter((s) => ["agendado", "producao"].includes(s.status)).reduce((n, s) => n + (s.materiais_necessarios || []).filter((m) => !m.arquivado && !m.comprado).length, 0);
   const estoqueBaixoN = (estoque || []).filter((e) => /^(ZERADO|ABAIXO)/i.test(String(e.status || ""))).length;
   const contagemProducao = services.filter(servicoPronto).length + services.filter(ocupaCapacidade).length + materiaisPendentesN + estoqueBaixoN;
-  const totalAPagar = (finances || []).filter((f) => f.status === "a_pagar" && f.tipo === "saida" && f.categoria !== "Vale" && f.categoria !== CATEGORIA_MAO_DE_OBRA).reduce((soma, f) => soma + Number(f.valor || 0), 0);
+  // Resumo do Dinheiro fechado (Diego, 12/10/2026: "esses 25 mil a pagar não sei nem de onde é"): somar TODAS as
+  // parcelas a pagar até 2027 assusta e não ajuda a decidir. Fechado mostra o que está vencido; se nada venceu,
+  // o que vence nos próximos 30 dias. O resto continua dentro, em A pagar.
+  const aPagarAbertas = (finances || []).filter((f) => f.status === "a_pagar" && f.tipo === "saida" && f.categoria !== "Vale" && f.categoria !== CATEGORIA_MAO_DE_OBRA);
+  const em30 = (() => { const d = new Date(today + "T12:00:00"); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })();
+  const vencidoAPagar = aPagarAbertas.filter((f) => (f.data || "") < today).reduce((soma, f) => soma + Number(f.valor || 0), 0);
+  const proximos30APagar = aPagarAbertas.filter((f) => (f.data || "") >= today && (f.data || "") <= em30).reduce((soma, f) => soma + Number(f.valor || 0), 0);
+  const resumoDinheiro = vencidoAPagar > 0 ? `${money(vencidoAPagar)} vencido` : proximos30APagar > 0 ? `${money(proximos30APagar)} em 30 dias` : null;
   return <div className="page-grid painel-rolagem">
     {(atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}
       {/* ETIQUETA NUM CONTROLE SÓ (Diego, 11/10/2026: a linha de 14 botões empurrava os cards pra baixo). */}
@@ -7503,8 +7512,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{antigosAcima30.length} com mais de 30 dias · histórico preservado para revisão</span></>}>
       {[...antigos].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
-    {pessoaisAtrasados.length > 0 && <CardRecolhivel selo={pessoaisAtrasados.length} tom="azul" icone="🏠" cabecalho={<><p className="kicker">PESSOAIS</p><h3>{pessoaisAtrasados.length} item(ns) com data vencida</h3><span className="ficha-note" style={{ margin: 0 }}>Concluir ou remarcar no card Pessoais</span></>}>
-      {[...pessoaisAtrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
+    {/* A linha "PESSOAIS · N item(ns) com data vencida" saiu daqui (12/10/2026): pessoal vencido agora mora em Atrasados. */}
       {(() => { const perguntas = (inbox || []).filter((item) => item.status === "aguardando_voce"); if (!perguntas.length || !onAbrirCaixa) return null;
         return <button type="button" className="pend-linha com-selo tom-azul" onClick={onAbrirCaixa}><span className="selo-num" aria-hidden="true"><b>{perguntas.length}</b><small>❓</small></span><h3>{perguntas.length} pergunta(s) aguardando você na Caixa</h3><i>abrir ›</i></button>; })()}
     {/* SAIU DO PAINEL o card Caixa (Diego, 11/10/2026: "está muito cheio"). A aba Caixa no menu já mostra a contagem. */}
@@ -7551,7 +7559,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     </GrupoRecolhivel>
     {/* DINHEIRO (Painel único, 11/10/2026): contas (card de sempre) + a pagar + profissionais + mês. Só leitura e
         atalho; marcar pago continua nas telas de sempre, que abrem pelo "ver tudo". */}
-    <GrupoRecolhivel titulo="Dinheiro" className="grupo-dinheiro" semContador resumo={totalAPagar > 0 ? `${money(totalAPagar)} a pagar` : null} verTudo="ver o financeiro todo ›" onVerTudo={onVerFinanceiro}>
+    <GrupoRecolhivel titulo="Dinheiro" className="grupo-dinheiro" semContador resumo={resumoDinheiro} verTudo="ver o financeiro todo ›" onVerTudo={onVerFinanceiro}>
     {(() => {
       // CONTA CHEGANDO: entra sozinho no Painel 3 dias antes do vencimento (e fica enquanto estiver vencida),
       // com o caixa possível do lado — porque a pergunta que ele faz é "tenho de onde tirar?".
