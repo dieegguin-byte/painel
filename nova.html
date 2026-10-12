@@ -673,7 +673,7 @@ button.sutil{opacity:.55;font-size:12px}
 .pend-linha{width:100%;display:flex;align-items:center;gap:12px;color:inherit;text-align:left;font:inherit;cursor:pointer}
 .pend-linha h3{flex:1;font-size:15px;font-weight:600;margin:0;color:var(--cream)}
 .pend-linha i{font-style:normal;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);white-space:nowrap}
-.grupo-card:not(:has(.card-toggle,.pend-linha)){display:none}
+.grupo-card:not(:has(.card-toggle,.pend-linha)):not(.grupo-agente){display:none}
 /* Topo do Painel: Atrasados e Próximos como cards grandes com selo, no mesmo nível do Hoje */
 .topo-card{position:relative;overflow:hidden;border-color:var(--line2);box-shadow:inset 0 1px 0 #ffffff14,0 1px 2px #0000004d,0 16px 36px -14px var(--tom)}
 .topo-card::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--tom),transparent 75%)}
@@ -858,6 +858,38 @@ button.sutil{opacity:.55;font-size:12px}
 .foto.video::after{content:"▶";position:absolute;inset:0;display:grid;place-items:center;font-size:26px;color:#fff;text-shadow:0 2px 8px #000c;pointer-events:none}
 .foto-add{aspect-ratio:1;border-radius:10px;font-size:11px;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center}
 .foto-add b{font-size:22px;line-height:1;color:var(--orange2)}
+/* O QUE O AGENTE FEZ (12/10/2026) */
+.grupo-agente .grupo-titulo::before{content:"🤖 ";font-size:12px}
+.agente-dia{margin:0 0 10px}
+.agente-dia-titulo{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:6px 0 4px}
+.agente-item{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.agente-item:last-child{border-bottom:0}
+.agente-item time{font-size:12px;font-weight:700;color:var(--muted);padding-top:2px;font-variant-numeric:tabular-nums}
+.agente-item strong{display:block;font-size:14px;font-weight:600;color:var(--text);overflow-wrap:anywhere}
+.agente-item span{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.agente-item.por-auditoria time{color:var(--orange2)}
+.agente-fonte{display:inline-block;font-style:normal;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--orange2);margin-right:6px}
+.agente-vazio{margin:0;padding:6px 0 2px}
+/* TOPO ENXUTO (12/10/2026): menu "⋯" no lugar dos seis botões */
+.header-actions{position:relative}
+.menu-topo-botao{min-width:44px;min-height:44px;padding:6px 12px;font-size:20px;line-height:1;border-radius:12px}
+.menu-topo-botao.aberto{background:var(--orange);color:#1a1210;border-color:var(--orange)}
+.menu-topo-fundo{position:fixed;inset:0;z-index:40;background:#0006}
+.menu-topo{position:absolute;right:0;top:calc(100% + 6px);z-index:41;min-width:220px;display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:14px;background:#1d1613;border:1px solid var(--line2);box-shadow:var(--shadow);animation:noticeIn .15s ease}
+.menu-topo .ghost{width:100%;text-align:left;min-height:44px;font-size:13px}
+@media(max-width:560px){.workspace-header{display:flex;align-items:center;justify-content:space-between}.header-actions{margin-top:0}}
+/* FILTROS DENTRO DOS CARDS (12/10/2026) */
+.filtro-faixa{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:0 0 10px;padding:0 0 10px;border-bottom:1px dashed var(--line)}
+.filtro-faixa button{background:var(--surface2);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:5px 11px;font-size:11px;min-height:30px;cursor:pointer}
+.filtro-faixa button.active{background:var(--orange);border-color:var(--orange);color:#1a1210;font-weight:700}
+.filtro-faixa .filtro-selo-select{font-size:11px;padding:5px 10px;min-height:30px;flex:1 1 120px;min-width:0}
+.filtro-faixa.ativa{border-bottom-color:#d4a64e80}
+/* PAGUEI NO PAINEL (12/10/2026): botão por conta dentro do card Dinheiro, dois toques pra confirmar */
+.contas-card .conta-linha-paguei{position:relative}
+.contas-card .paguei-btn{flex:1 0 100%;margin-top:6px;min-height:42px;border-radius:12px;border:1px solid #6fcf9780;background:#6fcf9722;color:var(--green,#6fcf97);font-weight:800;font-size:14px;letter-spacing:.02em;cursor:pointer;transition:background .15s,transform .1s}
+.contas-card .paguei-btn:active{transform:scale(.98)}
+.contas-card .paguei-btn.armado{background:var(--green,#6fcf97);color:#0f1a12;border-color:transparent;animation:pagueiPisca .9s ease-in-out infinite}
+@keyframes pagueiPisca{0%,100%{box-shadow:0 0 0 0 #6fcf9766}50%{box-shadow:0 0 0 6px #6fcf9700}}
 /* Contas vencida: brilho pulsando mais forte */
 .contas-card::after{animation:contaPulsa 1.8s ease-in-out infinite}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
@@ -1400,6 +1432,22 @@ const demoPessoais = [
 // AGENDA-CAIXA-AVISOS-20260831-001. Aponta pro `a6`, a retirada PROVISÓRIA de Valparaíso que já existia
 // aqui: marcar um presencial perto dela sem saber que ela está esperando encaixe é perder a viagem.
 // A cidade NÃO se repete no aviso — sai de `referencia_id`, do próprio compromisso. Dado duplicado diverge.
+// O QUE O AGENTE FEZ — demo. Linhas de `historico` como as rotinas gravam: `o_que` curto, `por` agente ou
+// auditoria, `detalhe` opcional. "Rodou — nada novo" é a batida de presença: conta pra "última vez", não aparece na lista.
+const demoAtividadeAgente = (() => {
+  const h = (horasAtras, o_que, fonte, detalhe = null) => ({ id: "h" + horasAtras + fonte, o_que: (fonte === "auditoria" ? "Auditoria: " : "Agente: ") + o_que, por: "claude", detalhe, quando: new Date(Date.now() - horasAtras * 3600000).toISOString() });
+  return [
+    h(1, "Rodou — nada novo", "agente"),
+    h(2, "Lead novo: Bruna Bueno — poltrona", "agente", "Da coleta do WhatsApp. Ficou em Leads aguardando a auditoria."),
+    h(2, "Card criado: Follow-up — Bruna Bueno — poltrona R$ 600", "agente", "Amanhã 10h, remoto."),
+    h(5, "Conta lançada: Energia — Equatorial R$ 191,23", "agente", "Vence em 2 dias. Entrou em A pagar."),
+    h(9, "Rodou — nada novo", "agente"),
+    h(23, "2 cards conferidos, 1 lead marcado perdido (Wanderson)", "auditoria", "Sem resposta há 9 dias."),
+    h(23, "Resumo da manhã gravado", "auditoria"),
+    h(31, "Follow-up 1 enviado pela Zapia: Hugo", "agente", "Sem resposta ainda."),
+    h(50, "Card marcado CONFERIR — Pegar medida com Marlom Júnior — Suzany", "agente", "Diego já fez; a auditoria pergunta."),
+  ];
+})();
 const demoAvisos = [
   { id: "av1", dominio: "agenda", prioridade: "alta", ativo: true, expira_em: null, referencia_id: "a6",
     aviso: "Retirada ainda PROVISÓRIA, não confirmada com a cliente. Exige desmontagem do sofá — protege a janela da tarde: só encaixar outro presencial se for pequeno e couber com folga." },
@@ -3667,6 +3715,9 @@ function Home() {
   const [fornecedores, setFornecedores] = useState([]);
   const [estoque, setEstoque] = useState([]);
   const [avisos, setAvisos] = useState([]);
+  // O QUE O AGENTE FEZ (Diego 12/10/2026): linhas de `historico` escritas pelas rotinas (por agente/auditoria/claude).
+  const [atividadeAgente, setAtividadeAgente] = useState([]);
+  const [menuTopo, setMenuTopo] = useState(false);
   // DÍVIDAS (recado de 13/09/2026, caso Raquel R$ 1.489,89). Obrigação viva sem vencimento — não é linha de
   // financeiro. Até aqui o app nunca lia a tabela: a dívida existia certa no banco e invisível na tela.
   const [dividas, setDividas] = useState([]);
@@ -3746,6 +3797,7 @@ function Home() {
     // Avisos entram no pacote (e no cache offline) pelo mesmo motivo do estoque: a decisão de encaixar um
     // compromisso na rota acontece na estrada, muitas vezes sem sinal.
     setAvisos(p.avisos || []);
+    setAtividadeAgente(p.atividadeAgente || []);
     // Dívidas entram no pacote (e no cache offline): sem sinal, a dívida não pode sumir e parecer quitada.
     setDividas(p.dividas || []);
     setProfissionais(p.profissionais || []);
@@ -3756,13 +3808,13 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setDividas(demoDividas); setProfissionais(demoProfissionais); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setAtividadeAgente(demoAtividadeAgente); setDividas(demoDividas); setProfissionais(demoProfissionais); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
-    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, firstError;
+    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, firstError;
     try {
-      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf] = await Promise.all([
+      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
@@ -3806,6 +3858,11 @@ function Home() {
         // PROFISSIONAIS: camada de apoio, como `ds`/`es`/`av`. Se falhar sozinha o app abre normal e a conta
         // do acerto usa o nome que já vem embutido em cada serviço (profissional_cadastro).
         db.from("profissionais").select("id,nome,ativo").order("nome", { ascending: true }),
+        // O QUE O AGENTE FEZ: camada de apoio como `av`. Só o que as rotinas gravaram em `historico` com
+        // `por` agente/auditoria/claude nos últimos 7 dias. Tabela que já existia; nada de schema novo.
+        // `historico_por_check` só aceita 'diego' e 'claude', então as rotinas gravam por='claude' e dizem quem
+        // são no começo do `o_que`: "Agente: …" ou "Auditoria: …". O filtro de prefixo fica no JS (AgenteCard).
+        db.from("historico").select("id,o_que,por,detalhe,quando").eq("por", "claude").or("o_que.ilike.Agente:%,o_que.ilike.Auditoria:%").gte("quando", new Date(Date.now() - 7 * 86400000).toISOString()).order("quando", { ascending: false }).limit(80),
       ]);
       // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
       // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
@@ -3824,7 +3881,7 @@ function Home() {
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
     setOfflineDesde(null);
-    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [] };
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [] };
     aplicarPacote(pacote);
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
@@ -4515,7 +4572,22 @@ function Home() {
     </aside>
     <main className="workspace">
       <div className={`barra-compacta${rolou ? " visivel" : ""}`} aria-hidden="true">{nav.find((item) => item.id === tab)?.label}</div>
-      <header ref={cabecalhoRef} className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions"><BotaoNotificacao db={db} demo={demo} notify={notify} /><button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button><button className="ghost" onClick={copyContext}>Copiar contexto</button>{!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}<button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "Atualizar"}</button>{demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}</div></header>
+      <header ref={cabecalhoRef} className="workspace-header"><div><p className="kicker">{mode === "claude" ? "MODO CLAUDE · OPERAÇÃO SEGURA" : "MODO DIEGO · CONTROLE TOTAL"}</p><h1>{nav.find((item) => item.id === tab)?.label}</h1></div><div className="header-actions">
+        {/* TOPO ENXUTO (Diego, 12/10/2026, foto: "diminuir ou remover"). Os seis botões viraram um menu "⋯";
+            nenhum sumiu, só saíram da frente dos cards. */}
+        <button type="button" className={`ghost menu-topo-botao${menuTopo ? " aberto" : ""}`} aria-label="Mais opções" aria-expanded={menuTopo} onClick={() => { vibrar(6); setMenuTopo((v) => !v); }}>{loading ? "⟳" : "⋯"}</button>
+        {menuTopo && <>
+          <div className="menu-topo-fundo" onClick={() => setMenuTopo(false)} />
+          <div className="menu-topo" onClick={() => setMenuTopo(false)}>
+            <BotaoNotificacao db={db} demo={demo} notify={notify} />
+            <button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button>
+            <button className="ghost" onClick={copyContext}>Copiar contexto</button>
+            {!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}
+            <button className="ghost" onClick={loadAll}>{loading ? "Atualizando…" : "↻ Atualizar"}</button>
+            {demo ? <button className="ghost" onClick={() => setDemo(false)}>Sair da demo</button> : <button className="ghost" onClick={() => { window.sessionStorage.removeItem("tb_pin_ok"); db.auth.signOut(); }}>Sair</button>}
+          </div>
+        </>}
+      </div></header>
 
       {/* A TELA DA CAIXA DE ENTRADA FOI REMOVIDA EM 23/08/2026, a pedido do Diego.
           Ela era a porta de digitação do app — colar mensagem, triar, virar cliente/agenda/
@@ -4528,7 +4600,7 @@ function Home() {
       {/* Uma barreira por aba (ver BarreiraDaAba lá embaixo): erro numa aba não leva a barra de abas junto.
           `key={tab}` zera a barreira na troca de aba — sem ele, a aba quebrada contaminaria a próxima. */}
       <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}><div className={`aba-entra${abaAnterior.current.classe}`}>
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} atividadeAgente={atividadeAgente} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
       {tab === "caixa" && <CaixaView inbox={inbox} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
       {/* `addInbox` VOLTOU pro Painel (Painel único, etapa 2, 11/10/2026): o card "Anotar agora" tinha saído
           porque o Diego não lançava mais pelo app; agora ele é o botão flutuante "+ Anotar", que salva na
@@ -7191,6 +7263,45 @@ function GrupoRecolhivel({ titulo, resumo = null, contagem = null, semContador =
     {aberto && verTudo && onVerTudo && <button type="button" className="grupo-ver-tudo" onClick={onVerTudo}>{verTudo}</button>}
   </section>;
 }
+// ===== O QUE O AGENTE FEZ (Diego, 12/10/2026: "acompanhamento do que o Agente está fazendo") =====
+// Fonte: `historico`, por='claude', `o_que` começando com "Agente: " (rotina de hora em hora) ou "Auditoria: "
+// (02h20) — o check `historico_por_check` só deixa 'diego' e 'claude', então quem fez vai no prefixo. Últimos
+// 7 dias. O card fica recolhido como os outros; fechado mostra quando foi a última vez e quantas ações hoje;
+// aberto, a lista por dia. "Agente: Rodou — nada novo" é a batida de presença de cada hora: entra na conta
+// da última vez e fica de fora da lista.
+const AGENTE_PREFIXO = /^(agente|auditoria)\s*:\s*/i;
+const AGENTE_BATIDA = /^rodou\b/i;
+function separarFonteAgente(h) {
+  const m = AGENTE_PREFIXO.exec(String(h.o_que || "")); if (!m) return null;
+  return { ...h, fonte: m[1].toLowerCase(), texto: String(h.o_que).slice(m[0].length).trim() };
+}
+function AgenteCard({ itens, today }) {
+  const linhas = (itens || []).filter((h) => h && h.quando).map(separarFonteAgente).filter(Boolean).sort((a, b) => String(b.quando).localeCompare(String(a.quando)));
+  if (!linhas.length) return <GrupoRecolhivel titulo="Agente" className="grupo-agente" semContador resumo="ainda não registrou nada aqui">
+    <p className="ficha-note agente-vazio">Quando o Agente de hora em hora ou a auditoria gravarem uma ação, ela aparece aqui.</p>
+  </GrupoRecolhivel>;
+  const ultima = new Date(linhas[0].quando);
+  const minutos = Math.max(0, Math.round((Date.now() - ultima.getTime()) / 60000));
+  const haQuanto = minutos < 2 ? "agora" : minutos < 60 ? `há ${minutos} min` : minutos < 36 * 60 ? `há ${Math.round(minutos / 60)} h` : `${compactDate(ultima.toISOString().slice(0, 10))}`;
+  const acoes = linhas.filter((h) => !AGENTE_BATIDA.test(h.texto));
+  const diaDe = (h) => { const d = new Date(h.quando); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const hojeN = acoes.filter((h) => diaDe(h) === today).length;
+  const resumo = `última vez ${haQuanto}${hojeN ? ` · ${hojeN} ${hojeN === 1 ? "ação hoje" : "ações hoje"}` : ""}`;
+  const grupos = []; acoes.forEach((h) => { const dia = diaDe(h); const g = grupos[grupos.length - 1]; if (g && g.dia === dia) g.itens.push(h); else grupos.push({ dia, itens: [h] }); });
+  const ontem = somarDias(today, -1);
+  const rotuloDia = (dia) => dia === today ? "Hoje" : dia === ontem ? "Ontem" : compactDate(dia);
+  const hora = (h) => { const d = new Date(h.quando); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+  return <GrupoRecolhivel titulo="Agente" className="grupo-agente" semContador resumo={resumo}>
+    {grupos.slice(0, 7).map((g) => <div className="agente-dia" key={g.dia}>
+      <p className="agente-dia-titulo">{rotuloDia(g.dia)}</p>
+      {g.itens.map((h) => <div className={`agente-item por-${h.fonte}`} key={h.id}>
+        <time>{hora(h)}</time>
+        <div><strong>{h.fonte === "auditoria" && <i className="agente-fonte">auditoria</i>}{h.texto}</strong>{h.detalhe && <span>{String(h.detalhe).length > 120 ? String(h.detalhe).slice(0, 117).trimEnd() + "…" : h.detalhe}</span>}</div>
+      </div>)}
+    </div>)}
+    {!acoes.length && <p className="ficha-note agente-vazio">Só batidas de presença nos últimos dias — nenhuma ação registrada.</p>}
+  </GrupoRecolhivel>;
+}
 // ===== RESUMO DA MANHÃ (Diego, 11/10/2026: "3 bacana") =====
 // A auditoria das 2h20 grava UMA linha em avisos_operacionais com dominio "resumo_manha" e expira_em = o dia,
 // e o Painel só mostra. Sem tabela nova: o pacote já traz os avisos ativos. Formato do texto, de propósito
@@ -7231,10 +7342,30 @@ function ResumoManhaCard({ avisos, today, db, demo, notify, onOpenFicha, onChang
     {blocos.map((b, i) => <div key={i} className={`resumo-bloco${/priorid/i.test(b.titulo) ? " prioridades" : ""}`}><b>{b.titulo}</b><ul>{b.itens.map((it, j) => <Item key={j} it={it} />)}</ul></div>)}
   </section>;
 }
-function Dashboard({ inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, onVerLeads, onVerOrcamentos, onVerAgenda, onVerEstoque, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+function Dashboard({ inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, atividadeAgente = [], finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, onVerLeads, onVerOrcamentos, onVerAgenda, onVerEstoque, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   // Gaveta do botão flutuante "Anotar" (Painel único, etapa 2, 11/10/2026).
   const [anotarAberto, setAnotarAberto] = useState(false);
+  // PAGUEI DIRETO NO PAINEL (Diego 12/10/2026: "paguei Pix no Nubank... deixar marcado, fica mais rápido e diminui
+  // a auditoria"). Dois toques no mesmo botão: o primeiro arma ("Confirmar"), o segundo paga. Mesmo gateway e
+  // mesmo eventoId do botão "Marcar pago" da tela A pagar, então pagar aqui ou lá dá no mesmo registro.
+  const [pagandoId, setPagandoId] = useState(null);
+  const [armadoId, setArmadoId] = useState(null);
+  useEffect(() => { if (!armadoId) return; const t = setTimeout(() => setArmadoId(null), 5000); return () => clearTimeout(t); }, [armadoId]);
+  const pagarConta = async (item) => {
+    if (armadoId !== item.id) { vibrar(6); setArmadoId(item.id); return; }
+    setArmadoId(null);
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    if (!db) return;
+    setPagandoId(item.id);
+    try {
+      await processarEventoOperacaoBahia(db, { tipo: "financeiro", eventoId: "app-conta-paga-" + item.id, dados: { financeiroId: item.id, status: "pago", data: hojeISO() } });
+      try { await db.from("historico").insert({ o_que: `Pago pelo Painel: ${descricaoFinanceiraVisivel(item.descricao) || item.categoria || "conta"} · ${money(item.valor)}`, por: "diego", detalhe: "Botão Paguei no card Dinheiro." }); } catch (e) { /* segue */ }
+      vibrar([10, 40, 10]);
+      notify("Pago — saiu da lista e entrou no caixa.", "ok");
+      if (onServicoChanged) await onServicoChanged();
+    } catch (e) { notify("Não consegui marcar pago: " + e.message, "error"); } finally { setPagandoId(null); }
+  };
   // Filtro por etiqueta (Diego, 11/10/2026). Nunca guardado: o app sempre abre em "Todas", pra nenhum card
   // "sumir" por filtro esquecido (susto de 08/10).
   const [filtroSelo, setFiltroSelo] = useState(null);
@@ -7516,14 +7647,25 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   const vencidoAPagar = aPagarAbertas.filter((f) => (f.data || "") < today).reduce((soma, f) => soma + Number(f.valor || 0), 0);
   const proximos30APagar = aPagarAbertas.filter((f) => (f.data || "") >= today && (f.data || "") <= em30).reduce((soma, f) => soma + Number(f.valor || 0), 0);
   const resumoDinheiro = vencidoAPagar > 0 ? `${money(vencidoAPagar)} vencido` : proximos30APagar > 0 ? `${money(proximos30APagar)} em 30 dias` : null;
+  const filtroAtivo = filtroTipo !== "todos" || !!filtroSelo;
+  const rotuloFiltro = [filtroTipo !== "todos" ? (filtroTipo === "remoto" ? "Só remoto" : "Só presencial") : null, filtroSelo ? `só “${filtroSelo}”` : null].filter(Boolean).join(" · ");
+  const totalAgenda = atrasadosAll.length + pessoaisAtrasadosAll.length + hojeAll.length + futurosAll.length;
+  const escondidosPorFiltro = filtroAtivo ? Math.max(0, totalAgenda - (atrasados.length + hoje.length + futuros.length)) : 0;
+  const seloFiltro = filtroAtivo ? <em className="filtro-chip">⚲ {rotuloFiltro}</em> : null;
+  const faixaFiltro = totalAgenda > 0 ? <div className={`filtro-faixa${filtroAtivo ? " ativa" : ""}`}>
+    {PAINEL_TIPO_FILTROS.map((f) => <button type="button" key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => { vibrar(4); setFiltroTipo(f.id); }}>{f.label}</button>)}
+    {todosDoTipo.length > 0 && <select className={`filtro-selo-select${filtroSelo ? " ativo" : ""}`} value={filtroSelo || ""} onChange={(e) => setFiltroSelo(e.target.value || null)} aria-label="Filtrar por etiqueta">
+      <option value="">Etiqueta: todas ▾</option>
+      {Object.entries(contagemSelos).sort((x, y) => y[1] - x[1]).map(([r, n]) => <option key={r} value={r}>{r} ({n})</option>)}
+    </select>}
+  </div> : null;
   return <div className="page-grid painel-rolagem">
-    {(atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}
-      {/* ETIQUETA NUM CONTROLE SÓ (Diego, 11/10/2026: a linha de 14 botões empurrava os cards pra baixo). */}
-      {todosDoTipo.length > 0 && <select className={`filtro-selo-select${filtroSelo ? " ativo" : ""}`} value={filtroSelo || ""} onChange={(e) => setFiltroSelo(e.target.value || null)} aria-label="Filtrar por etiqueta">
-        <option value="">Etiqueta: todas ▾</option>
-        {Object.entries(contagemSelos).sort((x, y) => y[1] - x[1]).map(([r, n]) => <option key={r} value={r}>{r} ({n})</option>)}
-      </select>}</div>}
-    {filtroSelo && escondidosPorSelo > 0 && <p className="filtro-aviso">Só “{filtroSelo}” · {escondidosPorSelo} escondido(s) · <button type="button" onClick={() => setFiltroSelo(null)}>Mostrar todos</button></p>}
+    {/* FILTROS DENTRO DOS CARDS (Diego, 12/10/2026, foto do topo: "presencial, remoto e coisa do tipo poderia ir
+        para dentro dos cards"). A linha Todos/Presencial/Remoto + Etiqueta saiu do topo e virou uma faixa
+        pequena dentro de Atrasados, Hoje e Próximos (os três compartilham o mesmo filtro). Quando algum filtro
+        está ligado, o cabeçalho de cada card mostra um selinho laranja — compromisso "sumido" é o primeiro
+        sintoma de filtro esquecido, então o aviso fica na cara, mesmo com o card fechado. */}
+    {filtroAtivo && <p className="filtro-aviso">{rotuloFiltro}{escondidosPorFiltro > 0 ? ` · ${escondidosPorFiltro} escondido(s)` : ""} · <button type="button" onClick={() => { setFiltroTipo("todos"); setFiltroSelo(null); }}>Mostrar todos</button></p>}
     {/* TOPO DO PAINEL (Diego, 11/10/2026: "compromisso atrasado, Hoje e próximos compromissos são os mais
         importantes"): os três ficam no alto, como cards grandes, fora do grupo Pendências. */}
     <ResumoManhaCard avisos={avisos} today={today} db={db} demo={demo} notify={notify} onOpenFicha={onOpenFicha} onChanged={onServicoChanged} />
@@ -7531,7 +7673,8 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
         ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasDeAtraso(atrasadoMaisAntigo.data, today)} dia(s)`
-        : "De 1 a 14 dias de atraso"}</span></>}>
+        : "De 1 a 14 dias de atraso"}</span>{seloFiltro}</>}>
+      {faixaFiltro}
       {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
@@ -7540,8 +7683,9 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     <CardRecolhivel className="content-card hoje-card"
       cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
       <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${rotinasPendentesHoje} rotina(s)` : ""}</h3>
-      {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora</span>}</>}
+      {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora</span>}{seloFiltro}</>}
       resumo={<AvisoRota compromissos={hojeAll} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />}>
+      {faixaFiltro}
       {hoje.length > 0
         ? [...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)
         : <div className="empty-state"><b>O dia está livre.</b><span>Nada marcado para {compactDate(today)}.</span></div>}
@@ -7554,7 +7698,8 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {/* Só data POSTERIOR a hoje. O "N ainda hoje" saiu daqui: hoje tem card próprio, e repetir o mesmo
         compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
     {futuros.length > 0 && <CardRecolhivel className="content-card topo-card tom-laranja" selo={futuros.length} tom="laranja" icone="📅"
-      cabecalho={<><p className="kicker">PRÓXIMOS COMPROMISSOS</p><h3>{futuros.length} próximo(s) compromisso(s)</h3></>}>
+      cabecalho={<><p className="kicker">PRÓXIMOS COMPROMISSOS</p><h3>{futuros.length} próximo(s) compromisso(s)</h3>{seloFiltro}</>}>
+      {faixaFiltro}
       {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
     {/* ENVIADO AO CLAUDE vem DEPOIS de Atrasados, Hoje e Próximos (Diego, 12/10: "os compromissos de hoje,
         atrasados precisam ser os primeiros, não o recado que vai pro Claude"). Fica recolhido, só com o selo. */}
@@ -7645,7 +7790,10 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         resumo={r.potencialCaixa > 0
           ? <span>💰 Dá pra levantar {money(r.potencialCaixa)}{r.prontosSemCobranca.length ? ` — ${r.prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")} sem pagamento registrado` : ""}</span>
           : <span>Nenhum serviço pronto pra cobrar no momento.</span>}>
-        {alerta.map(linhaConta)}
+        {alerta.map((f) => { const rv = rotuloVencimento(f, today); const armado = armadoId === f.id; const pagando = pagandoId === f.id; return <span className="conta-linha conta-linha-paguei" key={f.id}>
+          <em className={`conta-prazo ${rv.nivel}`}>{rv.texto}</em><strong>{curto(f)}</strong><b>{money(f.valor)}</b>
+          <button type="button" className={`paguei-btn${armado ? " armado" : ""}`} disabled={pagando} onClick={() => pagarConta(f)}>{pagando ? "Salvando…" : armado ? "Confirmar ✓" : "Paguei"}</button>
+        </span>; })}
         {onVerAPagar && <button type="button" className="ghost" onClick={onVerAPagar}>Ver todas em A pagar</button>}
         {/* SEM PRAZO fica no Painel de propósito: foi assim que a dívida do Ozair saiu da rotina — o lembrete
             irmão não nasceu e só o Financeiro guardou. Aqui ela não vence, não cobra e não some. */}
@@ -7713,6 +7861,8 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {/* PESSOAIS mora na mesma home por conveniência dele, mas é outro domínio — e fica DEPOIS do trabalho,
         porque a primeira olhada do dia é a rota. Só sobe pra cara dele quando tem atrasado. */}
     <PessoaisCard pessoais={pessoais} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
+    {/* O QUE O AGENTE FEZ fica por último: é prestação de contas, não decisão do dia. */}
+    <AgenteCard itens={atividadeAgente} today={today} />
     {/* SAIU DO PAINEL em 30/07/2026 o card "N cliente(s) esperando remarcação". Diego: "achei desnecessário
         pra mim, se tem o aviso aqui para Claude". Ele estava certo: remarcar é trabalho que o Claude resolve
         pela caixa, e o item já conta no badge da aba Caixa — o card só repetia isso ocupando o topo da tela
