@@ -7353,8 +7353,10 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       const nomeCurto = (t) => String(t || "").split(/\s[—–-]\s/)[0].trim().split(/\s+/).slice(0, 3).join(" ");
       const porRegiao = {};
       encaixes.forEach((e) => (porRegiao[e.regiao || "Região não informada"] ||= []).push(e));
-      return <section className="content-card encaixes-card">
-        <div className="card-toggle"><span className="selo-num tom-azul" aria-hidden="true"><b>{encaixes.length}</b><small>📍</small></span><div><p className="kicker">ENCAIXES DE ROTA</p><h3>{encaixes.length} caso(s) esperando rota</h3><span className="ficha-note" style={{ margin: 0 }}>Sem data de propósito: quando fechar rota pra região, encaixa.</span></div></div>
+      // AGORA RECOLHÍVEL (Diego, 12/10/2026: "os casos esperando rota têm que ser recolhidos também").
+      // O selo com o número continua à vista; a lista abre no toque.
+      return <CardRecolhivel className="content-card encaixes-card" selo={encaixes.length} tom="azul" icone="📍"
+        cabecalho={<><p className="kicker">ENCAIXES DE ROTA</p><h3>{encaixes.length} caso(s) esperando rota</h3><span className="ficha-note" style={{ margin: 0 }}>Sem data de propósito: quando fechar rota pra região, encaixa.</span></>}>
         {/* SEM `funil-dir` NESTE CARD, medido no A23 (360px): a `status-pill` "AGUARDANDO ROTA" é uppercase
             e sobe pra 13px no celular — comia 164px de um cartão de 292 e espremia nome, região e ação em
             86px. Não havia estouro de página, então o teste de largura sozinho passava; o defeito era a
@@ -7367,7 +7369,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
             {e.cliente?.id && onOpenFicha && <i>›</i>}
           </article>)}
         </div>)}</div>
-      </section>;
+      </CardRecolhivel>;
     })();
   return <div className="page-grid painel-rolagem">
     {(atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="funil-filtros">{PAINEL_TIPO_FILTROS.map((f) => <button key={f.id} className={filtroTipo === f.id ? "active" : ""} onClick={() => setFiltroTipo(f.id)}>{f.label}</button>)}
