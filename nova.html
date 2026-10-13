@@ -5417,6 +5417,12 @@ function interlocutorCompromisso(a, svc, fornecedores, profissionais) {
   if (forn && !citaCliente) return { destino: "interno", motivo: `é na ${forn}` };
   // `profissional`: nome do terceiro citado no título, pro card oferecer o WhatsApp dele (12/10/2026).
   if (prof && !citaCliente) return { destino: "interno", motivo: `é com ${prof}`, profissional: prof };
+  // O QUE FALTA É DO PROFISSIONAL (Diego, 13/10/2026, caso Eloiza x Marcão: "tem que ser do profissional").
+  // "Perguntar a Marcão custo da alternativa ... de Eloiza" cita os dois, e o card abria o WhatsApp da CLIENTE.
+  // Quando o compromisso espera algo do profissional (orçamento, custo, mão de obra, medida, prontidão), o
+  // botão principal é o dele — o cliente fica como segundo botão. Esperar algo do cliente continua "cliente".
+  const esperaDoProfissional = /\b(orcament\w*|orcar|custo|preco|mao de obra|medi(r|da|das|cao)|pront(o|a|os|as|idao)|perguntar|checar|conferir|combinar|cobrar|falar|ver)\b/.test(alvo);
+  if (prof && citaCliente && esperaDoProfissional) return { destino: "profissional", motivo: `é com ${prof}, o que falta é dele`, profissional: prof };
   if ((forn || prof) && citaCliente) return { destino: "incerto", motivo: `envolve ${forn || prof} e o cliente`, profissional: prof || null };
   return { destino: "cliente", motivo: "" };
 }
@@ -6142,9 +6148,15 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
           // todos desde o #72. Só aparece quando o cadastro tem telefone; sem telefone, nada de botão quebrado.
           const telProf = profCadastro ? telefoneWhatsapp(profCadastro.telefone) : "";
           const nomeCurto = (n) => (n || "").split(" ")[0];
+          // PROFISSIONAL NA FRENTE (Diego, 13/10/2026): quando o que falta é do profissional (ou o compromisso é
+          // só com ele), o botão principal "WhatsApp · Marcão" é o dele e a cliente vira o segundo botão "👤 Eloiza".
+          // Esperando algo do cliente, ou na dúvida, a ordem continua a de sempre: cliente na frente.
+          const profNaFrente = !!telProf && (quem.destino === "profissional" || quem.destino === "interno");
+          const nomeProf = nomeCurto(profCadastro?.apelido || profCadastro?.nome);
+          const btnCliente = tel && <a key="cli" className={`btn-wpp${profNaFrente ? " btn-wpp-prof" : ""}`} href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">{profNaFrente ? `👤 ${nomeCurto(cli?.nome) || "Cliente"}` : `WhatsApp${telProf && cli?.nome ? ` · ${nomeCurto(cli.nome)}` : ""}`}</a>;
+          const btnProf = telProf && <a key="prof" className={`btn-wpp${profNaFrente ? "" : " btn-wpp-prof"}`} href={urlWhatsapp(telProf, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">{profNaFrente ? `WhatsApp · ${nomeProf}` : `🛠 ${nomeProf}`}</a>;
           return <div className={`compromisso-botoes${tel ? "" : " sem-wpp"}${temRota ? "" : " sem-rota"}${telProf ? " com-prof" : ""}`}>
-            {tel && <a className="btn-wpp" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp{telProf && cli?.nome ? ` · ${nomeCurto(cli.nome)}` : ""}</a>}
-            {telProf && <a className="btn-wpp btn-wpp-prof" href={urlWhatsapp(telProf, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🛠 {nomeCurto(profCadastro.apelido || profCadastro.nome)}</a>}
+            {profNaFrente ? [btnProf, btnCliente] : [btnCliente, btnProf]}
             {temRota && <a className="btn-rota btn-waze" href={linkWaze} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Waze{selo}</a>}
             {temRota && <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>}
           </div>;
