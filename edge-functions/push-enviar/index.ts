@@ -146,6 +146,10 @@ async function cifrar(texto: string, p256dh: string, auth: string): Promise<Uint
 // ---------------------------------------------------------------- envio
 
 type Assinatura = { id: string; endpoint: string; p256dh: string; auth: string };
+// Um botão da notificação: `action` é a letra que o aparelho devolve, `title` o rótulo, `plano` o que o banco
+// faz quando ela volta (push_acao). O Chrome no Android mostra no máximo 2.
+type Botao = { action: string; title: string; plano: { tabela: string; id?: string; resposta?: string } };
+const MAX_BOTOES = 2;
 
 async function entregar(assinatura: Assinatura, aviso: unknown): Promise<{ ok: boolean; status: number; erro: string; recibo?: string }> {
   const vp = await vapid();
@@ -154,8 +158,14 @@ async function entregar(assinatura: Assinatura, aviso: unknown): Promise<{ ok: b
   // notificação some de vista. O recibo viaja DENTRO da carga cifrada; o service worker devolve no
   // instante em que o evento `push` chega nele. Comparar as duas horas separa as duas causas
   // possíveis — aparelho que não recebe (Android segurando) e aparelho que recebe e não mostra.
-  const recibo = await rpc("push_recibo_abrir", { p_tag: (aviso as any)?.tag ?? null });
-  const corpo = await cifrar(JSON.stringify({ ...(aviso as any), recibo }), assinatura.p256dh, assinatura.auth);
+  // BOTÕES (13/10/2026). O plano do que cada botão faz fica no recibo, no banco; a carga leva só a letra e
+  // o rótulo. O aparelho devolve "a0"/"a1" e o banco aplica o que ele mesmo gravou — ninguém consegue
+  // mandar uma resposta que a pergunta não ofereceu.
+  const botoes: Botao[] = Array.isArray((aviso as any)?.acoes) ? (aviso as any).acoes : [];
+  const plano = botoes.length ? Object.fromEntries(botoes.map((b) => [b.action, b.plano])) : null;
+  const recibo = await rpc("push_recibo_abrir", { p_tag: (aviso as any)?.tag ?? null, p_acoes: plano });
+  const carga = { ...(aviso as any), recibo, acoes: botoes.length ? botoes.map((b) => ({ action: b.action, title: b.title })) : undefined };
+  const corpo = await cifrar(JSON.stringify(carga), assinatura.p256dh, assinatura.auth);
   const r = await fetch(assinatura.endpoint, {
     method: "POST",
     headers: {
@@ -307,6 +317,39 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
   return lista;
 }
 
+// ---------------------------------------------------------------- cartões pra você
+//
+// DIEGO, 13/10/2026: "algumas coisas resolver por lá sem entrar no app, o WhatsApp mesmo responde rapidamente
+// por lá" — mostrando o Niagara. O cartão (duvidas_agente aberta) vira notificação com as duas primeiras opções
+// como botão. Tocar grava a resposta pelo recibo (ver `entregar` e modo=acao); tocar no corpo abre o Painel,
+// onde ficam as opções restantes e o 🎤. Cartão sem opção vai sem botão. Vários de uma vez (a auditoria das
+// 02h20 cria uns quatro) viram UM aviso sem botão: botão só faz sentido quando é uma pergunta só.
+// Janela de horário igual à das contas: o que a auditoria cria de madrugada chega às 08:00, não às 02:25.
+const quemPergunta = (origem: string) => ({ agente: "Manu", manu: "Manu", auditoria: "Auditoria", pix: "Pix", caixa: "Caixa", claude: "Claude" } as Record<string, string>)[String(origem || "agente").toLowerCase()] || String(origem || "Manu");
+
+function avisosDosCartoes(duvidas: any[]): Envio[] {
+  if (!duvidas.length) return [];
+  if (duvidas.length === 1) {
+    const d = duvidas[0];
+    const opcoes: string[] = (Array.isArray(d.opcoes) ? d.opcoes : []).map((o: any) => String(o)).filter(Boolean);
+    const acoes: Botao[] = opcoes.slice(0, MAX_BOTOES).map((titulo, i) => ({
+      action: `a${i}`, title: titulo.slice(0, 20), plano: { tabela: "duvidas_agente", id: String(d.id), resposta: titulo },
+    }));
+    const corpo = [String(d.pergunta || ""), d.cliente ? `(${d.cliente})` : null, opcoes.length > MAX_BOTOES ? `Mais opções no app.` : null]
+      .filter(Boolean).join(" ").slice(0, 240);
+    return [{ chaves: [`duvida:${d.id}`], aviso: { titulo: `${quemPergunta(d.origem)} pergunta`, corpo, tag: `duvida-${d.id}`, url: "./nova.html", acoes } }];
+  }
+  return [{
+    chaves: duvidas.map((d) => `duvida:${d.id}`),
+    aviso: {
+      titulo: `${duvidas.length} cartões pra você`,
+      corpo: duvidas.map((d) => String(d.pergunta || "").slice(0, 60)).join(" · ").slice(0, 200),
+      tag: "duvidas-lote",
+      url: "./nova.html",
+    },
+  }];
+}
+
 // ---------------------------------------------------------------- contas a pagar (D-3)
 //
 // RECADO DO CLASSIC DE 26/09/2026. O resumo das 07:30 dizia "14 conta(s) a pagar · R$ 3.665,27" e mais
@@ -438,6 +481,19 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: achou }), { headers: cabecalhos });
     }
 
+    // BOTÃO TOCADO. Mesma confiança do recibo: o uuid só existe dentro da carga cifrada, e o que ele pode
+    // fazer está gravado no banco (push_acao só aplica o plano daquele recibo, uma vez). GET simples pelo
+    // mesmo motivo do recibo: sem preflight. Resposta legível (CORS aberto) pra que o service worker saiba
+    // se gravou — se não gravou, ele abre o app no lugar.
+    if (modo === "acao") {
+      const id = String(url.searchParams.get("recibo") || doCorpo.recibo || "");
+      const acao = String(url.searchParams.get("acao") || doCorpo.acao || "");
+      const cabecalhos = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
+      if (!/^[0-9a-fA-F-]{36}$/.test(id) || !/^a[0-9]$/.test(acao)) return new Response(JSON.stringify({ ok: false, erro: "pedido invalido" }), { status: 400, headers: cabecalhos });
+      const saida = await rpc("push_acao", { p_recibo: id, p_acao: acao });
+      return new Response(JSON.stringify(saida || { ok: false }), { headers: cabecalhos });
+    }
+
     const segredo = await rpc("push_segredo", { nome: "PUSH_SECRET" });
     if (!segredo || req.headers.get("x-push-secret") !== segredo) {
       return new Response(JSON.stringify({ erro: "sem autorizacao" }), { status: 401, headers: { "Content-Type": "application/json" } });
@@ -451,9 +507,14 @@ Deno.serve(async (req) => {
           endpoint: alvo.endpoint.slice(0, 60) + "...",
           ...(await entregar(alvo, {
             titulo: "Teste do painel",
-            corpo: "Se você está lendo isto, a notificação chega. " + new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+            corpo: "Se você está lendo isto, a notificação chega. Toque num botão pra testar a resposta. " + new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" }),
             tag: "teste",
             url: "./nova.html",
+            // Botões de teste: não mexem em nada, só carimbam o recibo (push_acao, tabela "teste").
+            acoes: [
+              { action: "a0", title: "Chegou", plano: { tabela: "teste", resposta: "Chegou" } },
+              { action: "a1", title: "Também", plano: { tabela: "teste", resposta: "Também" } },
+            ] as Botao[],
           })),
         });
       }
@@ -489,10 +550,12 @@ Deno.serve(async (req) => {
       const leva = levaDaAgenda(pendencias.agenda || []);
       const caixa = pendencias.caixa || [];
       const hora = Number(String(pendencias.agora || "").slice(11, 13));
-      const contas = hora >= HORA_INICIO_CONTAS && hora < HORA_FIM_CONTAS ? contasComPrazo(pendencias).filter(naJanela) : [];
-      candidatos = leva.length + caixa.length + contas.length;
+      const horaDeDia = hora >= HORA_INICIO_CONTAS && hora < HORA_FIM_CONTAS;
+      const contas = horaDeDia ? contasComPrazo(pendencias).filter(naJanela) : [];
+      const duvidas = horaDeDia ? (pendencias.duvidas || []) : [];
+      candidatos = leva.length + caixa.length + contas.length + duvidas.length;
       if (candidatos) {
-        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta)];
+        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`)];
         const liberadas = new Set<string>(await rpc("push_reservar", { chaves }));
         envios = [
           ...avisosDaVarredura(
@@ -500,6 +563,7 @@ Deno.serve(async (req) => {
             caixa.filter((c: any) => liberadas.has(`caixa:${c.id}`)),
           ),
           ...avisoContasD3(contas.filter((c: any) => liberadas.has(chaveConta(c)))),
+          ...avisosDosCartoes(duvidas.filter((d: any) => liberadas.has(`duvida:${d.id}`))),
         ];
       }
     }

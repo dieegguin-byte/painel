@@ -46,7 +46,12 @@
    Android nao acordou o processo e o problema e de ENTREGA. Sao causas diferentes com consertos
    diferentes, e sem esse carimbo as duas parecem iguais de fora. */
 /* v18 (16/09/2026): expulsa do cache a UI anterior que ainda exibia o cronograma Codex como acompanhamento vigente. */
-const VERSAO = 'tb-atendimento-v18';
+/* v19 (13/10/2026): BOTOES NA NOTIFICACAO. Diego mostrou o Niagara respondendo o WA Business sem abrir o
+   app e pediu o mesmo. O Chrome no Android aceita ate 2 botoes por notificacao (texto digitado, nao). O
+   cartao pra voce chega com as duas primeiras opcoes como botao; o toque manda a letra do botao junto com o
+   recibo pra push-enviar?modo=acao, e o banco aplica o plano que ELE gravou no envio. Se nao gravou, abre o
+   app no lugar - o toque nunca some calado. */
+const VERSAO = 'tb-atendimento-v19';
 // Sem segredo aqui de proposito: este arquivo e publico. O que autentica o recibo e o proprio id, que
 // e um uuid que so existe dentro da carga cifrada - quem nao recebeu a notificacao nao tem como chutar.
 const PUSH_FUNCAO = 'https://iymlzdcloaeyybhefywp.supabase.co/functions/v1/push-enviar';
@@ -225,18 +230,53 @@ self.addEventListener('push', (e) => {
       icon: './icon-192.png',
       badge: './icon-192.png',
       vibrate: [80, 40, 80],
+      // Botoes (v19). So {action, title}: o que cada um faz ficou no banco, dentro do recibo.
+      actions: botoesDe(aviso),
       data: { url: (aviso && aviso.url) || './nova.html', recibo: (aviso && aviso.recibo) || null }
     })
   ]));
 });
+
+function botoesDe(aviso) {
+  const lista = aviso && Array.isArray(aviso.acoes) ? aviso.acoes : [];
+  return lista
+    .filter(function (b) { return b && /^a[0-9]$/.test(String(b.action)) && b.title; })
+    .slice(0, 2)
+    .map(function (b) { return { action: String(b.action), title: String(b.title).slice(0, 20) }; });
+}
+// BOTAO TOCADO (v19). Vai com modo cors de proposito: preciso LER a resposta pra saber se gravou. GET sem
+// cabecalho extra nao dispara preflight, entao continua uma requisicao so. Devolve true se o banco aplicou.
+function responderPeloBotao(recibo, acao) {
+  if (!recibo) return Promise.resolve(false);
+  return fetch(PUSH_FUNCAO + '?modo=acao&recibo=' + encodeURIComponent(recibo) + '&acao=' + encodeURIComponent(acao),
+    { mode: 'cors', cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) { return !!(j && j.ok); })
+    .catch(function () { return false; });
+}
 
 // TOQUE NA NOTIFICACAO. Se o app ja esta aberto numa aba, foca ela - reabrir do zero perderia o que ele
 // estava vendo e ainda faria o Babel transpilar 580 KB de novo.
 self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const destino = new URL((e.notification.data && e.notification.data.url) || './nova.html', self.location).href;
-  carimbarRecibo(e.notification.data && e.notification.data.recibo, 'aberto');
-  e.waitUntil((async () => {
+  const recibo = e.notification.data && e.notification.data.recibo;
+  // Toque num BOTAO: grava sem abrir o app. Se o banco nao confirmar (sem sinal, recibo ja usado, cartao
+  // ja fechado no app), cai no toque comum e abre o app - ele ve o cartao e resolve la.
+  if (e.action) {
+    carimbarRecibo(recibo, 'aberto');
+    e.waitUntil(responderPeloBotao(recibo, e.action).then(function (gravou) {
+      if (gravou) return;
+      return abrirApp(destino);
+    }));
+    return;
+  }
+  carimbarRecibo(recibo, 'aberto');
+  e.waitUntil(abrirApp(destino));
+});
+
+function abrirApp(destino) {
+  return (async () => {
     const abertas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const janela of abertas) {
       if (janela.url.indexOf(self.location.origin) !== 0) continue;
@@ -246,5 +286,5 @@ self.addEventListener('notificationclick', (e) => {
       if ('focus' in janela) return janela.focus();
     }
     if (self.clients.openWindow) return self.clients.openWindow(destino);
-  })());
-});
+  })();
+}
