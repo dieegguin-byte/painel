@@ -5584,7 +5584,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     if (demo || !db || !session) return;
     // Abertos + o que a rotina respondeu nos últimos 3 dias (pra ele ver o que o Claude fez).
     const desde = new Date(Date.now() - 3 * 864e5).toISOString();
-    const { data, error } = await db.from("agenda_recados").select("*, agenda(titulo,data,hora,status)").or(`processado_em.is.null,processado_em.gte.${desde}`).order("criado_em", { ascending: true });
+    const { data, error } = await db.from("agenda_recados").select("*, agenda(titulo,data,hora,status,pessoal_id)").or(`processado_em.is.null,processado_em.gte.${desde}`).order("criado_em", { ascending: true });
     if (!error) setRecados(data || []);
   }, [db, demo, session]);
   useEffect(() => { carregar(); }, [carregar]);
@@ -5610,7 +5610,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     const textoGravado = antecipado ? [limpo, `[marcado para ${a.data}${a.hora ? " " + a.hora.slice(0, 5) : ""}]`].filter(Boolean).join(" ") : limpo;
     // O recado nasce ANTES da mudança na agenda: se a mudança falhar, ele é apagado; se o recado falhasse
     // depois da mudança, o card sumiria sem a rotina saber que precisa arrumar o resto.
-    const { data: rec, error: recErr } = await db.from("agenda_recados").insert({ agenda_id: a.id, acao, texto: textoGravado, audio_path: audioPath }).select("*, agenda(titulo,data,hora,status)").single();
+    const { data: rec, error: recErr } = await db.from("agenda_recados").insert({ agenda_id: a.id, acao, texto: textoGravado, audio_path: audioPath }).select("*, agenda(titulo,data,hora,status,pessoal_id)").single();
     if (recErr) throw recErr;
     // Feito ANTES do dia (Diego, 11/10: "o concluir não aceita apertar"): resolveu antes da hora, então a data
     // vira hoje — é o que o próprio banco manda fazer, e o mesmo que o Concluir antigo fazia.
@@ -5620,14 +5620,37 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
       const { error: agErr } = await db.from("agenda").update({ ...(patch || {}), ...(conferir || {}) }).eq("id", a.id).eq("status", "planejado");
       if (agErr) { await db.from("agenda_recados").delete().eq("id", rec.id); throw agErr; }
     }
+    // CARD PESSOAL COM BLOQUEIO (Diego, 13/10/2026: "não tem como eu marcar feito naquele compromisso do carro").
+    // A linha da agenda com pessoal_id é só a indisponibilidade; o fato mora em `pessoais`. Feito/Cancelar aqui
+    // encerram os dois — antes o card escondia os botões e mandava pro card Pessoais, que ele não achava.
+    // Se a segunda escrita falhar, ele PRECISA saber (mesma regra do sincronizarBloqueio do card Pessoais).
+    let avisoPessoal = "";
+    if (patch && a.pessoal_id) {
+      const agora = new Date().toISOString();
+      const pPatch = acao === "feito" ? { status: "CONCLUIDO", concluido_em: agora, atualizado_em: agora } : { status: "CANCELADO", atualizado_em: agora };
+      const { error: pErr } = await db.from("pessoais").update(pPatch).eq("id", a.pessoal_id).eq("status", "PENDENTE");
+      if (pErr) avisoPessoal = " O registro pessoal NÃO acompanhou (" + pErr.message + ") — confira no card Pessoais.";
+    }
     // Histórico é registro, não trava: se falhar, a ação já valeu.
     try { await db.from("historico").insert({ o_que: `${ACAO_RECADO_ROTULO[acao]}: ${a.titulo}`, por: "diego", detalhe: limpo || (audioPath ? "(áudio)" : null) }); } catch (e) { /* segue */ }
     setRecados((prev) => [...prev, rec]);
     if (patch) setAppointments((prev) => prev.filter((x) => x.id !== a.id));
-    notify(acao === "feito" ? "Feito. Saiu da agenda."
-      : acao === "cancelar" ? "Cancelado. Saiu da agenda."
+    notify(acao === "feito" ? "Feito. Saiu da agenda." + avisoPessoal
+      : acao === "cancelar" ? "Cancelado. Saiu da agenda." + avisoPessoal
       : acao === "remarcar" ? `Anotado. O card sai da tela e volta na data nova que o Claude escolher (${HORARIOS_ROTINA_RECADOS}).`
-      : `Recado guardado. O Claude lê na próxima rodada (${HORARIOS_ROTINA_RECADOS}).`, "ok");
+      : `Recado guardado. O Claude lê na próxima rodada (${HORARIOS_ROTINA_RECADOS}).`, avisoPessoal ? "error" : "ok");
+    if (onChanged) onChanged();
+    return true;
+  }, [db, demo, notify, onChanged, setAppointments]);
+
+  // ITEM PESSOAL SEM LINHA NA AGENDA (projetado por pessoaisNaFila): o Feito escreve direto em `pessoais`.
+  const concluirPessoal = useCallback(async (a) => {
+    if (demo) { setAppointments((prev) => prev.filter((x) => x.id !== a.id)); notify("Concluído (demo).", "ok"); return true; }
+    const agora = new Date().toISOString();
+    const { error } = await db.from("pessoais").update({ status: "CONCLUIDO", concluido_em: agora, atualizado_em: agora }).eq("id", a.pessoal_id).eq("status", "PENDENTE");
+    if (error) throw error;
+    try { await db.from("historico").insert({ o_que: `Feito: ${a.titulo}`, por: "diego", detalhe: "Pessoal, pelo card da agenda." }); } catch (e) { /* segue */ }
+    notify("Concluído. Continua guardado no histórico, no card Pessoais.", "ok");
     if (onChanged) onChanged();
     return true;
   }, [db, demo, notify, onChanged, setAppointments]);
@@ -5653,6 +5676,11 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
         const volta = { status: "planejado", ...(m ? { data: m[1], ...(m[2] ? { hora: m[2] } : {}) } : {}) };
         const { error: agErr } = await db.from("agenda").update(volta).eq("id", r.agenda_id).eq("status", r.acao === "feito" ? "feito" : "cancelado");
         if (agErr) throw agErr;
+        // O registro pessoal volta junto com o bloqueio (ver enviar).
+        if (r.agenda?.pessoal_id) {
+          const { error: pErr } = await db.from("pessoais").update({ status: "PENDENTE", concluido_em: null, atualizado_em: new Date().toISOString() }).eq("id", r.agenda.pessoal_id).neq("status", "PENDENTE");
+          if (pErr) notify("O bloqueio voltou, mas o registro pessoal NÃO (" + pErr.message + ") — confira no card Pessoais.", "error");
+        }
       }
       const { error: delErr } = await db.from("agenda_recados").delete().eq("id", r.id).is("processado_em", null);
       if (delErr) throw delErr;
@@ -5670,7 +5698,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     return data?.signedUrl || null;
   }, [db, demo, notify]);
 
-  return useMemo(() => ({ recados, enviar, manter, ouvir, desfazer, notify }), [recados, enviar, manter, ouvir, desfazer, notify]);
+  return useMemo(() => ({ recados, enviar, concluirPessoal, manter, ouvir, desfazer, notify }), [recados, enviar, concluirPessoal, manter, ouvir, desfazer, notify]);
 }
 
 // Selo SEMPRE visível (fora do corpo recolhido): remarcação do Claude esperando conferência e recados que a
@@ -5867,10 +5895,16 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
     : passouDaHora ? <em className="idade-atraso">passou da hora</em> : null;
   // Sem `notify` aqui (o card não recebe a prop) — o aviso da cópia vive no próprio card.
   const [avisoGPT, setAvisoGPT] = useState("");
-  // ITEM PESSOAL PROJETADO (ver pessoaisNaFila): não existe linha de agenda por trás dele. Este card não
-  // conclui e não reagenda de propósito — as duas ações escrevem em `agenda`, e aqui não há linha pra
-  // escrever; um botão que não tem o que gravar é pior que botão nenhum. Quem encerra ou remarca é o card
-  // Pessoais, que é o dono do fato. Este card existe pra ele enxergar o dia inteiro num lugar só.
+  const [busyPessoal, setBusyPessoal] = useState(false);
+  // ITEM PESSOAL PROJETADO (ver pessoaisNaFila): não existe linha de agenda por trás dele. Remarcar continua
+  // no card Pessoais (é lá que mora a data), mas o FEITO escreve direto em `pessoais` (Diego, 13/10/2026:
+  // "não tem como eu marcar feito naquele compromisso do carro" — o botão tem que estar onde o card está).
+  const feitoPessoal = async () => {
+    if (busyPessoal || !acoes?.concluirPessoal) return;
+    if (!window.confirm(`Marcar “${a.titulo}” como feito?`)) return;
+    setBusyPessoal(true);
+    try { await acoes.concluirPessoal(a); } catch (e) { acoes.notify("Não salvou: " + (e.message || e), "error"); } finally { setBusyPessoal(false); }
+  };
   if (a.pessoal_virtual) return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}`}>
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
@@ -5884,10 +5918,13 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       </span>
       <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
     </button>
-    <p className="compromisso-material">⛔ Pessoal{a.hora ? "" : " · sem hora marcada, por isso não bloqueia horário na agenda"}. Concluir ou remarcar é no card Pessoais.</p>
+    <p className="compromisso-material">⛔ Pessoal{a.hora ? "" : " · sem hora marcada, por isso não bloqueia horário na agenda"}. Remarcar é no card Pessoais.</p>
     {aberto && <div className="compromisso-corpo">{a.pessoal
       ? <PessoalDetalhe p={a.pessoal} a={a} today={today} />
-      : a.detalhe_visivel && <p className="compromisso-material">{a.detalhe_visivel}</p>}</div>}
+      : a.detalhe_visivel && <p className="compromisso-material">{a.detalhe_visivel}</p>}
+      {acoes?.concluirPessoal && <div className="card-acoes"><div className="card-acoes-botoes linha">
+        <button type="button" className="primary" onClick={feitoPessoal} disabled={busyPessoal}>{busyPessoal ? "…" : "✅ Feito"}</button>
+      </div></div>}</div>}
   </article>;
   // A sugestão GRAVADA vence sempre: ela nasce da conversa real, com julgamento comercial.
   // Só quando ela falta é que o app escreve — e apenas se provar que o interlocutor é o cliente.
@@ -6034,7 +6071,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
     </button>
     {revisaoData && <p className="revisao-data">Remarcação pendente · idade calculada pela data original. A data precisa de revisão.</p>}
-    {acoes && !a.pessoal_id && <SelosClaudeDoCard a={a} acoes={acoes} onMudar={() => setAberto(true)} />}
+    {acoes && <SelosClaudeDoCard a={a} acoes={acoes} onMudar={() => setAberto(true)} />}
     {sucessor && diasAtraso > 0 && <p className="talvez-feito">Pode já estar feito: “{sucessor.titulo}” foi criado depois deste, no mesmo serviço. Se a etapa aconteceu, conclua aqui — o app não fecha sozinho.</p>}
     {aberto && <div className="compromisso-corpo">
       {(a.pessoal || oQueFazer !== tituloCard) && <h4 title={tituloCard}>{tituloCard}</h4>}
@@ -6046,7 +6083,8 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
           o próprio Diego, e ele estava vendo "Compromisso pessoal" às 14h sem saber que era o parafuso do
           banco do carro. Decisão dele: pessoal tem que ser legível em todo lugar do app. */}
       {/* MUDOU DE NOVO EM 13/09 (recado de 08/09): o registro completo vem aqui dentro, não "no card Pessoais". */}
-      {a.pessoal_id && <p className="compromisso-material">⛔ Pessoal — você está indisponível neste horário{!a.pessoal && a.detalhe_visivel ? ` · ${a.detalhe_visivel}` : ""}. Concluir ou remarcar é no card Pessoais.</p>}
+      {/* 13/10/2026: os botões voltaram pra este card. Feito e Cancelar encerram o bloqueio E o registro pessoal (ver enviar). */}
+      {a.pessoal_id && <p className="compromisso-material">⛔ Pessoal — você está indisponível neste horário{!a.pessoal && a.detalhe_visivel ? ` · ${a.detalhe_visivel}` : ""}. Feito aqui encerra também o registro pessoal.</p>}
       {a.pessoal && <PessoalDetalhe p={a.pessoal} a={a} today={today} />}
       {!!(materiais || []).length && <p className="compromisso-material">⚑ Aproveitar para o material: {(materiais || []).map((m) => m.descricao || "material").join(" · ")}</p>}
       {/* CONTATO IMPOSSÍVEL: o app mandava "tentar contato de novo" sem existir telefone na ficha, e o Diego
@@ -6102,7 +6140,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         })()}
         {avisoGPT && <p className="compromisso-material">{avisoGPT}</p>}
       </div>
-      {acoes && !a.pessoal_id && <AcoesDoCompromisso a={a} acoes={acoes} today={today} />}
+      {acoes && <AcoesDoCompromisso a={a} acoes={acoes} today={today} />}
     </div>}
   </article>;
 }
