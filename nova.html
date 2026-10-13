@@ -2015,6 +2015,10 @@ const IGREJA_HORA_RESERVA = "20:00";
 const IGREJA_ROTULO = IGREJA_HORA.endsWith(":00") ? String(Number(IGREJA_HORA.slice(0, 2))) + "h" : IGREJA_HORA.replace(":", "h");
 // Margem pra trocar de roupa e sair — chegar em cima da hora é chegar atrasado.
 const IGREJA_MARGEM_MIN = 20;
+// ALMOÇO (Diego 13/10/2026): de segunda a sexta, das 11h às 13h30 ele busca a marmita, leva a Raquel na escola e
+// leva marmita pra mãe. Presencial nessa faixa só se o cliente não tiver outro jeito — arriscado, não proibido.
+const ALMOCO_DIAS = [1, 2, 3, 4, 5];
+const ALMOCO_JANELA = ["11:00", "13:30"];
 // Tempo típico de estrada entre as praças do Diego, em minutos (par de cidadeChave em ordem alfabética). Estimativa pro ALERTA, não pra bloquear.
 const TEMPO_ESTRADA_MIN = { "brasilia|luziania": 75, "luziania|valparaiso": 25, "cidade ocidental|luziania": 30, "luziania|novo gama": 35, "jardim inga|luziania": 15, "aguas lindas de goias|luziania": 105, "aguas claras|luziania": 60, "aguas claras|brasilia": 25, "brasilia|valparaiso": 45, "brasilia|novo gama": 50, "brasilia|cidade ocidental": 50, "aguas lindas de goias|brasilia": 50, "novo gama|valparaiso": 15, "cidade ocidental|valparaiso": 15, "cidade ocidental|novo gama": 20, "luziania|riacho fundo": 50, "riacho fundo|valparaiso": 30, "aguas claras|riacho fundo": 20, "brasilia|riacho fundo": 25, "novo gama|riacho fundo": 30, "cidade ocidental|riacho fundo": 45, "aguas lindas de goias|riacho fundo": 60, "aguas claras|valparaiso": 40, "aguas claras|novo gama": 45, "aguas claras|cidade ocidental": 55, "aguas claras|aguas lindas de goias": 60, "luziania|taguatinga": 60, "aguas claras|taguatinga": 10, "brasilia|taguatinga": 25, "taguatinga|valparaiso": 45, "novo gama|taguatinga": 45, "cidade ocidental|taguatinga": 55, "riacho fundo|taguatinga": 20, "aguas lindas de goias|taguatinga": 40, "jardim inga|taguatinga": 55 };
 // Riacho Fundo e os pares com Águas Claras entraram em 23/07/2026 porque o par que não existe aqui cai num
@@ -3401,6 +3405,14 @@ function conflitaComIgreja(dataISO, hora, tipo, cidade) {
   const volta = voltaDaIgreja(dataISO, hora, tipo, cidade);
   return volta !== null && volta > minutosDoHorario(IGREJA_HORA) - IGREJA_MARGEM_MIN;
 }
+// Mesma conta da igreja: o que importa é a hora em que ele chega de volta em Luziânia. Um 10h em Brasília acaba
+// 11h e chega 12h15 — cai no almoço. Horário que começa depois das 13h30 não conflita.
+function conflitaComAlmoco(dataISO, hora, tipo, cidade) {
+  if (tipo === "remoto" || !hora || !ALMOCO_DIAS.includes(new Date(dataISO + "T00:00:00").getDay())) return false;
+  const inicio = minutosDoHorario(hora);
+  if (inicio >= minutosDoHorario(ALMOCO_JANELA[1])) return false;
+  return inicio + DURACAO_SERVICO_MIN + tempoEstradaMin(cidade, CIDADE_BASE) > minutosDoHorario(ALMOCO_JANELA[0]);
+}
 function igrejaBloqueia(dataISO, hora, tipo, cidade) {
   const volta = voltaDaIgreja(dataISO, hora, tipo, cidade);
   return volta !== null && volta > minutosDoHorario(IGREJA_HORA_RESERVA) - IGREJA_MARGEM_MIN;
@@ -3433,7 +3445,7 @@ function horariosSugeridos(dataISO, tipo, ocupados, cidade, outrosDoDia) {
   const agora = new Date();
   const minAgora = dataISO === hojeISO() ? agora.getHours() * 60 + agora.getMinutes() : -1;
   return horariosParaTipo(dataISO, tipo, ocupados).filter((h) => minutosDoHorario(h) > minAgora
-    && !conflitaComIgreja(dataISO, h, tipo, cidade) && !apertaARota(h, tipo, cidade, outrosDoDia));
+    && !conflitaComIgreja(dataISO, h, tipo, cidade) && !conflitaComAlmoco(dataISO, h, tipo, cidade) && !apertaARota(h, tipo, cidade, outrosDoDia));
 }
 // Uma sugestão só, pra quem precisa de um horário e não de uma lista (triagem, plano de compra): o primeiro
 // horário livre e seguro do dia. Sem preferência de tarde desde 14/09 (a rotina saiu), então pode cair às 08:00.
@@ -8789,18 +8801,19 @@ function AgendaPicker({ appointments, appt, onClose, onPicked }) {
       <div className="modal-head"><div><p className="kicker">ESCOLHER DIA E HORÁRIO</p><h2>{appt.titulo || "Compromisso"}</h2></div><button className="ghost" onClick={onClose}>Fechar</button></div>
       <p className="modal-intro">{tipo === "remoto"
         ? "Tarefa remota — não disputa horário nem estrada."
-        : `Presencial${cidade ? " em " + cidade : ""} — horários livres que não apertam a estrada nem a igreja de ${IGREJA_ROTULO}; os arriscados ficam atrás do botão abaixo.`}</p>
+        : `Presencial${cidade ? " em " + cidade : ""} — horários livres que não apertam a estrada, o almoço (11h–13h30) nem a igreja de ${IGREJA_ROTULO}; os arriscados ficam atrás do botão abaixo.`}</p>
       {!dias.length ? <div className="empty-state"><b>Sem horário sugerido nos próximos 14 dias.</b><span>Use "ver todos os horários" pra escolher manualmente.</span></div> : dias.map((dia) => <div className="picker-day" key={dia.dataISO}>
         <div className={`picker-day-label${dia.conflito ? " conflito" : ""}`}>{compactDate(dia.dataISO)}{dia.doDia.length ? ` · ${dia.doDia.length} compromisso(s)` : " · dia livre"}{dia.cidadesDoDia.length ? ` · 🏙 ${dia.cidadesDoDia.join(", ")}` : ""}{dia.igreja ? ` · ⛪ ${IGREJA_ROTULO}` : ""}</div>
         {dia.conflito && <div className="picker-aviso">⚠️ Já tem {dia.outrasCidades.map((a) => `${(a.hora || "").slice(0, 5)} em ${a.cidade}`).join(", ")} — horários em vermelho não dão tempo de serviço + estrada.</div>}
         <div className="picker-slots">{dia.livres.map((h) => {
           const rota = horarioApertado(h, dia.outrasCidades, cidade);
           const igreja = conflitaComIgreja(dia.dataISO, h, tipo, cidade);
-          const travado = rota || igreja;
+          const almoco = conflitaComAlmoco(dia.dataISO, h, tipo, cidade);
+          const travado = rota || igreja || almoco;
           const chave = dia.dataISO + " " + h;
-          const motivo = igreja ? `Serviço + estrada de volta não fecha antes do culto das ${IGREJA_ROTULO} — se marcar, ele vai no das 20h.` : "Muito perto do compromisso em outra cidade — serviço + estrada não fecha.";
+          const motivo = igreja ? `Serviço + estrada de volta não fecha antes do culto das ${IGREJA_ROTULO} — se marcar, ele vai no das 20h.` : almoco ? "Cai no almoço (11h–13h30: marmita, Raquel na escola, marmita da mãe) — só se o cliente não tiver outro jeito." : "Muito perto do compromisso em outra cidade — serviço + estrada não fecha.";
           return <button key={h} className={`picker-slot${travado ? " risky" : ""}${confirmando === chave ? " confirmando" : ""}`} title={travado ? motivo : ""} onClick={() => escolher(dia.dataISO, h, travado)}>
-            {confirmando === chave ? "Confirmar " + h + "?" : h}{igreja && confirmando !== chave ? " ⛪" : ""}
+            {confirmando === chave ? "Confirmar " + h + "?" : h}{igreja && confirmando !== chave ? " ⛪" : almoco && confirmando !== chave ? " 🍱" : ""}
           </button>;
         })}</div>
       </div>)}
