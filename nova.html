@@ -899,7 +899,7 @@ button.sutil{opacity:.55;font-size:12px}
 .compromisso-obs .compromisso-obs-texto{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--text)}
 .compromisso-botoes{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:6px}
 .compromisso-botoes.sem-rota{grid-template-columns:1fr}
-.compromisso-botoes.sem-wpp{grid-template-columns:1fr 1fr}
+.compromisso-botoes.sem-wpp{grid-template-columns:1fr 1fr}.compromisso-botoes.com-prof{grid-template-columns:1.1fr 1.1fr 1fr 1fr}.compromisso-botoes.com-prof.sem-rota{grid-template-columns:1fr 1fr}.compromisso-botoes.com-prof.sem-wpp{grid-template-columns:1fr 1fr 1fr}.compromisso-botoes.com-prof.sem-wpp.sem-rota{display:grid;grid-template-columns:1fr}.btn-wpp-prof{background:#1f2b22;border:1px solid #2f5a3f;color:#9fd9b4}
 .compromisso-botoes.sem-wpp.sem-rota{display:none}
 .compromisso-botoes .btn-maps{background:#1f1714;border:1px solid var(--line2);color:var(--text)}
 .compromisso-botoes .btn-wpp,.compromisso-botoes .btn-rota{min-width:0;padding:12px 8px;font-size:13px;display:flex;align-items:center;justify-content:center;min-height:48px}
@@ -1434,6 +1434,7 @@ const demoAppointments = [
   // Os cinco casos de destino que existem na base real, pra demo servir de teste de regressão:
   // loja com endereço e sem serviço · local igual à cidade · local que é aviso, não endereço ·
   // fornecedor só com nome · cliente com endereço na ficha.
+  { id: "a00", titulo: "Checar prontidão — Reforma de sofá com Marlom Júnior", data: hojeISO(), hora: "07:30", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", servico_id: "s8" },
   { id: "a0", titulo: "Comprar material Ana Paula — Plástico & Tal", data: hojeISO(), hora: "08:00", cidade: "Valparaíso de Goiás", local: "Plástico & Tal - Av. Marginal, Qd. 45, lote 32 B - Jardim Ipanema", tipo: "presencial", status: "planejado", servico_id: null },
   { id: "a1", titulo: "Ana Paula — entregar poltrona", data: hojeISO(), hora: "14:00", cidade: "Valparaíso", local: "Valparaíso", tipo: "presencial", status: "planejado", servico_id: "s4" },
   { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", local: "Remoto / WhatsApp", tipo: "remoto", status: "planejado", servico_id: "s2" },
@@ -1601,7 +1602,7 @@ const demoEstoque = [
 ];
 // Cadastro mínimo pra demo provar o acerto por serviço: dois com conta e um só pra sugestão do seletor.
 const demoProfissionais = [
-  { id: "p1", nome: "Marlom Júnior", ativo: true },
+  { id: "p1", nome: "Marlom Júnior", telefone: "61991112233", ativo: true },
   { id: "p2", nome: "Marcão", ativo: true },
   { id: "p3", nome: "Gaspar", ativo: true },
 ];
@@ -3832,7 +3833,8 @@ function Home() {
   // financeiro. Até aqui o app nunca lia a tabela: a dívida existia certa no banco e invisível na tela.
   const [dividas, setDividas] = useState([]);
   // CADASTRO DE PROFISSIONAIS (06/10/2026): o acerto por serviço soma pelo vínculo, não pelo nome escrito.
-  // Só id e nome — é o que dá nome à conta e alimenta os seletores da aba Profissionais.
+  // id, nome, apelido e telefone — dá nome à conta, alimenta os seletores da aba Profissionais e, desde
+  // 12/10/2026, o botão de WhatsApp do profissional nos cards da agenda (via CadastroProfissionaisCtx).
   const [profissionais, setProfissionais] = useState([]);
   // DOMÍNIO PESSOAIS (item APP-PESSOAIS-CARD-20260824-2145) — vive na mesma tela por conveniência dele,
   // mas é outro domínio: não entra em cliente, serviço, financeiro nem em nenhum indicador da Tapeçaria.
@@ -3968,7 +3970,7 @@ function Home() {
         db.from("dividas").select("id,credor,valor_original,valor_pago,descricao,status,criado_em,atualizado_em").or("status.is.null,status.neq.quitada").order("criado_em", { ascending: true }),
         // PROFISSIONAIS: camada de apoio, como `ds`/`es`/`av`. Se falhar sozinha o app abre normal e a conta
         // do acerto usa o nome que já vem embutido em cada serviço (profissional_cadastro).
-        db.from("profissionais").select("id,nome,ativo").order("nome", { ascending: true }),
+        db.from("profissionais").select("id,nome,apelido,telefone,ativo").order("nome", { ascending: true }),
         // O QUE O AGENTE FEZ: camada de apoio como `av`. Só o que as rotinas gravaram em `historico` com
         // `por` agente/auditoria/claude nos últimos 7 dias. Tabela que já existia; nada de schema novo.
         // `historico_por_check` só aceita 'diego' e 'claude', então as rotinas gravam por='claude' e dizem quem
@@ -4774,7 +4776,7 @@ function Home() {
     const de = nav.findIndex((item) => item.id === abaAnterior.current.tab), para = nav.findIndex((item) => item.id === tab);
     abaAnterior.current = { tab, classe: de < 0 || para < 0 ? "" : para > de ? " vem-direita" : " vem-esquerda" };
   }
-  return <AcoesAgendaCtx.Provider value={acoesAgenda}><div className={`product-shell mode-${mode}`}>
+  return <AcoesAgendaCtx.Provider value={acoesAgenda}><CadastroProfissionaisCtx.Provider value={profissionais}><div className={`product-shell mode-${mode}`}>
     {notice && <div key={notice.id} className={`notice ${notice.kind}`}
       onTouchStart={(e) => { const t = e.touches[0]; e.currentTarget._x0 = t.clientX; e.currentTarget._y0 = t.clientY; }}
       onTouchMove={(e) => { const el = e.currentTarget, t = e.touches[0]; const dx = t.clientX - el._x0, dy = Math.min(0, t.clientY - el._y0); el.style.transform = `translate(${dx}px, ${dy}px)`; el.style.opacity = String(Math.max(0.2, 1 - Math.abs(dx) / 260)); }}
@@ -4854,7 +4856,7 @@ function Home() {
     {explicar && <BarreiraDaAba nome="A explicação" onFechar={() => setExplicar(null)}><ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
     {concluirAppt && <BarreiraDaAba nome="A conclusão do compromisso" onFechar={() => setConcluirAppt(null)}><ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} services={services} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
     {addAgendaOpen && <BarreiraDaAba nome="O novo compromisso" onFechar={() => setAddAgendaOpen(false)}><AddAgendaModal appointments={agendaVisivel} avisos={avisos} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} /></BarreiraDaAba>}
-  </div></AcoesAgendaCtx.Provider>;
+  </div></CadastroProfissionaisCtx.Provider></AcoesAgendaCtx.Provider>;
 }
 
 function agenteTexto(valor, vazio = "Não registrado") {
@@ -5536,8 +5538,9 @@ function interlocutorCompromisso(a, svc, fornecedores, profissionais) {
   // "Comprar" nunca é conversa com o cliente, mesmo quando é a ficha dele que motiva a compra.
   if (/\bcompr(a|ar|ei|as)\b/.test(alvo)) return { destino: "interno", motivo: forn ? `compra na ${forn}` : "compra de material" };
   if (forn && !citaCliente) return { destino: "interno", motivo: `é na ${forn}` };
-  if (prof && !citaCliente) return { destino: "interno", motivo: `é com ${prof}` };
-  if ((forn || prof) && citaCliente) return { destino: "incerto", motivo: `envolve ${forn || prof} e o cliente` };
+  // `profissional`: nome do terceiro citado no título, pro card oferecer o WhatsApp dele (12/10/2026).
+  if (prof && !citaCliente) return { destino: "interno", motivo: `é com ${prof}`, profissional: prof };
+  if ((forn || prof) && citaCliente) return { destino: "incerto", motivo: `envolve ${forn || prof} e o cliente`, profissional: prof || null };
   return { destino: "cliente", motivo: "" };
 }
 // CONTEXTO DO LEAD (Diego, 08/10/2026: "a mensagem tem que ter contexto mais próximo do lead no momento,
@@ -5694,6 +5697,18 @@ function PessoalDetalhe({ p, a, today }) {
 // celular transcreve enquanto grava (reconhecimento de voz do navegador, pt-BR) e o texto cai na caixinha,
 // onde o Diego confere. Se o aparelho não transcrever, o áudio vai mesmo assim e o card avisa.
 const AcoesAgendaCtx = React.createContext(null);
+// CADASTRO DE PROFISSIONAIS NOS CARDS (Diego, 12/10/2026, "Sim, mudar"): o card de compromisso recebe só os
+// NOMES (nomesProfissionais); o telefone vem do cadastro, por contexto, pra não enfiar mais uma prop em
+// Dashboard/Agenda/Hoje. Lista de { id, nome, apelido, telefone, ativo }.
+const CadastroProfissionaisCtx = React.createContext([]);
+function profissionalDoCadastro(cadastro, nome) {
+  if (!nome) return null;
+  const marca = marcaDoNome(nome);
+  const alvoDe = (c) => semAcento(`${c.nome || ""} ${c.apelido || ""}`);
+  return (cadastro || []).find((c) => semAcento(c.nome || "") === semAcento(nome))
+    || (cadastro || []).find((c) => marca && marca.test(alvoDe(c)))
+    || null;
+}
 const HORARIOS_ROTINA_RECADOS = "8h, 12h, 16h e 18h";
 const ACAO_RECADO_ROTULO = { recado: "Recado", feito: "Feito", remarcar: "Remarcar", cancelar: "Cancelar" };
 
@@ -6008,6 +6023,8 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   // A sugestão GRAVADA vence sempre: ela nasce da conversa real, com julgamento comercial.
   // Só quando ela falta é que o app escreve — e apenas se provar que o interlocutor é o cliente.
   const quem = interlocutorCompromisso(a, svc, fornecedores, profissionais);
+  const cadastroProf = React.useContext(CadastroProfissionaisCtx);
+  const profCadastro = quem.profissional ? profissionalDoCadastro(cadastroProf, quem.profissional) : null;
   // ENVELOPE DE TRIAGEM NÃO GANHA MENSAGEM PRONTA. Apareceu no teste de 27/08, no minuto em que o botão de
   // WhatsApp passou a renderizar: o app montava "Oi, tudo bem? Passando pra falar do SEU ESTOFADO" para um
   // número que ninguém triou ainda — sem cliente, sem serviço, sem saber do que a conversa trata. É a mesma
@@ -6202,8 +6219,14 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
           // Sem `target="_blank"` no Android no Waze: aba nova não sabe abrir intent:// e ficaria em branco.
           // 💬 ChatGPT saiu dos cards (Diego, 12/10/2026: "o GPT não está mais no negócio por dentro").
           const temRota = a.tipo !== "remoto" && !!destinoRota;
-          return <div className={`compromisso-botoes${tel ? "" : " sem-wpp"}${temRota ? "" : " sem-rota"}`}>
-            {tel && <a className="btn-wpp" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a>}
+          // WHATSAPP DO PROFISSIONAL (Diego, 12/10/2026, "Sim, mudar"): compromisso que é com um profissional
+          // ("Checar prontidão … com Marlom Júnior") ganha o botão dele ao lado do da cliente. Abre LIMPO, como
+          // todos desde o #72. Só aparece quando o cadastro tem telefone; sem telefone, nada de botão quebrado.
+          const telProf = profCadastro ? telefoneWhatsapp(profCadastro.telefone) : "";
+          const nomeCurto = (n) => (n || "").split(" ")[0];
+          return <div className={`compromisso-botoes${tel ? "" : " sem-wpp"}${temRota ? "" : " sem-rota"}${telProf ? " com-prof" : ""}`}>
+            {tel && <a className="btn-wpp" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp{telProf && cli?.nome ? ` · ${nomeCurto(cli.nome)}` : ""}</a>}
+            {telProf && <a className="btn-wpp btn-wpp-prof" href={urlWhatsapp(telProf, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🛠 {nomeCurto(profCadastro.apelido || profCadastro.nome)}</a>}
             {temRota && <a className="btn-rota btn-waze" href={linkWaze} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Waze{selo}</a>}
             {temRota && <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>}
           </div>;
