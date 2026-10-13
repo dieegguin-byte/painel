@@ -8,7 +8,8 @@
 -- no recibo, na hora do envio — o aparelho só devolve "a0" ou "a1", nunca o texto. Assim ninguém grava
 -- resposta inventada: só uma das opções que a própria pergunta ofereceu.
 --
--- Aplicada em 13/10/2026 pelo Claude Projetos (Supabase MCP) depois do sim do Diego. Idempotente.
+-- Aplicada em 13/10/2026 pelo Claude Projetos (Supabase MCP, execute_sql em partes: apply_migration estourava
+-- 60 s) depois do sim do Diego. Idempotente.
 
 -- 1. O recibo guarda o plano dos botões e carimba quando um foi tocado.
 alter table public.push_recibos add column if not exists acoes jsonb;
@@ -16,9 +17,11 @@ alter table public.push_recibos add column if not exists acionado_em timestamptz
 alter table public.push_recibos add column if not exists acao text;
 comment on column public.push_recibos.acoes is 'Plano por botao: {"a0": {"tabela":"duvidas_agente","id":"...","resposta":"Feito"}, "a1": {...}}. Nulo quando o aviso nao tem botao.';
 
--- 2. Abrir recibo passa a aceitar o plano (opcional: os avisos antigos continuam chamando só com a tag).
-drop function if exists public.push_recibo_abrir(text);
-create or replace function public.push_recibo_abrir(p_tag text, p_acoes jsonb default null) returns uuid
+-- 2. Abrir recibo passa a aceitar o plano. É uma SEGUNDA assinatura, sem default e sem apagar a de um
+-- argumento: a Edge Function nova sempre manda p_acoes (nulo quando não há botão), e a versão antiga da
+-- função, se ainda rodar, continua caindo na de um argumento. Com default, o PostgREST não saberia qual
+-- escolher quando só p_tag vier. (O drop da antiga travou no Supabase MCP em 13/10; ficou as duas.)
+create or replace function public.push_recibo_abrir(p_tag text, p_acoes jsonb) returns uuid
 language sql security definer set search_path = public as $$
   insert into push_recibos (tag, acoes) values (p_tag, p_acoes) returning recibo;
 $$;
