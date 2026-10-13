@@ -11628,7 +11628,29 @@ root.render(<Barreira><Home /></Barreira>);
 if ('serviceWorker' in navigator) {
   // O ?v= acompanha a VERSAO dentro do sw.js. Ficou parado no v=12 enquanto o arquivo já ia no v14: o
   // navegador atualiza pelo conteúdo, então funcionava, mas quem lê o código acha que não subiu.
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=18').catch(() => {}));
+  //
+  // ATUALIZAÇÃO NA PRIMEIRA ABERTURA (Diego, 13/10/2026: "tem que dar certo da primeira, toda atualização
+  // já ir por aí"). O app instalado no PC abriu com a versão velha mesmo depois de publicada: o service
+  // worker antigo ainda controlava a aba e serviu a cópia guardada; o novo só assumia na abertura seguinte.
+  // Agora: (1) o app pede a verificação do sw.js ao abrir e toda vez que volta pro primeiro plano;
+  // (2) quando um sw.js novo assume a aba (controllerchange), a página recarrega UMA vez sozinha, e sai
+  // com o HTML novo. Na primeiríssima instalação não recarrega (não tinha controle antes, não há o que
+  // trocar). Se ele estiver escrevendo num campo, a recarga espera ele sair do app e voltar.
+  const tinhaControle = !!navigator.serviceWorker.controller;
+  let recarregando = false, recargaPendente = false;
+  const escrevendo = () => { const el = document.activeElement; return !!el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') && !!el.value; };
+  const recarregar = () => {
+    if (recarregando) return;
+    if (escrevendo() || document.visibilityState !== 'visible') { recargaPendente = true; return; }
+    recarregando = true; location.reload();
+  };
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (tinhaControle) recarregar(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && recargaPendente) recarregar(); });
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=19').then((reg) => {
+    const checar = () => reg.update().catch(() => {});
+    checar();
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checar(); });
+  }).catch(() => {}));
 }
 </script>
 </body>
