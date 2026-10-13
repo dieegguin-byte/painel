@@ -3392,7 +3392,8 @@ const WHATSAPP_PACOTE = "com.whatsapp.w4b";
 // pediu aquele caso, nunca por inferência do app. Segunda entrada: Luana (+55 61 99137-8814), recado de
 // 18/09/2026, mesmo motivo da Sabrina — a conversa dela vive no WhatsApp comum. Terceira: Rosana Alves
 // (+55 61 99184-4530), 08/10/2026 — chegou pelo WhatsApp comum (o número do Google Meu Negócio).
-const WHATSAPP_COMUM_POR_NUMERO = new Set(["61996031000", "61991378814", "61991844530"]);
+// Quarta: Carol (+55 61 98127-6678), 13/10/2026 — chegou pelo WhatsApp comum, não pelo Business.
+const WHATSAPP_COMUM_POR_NUMERO = new Set(["61996031000", "61991378814", "61991844530", "61981276678"]);
 function pacoteWhatsapp(tel) {
   const d = String(tel || "").replace(/\D/g, "");
   const semPais = d.length > 11 && d.startsWith("55") ? d.slice(2) : d;
