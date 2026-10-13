@@ -770,6 +770,9 @@ button.sutil{opacity:.55;font-size:12px}
 .grupo-card.aberto .grupo-cabecalho{margin-bottom:12px}
 .grupo-card.fechado .grupo-corpo{height:0;overflow:hidden;visibility:hidden;margin:0;padding:0}
 .grupo-card.fechado .grupo-ver-tudo{display:none}
+.grupo-ver-mais{margin-top:6px;border-style:solid;border-color:var(--line);color:var(--muted)}
+.grupo-caixa .pend-linha h3{min-width:0}
+.grupo-caixa .pend-linha .linha-sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .grupo-card .grupo-total{position:static;flex:none}
 .grupo-card.sem-contador .grupo-total{display:none}
 .grupo-card .grupo-total.contagem-js::before{content:attr(data-n)}
@@ -909,6 +912,13 @@ button.sutil{opacity:.55;font-size:12px}
 .card-recado{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:#ffffff06;border:1px dashed var(--line2)}
 /* O QUE O AGENTE FEZ (12/10/2026) */
 .grupo-agente .grupo-titulo::before{content:"🤖 ";font-size:12px}
+/* MANU, UM CARD SÓ (13/10/2026): o grupo veste o dourado dos Cartões quando tem pergunta esperando, e os cards de
+   dentro (perguntas, respondido, o que fez, regras) ficam como linhas do grupo. */
+.grupo-manu.com-perguntas{border-color:#d4a64e80;background:linear-gradient(160deg,#2a2416 0,#201c14 40%,#141110 100%)}
+.grupo-manu.com-perguntas .grupo-resumo{color:#e8c56a}
+.grupo-manu .grupo-corpo>.duvidas-card{margin:0 0 8px;padding:12px;border-radius:14px}
+.grupo-manu .grupo-corpo>.duvidas-card .resumo-topo h3{font-size:18px}
+.grupo-manu .grupo-corpo>.content-card .card-toggle .kicker{display:block}
 .agente-dia{margin:0 0 10px}
 .agente-dia-titulo{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin:6px 0 4px}
 .agente-item{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
@@ -4678,7 +4688,7 @@ function Home() {
       {/* Uma barreira por aba (ver BarreiraDaAba lá embaixo): erro numa aba não leva a barra de abas junto.
           `key={tab}` zera a barreira na troca de aba — sem ele, a aba quebrada contaminaria a próxima. */}
       <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}><div className={`aba-entra${abaAnterior.current.classe}`}>
-      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} atividadeAgente={atividadeAgente} duvidasAgente={duvidasAgente} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
+      {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} atividadeAgente={atividadeAgente} duvidasAgente={duvidasAgente} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} onVerClientes={() => setTab("clientes")} onVerFornecedores={() => setTab("fornecedores")} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
       {tab === "caixa" && <CaixaView inbox={inbox} abrirId={caixaAbrirId} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
       {/* `addInbox` VOLTOU pro Painel (Painel único, etapa 2, 11/10/2026): o card "Anotar agora" tinha saído
           porque o Diego não lançava mais pelo app; agora ele é o botão flutuante "+ Anotar", que salva na
@@ -7451,9 +7461,16 @@ function separarAtrasadosPorIdade(appointments, hoje) {
 // Nasce fechado: só o título e a quantidade (ou o valor, no Dinheiro). O corpo fica montado e escondido por
 // CSS, de propósito: o contador de linhas (counter `linhas`) e o `:has()` que some com grupo vazio dependem
 // dos filhos existirem. `contagem` vem calculada em JS quando o número de ITENS é mais honesto que o de linhas.
-function GrupoRecolhivel({ titulo, resumo = null, contagem = null, semContador = false, verTudo = null, onVerTudo = null, className = "", children }) {
-  const [aberto, setAberto] = useState(false);
-  return <section className={`content-card grupo-card ${className}${aberto ? " aberto" : " fechado"}${semContador ? " sem-contador" : ""}`}>
+// `maisLinks` (Painel único, etapa 3, 13/10/2026): um grupo pode ter mais de um "ver tudo" quando reúne mais de uma
+// tela (Clientes e Leads → Leads e Clientes; Produção → Compras, Estoque e Fornecedores). Diego: "igual tá lá
+// quando vai em Dinheiro, ver todo financeiro lá embaixo me leva ao Financeiro". Cada tela do "Mais" ganha
+// um atalho no grupo que fala dela; a barra de baixo fica como está (ele tirou essa parte da proposta).
+function GrupoRecolhivel({ titulo, resumo = null, contagem = null, semContador = false, verTudo = null, onVerTudo = null, maisLinks = [], className = "", id, abertoInicial = false, children }) {
+  const [aberto, setAberto] = useState(abertoInicial);
+  // Os dados chegam depois do primeiro render; quando `abertoInicial` vira true (chegou pergunta da Manu), o grupo
+  // abre sozinho. Fechar com o dedo continua valendo até a próxima pergunta nova.
+  useEffect(() => { if (abertoInicial) setAberto(true); }, [abertoInicial]);
+  return <section id={id} className={`content-card grupo-card ${className}${aberto ? " aberto" : " fechado"}${semContador ? " sem-contador" : ""}`}>
     <button type="button" className="grupo-cabecalho" aria-expanded={aberto} onClick={() => { vibrar(6); setAberto((v) => !v); }}>
       <p className="kicker grupo-titulo">{titulo}</p>
       {resumo && <b className="grupo-resumo">{resumo}</b>}
@@ -7462,6 +7479,7 @@ function GrupoRecolhivel({ titulo, resumo = null, contagem = null, semContador =
     </button>
     <div className="grupo-corpo">{children}</div>
     {aberto && verTudo && onVerTudo && <button type="button" className="grupo-ver-tudo" onClick={onVerTudo}>{verTudo}</button>}
+    {aberto && maisLinks.filter((l) => l && l.texto && l.onClick).map((l) => <button key={l.texto} type="button" className="grupo-ver-tudo grupo-ver-mais" onClick={l.onClick}>{l.texto}</button>)}
   </section>;
 }
 // ===== O QUE O AGENTE FEZ (Diego, 12/10/2026: "acompanhamento do que o Agente está fazendo") =====
@@ -7513,15 +7531,16 @@ function AgenteCard({ itens, today, services, appointments, customers, finances,
   const rotuloDia = (dia) => dia === today ? "Hoje" : dia === ontem ? "Ontem" : compactDate(dia);
   const hora = (h) => { const d = new Date(h.quando); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
   const haQuanto = (h) => { const minutos = Math.max(0, Math.round((Date.now() - new Date(h.quando).getTime()) / 60000)); return minutos < 2 ? "agora" : minutos < 60 ? `há ${minutos} min` : minutos < 36 * 60 ? `há ${Math.round(minutos / 60)} h` : compactDate(diaDe(h)); };
-  if (!linhas.length) return <GrupoRecolhivel titulo="Manu" className="grupo-agente" semContador resumo="ainda não rodou">
+  // Desde 13/10/2026 isto é um card DENTRO do grupo Manu (ver ManuCard), não um grupo solto no fim do Painel.
+  if (!linhas.length) return <CardRecolhivel className="content-card" cabecalho={<><p className="kicker">O QUE A MANU FEZ</p><h3>Ainda não rodou</h3></>}>
     <p className="ficha-note agente-vazio">Quando a Manu (o agente de hora em hora) fizer algo sozinha, aparece aqui.</p>
-  </GrupoRecolhivel>;
+  </CardRecolhivel>;
   const acoes = linhas.filter((h) => !AGENTE_BATIDA.test(h.texto));
   const rodada = linhas.find((h) => AGENTE_BATIDA.test(h.texto));
   const hojeN = acoes.filter((h) => diaDe(h) === today).length;
   const resumo = `última rodada ${haQuanto(linhas[0])} · ${hojeN ? `${hojeN} ${hojeN === 1 ? "ação" : "ações"} hoje` : "nada hoje"}`;
   const grupos = []; acoes.forEach((h) => { const dia = diaDe(h); const g = grupos[grupos.length - 1]; if (g && g.dia === dia) g.itens.push(h); else grupos.push({ dia, itens: [h] }); });
-  return <GrupoRecolhivel titulo="Manu" className="grupo-agente" semContador resumo={resumo}>
+  return <CardRecolhivel className="content-card" cabecalho={<><p className="kicker">O QUE A MANU FEZ</p><h3>{resumo}</h3></>}>
     {rodada && <p className="agente-rodada">Última rodada {hora(rodada)} ({haQuanto(rodada)}): {rodada.texto.replace(AGENTE_BATIDA, "").replace(/^\s*[—-]\s*/, "")}{rodada.detalhe ? ` · ${parseDetalheAgente(rodada.detalhe).texto}` : ""}</p>}
     {!acoes.length && <p className="ficha-note agente-vazio">Nenhuma ação automática nos últimos 7 dias, só rodadas sem novidade.</p>}
     {grupos.slice(0, 7).map((g) => <div className="agente-dia" key={g.dia}>
@@ -7537,7 +7556,7 @@ function AgenteCard({ itens, today, services, appointments, customers, finances,
         </div>
       </div>; })}
     </div>)}
-  </GrupoRecolhivel>;
+  </CardRecolhivel>;
 }
 // ===== RESUMO DA MANHÃ (Diego, 11/10/2026: "3 bacana") =====
 // A auditoria das 2h20 grava UMA linha em avisos_operacionais com dominio "resumo_manha" e expira_em = o dia,
@@ -7696,6 +7715,24 @@ function RespondidasAoClaude({ duvidas, inbox = [], db, demo, notify, onChanged 
     {linhas.length > 8 && <small>+{linhas.length - 8} mais</small>}
   </CardRecolhivel>;
 }
+// ===== MANU, UM CARD SÓ (Diego, 13/10/2026: "o da Manu tem que responder, não precisa ir para lá, e tudo da Manu em
+// um card só") =====
+// Antes eram quatro blocos espalhados: "Cartões pra você" no alto, "Respondido à Manu" logo abaixo, e "Manu" e
+// "Regras que a Manu aprendeu" no fim do Painel. Agora é um grupo recolhível no fim do Painel (o Diego não quer a Manu no topo), com
+// as perguntas respondidas ALI (toque na opção ou 🎤, mesma gravação de antes), as respostas que dá pra desfazer,
+// o que ela fez e as regras. Nasce ABERTO quando tem pergunta esperando (é decisão do dia) e fechado quando não.
+function ManuCard({ duvidas, inbox = [], atividadeAgente = [], today, db, demo, notify, customers, services, appointments, finances, onOpenFicha, onAbrirCaixa, onChanged }) {
+  const abertas = (duvidas || []).filter((d) => d.status === "aberta").length + (inbox || []).filter((it) => it && it.status === "aguardando_voce" && !it.processado).length;
+  const respondidas = (duvidas || []).filter((d) => d.status === "respondida").length + (inbox || []).filter((it) => it && it.status === "respondido" && !it.processado).length;
+  const ultima = (atividadeAgente || []).filter((h) => h && h.quando).map(separarFonteAgente).filter((h) => h && h.fonte === "agente").sort((a, b) => String(b.quando).localeCompare(String(a.quando)))[0];
+  const resumo = abertas ? `${abertas} pergunta${abertas === 1 ? "" : "s"} pra você` : respondidas ? `${respondidas} resposta${respondidas === 1 ? "" : "s"} esperando ela` : ultima ? `última rodada ${idadeDoDado(new Date(ultima.quando).getTime())}` : "ainda não rodou";
+  return <GrupoRecolhivel id="grupo-manu" titulo="Manu" className={`grupo-agente grupo-manu${abertas ? " com-perguntas" : ""}`} semContador resumo={resumo} abertoInicial={abertas > 0}>
+    <DuvidasAgenteCard duvidas={duvidas} inbox={inbox} today={today} db={db} demo={demo} notify={notify} customers={customers} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />
+    <RespondidasAoClaude duvidas={duvidas} inbox={inbox} db={db} demo={demo} notify={notify} onChanged={onChanged} />
+    <AgenteCard itens={atividadeAgente} today={today} services={services} appointments={appointments} customers={customers} finances={finances} onOpenFicha={onOpenFicha} />
+    <RegrasAprendidasCard duvidas={duvidas} db={db} demo={demo} notify={notify} onChanged={onChanged} />
+  </GrupoRecolhivel>;
+}
 // REGRAS APRENDIDAS: tudo que o Diego respondeu com "vale sempre". O agente relê esta lista em toda rodada.
 // "Não vale mais" tira a regra (vale_sempre=false) sem apagar a linha — histórico fica.
 function RegrasAprendidasCard({ duvidas, db, demo, notify, onChanged }) {
@@ -7709,14 +7746,14 @@ function RegrasAprendidasCard({ duvidas, db, demo, notify, onChanged }) {
       vibrar(8); notify("Regra retirada. A Manu volta a perguntar se precisar.", "ok"); if (onChanged && !demo) onChanged();
     } catch (e) { notify("Erro ao retirar a regra: " + e.message, "error"); } finally { setBusyId(null); }
   };
-  return <GrupoRecolhivel titulo="Regras que a Manu aprendeu" className="grupo-agente grupo-regras" semContador resumo={`${regras.length} regra${regras.length === 1 ? "" : "s"}`}>
+  return <CardRecolhivel className="content-card grupo-regras" cabecalho={<><p className="kicker">📌 REGRAS QUE A MANU APRENDEU</p><h3>{regras.length} regra{regras.length === 1 ? "" : "s"} · vale sempre</h3></>}>
     {regras.map((d) => <div className="regra-item" key={d.id}>
       <div><strong>{d.regra || d.resposta}</strong><span>{d.pergunta}{d.respondido_em ? ` · ${compactDate(String(d.respondido_em).slice(0, 10))}` : ""}{d.regra ? "" : " · a Manu ainda vai escrever a regra geral"}</span></div>
       <button type="button" className="ghost" disabled={busyId === d.id} onClick={() => tirar(d)}>Não vale mais</button>
     </div>)}
-  </GrupoRecolhivel>;
+  </CardRecolhivel>;
 }
-function Dashboard({ inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, atividadeAgente = [], duvidasAgente = [], finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, onVerLeads, onVerOrcamentos, onVerAgenda, onVerEstoque, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+function Dashboard({ inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, atividadeAgente = [], duvidasAgente = [], finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, onVerLeads, onVerOrcamentos, onVerAgenda, onVerEstoque, onVerClientes, onVerFornecedores, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   // Gaveta do botão flutuante "Anotar" (Painel único, etapa 2, 11/10/2026).
   const [anotarAberto, setAnotarAberto] = useState(false);
@@ -8006,7 +8043,14 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   // Contagens dos grupos recolhidos (12/10/2026): itens, não linhas, pra "Pendências · 7" dizer quantas coisas tem.
   const perguntasCaixa = (inbox || []).filter((item) => item.status === "aguardando_voce");
   const conversasSemDestino = triagensSemDestino(agendaHistorico, appointments, customers);
-  const contagemPendencias = antigos.length + perguntasCaixa.length + conversasSemDestino.length;
+  const contagemPendencias = antigos.length + conversasSemDestino.length;
+  // GRUPO CAIXA (Painel único, etapa 3, 13/10/2026). O card Caixa tinha saído do Painel em 11/10 ("está muito
+  // cheio"); volta como grupo recolhido, igual aos outros: fechado é só "Caixa · N", aberto mostra o que está na
+  // fila por tipo e o último item, e o "ver a caixa toda ›" abre a aba. Mesma fila da aba (itensDaFilaDaCaixa),
+  // mesmo número do selo da barra — contador diferente em dois lugares é o que faz ele desconfiar do app.
+  const filaCaixa = itensDaFilaDaCaixa(inbox);
+  const caixaPorTipo = filaCaixa.reduce((acc, item) => { const t = tipoDoItemDaCaixa(item); acc[t] = (acc[t] || 0) + 1; return acc; }, {});
+  const ultimoDaCaixa = filaCaixa.length ? filaCaixa[filaCaixa.length - 1] : null;
   const orcamentosAbertos = services.filter((s) => s.status === "orcamento");
   const leadsNovos = services.filter((s) => s.status === "lead");
   const retornosVencidosN = services.filter((s) => retornoVencido(s, today)).length;
@@ -8044,9 +8088,8 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {/* TOPO DO PAINEL (Diego, 11/10/2026: "compromisso atrasado, Hoje e próximos compromissos são os mais
         importantes"): os três ficam no alto, como cards grandes, fora do grupo Pendências. */}
     <ResumoManhaCard avisos={avisos} today={today} db={db} demo={demo} notify={notify} onOpenFicha={onOpenFicha} onChanged={onServicoChanged} />
-    {/* DÚVIDAS DO AGENTE no alto: é decisão do dia, não prestação de contas. Some quando não há pergunta. */}
-    <DuvidasAgenteCard duvidas={duvidasAgente} inbox={inbox} today={today} db={db} demo={demo} notify={notify} customers={customers} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onServicoChanged} />
-    <RespondidasAoClaude duvidas={duvidasAgente} inbox={inbox} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
+    {/* O card da Manu NÃO fica no topo (Diego, 13/10/2026: "Não quero da Manu no topo"): está no fim, depois de
+        Pessoais, onde o card Manu já ficava. */}
     {atrasados.length > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes topo-card tom-vermelho" selo={atrasados.length} tom="vermelho" icone="⏰"
       cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{atrasados.length} compromisso(s) com atraso recente</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
@@ -8084,6 +8127,12 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         só que como uma linha dentro do grupo (ver CSS `.grupo-card`). Os dois quadrados de número saíram
         porque repetiam o que as linhas de Pendências já contam; o card de Rotinas solto saiu porque as
         rotinas já estão dentro de Hoje. Grupo sem nenhuma linha some sozinho (`:has`). */}
+    <GrupoRecolhivel titulo="Caixa" className="grupo-caixa" contagem={filaCaixa.length} verTudo="ver a caixa toda ›" onVerTudo={onAbrirCaixa}>
+      {Object.keys(CAIXA_TIPOS).filter((t) => caixaPorTipo[t]).map((t) => { const info = CAIXA_TIPOS[t]; const n = caixaPorTipo[t]; const tom = t === "pergunta" ? "tom-azul" : t === "operacao_travada" ? "tom-vermelho" : t === "remarcacao" ? "tom-ambar" : t === "lead" ? "tom-laranja" : "tom-verde";
+        return <button key={t} type="button" className={`pend-linha com-selo ${tom}`} onClick={t === "pergunta" ? () => { vibrar(6); document.getElementById("grupo-manu")?.scrollIntoView({ behavior: "smooth", block: "start" }); } : onAbrirCaixa}><span className="selo-num" aria-hidden="true"><b>{n}</b><small>{info.icone}</small></span><h3>{n} · {info.rotulo}{t === "pergunta" ? <span className="linha-sub">responda no card da Manu</span> : null}</h3><i>{t === "pergunta" ? "Manu ↓" : "abrir ›"}</i></button>; })}
+      {ultimoDaCaixa && (() => { const texto = parseInbox(ultimoDaCaixa.texto || "").text || (parseInbox(ultimoDaCaixa.texto || "").images.length ? "Print sem anotação" : ""); const quando = Date.parse(ultimoDaCaixa.criado_em || "");
+        return <button type="button" className="pend-linha com-selo tom-verde" onClick={onAbrirCaixa}><span className="selo-num" aria-hidden="true"><b>✉</b></span><h3>Último na fila{Number.isFinite(quando) ? ` · ${idadeDoDado(quando)}` : ""}<span className="linha-sub">{texto.length > 90 ? texto.slice(0, 87).trimEnd() + "…" : texto}</span></h3><i>abrir ›</i></button>; })()}
+    </GrupoRecolhivel>
     <GrupoRecolhivel titulo="Pendências" contagem={contagemPendencias} verTudo="ver a agenda toda ›" onVerTudo={onVerAgenda}>
     {antigos.length > 0 && <CardRecolhivel id="secao-revisao-antiga" className="content-card revisao-antiga" selo={antigos.length} tom="ambar" icone="🗂"
       cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
@@ -8096,9 +8145,8 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       <span className="ficha-note" style={{ margin: 0 }}>remoto, não ocupa rota</span></>}>
       {[...semHora].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {/* A linha "PESSOAIS · N item(ns) com data vencida" saiu daqui (12/10/2026): pessoal vencido agora mora em Atrasados. */}
-      {(() => { const perguntas = (inbox || []).filter((item) => item.status === "aguardando_voce"); if (!perguntas.length || !onAbrirCaixa) return null;
-        return <button type="button" className="pend-linha com-selo tom-azul" onClick={onAbrirCaixa}><span className="selo-num" aria-hidden="true"><b>{perguntas.length}</b><small>❓</small></span><h3>{perguntas.length} pergunta(s) aguardando você na Caixa</h3><i>abrir ›</i></button>; })()}
-    {/* SAIU DO PAINEL o card Caixa (Diego, 11/10/2026: "está muito cheio"). A aba Caixa no menu já mostra a contagem. */}
+    {/* A linha "N pergunta(s) aguardando você na Caixa" saiu daqui e virou o grupo Caixa, logo abaixo do topo
+        (Painel único, etapa 3, 13/10/2026). */}
     {/* CONVERSA ENCERRADA SEM DESTINO — ver triagensSemDestino(). Fica recolhido e só existe quando há
         caso: se o Classic estiver encerrando tudo com destino, este card não aparece nunca, que é o
         estado desejado. */}
@@ -8123,7 +8171,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {/* CLIENTES E LEADS (Painel único, etapa 2, 11/10/2026): o que está vivo no funil, num lugar só. Orçamentos
         abertos com o valor somado, leads novos, sem próxima ação (saiu de Pendências), retorno vencido (idem) e
         os encaixes de rota, que são clientes esperando a rota passar. "Ver tudo" abre a aba Leads. */}
-    <GrupoRecolhivel titulo="Clientes e Leads" contagem={contagemClientes} verTudo="ver todos os clientes e leads ›" onVerTudo={onVerLeads}>
+    <GrupoRecolhivel titulo="Clientes e Leads" contagem={contagemClientes} verTudo="ver os leads ›" onVerTudo={onVerLeads} maisLinks={[{ texto: "ver todos os clientes ›", onClick: onVerClientes }]}>
       {(() => {
         const abertos = services.filter((s) => s.status === "orcamento");
         if (!abertos.length) return null;
@@ -8215,7 +8263,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
         return <button type="button" className={`pend-linha com-selo ${saldo >= 0 ? "tom-verde" : "tom-vermelho"}`} onClick={onVerFinanceiro}><span className="selo-num selo-txt" aria-hidden="true"><b>{money(saldo)}</b><small>$</small></span><h3>No mês: entrou {money(entrou)} · saiu {money(saiu)}</h3><i>ver ›</i></button>;
       })()}
     </GrupoRecolhivel>
-    <GrupoRecolhivel titulo="Produção" contagem={contagemProducao} verTudo="ver as compras todas ›" onVerTudo={onVerCompras}>
+    <GrupoRecolhivel titulo="Produção" contagem={contagemProducao} verTudo="ver as compras todas ›" onVerTudo={onVerCompras} maisLinks={[{ texto: "ver o estoque ›", onClick: onVerEstoque }, { texto: "ver os fornecedores ›", onClick: onVerFornecedores }]}>
       <ProntosParaEntregarCard services={services} onOpenFicha={onOpenFicha} />
       <CapacidadeCard services={services} finances={finances} fornecedores={fornecedores} appointments={appointments} agendaHistorico={agendaHistorico} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
       <ServicosSemProximoPassoCard services={services} appointments={appointments} agendaHistorico={agendaHistorico} inbox={inbox} idsEncaixe={idsEncaixe} onOpenFicha={onOpenFicha} />
@@ -8242,9 +8290,10 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {/* PESSOAIS mora na mesma home por conveniência dele, mas é outro domínio — e fica DEPOIS do trabalho,
         porque a primeira olhada do dia é a rota. Só sobe pra cara dele quando tem atrasado. */}
     <PessoaisCard pessoais={pessoais} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
-    {/* O QUE O AGENTE FEZ fica por último: é prestação de contas, não decisão do dia. */}
-    <AgenteCard itens={atividadeAgente} today={today} services={services} appointments={agendaPlanejada} customers={customers} finances={finances} onOpenFicha={onOpenFicha} />
-    <RegrasAprendidasCard duvidas={duvidasAgente} db={db} demo={demo} notify={notify} onChanged={onServicoChanged} />
+    {/* MANU, um card só (13/10/2026): perguntas respondidas aqui mesmo, respostas que dá pra desfazer, o que ela
+        fez e as regras. Abre sozinho quando tem pergunta; fechado, mostra só o resumo. Fica aqui no fim, depois
+        de Pessoais (onde o card Manu já ficava), porque o Diego não quer a Manu no topo. */}
+    <ManuCard duvidas={duvidasAgente} inbox={inbox} atividadeAgente={atividadeAgente} today={today} db={db} demo={demo} notify={notify} customers={customers} services={services} appointments={agendaPlanejada} finances={finances} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onServicoChanged} />
     {/* SAIU DO PAINEL em 30/07/2026 o card "N cliente(s) esperando remarcação". Diego: "achei desnecessário
         pra mim, se tem o aviso aqui para Claude". Ele estava certo: remarcar é trabalho que o Claude resolve
         pela caixa, e o item já conta no badge da aba Caixa — o card só repetia isso ocupando o topo da tela
