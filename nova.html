@@ -2005,8 +2005,11 @@ const JANELA_PRESENCIAL = ["08:00", "21:00"];
 // Tarefa remota (ligar, mandar mensagem) não disputa horário: janela ampla, todo dia, nunca bloqueia horário ocupado.
 const JANELA_REMOTO = ["07:00", "22:00"];
 const IGREJA_DIAS = [1, 3, 5];
-// 20h desde 14/09/2026 (Diego: "igreja às 20 horas agora"). Era 18h30.
-const IGREJA_HORA = "20:00";
+// Desde 13/10/2026 (Diego): seg/qua/sex o culto preferido é o das 18h30; o das 20h é o reserva pra quando um
+// cliente precisa do fim da tarde. Entre 14/09 e 13/10 era só 20h; antes disso, 18h30.
+const IGREJA_HORA = "18:30";
+// Culto reserva. O que não deixa ele voltar a tempo nem desse é bloqueado de verdade — nem atrás do botão.
+const IGREJA_HORA_RESERVA = "20:00";
 // O rótulo de tela sai da constante: com o texto escrito à mão em três lugares, a hora mudava aqui e a tela
 // continuava dizendo 18h30.
 const IGREJA_ROTULO = IGREJA_HORA.endsWith(":00") ? String(Number(IGREJA_HORA.slice(0, 2))) + "h" : IGREJA_HORA.replace(":", "h");
@@ -3384,14 +3387,23 @@ function urlWhatsapp(tel, texto) {
   return `intent://send?${qs}#Intent;scheme=whatsapp;package=${pacoteWhatsapp(tel)};S.browser_fallback_url=${encodeURIComponent(web)};end`;
 }
 function horarioApertado(h, outros, cidadeNova) { return (outros || []).some((a) => Math.abs(minutosDoHorario(h) - minutosDoHorario(a.hora)) < tempoEstradaMin(cidadeNova, a.cidade) + DURACAO_SERVICO_MIN); }
-// IGREJA É COMPROMISSO, NÃO "HORÁRIO VAZIO". Seg/qua/sex às 20h desde 14/09 (era 18h30 — o exemplo abaixo é dessa época). O que trava não é a hora do serviço, é a
+// IGREJA É COMPROMISSO, NÃO "HORÁRIO VAZIO". Seg/qua/sex às 18h30 (culto preferido) ou 20h (reserva). O que trava não é a hora do serviço, é a
 // hora em que ele consegue voltar: serviço + estrada de volta pra base. Um 17h em Brasília termina 18h e
 // chega em Luziânia 19h15 — o app oferecia esse slot sem dizer nada. Remoto não desloca, então não conflita.
+// Dois níveis (13/10/2026): `conflitaComIgreja` = perde o das 18h30, fica arriscado (⛪, atrás da confirmação:
+// se o cliente só puder nessa hora, ele vai no das 20h). `igrejaBloqueia` = não volta nem pro das 20h, some da lista.
 function ehDiaDeIgreja(dataISO) { return IGREJA_DIAS.includes(new Date(dataISO + "T00:00:00").getDay()); }
+function voltaDaIgreja(dataISO, hora, tipo, cidade) {
+  if (tipo === "remoto" || !hora || !ehDiaDeIgreja(dataISO)) return null;
+  return minutosDoHorario(hora) + DURACAO_SERVICO_MIN + tempoEstradaMin(cidade, CIDADE_BASE);
+}
 function conflitaComIgreja(dataISO, hora, tipo, cidade) {
-  if (tipo === "remoto" || !hora || !ehDiaDeIgreja(dataISO)) return false;
-  const volta = minutosDoHorario(hora) + DURACAO_SERVICO_MIN + tempoEstradaMin(cidade, CIDADE_BASE);
-  return volta > minutosDoHorario(IGREJA_HORA) - IGREJA_MARGEM_MIN;
+  const volta = voltaDaIgreja(dataISO, hora, tipo, cidade);
+  return volta !== null && volta > minutosDoHorario(IGREJA_HORA) - IGREJA_MARGEM_MIN;
+}
+function igrejaBloqueia(dataISO, hora, tipo, cidade) {
+  const volta = voltaDaIgreja(dataISO, hora, tipo, cidade);
+  return volta !== null && volta > minutosDoHorario(IGREJA_HORA_RESERVA) - IGREJA_MARGEM_MIN;
 }
 // O QUE O APP PODE ESCOLHER SOZINHO. horariosParaTipo devolve tudo que cabe no dia; esta lista tira o que é
 // arriscado — horário que faz ele chegar atrasado na igreja, que não dá tempo de estrada até outra cidade do dia
@@ -3433,7 +3445,8 @@ function horaSugerida(dataISO, tipo, ocupados, cidade, outrosDoDia) {
   // Sem horário sugerível, o fallback continua existindo — mas ele também não pode escolher um slot que a
   // estrada já reprovou. Só se NADA sobrar é que aceita o apertado, porque devolver horário nenhum
   // quebraria o cadastro; e aí o compromisso nasce e fica visível pro Diego decidir, que é o certo.
-  const possiveis = horariosParaTipo(dataISO, tipo, ocupados).filter((h) => !conflitaComIgreja(dataISO, h, tipo, cidade));
+  // Arriscado (perde o culto das 18h30) ainda serve de fallback; o que não volta nem pro das 20h, não.
+  const possiveis = horariosParaTipo(dataISO, tipo, ocupados).filter((h) => !igrejaBloqueia(dataISO, h, tipo, cidade));
   const folgados = possiveis.filter((h) => !apertaARota(h, tipo, cidade, outrosDoDia));
   const lista = folgados.length ? folgados : possiveis;
   return lista[lista.length - 1] || "14:00";
@@ -8756,7 +8769,8 @@ function AgendaPicker({ appointments, appt, onClose, onPicked }) {
     const dataISO = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const doDia = porDia[dataISO] || [];
     const ocupados = tipo === "presencial" ? doDia.filter((a) => !ehRemoto(a) && cidadeChave(a.cidade) === cidadeChave(cidade)).map((a) => a.hora) : [];
-    const todos = horariosParaTipo(dataISO, tipo, ocupados);
+    // "Ver todos" mostra o arriscado (⛪), mas não o que estoura até o culto das 20h — esse não é escolha.
+    const todos = horariosParaTipo(dataISO, tipo, ocupados).filter((h) => !igrejaBloqueia(dataISO, h, tipo, cidade));
     const sugeridos = horariosSugeridos(dataISO, tipo, ocupados, cidade);
     escondidos += todos.length - sugeridos.length;
     const livres = mostrarTudo ? [...new Set([...sugeridos, ...todos])].sort() : sugeridos;
@@ -8784,7 +8798,7 @@ function AgendaPicker({ appointments, appt, onClose, onPicked }) {
           const igreja = conflitaComIgreja(dia.dataISO, h, tipo, cidade);
           const travado = rota || igreja;
           const chave = dia.dataISO + " " + h;
-          const motivo = igreja ? `Serviço + estrada de volta não fecha antes da igreja de ${IGREJA_ROTULO}.` : "Muito perto do compromisso em outra cidade — serviço + estrada não fecha.";
+          const motivo = igreja ? `Serviço + estrada de volta não fecha antes do culto das ${IGREJA_ROTULO} — se marcar, ele vai no das 20h.` : "Muito perto do compromisso em outra cidade — serviço + estrada não fecha.";
           return <button key={h} className={`picker-slot${travado ? " risky" : ""}${confirmando === chave ? " confirmando" : ""}`} title={travado ? motivo : ""} onClick={() => escolher(dia.dataISO, h, travado)}>
             {confirmando === chave ? "Confirmar " + h + "?" : h}{igreja && confirmando !== chave ? " ⛪" : ""}
           </button>;
