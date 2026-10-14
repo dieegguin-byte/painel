@@ -4640,7 +4640,7 @@ function Home() {
     // abaixo de 850px a barra lateral tem `display:none`, então no CELULAR — que é onde ele usa — o botão
     // não apareceria. Entrando aqui no array, ele nasce nas DUAS barras de uma vez, porque a lateral e a de
     // baixo renderizam da mesma lista. Menos código e sem observer brigando com o React.
-    { id: "estoque", label: "Estoque", icon: "▦", pagina: "./estoque.html" },
+    { id: "estoque", label: "Estoque", icon: "▦" },
   ];
   // Item que aponta pra página própria sai do app; o resto continua trocando de aba aqui dentro.
   const irParaAba = (item) => { if (item.pagina) { window.location.href = item.pagina; return; } if (item.id !== tab) vibrar(8); setTab(item.id); setSelectedId(null); };
@@ -4699,6 +4699,10 @@ function Home() {
       {/* Uma barreira por aba (ver BarreiraDaAba lá embaixo): erro numa aba não leva a barra de abas junto.
           `key={tab}` zera a barreira na troca de aba — sem ele, a aba quebrada contaminaria a próxima. */}
       <BarreiraDaAba key={tab} nome={`A aba ${nav.find((item) => item.id === tab)?.label || tab}`}><div className={`aba-entra${abaAnterior.current.classe}`}>
+      {/* ESTOQUE DENTRO DO APP (Diego, 12/10/2026: "ao tocar nas abas às vezes abre uma página em branco e sai do app"):
+          antes a aba trocava a página inteira por ./estoque.html; se ela não carregasse, ficava branco e sem volta.
+          Agora é um quadro dentro da tela, e as outras abas continuam a um toque. */}
+      {tab === "estoque" && <iframe title="Estoque" src="./estoque.html" style={{ width: "100%", height: "calc(100dvh - 150px)", minHeight: 480, border: 0, borderRadius: 12, background: "transparent" }} />}
       {tab === "painel" && <Dashboard inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} atividadeAgente={atividadeAgente} duvidasAgente={duvidasAgente} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} onVerClientes={() => setTab("clientes")} onVerFornecedores={() => setTab("fornecedores")} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
       {tab === "caixa" && <CaixaView inbox={inbox} abrirId={caixaAbrirId} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
       {/* `addInbox` VOLTOU pro Painel (Painel único, etapa 2, 11/10/2026): o card "Anotar agora" tinha saído
@@ -5413,7 +5417,9 @@ function interlocutorCompromisso(a, svc, fornecedores, profissionais) {
   if (a?.tipo === "operacional") return { destino: "interno", motivo: "compromisso operacional" };
   if (/\b(tarefa interna|bloqueio|uso interno)\b/.test(alvo)) return { destino: "interno", motivo: "tarefa interna" };
   // "Comprar" nunca é conversa com o cliente, mesmo quando é a ficha dele que motiva a compra.
-  if (/\bcompr(a|ar|ei|as)\b/.test(alvo)) return { destino: "interno", motivo: forn ? `compra na ${forn}` : "compra de material" };
+  // Se o título manda pedir pro profissional ("Compras ... pedir pro Marlom Júnior"), o botão dele vem na frente
+  // (Diego, 13/10/2026: "era para pedir o marlom junior"); sem profissional citado, segue sem destinatário.
+  if (/\bcompr(a|ar|ei|as)\b/.test(alvo)) return { destino: "interno", motivo: forn ? `compra na ${forn}` : "compra de material", ...(prof ? { profissional: prof } : {}) };
   if (forn && !citaCliente) return { destino: "interno", motivo: `é na ${forn}` };
   // `profissional`: nome do terceiro citado no título, pro card oferecer o WhatsApp dele (12/10/2026).
   if (prof && !citaCliente) return { destino: "interno", motivo: `é com ${prof}`, profissional: prof };
