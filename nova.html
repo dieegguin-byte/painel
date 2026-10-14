@@ -5402,7 +5402,7 @@ function nomesProfissionais(services) {
 function interlocutorCompromisso(a, svc, fornecedores, profissionais) {
   // Só título e local: descrevem o compromisso em si. `proxima_acao` fala do SERVIÇO inteiro e
   // costuma citar loja ("fechar o Klee 09 na Afibracom") mesmo quando o compromisso é a visita.
-  const alvo = semAcento(`${a?.titulo || ""} ${a?.local || ""}`);
+  const alvo = semAcento(`${a?.titulo || ""} ${a?.local || ""}`).replace(/\bmarlon\b/g, "marlom");
   const primeiroNome = semAcento((svc?.clientes?.nome || "").split(" ")[0]);
   const citaCliente = primeiroNome.length >= 3 && new RegExp("\\b" + primeiroNome + "\\b").test(alvo);
   // Nome curto no aviso: o cadastro tem a razão social ("Plástico & Tal Materiais para
@@ -5584,6 +5584,12 @@ const AcoesAgendaCtx = React.createContext(null);
 // NOMES (nomesProfissionais); o telefone vem do cadastro, por contexto, pra não enfiar mais uma prop em
 // Dashboard/Agenda/Hoje. Lista de { id, nome, apelido, telefone, ativo }.
 const CadastroProfissionaisCtx = React.createContext([]);
+// Nomes pra procurar no título: apelido ou nome de cada profissional cadastrado, sem a linha solta que já está
+// contida em outra ("Júnior" dentro de "Marlom Júnior"), pra não cair na linha sem telefone.
+function nomesDoCadastro(cadastro) {
+  const nomes = (cadastro || []).map((c) => c.apelido || c.nome).filter(Boolean);
+  return nomes.filter((n) => !nomes.some((o) => o !== n && semAcento(o).includes(semAcento(n))));
+}
 function profissionalDoCadastro(cadastro, nome) {
   if (!nome) return null;
   const marca = marcaDoNome(nome);
@@ -5945,8 +5951,11 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   </article>;
   // A sugestão GRAVADA vence sempre: ela nasce da conversa real, com julgamento comercial.
   // Só quando ela falta é que o app escreve — e apenas se provar que o interlocutor é o cliente.
-  const quem = interlocutorCompromisso(a, svc, fornecedores, profissionais);
   const cadastroProf = React.useContext(CadastroProfissionaisCtx);
+  // PROFISSIONAL CITADO VALE MESMO SEM VÍNCULO NO SERVIÇO (Diego, 14/10/2026: "o WhatsApp tem que abrir do Marcão,
+  // não da Heloísa"). `profissionais` vem só de servicos.responsavel; quem não tem serviço com ele (Marcão na
+  // Eloiza) ou tem outro nome não era achado, e o botão caía na cliente. Agora o cadastro também entra na busca.
+  const quem = interlocutorCompromisso(a, svc, fornecedores, [...nomesDoCadastro(cadastroProf), ...(profissionais || [])]);
   const profCadastro = quem.profissional ? profissionalDoCadastro(cadastroProf, quem.profissional) : null;
   // ENVELOPE DE TRIAGEM NÃO GANHA MENSAGEM PRONTA. Apareceu no teste de 27/08, no minuto em que o botão de
   // WhatsApp passou a renderizar: o app montava "Oi, tudo bem? Passando pra falar do SEU ESTOFADO" para um
