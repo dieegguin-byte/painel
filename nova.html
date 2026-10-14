@@ -169,6 +169,18 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}
 .compromisso-card .compromisso-corpo{margin-top:13px}
 .compromisso-card.cor-alta{border-left-color:var(--red)}.compromisso-card.cor-media{border-left-color:var(--yellow)}.compromisso-card.cor-baixa{border-left-color:var(--green)}
+/* CARDS LIGADOS (Diego, 14/10/2026: "são cards separados, mas é um ligado no outro, com cores iguais"). Tarefas no mesmo
+   lugar ou com a mesma pessoa, no mesmo dia e a poucos minutos uma da outra, continuam um card por tarefa, mas o grupo
+   ganha UMA cor (borda, fundo e selo) e os cards ficam colados. Grupos diferentes no mesmo dia, cores diferentes. */
+.compromisso-card.ligado{--liga:#e0b04a;border-color:color-mix(in srgb,var(--liga) 55%,transparent);border-left-color:var(--liga);background:linear-gradient(150deg,color-mix(in srgb,var(--liga) 13%,#1a1512),color-mix(in srgb,var(--liga) 5%,#151210));box-shadow:0 0 0 1px color-mix(in srgb,var(--liga) 22%,transparent)}
+.compromisso-card.ligado.liga-ini,.compromisso-card.ligado.liga-meio{margin-bottom:4px;border-bottom-left-radius:6px;border-bottom-right-radius:6px}
+.compromisso-card.ligado.liga-meio,.compromisso-card.ligado.liga-fim{border-top-left-radius:6px;border-top-right-radius:6px}
+.compromisso-card.ligado.liga-cor-1{--liga:#e0b04a}.compromisso-card.ligado.liga-cor-2{--liga:#5cc3b5}.compromisso-card.ligado.liga-cor-3{--liga:#b48ee6}.compromisso-card.ligado.liga-cor-4{--liga:#e48aa7}.compromisso-card.ligado.liga-cor-5{--liga:#6aa9e9}
+.selo-ligado{display:inline-block;font-style:normal;font-size:11px;font-weight:700;color:var(--liga,#e0b04a);background:color-mix(in srgb,var(--liga,#e0b04a) 16%,transparent);border:1px solid color-mix(in srgb,var(--liga,#e0b04a) 45%,transparent);border-radius:999px;padding:1px 8px;margin-right:7px;vertical-align:1px}
+/* COMPROMISSO DUPLICADO (Diego, 14/10/2026, Simone: "foi duplicado feio... não deixar ficar duplicado"). Buscar no
+   profissional e entregar a mesma peça é UM card só; se aparecerem dois no mesmo dia pro mesmo serviço, o app avisa. */
+.aviso-duplicado{padding:8px 12px;font-size:12px;line-height:1.4;color:#f0b48a;border-left:2px solid #f0b48a;background:#f0b48a12;border-radius:0 8px 8px 0;margin:8px 0 4px}
+
 .compromisso-quando{background:#0f0d0c;border:1px solid var(--line);border-radius:12px;padding:11px 6px;text-align:center;align-self:start}
 .compromisso-quando b{display:block;font:700 19px Georgia,serif;color:var(--orange2)}
 .compromisso-quando span{display:block;font-size:10px;color:var(--dim);margin-top:3px}
@@ -993,7 +1005,7 @@ button.sutil{opacity:.55;font-size:12px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 
 /* CARDS DA AGENDA COM AÇÕES (11/10/2026): Feito / Remarcar / Cancelar / recado com áudio. */
-.card-acoes{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}.card-acoes textarea{width:100%;min-height:64px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:14px;line-height:1.45}.card-acoes textarea:focus{border-color:#d37742}.card-acoes-botoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.card-acoes-botoes button{min-height:44px;font-size:12px}.card-acoes-botoes .perigo{color:#f08a7a;border-color:#7a3a30}.gravador{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.gravador button{min-height:40px;font-size:12px}.gravador audio{height:36px;max-width:100%;flex:1 1 180px}.gravador small,.card-acoes small{font-size:11px;color:var(--dim)}.gravador .gravando{animation:pulsoGravando 1.2s ease-in-out infinite}@keyframes pulsoGravando{50%{opacity:.55}}.desfazer-linha{padding:6px 0;border-bottom:1px solid var(--line)}.desfazer-linha:last-child{border-bottom:0}.desfazer-linha{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;line-height:1.4}.desfazer-linha span{min-width:0;overflow-wrap:anywhere}.desfazer-linha small{display:block;font-size:11px;color:var(--dim)}.desfazer-linha button{min-height:40px;font-size:12px;flex:none}.selo-claude{margin:8px 12px 0;padding:10px 12px;border-radius:12px;background:#d4a64e17;border:1px solid #d4a64e66;font-size:13px;line-height:1.45}.selo-claude b{display:block;color:#e8c06d;margin-bottom:3px}.selo-claude .selo-botoes{display:flex;gap:6px;margin-top:8px}.selo-claude .selo-botoes button{min-height:40px;font-size:12px;flex:1}.selo-recado{margin:8px 12px 0;padding:8px 12px;border-radius:12px;background:#6097c014;border:1px solid #6097c055;color:#a9c8e2;font-size:12px;line-height:1.45}.recados-do-card{display:flex;flex-direction:column;gap:6px}.recados-do-card div{font-size:12px;line-height:1.45;padding:8px 10px;border-radius:10px;background:var(--surface2);border:1px solid var(--line)}.recados-do-card em{display:block;font-style:normal;color:var(--dim);font-size:11px}.recados-do-card button{margin-top:4px;min-height:36px;font-size:11px}
+.card-acoes{margin-top:12px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}.card-acoes textarea{width:100%;min-height:64px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:14px;line-height:1.45}.card-acoes textarea:focus{border-color:#d37742}.card-acoes-botoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.card-acoes-botoes button{min-height:44px;font-size:12px}.card-acoes-botoes .perigo{color:#f08a7a;border-color:#7a3a30}.gravador{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.gravador button{min-height:40px;font-size:12px}.gravador audio{height:36px;max-width:100%;flex:1 1 180px}.gravador small,.card-acoes small{font-size:11px;color:var(--dim)}.gravador .gravando{animation:pulsoGravando 1.2s ease-in-out infinite}@keyframes pulsoGravando{50%{opacity:.55}}.desfazer-linha{padding:6px 0;border-bottom:1px solid var(--line)}.desfazer-linha:last-child{border-bottom:0}.desfazer-linha{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;line-height:1.4}.desfazer-linha span{min-width:0;overflow-wrap:anywhere}.desfazer-linha small{display:block;font-size:11px;color:var(--dim)}.desfazer-linha small.desfazer-texto{color:var(--text);font-size:12px;white-space:pre-wrap;margin:2px 0}.desfazer-linha button{min-height:40px;font-size:12px;flex:none}.selo-claude{margin:8px 12px 0;padding:10px 12px;border-radius:12px;background:#d4a64e17;border:1px solid #d4a64e66;font-size:13px;line-height:1.45}.selo-claude b{display:block;color:#e8c06d;margin-bottom:3px}.selo-claude .selo-botoes{display:flex;gap:6px;margin-top:8px}.selo-claude .selo-botoes button{min-height:40px;font-size:12px;flex:1}.selo-recado{margin:8px 12px 0;padding:8px 12px;border-radius:12px;background:#6097c014;border:1px solid #6097c055;color:#a9c8e2;font-size:12px;line-height:1.45}.recados-do-card{display:flex;flex-direction:column;gap:6px}.recados-do-card div{font-size:12px;line-height:1.45;padding:8px 10px;border-radius:10px;background:var(--surface2);border:1px solid var(--line)}.recados-do-card em{display:block;font-style:normal;color:var(--dim);font-size:11px}.recados-do-card button{margin-top:4px;min-height:36px;font-size:11px}
 </style>
 </head>
 <body>
@@ -1052,18 +1064,29 @@ function comemorar() {
 (() => {
   if (!("IntersectionObserver" in window) || !("MutationObserver" in window) || semMovimento()) return;
   let fila = 0, zera = 0;
+  // BLOCO SUMIDO NO PAINEL (Diego, 14/10/2026, print das 10h11: ao abrir o card da Manu, Atrasados, Hoje, Próximos,
+  // Caixa e a própria Manu sumiram; fechar e abrir o app trazia tudo de volta). A classe `revela` deixa o bloco com
+  // opacity 0 até o observador marcar `visto`. Só que o React reescreve o className do bloco toda vez que ele
+  // abre/fecha (apaga `revela`/`visto`), e qualquer nó novo no Painel fazia `olhar()` esconder de novo TODOS os
+  // blocos sem a classe — inclusive os que já tinham aparecido — à espera de um observador que, fora da tela ou
+  // no meio de uma animação, podia não disparar. Duas travas agora:
+  //   1. cada bloco é escondido UMA vez só (WeakSet): bloco que já apareceu nunca mais é escondido;
+  //   2. rede de segurança: bloco escondido há mais de 1,2 s aparece de qualquer jeito, observador ou não.
+  const jaVistos = new WeakSet();
+  const mostrar = (el) => { if (jaVistos.has(el)) return; jaVistos.add(el); io.unobserve(el); el.classList.add("visto"); };
   const io = new IntersectionObserver((lista) => {
     for (const e of lista) {
       if (!e.isIntersecting) continue;
-      io.unobserve(e.target);
       e.target.style.setProperty("--atraso", `${Math.min(fila++, 6) * 90}ms`);
-      e.target.classList.add("visto");
+      mostrar(e.target);
       clearTimeout(zera); zera = setTimeout(() => { fila = 0; }, 250);
     }
   }, { threshold: 0.06 });
   const olhar = (painel) => {
     painel.querySelectorAll(":scope > *:not(.metric-grid):not(.funil-filtros):not(.revela)").forEach((el) => {
+      if (jaVistos.has(el)) return;
       el.classList.add("revela"); io.observe(el);
+      setTimeout(() => { if (!jaVistos.has(el)) { el.style.setProperty("--atraso", "0ms"); mostrar(el); } }, 1200);
     });
   };
   new MutationObserver((muts) => muts.forEach((m) => m.addedNodes.forEach((n) => {
@@ -1453,6 +1476,12 @@ const demoAppointments = [
   { id: "a0", titulo: "Comprar material Ana Paula — Plástico & Tal", data: hojeISO(), hora: "08:00", cidade: "Valparaíso de Goiás", local: "Plástico & Tal - Av. Marginal, Qd. 45, lote 32 B - Jardim Ipanema", tipo: "presencial", status: "planejado", servico_id: null },
   { id: "a1", titulo: "Ana Paula — entregar poltrona", data: hojeISO(), hora: "14:00", cidade: "Valparaíso", local: "Valparaíso", tipo: "presencial", status: "planejado", servico_id: "s4" },
   { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", local: "Remoto / WhatsApp", tipo: "remoto", status: "planejado", servico_id: "s2" },
+  // CARDS LIGADOS (14/10/2026): duas tarefas na mesma parada, 1 minuto uma da outra, título começando pela pessoa.
+  // A demo tem que mostrar os dois com a MESMA cor e colados — e, no a1/a9, o aviso de duplicado (buscar e entregar a
+  // mesma poltrona no mesmo dia, serviço s4).
+  { id: "a10", titulo: "Marlom Júnior — pegar cola quente para o mostruário", data: hojeISO(), hora: "16:00", cidade: "Luziânia", local: "", tipo: "presencial", status: "planejado", servico_id: null },
+  { id: "a11", titulo: "Marlom Júnior — levar o tecido da Mariana", data: hojeISO(), hora: "16:01", cidade: "Luziânia", local: "", tipo: "presencial", status: "planejado", servico_id: "s1" },
+  { id: "a9", titulo: "Marlom Júnior — buscar a poltrona da Ana Paula", data: hojeISO(), hora: "13:30", cidade: "Luziânia", local: "", tipo: "presencial", status: "planejado", servico_id: "s4" },
   // criado_em MAIS NOVO que o do a7 de propósito: os dois são do serviço s1, e é esse par que reproduz o caso
   // Karol (16/09/2026) — a visita só foi marcada porque o orçamento do a7 já tinha sido enviado, mas o a7
   // continua planejado e aparece como atrasado. É o que acende o aviso "pode já estar feito".
@@ -3722,6 +3751,8 @@ function Home() {
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Conta as cargas: a faixa "Enviado ao Claude" relê agenda_recados a cada carga (14/10/2026).
+  const [recargaN, setRecargaN] = useState(0);
   // Quando não é null, a tela está mostrando a última carga guardada no aparelho (sem sinal).
   const [offlineDesde, setOfflineDesde] = useState(null);
   // CONFERÊNCIA AUTOMÁTICA PAUSADA EM 15/09/2026 (Diego, após a análise do Claude). A única regra do monitor
@@ -3878,6 +3909,7 @@ function Home() {
     // nas travas do banco depois, sem ele ver o erro.
     if (!firstError) { try { window.localStorage.setItem(CACHE_OFFLINE, JSON.stringify({ em: Date.now(), pacote })); } catch (e) { /* aparelho sem espaço: segue sem cache */ } }
     setLoading(false);
+    setRecargaN((n) => n + 1);
   }, [db, demo, notify, session, aplicarPacote]);
   // O gesto de puxar pra atualizar (fora do React) chama isto.
   useEffect(() => { window.__tbAtualizar = loadAll; return () => { if (window.__tbAtualizar === loadAll) window.__tbAtualizar = null; }; }, [loadAll]);
@@ -3996,7 +4028,9 @@ function Home() {
     // UM canal só para as sete: cada `.on()` é uma inscrição barata, mas cada CANAL é um socket a mais.
     // E como todas caem no mesmo `recarregarLogo` com debounce, uma escrita do Classic que toca serviço +
     // financeiro + agenda de uma vez vira UMA recarga, não três.
-    const TABELAS_VIVAS = ["agenda", "servicos", "financeiro", "caixa_entrada", "clientes", "pessoais", "avisos_operacionais", "duvidas_agente"];
+    // `agenda_recados` entrou em 14/10/2026: a faixa "Enviado ao Claude" lia só a lista do aparelho, então o que a Manu
+    // processava, apagava ou recriava direto no banco não aparecia até fechar e abrir o app (faixa vazia das 10h05).
+    const TABELAS_VIVAS = ["agenda", "servicos", "financeiro", "caixa_entrada", "clientes", "pessoais", "avisos_operacionais", "duvidas_agente", "agenda_recados"];
     const canal = TABELAS_VIVAS.reduce(
       (ch, table) => ch.on("postgres_changes", { event: "*", schema: "public", table }, recarregarLogo),
       db.channel("operacao-viva")
@@ -4105,7 +4139,7 @@ function Home() {
   // bruto `appointments` diretamente. Correção de 25/07/2026: antes só o Painel escondia o card de um
   // compromisso com pendência de remarcação aberta; Agenda, rota, Compras e o seletor de horário do
   // "+ Adicionar" continuavam mostrando/permitindo agendar em cima de um compromisso fantasma.
-  const acoesAgenda = useRecadosAgenda({ db, demo, session, notify, onChanged: loadAll, setAppointments });
+  const acoesAgenda = useRecadosAgenda({ db, demo, session, notify, onChanged: loadAll, setAppointments, recarga: recargaN });
   // REMARCAR SOME DA TELA (Diego, 11/10: "no remarcar também pode sumir... só não pode sumir das suas vistas").
   // O card continua planejado no banco e o recado aberto em agenda_recados: a rotina do Claude acha os dois e
   // move. Até lá ele sai de toda tela, como a pendência da Regra Nº 12 — por isso o filtro é aqui, na coleção
@@ -5352,6 +5386,55 @@ function textoRotina(st) {
   if (st.estado === "hoje") return st.passouHora ? "Passou da hora" : "Fazer hoje";
   return st.dias === 1 ? "Amanhã" : `Em ${st.dias} dias`;
 }
+// CARDS LIGADOS (Diego, 14/10/2026). A Manu cria as tarefas de uma mesma parada como cards separados, 1 minuto um do
+// outro, com o título começando pelo lugar ou pela pessoa ("Marlom Júnior — pegar cola quente", "Marlom Júnior — buscar
+// o sofá"). O app reconhece o grupo sozinho, sem campo novo no banco: mesmo dia, mesmo começo de título antes do
+// travessão (ou mesmo cliente), e horário até 20 minutos depois do card anterior do grupo. Devolve, por id, a cor do
+// grupo (1..5, trocando a cada grupo do dia), a posição no grupo (ini/meio/fim) e o tamanho.
+// TAMBÉM marca o provável DUPLICADO (Diego, 14/10, Simone): dois cards do mesmo serviço no mesmo dia, um de buscar e
+// outro de entregar — pra ele, é um compromisso só. O app só avisa; quem não deixa nascer é a Manu e a auditoria.
+const LIGA_MINUTOS = 20;
+const LIGA_CORES = 5;
+function inicioDoTitulo(titulo) {
+  const t = String(titulo || "");
+  const m = /^(.*?)\s+(?:—|–|-)\s+/.exec(t);
+  return m ? semAcento(m[1]).replace(/[^a-z0-9]+/g, " ").trim() : "";
+}
+function minutosDaHora(hora) { const m = /^(\d{1,2}):(\d{2})/.exec(String(hora || "")); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
+const TITULO_BUSCA_ENTREGA = /\b(busc|retir|entreg|levar|pegar)/i;
+function ligacoesDaLista(lista) {
+  const mapa = new Map();
+  const cards = (lista || []).filter((a) => a && a.id && a.data && !a.pessoal_virtual);
+  if (cards.length < 2) return mapa;
+  const ordenados = [...cards].sort((a, b) => (a.data + (a.hora || "99")).localeCompare(b.data + (b.hora || "99")));
+  const grupos = []; const corPorDia = {};
+  for (const a of ordenados) {
+    const inicio = inicioDoTitulo(a.titulo); const min = minutosDaHora(a.hora);
+    let dono = null;
+    if (min !== null) for (const g of grupos) {
+      if (g.data !== a.data || g.ultimo === null || min - g.ultimo > LIGA_MINUTOS || min < g.ultimo) continue;
+      const mesmaParada = (inicio && g.inicio === inicio) || (a.cliente_id && g.cliente_id === a.cliente_id);
+      if (mesmaParada) { dono = g; break; }
+    }
+    if (dono) { dono.cards.push(a); dono.ultimo = min; }
+    else grupos.push({ data: a.data, inicio, cliente_id: a.cliente_id || null, ultimo: min, cards: [a] });
+  }
+  for (const g of grupos) {
+    if (g.cards.length < 2) continue;
+    corPorDia[g.data] = (corPorDia[g.data] || 0) + 1;
+    const cor = ((corPorDia[g.data] - 1) % LIGA_CORES) + 1;
+    g.cards.forEach((a, i) => mapa.set(a.id, { cor, pos: i === 0 ? "ini" : i === g.cards.length - 1 ? "fim" : "meio", n: g.cards.length, indice: i + 1 }));
+  }
+  // Duplicado: mesmo serviço, mesmo dia, dois cards de buscar/entregar.
+  const porServicoDia = new Map();
+  for (const a of cards) { if (!a.servico_id || !TITULO_BUSCA_ENTREGA.test(a.titulo || "")) continue; const k = a.servico_id + "|" + a.data; if (!porServicoDia.has(k)) porServicoDia.set(k, []); porServicoDia.get(k).push(a); }
+  for (const lista2 of porServicoDia.values()) {
+    if (lista2.length < 2) continue;
+    for (const a of lista2) { const outro = lista2.find((b) => b.id !== a.id); mapa.set(a.id, { ...(mapa.get(a.id) || {}), duplicadoDe: outro ? (outro.titulo || "outro card") : "" }); }
+  }
+  return mapa;
+}
+function classeLigado(l) { return l && l.cor ? ` ligado liga-cor-${l.cor} liga-${l.pos}` : ""; }
 function corCompromisso(data, hoje) { const amanha = new Date(hoje + "T12:00:00"); amanha.setDate(amanha.getDate() + 1); const amanhaISO = amanha.toISOString().slice(0, 10); return data <= hoje ? "alta" : data === amanhaISO ? "media" : "baixa"; }
 
 // Presencial antes de remoto no mesmo dia, depois por hora.
@@ -5574,7 +5657,8 @@ function PessoalDetalhe({ p, a, today }) {
 // CARDS DA AGENDA COM AÇÕES (Diego, 11/10/2026). Desde 23/08 o card era só leitura; agora cada um tem
 // Feito / Remarcar / Cancelar e um recado pro Claude (texto e áudio). O app grava o mínimo e na hora:
 //   Feito    -> agenda.status = feito (o banco recusa data futura) + recado em agenda_recados
-//   Cancelar -> agenda.status = cancelado + recado com o motivo (motivo obrigatório)
+//   Cancelar -> agenda.status = cancelado + recado com o motivo (motivo OPCIONAL desde 14/10/2026: "quando não
+//               quiser falar o motivo, só colocar cancelado"). Cancelar do Diego encerra o cliente.
 //   Remarcar -> só o recado. O Diego NÃO escolhe data: a rotina do Claude (8h, 12h, 16h e 18h, Brasília)
 //               escolhe pela rota saindo de casa em Luziânia, pelos compromissos e pela carga dos
 //               profissionais, move o card e escreve agenda.nota_claude ("Remarcado pelo Claude — motivo")
@@ -5607,15 +5691,17 @@ function profissionalDoCadastro(cadastro, nome) {
 const HORARIOS_ROTINA_RECADOS = "8h, 12h, 16h e 18h";
 const ACAO_RECADO_ROTULO = { recado: "Recado", feito: "Feito", remarcar: "Remarcar", cancelar: "Cancelar" };
 
-function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointments }) {
+function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointments, recarga = 0 }) {
   const [recados, setRecados] = useState([]);
+  // `recarga` muda a cada loadAll (canal vivo, volta ao primeiro plano, puxar pra atualizar): a lista é relida do banco,
+  // que é a fonte — a faixa não pode confiar só no que este aparelho mandou (14/10/2026).
   const carregar = useCallback(async () => {
     if (demo || !db || !session) return;
     // Abertos + o que a rotina respondeu nos últimos 3 dias (pra ele ver o que o Claude fez).
     const desde = new Date(Date.now() - 3 * 864e5).toISOString();
     const { data, error } = await db.from("agenda_recados").select("*, agenda(titulo,data,hora,status,pessoal_id)").or(`processado_em.is.null,processado_em.gte.${desde}`).order("criado_em", { ascending: true });
     if (!error) setRecados(data || []);
-  }, [db, demo, session]);
+  }, [db, demo, session, recarga]);
   useEffect(() => { carregar(); }, [carregar]);
 
   const enviar = useCallback(async (a, { acao, texto, audio }) => {
@@ -5846,8 +5932,10 @@ function DesfazerRecados() {
   return <CardRecolhivel className="content-card desfazer-faixa" selo={abertos.length} tom="azul" icone="↶"
     cabecalho={<><p className="kicker">ENVIADO AO CLAUDE</p><h3>{abertos.length} aguardando o Claude · dá pra desfazer</h3></>}>
     {abertos.slice(0, 6).map((r) => <div key={r.id} className="desfazer-linha">
-      <span>{icone[r.acao] || "•"} <b>{ACAO_RECADO_ROTULO[r.acao] || r.acao}</b> · {r.agenda?.titulo || "compromisso"}<small>{new Date(r.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small></span>
-      <button type="button" className="ghost" disabled={busyId === r.id} onClick={async () => { setBusyId(r.id); try { await acoes.desfazer(r); } finally { setBusyId(null); } }}>{busyId === r.id ? "…" : "↶ Desfazer"}</button>
+      <span>{icone[r.acao] || "•"} <b>{ACAO_RECADO_ROTULO[r.acao] || r.acao}</b> · {r.agenda?.titulo || "compromisso"}{r.texto && <small className="desfazer-texto">“{r.texto}”</small>}<small>{new Date(r.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small></span>
+      {/* CONFIRMA ANTES (Diego, 14/10/2026: desfez 6 itens sem querer só pra ler o que tinha escrito). O texto do recado
+          agora aparece na linha, então dá pra ler sem desfazer; e o Desfazer pergunta. */}
+      <button type="button" className="ghost" disabled={busyId === r.id} onClick={async () => { if (!window.confirm(`Quer mesmo desfazer “${ACAO_RECADO_ROTULO[r.acao] || r.acao}” de “${r.agenda?.titulo || "compromisso"}”?`)) return; setBusyId(r.id); try { await acoes.desfazer(r); } finally { setBusyId(null); } }}>{busyId === r.id ? "…" : "↶ Desfazer"}</button>
     </div>)}
     {abertos.length > 6 && <small>+{abertos.length - 6} mais</small>}
   </CardRecolhivel>;
@@ -5872,7 +5960,6 @@ function AcoesDoCompromisso({ a, acoes, today }) {
   const doCard = acoes.recados.filter((r) => r.agenda_id === a.id);
   const enviar = async (acao) => {
     if (busy) return;
-    if (acao === "cancelar" && !texto.trim() && !audio) { acoes.notify("Diga o motivo do cancelamento (texto ou áudio).", "error"); return; }
     if (acao === "recado" && !texto.trim() && !audio) { acoes.notify("Escreva ou grave o recado primeiro.", "error"); return; }
     if (acao === "cancelar" && !window.confirm(`Cancelar “${a.titulo_visivel || a.titulo}”?`)) return;
     if (acao === "feito" && !window.confirm(`Marcar “${a.titulo_visivel || a.titulo}” como feito${futuro ? " hoje" : ""}?`)) return;
@@ -5912,7 +5999,7 @@ function AcoesDoCompromisso({ a, acoes, today }) {
   </div>;
 }
 
-function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais, revisaoData = false, sucessor = null, passouDaHora = false }) {
+function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais, revisaoData = false, sucessor = null, passouDaHora = false, ligado = null }) {
   const [aberto, setAberto] = useState(false);
   // Ações do card (Feito/Remarcar/Cancelar/recado) vêm do contexto, não de prop: o card é desenhado em
   // vários lugares (Painel, Agenda, atrasados) e nenhum deles precisa saber gravar no banco.
@@ -5934,7 +6021,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
     setBusyPessoal(true);
     try { await acoes.concluirPessoal(a); } catch (e) { acoes.notify("Não salvou: " + (e.message || e), "error"); } finally { setBusyPessoal(false); }
   };
-  if (a.pessoal_virtual) return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}`}>
+  if (a.pessoal_virtual) return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}${classeLigado(ligado)}`}>
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
@@ -6089,7 +6176,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   if (Number(svc?.valor_orcamento)) instrucoes.push(["VALOR DO SERVIÇO",
     money(svc.valor_orcamento) + (svc?.prazo ? " · prazo " + compactDate(svc.prazo) : "")]);
   const obsFicha = cli?.obs ? String(cli.obs).trim() : "";
-  return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehFollowUpZapia(a) ? " followup-zapia" : ""}`}>
+  return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehFollowUpZapia(a) ? " followup-zapia" : ""}${classeLigado(ligado)}`}>
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
@@ -6098,12 +6185,13 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       </span>
       <span className="compromisso-idc">
         <strong>{nomeCliente}</strong>
-        <span>{seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
+        <span>{ligado && ligado.cor && <i className="selo-ligado" title="Mesma parada: cards separados, mas ligados">⛓ {ligado.indice}/{ligado.n}</i>}{seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
       </span>
       <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
     </button>
     {revisaoData && <p className="revisao-data">Remarcação pendente · idade calculada pela data original. A data precisa de revisão.</p>}
     {acoes && <SelosClaudeDoCard a={a} acoes={acoes} onMudar={() => setAberto(true)} />}
+    {ligado && ligado.duplicadoDe !== undefined && <p className="aviso-duplicado">⚠ Parece duplicado: este serviço já tem “{ligado.duplicadoDe}” no mesmo dia. Buscar no profissional e entregar a mesma peça é um card só — cancele o que sobrou como “Duplicado”.</p>}
     {sucessor && diasAtraso > 0 && <p className="talvez-feito">Pode já estar feito: “{sucessor.titulo}” foi criado depois deste, no mesmo serviço. Se a etapa aconteceu, conclua aqui — o app não fecha sozinho.</p>}
     {aberto && <div className="compromisso-corpo">
       {(a.pessoal || oQueFazer !== tituloCard) && <h4 title={tituloCard}>{tituloCard}</h4>}
@@ -7796,6 +7884,8 @@ function RespondidasAoClaude({ duvidas, inbox = [], db, demo, notify, onChanged 
   const linhas = [...respondidas, ...caixa].sort((x, y) => String(y.quando).localeCompare(String(x.quando)));
   if (!linhas.length) return null;
   const desfazer = async (l) => {
+    // Confirma antes (Diego, 14/10/2026): todo Desfazer do app pergunta.
+    if (!window.confirm(`Quer mesmo desfazer a resposta “${String(l.resposta || "").slice(0, 60)}”?`)) return;
     setBusyId(l.id);
     try {
       if (!demo) {
@@ -7832,11 +7922,15 @@ function ManuCard({ duvidas, inbox = [], atividadeAgente = [], today, db, demo, 
   const respondidas = (duvidas || []).filter((d) => d.status === "respondida").length + (inbox || []).filter((it) => it && it.status === "respondido" && !it.processado).length;
   const ultima = (atividadeAgente || []).filter((h) => h && h.quando).map(separarFonteAgente).filter((h) => h && h.fonte === "agente").sort((a, b) => String(b.quando).localeCompare(String(a.quando)))[0];
   const resumo = abertas ? `${abertas} pergunta${abertas === 1 ? "" : "s"} pra você` : respondidas ? `${respondidas} resposta${respondidas === 1 ? "" : "s"} esperando ela` : ultima ? `última rodada ${idadeDoDado(new Date(ultima.quando).getTime())}` : "ainda não rodou";
+  // BARREIRA PRÓPRIA (14/10/2026): um dado fora do padrão vindo da Manu (histórico, pergunta ou regra) não pode
+  // derrubar o Painel inteiro — se algo quebrar aqui dentro, só este card avisa, e Atrasados/Hoje seguem na tela.
   return <GrupoRecolhivel id="grupo-manu" titulo="Manu" className={`grupo-agente grupo-manu${abertas ? " com-perguntas" : ""}`} semContador resumo={resumo} abertoInicial={abertas > 0}>
-    <DuvidasAgenteCard duvidas={duvidas} inbox={inbox} today={today} db={db} demo={demo} notify={notify} customers={customers} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />
-    <RespondidasAoClaude duvidas={duvidas} inbox={inbox} db={db} demo={demo} notify={notify} onChanged={onChanged} />
-    <AgenteCard itens={atividadeAgente} today={today} services={services} appointments={appointments} customers={customers} finances={finances} onOpenFicha={onOpenFicha} />
-    <RegrasAprendidasCard duvidas={duvidas} db={db} demo={demo} notify={notify} onChanged={onChanged} />
+    <BarreiraDaAba nome="O card da Manu">
+      <DuvidasAgenteCard duvidas={duvidas} inbox={inbox} today={today} db={db} demo={demo} notify={notify} customers={customers} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />
+      <RespondidasAoClaude duvidas={duvidas} inbox={inbox} db={db} demo={demo} notify={notify} onChanged={onChanged} />
+      <AgenteCard itens={atividadeAgente} today={today} services={services} appointments={appointments} customers={customers} finances={finances} onOpenFicha={onOpenFicha} />
+      <RegrasAprendidasCard duvidas={duvidas} db={db} demo={demo} notify={notify} onChanged={onChanged} />
+    </BarreiraDaAba>
   </GrupoRecolhivel>;
 }
 // REGRAS APRENDIDAS: tudo que o Diego respondeu com "vale sempre". O agente relê esta lista em toda rodada.
@@ -8099,7 +8193,11 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
   const hojePassouDaHora = porTipo(passouDaHoraAll).length;
   const irParaVencendo = () => { if (!atrasos.recentes.length) return; setFiltroTipo("todos"); requestAnimationFrame(() => document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" })); };
   const semHora = cobrancasAll;
-  const cardAtrasado = (a) => <CompromissoCard key={a.id} a={a} svc={svcDe(a)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} revisaoData={idsRemarcacao.has(a.id)} sucessor={sucessorMaisNovoNoServico(a, agendaPlanejada)} passouDaHora={idsPassouDaHora.has(a.id)} />;
+  // Cards ligados (14/10/2026): o grupo é descoberto por lista — Atrasados, Hoje e Próximos, cada uma a sua.
+  const ligacoesAtrasados = useMemo(() => ligacoesDaLista(atrasados), [atrasados]);
+  const ligacoesHoje = useMemo(() => ligacoesDaLista(hoje), [hoje]);
+  const ligacoesFuturos = useMemo(() => ligacoesDaLista(futuros), [futuros]);
+  const cardAtrasado = (a) => <CompromissoCard key={a.id} a={a} svc={svcDe(a)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} revisaoData={idsRemarcacao.has(a.id)} sucessor={sucessorMaisNovoNoServico(a, agendaPlanejada)} passouDaHora={idsPassouDaHora.has(a.id)} ligado={ligacoesAtrasados.get(a.id) || null} />;
   // QUEM ESPERA HÁ MAIS TEMPO, NO CABEÇALHO FECHADO (19/09/2026, caso Cacau). O bloco "PRECISA
   // RESOLVER" nasce recolhido e dizia só a contagem: "1 compromisso(s) com atraso recente". Em 18/09
   // o Diego bateu o olho no Painel, viu o número e concluiu que os cartões da Cacau tinham sumido —
@@ -8226,7 +8324,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
       {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora · {hojePassouDaHora > 1 ? "estão" : "está"} em Precisa resolver</span>}{seloFiltro}</>}>
       {faixaFiltro}
       {hoje.length > 0
-        ? [...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)
+        ? [...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} ligado={ligacoesHoje.get(a.id) || null} />)
         : <div className="empty-state"><b>O dia está livre.</b><span>Nada marcado para {compactDate(today)}.</span></div>}
       <RotinasCard rotinas={rotinas || []} hoje={today} agora={agoraHHMM} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} soLista apenas="doDia" />
     </CardRecolhivel>
@@ -8239,7 +8337,7 @@ function Dashboard({ inbox, services, appointments, agendaPlanejada = appointmen
     {futuros.length > 0 && <CardRecolhivel className="content-card topo-card tom-laranja" selo={futuros.length} tom="laranja" icone="📅"
       cabecalho={<><p className="kicker">PRÓXIMOS COMPROMISSOS</p><h3>{futuros.length} próximo(s) compromisso(s)</h3>{seloFiltro}</>}>
       {faixaFiltro}
-      {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</CardRecolhivel>}
+      {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} ligado={ligacoesFuturos.get(a.id) || null} />)}</CardRecolhivel>}
     {/* ENVIADO AO CLAUDE vem DEPOIS de Atrasados, Hoje e Próximos (Diego, 12/10: "os compromissos de hoje,
         atrasados precisam ser os primeiros, não o recado que vai pro Claude"). Fica recolhido, só com o selo. */}
     <DesfazerRecados />
@@ -8537,7 +8635,7 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
           <div className="agenda-dia-meta"><b>{items.length}</b><span>{items.length === 1 ? "compromisso" : "compromissos"}</span></div>
           <i className={`agenda-dia-seta${aberto ? " aberta" : ""}`}>▼</i>
         </button>
-        {aberto && <div className="agenda-dia-corpo">{[...items].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} />)}</div>}
+        {aberto && (() => { const ligacoes = ligacoesDaLista(items); return <div className="agenda-dia-corpo">{[...items].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={hoje} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} ligado={ligacoes.get(a.id) || null} />)}</div>; })()}
       </div>;
     })}
     {/* SEM HORA — recolhido por padrão, como os dias. 26 linhas abertas seriam a parede de texto que ele
@@ -9419,10 +9517,16 @@ function ProfissionaisView({ finances, services, profissionais, db, demo, mode, 
   return <div className="page-grid">
     <section className="metric-grid finance-metrics">
       <Metric label="Falta pagar de mão de obra" value={money(faltaTotal)} detail={`${qtdAbertos} em aberto${qtdSemValor ? ` · ${qtdSemValor} sem valor` : ""}`} tone={qtdSemValor ? "orange" : "yellow"} />
-      <Metric label="Vales ainda soltos" value={money(valesSoltosTotal)} detail={`${qtdValesSoltos} vale(s) sem serviço`} tone="red" />
+      <Metric label="Vales ainda soltos" value={money(valesSoltosTotal)} detail={contasComAlgo.filter((c) => c.somaVales > 0).map((c) => `${c.nome.split(" ")[0]} ${money(c.somaVales)}`).join(" · ") || `${qtdValesSoltos} vale(s) sem serviço`} tone="red" />
       <Metric label="Sai do caixa no acerto" value={money(saiNoAcerto)} detail="Falta menos vale, por pessoa" tone="green" />
     </section>
 
+    {/* POR QUE 0,00 (Diego, 14/10/2026, Caixa: "é zero zero... se tem 160 lá escrito de vale"): o "Falta pagar" só soma
+        mão de obra COMBINADA anotada no serviço; sem combinado anotado, é 0,00 mesmo com vale adiantado. A linha abaixo
+        explica isso na tela, em vez de deixar o número mudo. */}
+    {faltaTotal === 0 && valesSoltosTotal > 0 && <p className="ficha-note" style={{ margin: "-4px 0 10px" }}>
+      Falta pagar está em 0,00 porque nenhum serviço em andamento tem a mão de obra combinada anotada (campo "R$ combinado" abaixo). Os {money(valesSoltosTotal)} de vale já saíram do caixa e vão descontar do que você pagar: {contasComAlgo.filter((c) => c.somaVales > 0).map((c) => `${c.nome} ${money(c.somaVales)} (${c.valesSoltos.length} vale${c.valesSoltos.length === 1 ? "" : "s"})`).join(", ")}.
+    </p>}
     {/* ANOTAR É O CORAÇÃO DA ABA: se anotar der trabalho, ele não anota, e a busca do Marcão volta a se perder.
         Por isso o formulário fica em cima, aberto, com o nome guardado entre uma anotação e outra — ele
         costuma lançar duas ou três seguidas do mesmo profissional. */}
@@ -9457,7 +9561,8 @@ function ProfissionaisView({ finances, services, profissionais, db, demo, mode, 
         const chaveSoltos = "soltos-" + conta.chave;
         const liquidoAvulsos = Number((conta.somaAvulsos - conta.somaVales).toFixed(2));
         return <div key={conta.chave} className="vale-fornecedor">
-        <div className="vale-fornecedor-head"><strong>{conta.nome}</strong><b className={conta.total > 0 ? "saida" : ""}>{conta.total > 0 ? money(conta.total) + " a pagar" : conta.total < 0 ? money(-conta.total) + " adiantado" : "quites"}</b></div>
+        <div className="vale-fornecedor-head"><strong>{conta.nome}</strong><b className={conta.total > 0 ? "saida" : ""}>{conta.total > 0 ? money(conta.total) + " a pagar" : conta.total < 0 ? money(-conta.total) + " de vale a descontar" : "quites"}</b></div>
+        {conta.total < 0 && <p className="ficha-note">Ele já recebeu {money(-conta.total)} adiantado{conta.servicos.some((l) => l.situacao === "sem_valor") ? " e nenhum serviço dele tem o combinado anotado — anote o R$ combinado e o vale desconta sozinho" : ""}. Nada a pagar por enquanto.</p>}
 
         {/* UMA LINHA POR SERVIÇO. Sem combinado, o campo pra anotar fica na própria linha: é um número só, e
             quem sabe ele é o Diego no dia em que fecha com o tapeceiro. */}
