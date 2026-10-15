@@ -199,7 +199,8 @@ body[data-filtro-tipo="todos"] .compromisso-card.remoto-pendente .selo-remoto{an
 .compromisso-info{background:#0f0d0c;border:1px solid var(--line);border-radius:12px;padding:12px}
 .ci-label{display:block;font-size:9px;font-weight:800;letter-spacing:1.1px;color:var(--orange2);margin-bottom:3px}
 .compromisso-info strong{display:block;font-size:13px;margin-bottom:10px;line-height:1.45}
-.dica-enter{display:block;font-size:11px;color:var(--dim);margin-top:4px}.compromisso-msg .copiar-sugestao{display:inline-block;margin-left:8px;font-style:normal;font-size:11px;min-height:28px;padding:3px 9px;border-radius:999px;background:var(--surface2);border:1px solid var(--line2);color:var(--muted);vertical-align:middle}.compromisso-msg{display:block;font-style:italic;color:var(--cream);font-size:12px;line-height:1.55;background:#1a1512;border-left:2px solid #5a3b2b;padding:9px 11px;border-radius:8px;margin:0 0 12px;quotes:none}
+.dica-enter{display:block;font-size:11px;color:var(--dim);margin-top:4px}.compromisso-msg .compromisso-pix b{user-select:all;word-break:break-all}
+.copiar-sugestao{display:inline-block;margin-left:8px;font-style:normal;font-size:11px;min-height:28px;padding:3px 9px;border-radius:999px;background:var(--surface2);border:1px solid var(--line2);color:var(--muted);vertical-align:middle}.compromisso-msg{display:block;font-style:italic;color:var(--cream);font-size:12px;line-height:1.55;background:#1a1512;border-left:2px solid #5a3b2b;padding:9px 11px;border-radius:8px;margin:0 0 12px;quotes:none}
 .compromisso-acoes{display:flex;gap:7px;flex-wrap:wrap}
 .btn-wpp{flex:1;min-width:170px;text-align:center;text-decoration:none;background:linear-gradient(135deg,#2f7d4f,#1f5a38);color:#eafff0;border-radius:10px;padding:12px 14px;font-size:12px;font-weight:750;border:1px solid #3f9160}
 /* ROTA (23/08/2026). Mesma altura do WhatsApp pra linha não ficar torta, mas sem flex:1 —
@@ -1616,6 +1617,8 @@ const demoAppointments = [
   { id: "a00", titulo: "Checar prontidão — Reforma de sofá com Marlom Júnior", data: hojeISO(), hora: "07:30", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", servico_id: "s8" },
   { id: "a0", titulo: "Comprar material Ana Paula — Plástico & Tal", data: hojeISO(), hora: "08:00", cidade: "Valparaíso de Goiás", local: "Plástico & Tal - Av. Marginal, Qd. 45, lote 32 B - Jardim Ipanema", tipo: "presencial", status: "planejado", servico_id: null },
   { id: "a1", titulo: "Ana Paula — entregar poltrona", data: hojeISO(), hora: "14:00", cidade: "Valparaíso", local: "Valparaíso", tipo: "presencial", status: "planejado", servico_id: "s4" },
+  // Demo do card de pagamento (15/10/2026): WhatsApp de quem recebe (Afibracom) na frente + chave Pix com copiar.
+  { id: "a12", titulo: "Pagar Pix — Afibracom — R$ 100 (pedido 84697, 3 m Colorado Preto)", data: hojeISO(), hora: "14:27", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", servico_id: "s1" },
   { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", local: "Remoto / WhatsApp", tipo: "remoto", status: "planejado", servico_id: "s2" },
   // CARDS LIGADOS (14/10/2026): duas tarefas na mesma parada, 1 minuto uma da outra, título começando pela pessoa.
   // A demo tem que mostrar os dois com a MESMA cor e colados — e, no a1/a9, o aviso de duplicado (buscar e entregar a
@@ -1792,7 +1795,7 @@ const demoProfissionais = [
   { id: "p3", nome: "Gaspar", ativo: true },
 ];
 const demoFornecedores = [
-  { id: "f1", nome: "Afibracom", contato_nome: "Rafael", telefone: "6185580041", produtos: "Tecidos (linho Klee, Chagall), PVC couro, pés de PVC, insumos", dias_entrega: "terca,quinta", observacao: "Pedido 1 dia antes" },
+  { id: "f1", nome: "Afibracom", contato_nome: "Rafael", telefone: "6185580041", chave_pix: "pix@afibracom.exemplo", produtos: "Tecidos (linho Klee, Chagall), PVC couro, pés de PVC, insumos", dias_entrega: "terca,quinta", observacao: "Pedido 1 dia antes" },
   { id: "f2", nome: "Ellis Tecidos", contato_nome: "Edmania", telefone: "6193178065", produtos: "Espuma D40/D45, veludo slim", dias_entrega: null, observacao: "Sem dia fixo" },
 ];
 
@@ -4047,7 +4050,7 @@ function Home() {
         db.from("dividas").select("id,credor,valor_original,valor_pago,descricao,status,criado_em,atualizado_em").or("status.is.null,status.neq.quitada").order("criado_em", { ascending: true }),
         // PROFISSIONAIS: camada de apoio, como `ds`/`es`/`av`. Se falhar sozinha o app abre normal e a conta
         // do acerto usa o nome que já vem embutido em cada serviço (profissional_cadastro).
-        db.from("profissionais").select("id,nome,apelido,telefone,ativo").order("nome", { ascending: true }),
+        db.from("profissionais").select("id,nome,apelido,telefone,ativo,chave_pix").order("nome", { ascending: true }),
         // O QUE O AGENTE FEZ: camada de apoio como `av`. Só o que as rotinas gravaram em `historico` com
         // `por` agente/auditoria/claude nos últimos 7 dias. Tabela que já existia; nada de schema novo.
         // `historico_por_check` só aceita 'diego' e 'claude', então as rotinas gravam por='claude' e dizem quem
@@ -5695,16 +5698,19 @@ function interlocutorCompromisso(a, svc, fornecedores, profissionais) {
   const citaCliente = primeiroNome.length >= 3 && new RegExp("\\b" + primeiroNome + "\\b").test(alvo);
   // Nome curto no aviso: o cadastro tem a razão social ("Plástico & Tal Materiais para
   // Estofamentos Ltda.") e o card precisa caber na tela do celular.
-  const forn = (fornecedores || []).map((f) => f.nome).filter((n) => n && !/avulsa|diversos/i.test(n))
-    .find((n) => marcaDoNome(n)?.test(alvo))?.split(/\s+/).slice(0, 3).join(" ").replace(/[.,]$/, "");
+  // `fornObj` é o cadastro inteiro (telefone, contato, chave Pix): o card de pagamento abre o WhatsApp de QUEM
+  // RECEBE e mostra a chave dele (Diego, 15/10/2026: "era para abrir o WhatsApp de quem eu tenho que pagar").
+  const fornObj = (fornecedores || []).filter((f) => f?.nome && !/avulsa|diversos/i.test(f.nome))
+    .find((f) => marcaDoNome(f.nome)?.test(alvo)) || null;
+  const forn = fornObj ? fornObj.nome.split(/\s+/).slice(0, 3).join(" ").replace(/[.,]$/, "") : undefined;
   const prof = (profissionais || []).find((n) => marcaDoNome(n)?.test(alvo));
   if (a?.tipo === "operacional") return { destino: "interno", motivo: "compromisso operacional" };
   if (/\b(tarefa interna|bloqueio|uso interno)\b/.test(alvo)) return { destino: "interno", motivo: "tarefa interna" };
   // "Comprar" nunca é conversa com o cliente, mesmo quando é a ficha dele que motiva a compra.
   // Se o título manda pedir pro profissional ("Compras ... pedir pro Marlom Júnior"), o botão dele vem na frente
   // (Diego, 13/10/2026: "era para pedir o marlom junior"); sem profissional citado, segue sem destinatário.
-  if (/\bcompr(a|ar|ei|as)\b/.test(alvo)) return { destino: "interno", motivo: forn ? `compra na ${forn}` : "compra de material", ...(prof ? { profissional: prof } : {}) };
-  if (forn && !citaCliente) return { destino: "interno", motivo: `é na ${forn}` };
+  if (/\bcompr(a|ar|ei|as)\b/.test(alvo)) return { destino: "interno", motivo: forn ? `compra na ${forn}` : "compra de material", ...(prof ? { profissional: prof } : {}), ...(fornObj ? { fornecedor: fornObj } : {}) };
+  if (forn && !citaCliente) return { destino: "interno", motivo: `é na ${forn}`, fornecedor: fornObj };
   // `profissional`: nome do terceiro citado no título, pro card oferecer o WhatsApp dele (12/10/2026).
   if (prof && !citaCliente) return { destino: "interno", motivo: `é com ${prof}`, profissional: prof };
   // O QUE FALTA É DO PROFISSIONAL (Diego, 13/10/2026, caso Eloiza x Marcão: "tem que ser do profissional").
@@ -6550,6 +6556,18 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       {!tel && (svc?.cliente_id || a.cliente_id) && <p className="compromisso-material">⚠ Sem telefone na ficha — não dá pra fazer esse contato. Pegue o número antes.</p>}
       {triagemSemTelefone && <p className="compromisso-material">⚠ Envelope de triagem com telefone técnico inválido — o app não vai adivinhar o número. Corrija a triagem.</p>}
       {tel && ehEnvelopeDeTriagem(a) && <p className="compromisso-material">✎ Conversa ainda não triada — o WhatsApp abre vazio de propósito. Leia antes de escrever.</p>}
+      {/* CHAVE PIX DE QUEM RECEBE (Diego, 15/10/2026: "a chave Pix também, com copia e cola, quando eu estiver devendo
+          alguém"). Só em compromisso de pagamento e só com chave GRAVADA no cadastro do fornecedor/profissional
+          (coluna chave_pix); sem chave, o card diz que falta, pra Manu completar. Nunca adivinha. */}
+      {(() => {
+        if (!seloTipo || seloTipo[1] !== "pagamento" || quem.destino !== "interno") return null;
+        const credor = profCadastro || quem.fornecedor || null;
+        if (!credor) return null;
+        const chave = String(credor.chave_pix || "").trim();
+        const nome = (credor.apelido || credor.nome || "").split(" ").slice(0, 2).join(" ");
+        if (!chave) return <p className="compromisso-material">💠 Pix de {nome}: chave não cadastrada — a Manu completa pelo pedido ou comprovante.</p>;
+        return <p className="compromisso-material compromisso-pix">💠 Pix de {nome}: <b>{chave}</b><button type="button" className="copiar-sugestao" title="Copiar chave Pix" onClick={async (e) => { e.preventDefault(); try { await navigator.clipboard.writeText(chave); vibrar(6); } catch (err) { /* segure no texto pra copiar */ } }}>📋 Copiar</button></p>;
+      })()}
       <div className="compromisso-info">
         {instrucoes.map(([rotulo, texto]) => <React.Fragment key={rotulo}>
           <span className="ci-label">{rotulo}</span><strong>{texto}</strong>
@@ -6588,6 +6606,12 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
           // todos desde o #72. Só aparece quando o cadastro tem telefone; sem telefone, nada de botão quebrado.
           const telProf = profCadastro ? telefoneWhatsapp(profCadastro.telefone) : "";
           const nomeCurto = (n) => (n || "").split(" ")[0];
+          // QUEM RECEBE (Diego, 15/10/2026, card "Pagar Pix — Afibracom": o WhatsApp abria a cliente Simone). Compromisso
+          // interno numa loja/fornecedor cadastrado com telefone ganha o botão principal "WhatsApp · Afibracom (Rafael)";
+          // a cliente vira o segundo botão. Sem telefone no cadastro, nada de botão quebrado.
+          const fornCadastro = quem.destino === "interno" && quem.fornecedor ? quem.fornecedor : null;
+          const telForn = fornCadastro ? telefoneWhatsapp(fornCadastro.telefone) : "";
+          const nomeForn = fornCadastro ? `${nomeCurto(fornCadastro.nome)}${fornCadastro.contato_nome ? ` (${nomeCurto(fornCadastro.contato_nome)})` : ""}` : "";
           // PROFISSIONAL NA FRENTE (Diego, 13/10/2026): quando o que falta é do profissional (ou o compromisso é
           // só com ele), o botão principal "WhatsApp · Marcão" é o dele e a cliente vira o segundo botão "👤 Eloiza".
           // Esperando algo do cliente, ou na dúvida, a ordem continua a de sempre: cliente na frente.
@@ -6595,8 +6619,11 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
           const nomeProf = nomeCurto(profCadastro?.apelido || profCadastro?.nome);
           const btnCliente = tel && <a key="cli" className={`btn-wpp${profNaFrente ? " btn-wpp-prof" : ""}`} href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">{profNaFrente ? `👤 ${nomeCurto(cli?.nome) || "Cliente"}` : `WhatsApp${telProf && cli?.nome ? ` · ${nomeCurto(cli.nome)}` : ""}`}</a>;
           const btnProf = telProf && <a key="prof" className={`btn-wpp${profNaFrente ? "" : " btn-wpp-prof"}`} href={urlWhatsapp(telProf, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">{profNaFrente ? `WhatsApp · ${nomeProf}` : `🛠 ${nomeProf}`}</a>;
-          return <div className={`compromisso-botoes${tel ? "" : " sem-wpp"}${temRota ? "" : " sem-rota"}${telProf ? " com-prof" : ""}`}>
-            {profNaFrente ? [btnProf, btnCliente] : [btnCliente, btnProf]}
+          const fornNaFrente = !!telForn && !telProf;
+          const btnForn = telForn && <a key="forn" className={`btn-wpp${fornNaFrente ? "" : " btn-wpp-prof"}`} href={urlWhatsapp(telForn, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">{fornNaFrente ? `WhatsApp · ${nomeForn}` : `🏪 ${nomeForn}`}</a>;
+          const btnClienteFinal = fornNaFrente && tel ? <a key="cli" className="btn-wpp btn-wpp-prof" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">👤 {nomeCurto(cli?.nome) || "Cliente"}</a> : btnCliente;
+          return <div className={`compromisso-botoes${tel ? "" : " sem-wpp"}${temRota ? "" : " sem-rota"}${telProf || telForn ? " com-prof" : ""}`}>
+            {profNaFrente ? [btnProf, btnCliente, btnForn] : fornNaFrente ? [btnForn, btnClienteFinal] : [btnCliente, btnProf, btnForn]}
             {temRota && <a className="btn-rota btn-waze" href={linkWaze} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">🧭 Waze{selo}</a>}
             {temRota && <a className="btn-rota btn-maps" href={linkMaps} target="_blank" rel="noreferrer">📍 Maps{selo}</a>}
           </div>;
@@ -11579,6 +11606,7 @@ function FornecedoresView({ fornecedores }) {
       <div>
         <strong>{f.nome}</strong>
         <span>{f.contato_nome ? f.contato_nome + " · " : ""}{f.telefone || "Sem telefone"}</span>
+        {f.chave_pix && <span>💠 Pix: {f.chave_pix}</span>}
         {f.produtos && <span>{f.produtos}</span>}
         {f.dias_entrega && <span>Entrega {f.dias_entrega.split(",").map((d) => DIA_LABEL[d.trim()] || d.trim()).join(" e ")}</span>}
         {f.observacao && <span>{f.observacao}</span>}
