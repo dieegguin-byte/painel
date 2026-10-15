@@ -5391,6 +5391,7 @@ function textoRotina(st) {
 // o sofá"). O app reconhece o grupo sozinho, sem campo novo no banco: mesmo dia, mesmo começo de título antes do
 // travessão (ou mesmo cliente), e horário até 20 minutos depois do card anterior do grupo. Devolve, por id, a cor do
 // grupo (1..5, trocando a cada grupo do dia), a posição no grupo (ini/meio/fim) e o tamanho.
+// Só cards PRESENCIAIS formam grupo (15/10/2026): remoto não é parada de rota.
 // TAMBÉM marca o provável DUPLICADO (Diego, 14/10, Simone): dois cards do mesmo serviço no mesmo dia, um de buscar e
 // outro de entregar — pra ele, é um compromisso só. O app só avisa; quem não deixa nascer é a Manu e a auditoria.
 const LIGA_MINUTOS = 20;
@@ -5404,9 +5405,13 @@ function minutosDaHora(hora) { const m = /^(\d{1,2}):(\d{2})/.exec(String(hora |
 const TITULO_BUSCA_ENTREGA = /\b(busc|retir|entreg|levar|pegar)/i;
 function ligacoesDaLista(lista) {
   const mapa = new Map();
+  // SÓ PRESENCIAL ENTRA NO GRUPO (Diego, 15/10/2026: "não adianta juntar tudo se não for presencial"). Card remoto
+  // (WhatsApp, ligação, conferir algo) e bloqueio pessoal nunca se ligam a outro, mesmo com a mesma pessoa e
+  // poucos minutos de diferença. O duplicado continua olhando todos os cards do serviço.
   const cards = (lista || []).filter((a) => a && a.id && a.data && !a.pessoal_virtual);
+  const presenciais = cards.filter((a) => !ehRemoto(a) && !a.pessoal_id && a.tipo !== "bloqueio_pessoal");
   if (cards.length < 2) return mapa;
-  const ordenados = [...cards].sort((a, b) => (a.data + (a.hora || "99")).localeCompare(b.data + (b.hora || "99")));
+  const ordenados = [...presenciais].sort((a, b) => (a.data + (a.hora || "99")).localeCompare(b.data + (b.hora || "99")));
   const grupos = []; const corPorDia = {};
   for (const a of ordenados) {
     const inicio = inicioDoTitulo(a.titulo); const min = minutosDaHora(a.hora);
