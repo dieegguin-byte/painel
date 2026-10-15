@@ -396,6 +396,14 @@ function avisosNaHora(lista: any[]): Envio[] {
 // onde ficam as opções restantes e o 🎤. Cartão sem opção vai sem botão. Vários de uma vez (a auditoria das
 // 02h20 cria uns quatro) chegam um por um, cada um com os seus botões (15/10/2026).
 // Janela de horário igual à das contas: o que a auditoria cria de madrugada chega às 08:00, não às 02:25.
+// DIEGO, 15/10/2026 ("por que que o Israel veio aqui para mim nas notificações?"): notificação é só o que já
+// está decidido e é pra fazer no dia — visita, buscar, entregar, pagar, material. Card "Decidir — cliente — assunto"
+// ainda não passou pela Manu nem por ele; fica no Painel, sem push (nem 60 min antes, nem na hora, nem insistência).
+// Pela mesma fala ("a Manu tem que perguntar quando eu abrir o app"), os cartões pra você também ficam só no app.
+// Se ele pedir as perguntas de volta no celular, CARTOES_NO_PUSH = true devolve tudo como era.
+const CARTOES_NO_PUSH = false;
+const jaDecidido = (a: any) => !/^\s*decidir\b/i.test(String(a?.titulo || ""));
+
 const quemPergunta = (origem: string) => ({ agente: "Manu", manu: "Manu", auditoria: "Auditoria", pix: "Pix", caixa: "Caixa", claude: "Claude" } as Record<string, string>)[String(origem || "agente").toLowerCase()] || String(origem || "Manu");
 
 function avisosDosCartoes(duvidas: any[]): Envio[] {
@@ -628,14 +636,14 @@ Deno.serve(async (req) => {
     } else {
       // Só a leva entra na reserva. Reservar as 6 horas inteiras marcaria como "já avisado" um
       // compromisso das 10:30 que ninguém viu ainda, e ele nunca ganharia lembrete.
-      const leva = levaDaAgenda(pendencias.agenda || []);
+      const leva = levaDaAgenda((pendencias.agenda || []).filter(jaDecidido));
       const caixa = pendencias.caixa || [];
       const hora = Number(String(pendencias.agora || "").slice(11, 13));
       const horaDeDia = hora >= HORA_INICIO_CONTAS && hora < HORA_FIM_CONTAS;
       const contas = horaDeDia ? contasComPrazo(pendencias).filter(naJanela) : [];
-      const duvidas = horaDeDia ? (pendencias.duvidas || []) : [];
+      const duvidas = horaDeDia && CARTOES_NO_PUSH ? (pendencias.duvidas || []) : [];
       // Na hora, com botões (15/10/2026). Mesma janela de dia dos cartões: fora dela o card fica no app.
-      const naHora = horaDeDia ? (pendencias.agenda_na_hora || []).filter(aindaInsiste) : [];
+      const naHora = horaDeDia ? (pendencias.agenda_na_hora || []).filter(jaDecidido).filter(aindaInsiste) : [];
       candidatos = leva.length + caixa.length + contas.length + duvidas.length + naHora.length;
       if (candidatos) {
         const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...naHora.map(chaveNaHora), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`)];
