@@ -1253,7 +1253,7 @@ function NumeroAnimado({ valor }) {
 //   quando a borda é alcançada, pra que rolar a lista normalmente nunca feche por acidente.
 // O título muda de cor assim que a lista rola (classe "rolou"), como no launcher que ele mostrou.
 const LIMITE_FECHAR = 110;
-// Dentro da lista por cima, os cards já nascem abertos (ela existe pra ler a lista, não pra abrir de novo).
+// Dentro da lista por cima, cada card abre NO LUGAR ao toque (fora dela, o toque abre o card por cima).
 const DentroDaLista = React.createContext(false);
 // Arrastar pra direita EM CIMA de um card/bloco do Painel abre aquele card por cima (Diego, 15/10/2026:
 // "não só na agenda, todos os cards do painel"). O toque continua abrindo no lugar, como antes. Devolve os
@@ -6463,13 +6463,17 @@ function ComposerCaixa({ composer, setComposer, files, setFiles, addInbox, busy,
 // Só é usado dentro dos grupos do Painel; sem `selo` o card fica como sempre foi.
 function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null }) {
   const naLista = React.useContext(DentroDaLista);
-  const [aberto, setAberto] = useState(naLista);
-  const [porCima, setPorCima] = useState(false); // arrastou pra direita: este card abre por cima (ListaLateral)
+  const [aberto, setAberto] = useState(false);
+  // TOCAR ABRE POR CIMA (Diego, 15/10/2026, depois de testar: "clicar e abrir ela inteira"): no Painel, o toque e o
+  // arrasto pra direita abrem o card inteiro na ListaLateral. Dentro da lista, cada card abre no lugar, ao toque.
+  // Um card que esteja aberto no lugar (só acontece dentro da lista) fecha no toque, como sempre.
+  const [porCima, setPorCima] = useState(false);
+  const abrir = () => { if (aberto) setAberto(false); else if (naLista) setAberto(true); else setPorCima(true); };
   const arraste = usarArrastePraDireita(() => setPorCima(true));
   const comSelo = (selo !== null && selo !== undefined) || !!seloTexto;
   return <section id={id} className={`${className || "content-card"}${comSelo ? ` com-selo tom-${tom}` : ""}${aberto ? " aberto" : ""}`} {...(naLista ? {} : arraste)}>
     {porCima && !naLista && ReactDOM.createPortal(<ListaLateral cabecalho={<>{cabecalho}</>} onFechar={() => setPorCima(false)}>{children}</ListaLateral>, document.body)}
-    <button type="button" className="card-toggle" aria-expanded={aberto} onClick={() => setAberto((v) => !v)}>
+    <button type="button" className="card-toggle" aria-expanded={aberto} onClick={abrir}>
       {comSelo && <span className={`selo-num${seloTexto ? " selo-txt" : ""}`} aria-hidden="true"><b>{seloTexto || selo}</b>{icone && <small>{icone}</small>}</span>}
       <div>{cabecalho}</div>
       <i>{aberto ? "▾ fechar" : "▸ abrir"}</i>
@@ -7779,7 +7783,9 @@ function GrupoRecolhivel({ titulo, legenda = null, resumo = null, contagem = nul
       {verTudo && onVerTudo && <button type="button" className="grupo-ver-tudo" onClick={onVerTudo}>{verTudo}</button>}
       {maisLinks.filter((l) => l && l.texto && l.onClick).map((l) => <button key={l.texto} type="button" className="grupo-ver-tudo grupo-ver-mais" onClick={l.onClick}>{l.texto}</button>)}
     </ListaLateral>, document.body)}
-    <button type="button" className="grupo-cabecalho" aria-expanded={aberto} onClick={() => { vibrar(6); setAberto((v) => !v); }}>
+    {/* Tocar no cabeçalho abre o grupo inteiro por cima (Diego, 15/10/2026). Se o grupo já estiver aberto no lugar
+        (a Manu abre sozinha quando tem pergunta), o toque só fecha, pra que o botão voltar continue recolhendo. */}
+    <button type="button" className="grupo-cabecalho" aria-expanded={aberto} onClick={() => { vibrar(6); if (aberto) setAberto(false); else setPorCima(true); }}>
       <p className="kicker grupo-titulo">{titulo}{legenda && <small className="grupo-legenda">{legenda}</small>}</p>
       {resumo && <b className="grupo-resumo">{resumo}</b>}
       {!semContador && <i className={`grupo-total${contagem !== null ? " contagem-js" : ""}`} data-n={contagem !== null ? contagem : undefined} aria-hidden="true" />}
