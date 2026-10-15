@@ -317,6 +317,34 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
   return lista;
 }
 
+// ---------------------------------------------------------------- compromisso NA HORA, com botões
+//
+// DIEGO, 15/10/2026 (olhando o Niagara): "se chegar na tela e eu puder resolver sem entrar no app... ver meus
+// próprios compromissos, marcar como feito, aí não precisaria da agenda". O lembrete de 60 min antes continua
+// (é pra sair de casa); quando a hora CHEGA, cada card com hora vira um aviso próprio com dois botões:
+// Feito (mesmo caminho do botão Feito do app: recado + status, a Manu enxerga igual) e Adiar 1h (empurra a hora
+// e lembra de novo). Um por card, nunca agrupado: botão só faz sentido por compromisso. Mesma tag do lembrete,
+// então substitui o aviso anterior na tela em vez de empilhar. Chave agenda-hora:<id>.
+function avisosNaHora(lista: any[]): Envio[] {
+  return lista.map((a) => {
+    const onde = [a.local, a.cidade].filter(Boolean).join(" · ");
+    const acoes: Botao[] = [
+      { action: "a0", title: "Feito", plano: { tabela: "agenda", id: String(a.id), resposta: "feito" } },
+      { action: "a1", title: "Adiar 1h", plano: { tabela: "agenda", id: String(a.id), resposta: "adiar" } },
+    ];
+    return {
+      chaves: [`agenda-hora:${a.id}`],
+      aviso: {
+        titulo: `Agora ${a.hora} · ${String(a.titulo || "").slice(0, 70)}`,
+        corpo: [onde, "Feito marca no app · Adiar empurra 1 hora"].filter(Boolean).join(" — "),
+        tag: `agenda-${a.id}`,
+        url: "./nova.html",
+        acoes,
+      },
+    };
+  });
+}
+
 // ---------------------------------------------------------------- cartões pra você
 //
 // DIEGO, 13/10/2026: "algumas coisas resolver por lá sem entrar no app, o WhatsApp mesmo responde rapidamente
@@ -429,11 +457,19 @@ function avisoContasD3(contas: any[]): Envio[] {
 // Quantas contas o resumo chama pelo nome. Passando disso vira "+N" — mas a conta da janela D-3 que ficou de
 // fora NÃO é marcada como avisada, e a varredura das 08:00 manda o aviso próprio dela.
 const CONTAS_NO_RESUMO = 8;
+// Quantos compromissos do dia o resumo chama pelo nome (Diego, 15/10/2026: ver o dia sem abrir o app).
+const COMPROMISSOS_NO_RESUMO = 6;
 
 function avisoDoResumo(p: any): Envio[] {
   const r = p.resumo || {};
   const partes: string[] = [];
-  // Contas primeiro: é o único item do resumo que custa dinheiro se passar do dia.
+  // A LISTA DO DIA primeiro: hora e título de cada compromisso, como a agenda do celular mostra.
+  const dia: any[] = Array.isArray(p.agenda_hoje) ? p.agenda_hoje : [];
+  if (dia.length) {
+    const nomeados = dia.slice(0, COMPROMISSOS_NO_RESUMO);
+    partes.push(`Hoje: ${nomeados.map((a) => `${a.hora} ${String(a.titulo || "").slice(0, 40)}`).join(" · ")}${dia.length > nomeados.length ? ` +${dia.length - nomeados.length}` : ""}`);
+  }
+  // Depois as contas: é o item do resumo que custa dinheiro se passar do dia.
   const contas = contasComPrazo(p);
   const nomeadas = contas.slice(0, CONTAS_NO_RESUMO);
   if (contas.length) {
@@ -553,15 +589,18 @@ Deno.serve(async (req) => {
       const horaDeDia = hora >= HORA_INICIO_CONTAS && hora < HORA_FIM_CONTAS;
       const contas = horaDeDia ? contasComPrazo(pendencias).filter(naJanela) : [];
       const duvidas = horaDeDia ? (pendencias.duvidas || []) : [];
-      candidatos = leva.length + caixa.length + contas.length + duvidas.length;
+      // Na hora, com botões (15/10/2026). Mesma janela de dia dos cartões: fora dela o card fica no app.
+      const naHora = horaDeDia ? (pendencias.agenda_na_hora || []) : [];
+      candidatos = leva.length + caixa.length + contas.length + duvidas.length + naHora.length;
       if (candidatos) {
-        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`)];
+        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...naHora.map((a: any) => `agenda-hora:${a.id}`), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`)];
         const liberadas = new Set<string>(await rpc("push_reservar", { chaves }));
         envios = [
           ...avisosDaVarredura(
             leva.filter((a: any) => liberadas.has(`agenda:${a.id}`)),
             caixa.filter((c: any) => liberadas.has(`caixa:${c.id}`)),
           ),
+          ...avisosNaHora(naHora.filter((a: any) => liberadas.has(`agenda-hora:${a.id}`))),
           ...avisoContasD3(contas.filter((c: any) => liberadas.has(chaveConta(c)))),
           ...avisosDosCartoes(duvidas.filter((d: any) => liberadas.has(`duvida:${d.id}`))),
         ];
