@@ -663,6 +663,16 @@ button.sutil{opacity:.55;font-size:12px}
    bonitos e efeitos mais fortes"). Grupos continuam; cada linha é um mini-card com selo de número colorido.
    Tons: vermelho (atraso), âmbar (revisão/avançar), verde (retorno/leads), azul (pessoais), laranja (produção). */
 @keyframes linhaEntra{from{opacity:0;transform:translateX(-22px) scale(.96)}to{opacity:1;transform:none}}
+/* Alarme na hora do compromisso (15/10/2026): faixa fixa no topo, acima de tudo, pulsando em laranja */
+.alarme-compromisso{position:fixed;top:0;left:0;right:0;z-index:400;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:calc(12px + env(safe-area-inset-top)) 16px 12px;background:linear-gradient(150deg,#f09a5c,#c8551f);color:#fff8f0;box-shadow:0 10px 30px -8px #000c;animation:alarmePulsa 1.2s ease-in-out infinite}
+.alarme-texto{flex:1 1 220px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.alarme-texto b{font-size:15px;letter-spacing:.3px}
+.alarme-texto span{font-size:14px;line-height:1.3;color:#fff8f0}
+.alarme-botoes{display:flex;gap:8px;flex:0 0 auto}
+.alarme-botoes button{min-height:40px;padding:8px 14px;border-radius:999px;font-weight:800;font-size:13px}
+.alarme-botoes .primary{background:#fff8f0;color:#8a3a12;border-color:#fff8f0}
+.alarme-botoes .ghost{background:#0000002e;color:#fff8f0;border-color:#ffffff55}
+@keyframes alarmePulsa{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18)}}
 @keyframes seloPop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.18);opacity:1}100%{transform:none;opacity:1}}
 /* Chegou pela notificação (Diego, 15/10/2026: "poderia ficar piscando qual é o cliente ali, só a primeira vez"):
    o card da Agenda pisca em laranja por uns 4 s e volta ao normal. Só classe, nada de dado. */
@@ -4825,6 +4835,7 @@ function Home() {
     abaAnterior.current = { tab, classe: de < 0 || para < 0 ? "" : para > de ? " vem-direita" : " vem-esquerda" };
   }
   return <AcoesAgendaCtx.Provider value={acoesAgenda}><CadastroProfissionaisCtx.Provider value={profissionais}><div className={`product-shell mode-${mode}`}>
+    <AlarmeCompromisso appointments={agendaVisivel} db={db} demo={demo} notify={notify} onChanged={loadAll} setAppointments={setAppointments} />
     {notice && <div key={notice.id} className={`notice ${notice.kind}`}
       onTouchStart={(e) => { const t = e.touches[0]; e.currentTarget._x0 = t.clientX; e.currentTarget._y0 = t.clientY; }}
       onTouchMove={(e) => { const el = e.currentTarget, t = e.touches[0]; const dx = t.clientX - el._x0, dy = Math.min(0, t.clientY - el._y0); el.style.transform = `translate(${dx}px, ${dy}px)`; el.style.opacity = String(Math.max(0.2, 1 - Math.abs(dx) / 260)); }}
@@ -5837,6 +5848,126 @@ function PessoalDetalhe({ p, a, today }) {
 // ÁUDIO: fica no bucket fotos-servicos em recados-agenda/<agenda_id>/. O Claude não escuta áudio, então o
 // celular transcreve enquanto grava (reconhecimento de voz do navegador, pt-BR) e o texto cai na caixinha,
 // onde o Diego confere. Se o aparelho não transcrever, o áudio vai mesmo assim e o card avisa.
+// ALARME NA HORA DO COMPROMISSO, COM O APP ABERTO (Diego, 15/10/2026: "tô no computador atendendo pelo WhatsApp e
+// esqueci da Luana completamente... se chegar uma notificação com barulho pequeno, não dá pra saber"). O push
+// chega no celular e no PC, mas é discreto. Isto aqui é o contrário: quando a hora de um card chega e o app está
+// aberto (PC ou celular), uma faixa laranja toma o topo, o título da aba pisca e um bipe alto repete a cada 6 s
+// até ele tocar Feito, Adiar 1h ou "Já vi". O som é gerado (WebAudio), sem arquivo; o Chrome só deixa tocar depois
+// de um toque na página, por isso o contexto é acordado no primeiro clique em qualquer lugar.
+const ALARME_JANELA_MIN = 45;      // até quanto tempo depois da hora ainda vale alarmar
+const ALARME_REPETE_MS = 6000;
+function alarmeSilenciados() {
+  try { const o = JSON.parse(localStorage.getItem("tb_alarme_silenciados") || "{}"); const corte = Date.now() - 864e5; return Object.fromEntries(Object.entries(o).filter(([, t]) => t > corte)); } catch (e) { return {}; }
+}
+function alarmeSilenciar(id) {
+  try { const o = alarmeSilenciados(); o[id] = Date.now(); localStorage.setItem("tb_alarme_silenciados", JSON.stringify(o)); } catch (e) {}
+}
+let alarmeAudioCtx = null;
+function alarmeAcordarAudio() {
+  try {
+    if (!alarmeAudioCtx) alarmeAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (alarmeAudioCtx.state === "suspended") alarmeAudioCtx.resume().catch(() => {});
+  } catch (e) {}
+}
+function alarmeBipar() {
+  try {
+    alarmeAcordarAudio();
+    const ctx = alarmeAudioCtx;
+    if (!ctx || ctx.state !== "running") return false;
+    const t0 = ctx.currentTime;
+    // Três pulsos altos, dois tons (880/1320 Hz): atravessa o barulho da sala sem ser um grito.
+    for (let i = 0; i < 3; i++) {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = "square"; osc.frequency.setValueAtTime(i % 2 ? 1320 : 880, t0);
+      g.gain.setValueAtTime(0.0001, t0 + i * 0.28); g.gain.exponentialRampToValueAtTime(0.35, t0 + i * 0.28 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + i * 0.28 + 0.22);
+      osc.connect(g).connect(ctx.destination); osc.start(t0 + i * 0.28); osc.stop(t0 + i * 0.28 + 0.24);
+    }
+    return true;
+  } catch (e) { return false; }
+}
+function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppointments }) {
+  const acoes = React.useContext(AcoesAgendaCtx);
+  const [alvo, setAlvo] = useState(null);
+  const [ocupado, setOcupado] = useState(false);
+  const tituloOriginal = React.useRef(typeof document !== "undefined" ? document.title : "");
+
+  // Acorda o áudio no primeiro toque em qualquer lugar (exigência do Chrome).
+  useEffect(() => {
+    const acordar = () => alarmeAcordarAudio();
+    window.addEventListener("pointerdown", acordar, { passive: true });
+    window.addEventListener("keydown", acordar);
+    return () => { window.removeEventListener("pointerdown", acordar); window.removeEventListener("keydown", acordar); };
+  }, []);
+
+  // Procura, a cada 20 s, o card de hoje cuja hora chegou (até ALARME_JANELA_MIN depois) e ainda não foi silenciado.
+  useEffect(() => {
+    const achar = () => {
+      const hoje = hojeISO();
+      const agora = new Date(); const min = agora.getHours() * 60 + agora.getMinutes();
+      const mudos = alarmeSilenciados();
+      const devidos = (appointments || []).filter((a) => a.status === "planejado" && a.data === hoje && a.hora && !mudos[a.id])
+        .map((a) => ({ a, m: minutosDaHora(a.hora) })).filter(({ m }) => m != null && m <= min && min - m <= ALARME_JANELA_MIN)
+        .sort((x, y) => x.m - y.m);
+      setAlvo((atual) => { const novo = devidos[0]?.a || null; return novo?.id === atual?.id ? atual : novo; });
+    };
+    achar();
+    const t = setInterval(achar, 20000);
+    const aoVoltar = () => { if (document.visibilityState === "visible") achar(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", aoVoltar); };
+  }, [appointments]);
+
+  // Enquanto há alvo: bipe + vibração a cada 6 s e título da aba piscando.
+  useEffect(() => {
+    if (!alvo) { document.title = tituloOriginal.current; return; }
+    const rotulo = `⏰ ${String(alvo.hora || "").slice(0, 5)} ${nomeCurto(alvo.titulo)}`;
+    let liga = false;
+    const tocar = () => { alarmeBipar(); vibrar([400, 150, 400, 150, 700]); };
+    tocar();
+    const som = setInterval(tocar, ALARME_REPETE_MS);
+    const pisca = setInterval(() => { liga = !liga; document.title = liga ? rotulo : tituloOriginal.current; }, 1000);
+    return () => { clearInterval(som); clearInterval(pisca); document.title = tituloOriginal.current; };
+  }, [alvo]);
+
+  if (!alvo) return null;
+  const silenciar = () => { alarmeSilenciar(alvo.id); setAlvo(null); };
+  const feito = async () => {
+    if (!acoes?.enviar) return;
+    setOcupado(true);
+    try { await acoes.enviar(alvo, { acao: "feito" }); alarmeSilenciar(alvo.id); setAlvo(null); } catch (e) { notify(e?.message || String(e), "error"); }
+    finally { setOcupado(false); }
+  };
+  const adiar = async () => {
+    setOcupado(true);
+    try {
+      if (demo) { setAppointments((prev) => prev.filter((x) => x.id !== alvo.id)); silenciar(); return; }
+      const m = minutosDaHora(alvo.hora) + 60;
+      // A agenda tem data+hora únicas: se bater em outro card, empurra de minuto em minuto até achar vaga.
+      let gravou = false, erro = null;
+      for (let extra = 0; extra < 6 && !gravou; extra++) {
+        const mm = m + extra; const hora = `${String(Math.floor(mm / 60) % 24).padStart(2, "0")}:${String(mm % 60).padStart(2, "0")}:00`;
+        const { error } = await db.from("agenda").update({ hora }).eq("id", alvo.id).eq("status", "planejado");
+        if (!error) { gravou = true; break; }
+        erro = error; if (!/duplicate|unique|23505/i.test(error.message || "")) break;
+      }
+      if (!gravou) throw erro || new Error("não deu pra adiar");
+      try { await db.from("historico").insert({ o_que: `Adiado 1h: ${alvo.titulo}`, por: "diego", detalhe: "Pelo alarme do app." }); } catch (e) { /* segue */ }
+      notify("Adiado 1 hora. Aviso de novo na hora nova.", "ok");
+      alarmeSilenciar(alvo.id); setAlvo(null);
+      if (onChanged) onChanged();
+    } catch (e) { notify("Não deu pra adiar: " + (e?.message || e), "error"); }
+    finally { setOcupado(false); }
+  };
+  return <div className="alarme-compromisso" role="alert">
+    <div className="alarme-texto"><b>⏰ Agora {String(alvo.hora || "").slice(0, 5)}</b><span>{alvo.titulo}{alvo.local || alvo.cidade ? ` · ${[alvo.local, alvo.cidade].filter(Boolean).join(" · ")}` : ""}</span></div>
+    <div className="alarme-botoes">
+      <button className="primary" disabled={ocupado} onClick={feito}>Feito</button>
+      <button className="ghost" disabled={ocupado} onClick={adiar}>Adiar 1h</button>
+      <button className="ghost" disabled={ocupado} onClick={silenciar}>Já vi</button>
+    </div>
+  </div>;
+}
+
 const AcoesAgendaCtx = React.createContext(null);
 // CADASTRO DE PROFISSIONAIS NOS CARDS (Diego, 12/10/2026, "Sim, mudar"): o card de compromisso recebe só os
 // NOMES (nomesProfissionais); o telefone vem do cadastro, por contexto, pra não enfiar mais uma prop em
@@ -12051,7 +12182,7 @@ if ('serviceWorker' in navigator) {
   };
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (tinhaControle) recarregar(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && recargaPendente) recarregar(); });
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=20').then((reg) => {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=21').then((reg) => {
     const checar = () => reg.update().catch(() => {});
     checar();
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checar(); });

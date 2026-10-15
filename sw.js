@@ -56,7 +56,8 @@
    aberto em segundo plano, `abrirApp` so focava a aba e ignorava o ?ir= - agora manda a URL pra aba por
    postMessage e o nova.html abre a ficha/o card sem recarregar. (2) A notificacao de compromisso so fecha
    quando um botao resolve (Feito/Adiar gravado); o toque no corpo deixa ela na barra, que e por onde ele resolve. */
-const VERSAO = 'tb-atendimento-v20';
+/* v21 (15/10/2026): aviso com botao vibra forte e fica na barra ate ele mexer (requireInteraction). */
+const VERSAO = 'tb-atendimento-v21';
 // Sem segredo aqui de proposito: este arquivo e publico. O que autentica o recibo e o proprio id, que
 // e um uuid que so existe dentro da carga cifrada - quem nao recebeu a notificacao nao tem como chutar.
 const PUSH_FUNCAO = 'https://iymlzdcloaeyybhefywp.supabase.co/functions/v1/push-enviar';
@@ -234,7 +235,10 @@ self.addEventListener('push', (e) => {
       renotify: true,
       icon: './icon-192.png',
       badge: './icon-192.png',
-      vibrate: [80, 40, 80],
+      // Aviso com botao (compromisso, cartao) e pra resolver: vibra forte e NAO some sozinho da barra ate ele
+      // mexer (requireInteraction) - Diego, 15/10/2026: "se for uma notificacao com barulho pequeno, nao da pra saber".
+      vibrate: botoesDe(aviso).length ? [400, 150, 400, 150, 700] : [80, 40, 80],
+      requireInteraction: botoesDe(aviso).length > 0,
       // Botoes (v19). So {action, title}: o que cada um faz ficou no banco, dentro do recibo.
       actions: botoesDe(aviso),
       data: { url: (aviso && aviso.url) || './nova.html', recibo: (aviso && aviso.recibo) || null }
