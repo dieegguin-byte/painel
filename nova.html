@@ -6297,7 +6297,8 @@ function AcoesDoCompromisso({ a, acoes, today }) {
     if (busy) return;
     if (acao === "recado" && !texto.trim() && !audio) { acoes.notify("Escreva ou grave o recado primeiro.", "error"); return; }
     if (acao === "cancelar" && !window.confirm(`Cancelar “${a.titulo_visivel || a.titulo}”?`)) return;
-    if (acao === "feito" && !window.confirm(`Marcar “${a.titulo_visivel || a.titulo}” como feito${futuro ? " hoje" : ""}?`)) return;
+    // FEITO SEM CONFIRMAÇÃO (Diego, 15/10/2026: "Feito no card não precisa de confirmação, qualquer coisa eu
+    // desfaço"): um toque marca; o ↶ Desfazer do recado volta atrás. Cancelar continua perguntando.
     setBusy(acao);
     try {
       await acoes.enviar(a, { acao, texto, audio });
@@ -6352,7 +6353,6 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   // "não tem como eu marcar feito naquele compromisso do carro" — o botão tem que estar onde o card está).
   const feitoPessoal = async () => {
     if (busyPessoal || !acoes?.concluirPessoal) return;
-    if (!window.confirm(`Marcar “${a.titulo}” como feito?`)) return;
     setBusyPessoal(true);
     try { await acoes.concluirPessoal(a); } catch (e) { acoes.notify("Não salvou: " + (e.message || e), "error"); } finally { setBusyPessoal(false); }
   };
