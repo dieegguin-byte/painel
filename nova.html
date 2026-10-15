@@ -170,6 +170,13 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .duvida.contato-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
 .compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}
 .compromisso-card .compromisso-corpo{margin-top:13px}
+/* CARD EM FOCO (Diego, 15/10/2026): o card abre sozinho por cima, na ListaLateral; a lista de trás não se mexe. */
+.foco-nav{display:flex;gap:8px;margin:0 0 12px}
+.foco-nav button{flex:1;padding:10px 6px;border-radius:12px;border:1px solid var(--line2);background:#1d1714;color:var(--text);font-size:13px;font-weight:600}
+.foco-nav button.foco-voltar{color:var(--orange2)}
+.foco-nav button:disabled{opacity:.3;cursor:default}
+.compromisso-card.em-foco{margin-bottom:0}
+.compromisso-card.em-foco .compromisso-cab{cursor:default}
 .compromisso-card.cor-alta{border-left-color:var(--red)}.compromisso-card.cor-media{border-left-color:var(--yellow)}.compromisso-card.cor-baixa{border-left-color:var(--green)}
 /* REMOTO DISCRETO (Diego, 15/10/2026, 16h34: o card inteiro em neon "fica pesado, pesa o app"). O card fica
    normal; só a etiqueta "◌ Remoto" é verde-água e, na lista Todos, a de hoje ou atrasado pisca de leve (opacidade,
@@ -6342,8 +6349,16 @@ function AcoesDoCompromisso({ a, acoes, today }) {
   </div>;
 }
 
-function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais, revisaoData = false, sucessor = null, passouDaHora = false, ligado = null }) {
+function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais, revisaoData = false, sucessor = null, passouDaHora = false, ligado = null, emFoco = false, onSairFoco = null }) {
   const [aberto, setAberto] = useState(false);
+  // CARD EM FOCO (Diego, 15/10/2026, 20h29: "clicar no card ter foco de ficar só nele, não mover até embaixo"):
+  // tocar no card não abre mais no meio da lista (empurrando o resto pra baixo); abre o card sozinho, por cima,
+  // na mesma ListaLateral dos grupos, com Voltar/Anterior/Próximo (FocoDoCard). A lista de trás fica onde estava.
+  // `emFoco` é a cópia desenhada dentro do foco: sempre aberta, sem id (o id fica no card original, que é por
+  // onde o foco acha os vizinhos). O item pessoal projetado continua abrindo no lugar (é curto).
+  const [foco, setFoco] = useState(false);
+  const mostrar = emFoco || aberto;
+  const propsCard = { a, svc, cliente, today, materiais, fornecedores, profissionais, revisaoData, sucessor, passouDaHora, ligado };
   // Ações do card (Feito/Remarcar/Cancelar/recado) vêm do contexto, não de prop: o card é desenhado em
   // vários lugares (Painel, Agenda, atrasados) e nenhum deles precisa saber gravar no banco.
   const acoes = React.useContext(AcoesAgendaCtx);
@@ -6518,8 +6533,10 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   if (Number(svc?.valor_orcamento)) instrucoes.push(["VALOR DO SERVIÇO",
     money(svc.valor_orcamento) + (svc?.prazo ? " · prazo " + compactDate(svc.prazo) : "")]);
   const obsFicha = cli?.obs ? String(cli.obs).trim() : "";
-  return <article id={`card-${a.id}`} className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehRemoto(a) ? " remoto" : ""}${ehRemoto(a) && a.data <= today ? " remoto-pendente" : ""}${ehFollowUpZapia(a) ? " followup-zapia" : ""}${classeLigado(ligado)}`}>
-    <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
+  return <>
+    {foco && !emFoco && ReactDOM.createPortal(<FocoDoCard props={propsCard} onFechar={() => setFoco(false)} />, document.body)}
+    <article id={emFoco ? undefined : `card-${a.id}`} className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehRemoto(a) ? " remoto" : ""}${ehRemoto(a) && a.data <= today ? " remoto-pendente" : ""}${ehFollowUpZapia(a) ? " followup-zapia" : ""}${classeLigado(ligado)}${emFoco ? " em-foco" : ""}`}>
+    <button type="button" className="compromisso-cab" onClick={() => { if (emFoco) { if (onSairFoco) onSairFoco(); return; } vibrar(6); setFoco(true); }} aria-expanded={false}>
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
         <span>{compactDate(a.data)}</span>
@@ -6529,14 +6546,14 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         <strong>{nomeCliente}</strong>
         <span>{ligado && ligado.cor && <i className="selo-ligado" title="Mesma parada: cards separados, mas ligados">⛓ {ligado.indice}/{ligado.n}</i>}{seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
       </span>
-      <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
+      <span className="compromisso-seta">{emFoco ? "" : "›"}</span>
     </button>
     {revisaoData && <p className="revisao-data">Remarcação pendente · idade calculada pela data original. A data precisa de revisão.</p>}
-    {acoes && <SelosClaudeDoCard a={a} acoes={acoes} onMudar={() => setAberto(true)} />}
+    {acoes && <SelosClaudeDoCard a={a} acoes={acoes} onMudar={() => { if (!emFoco) setFoco(true); }} />}
     {/* "⚠ Parece duplicado" SAIU DO CARD (Diego, 15/10/2026: "se tá uma coisa em dúvida, não deveria voltar para você?").
         Dúvida não chega nele: a view agenda_parece_duplicado tem a mesma regra e a Manu resolve na rodada de hora em hora. */}
     {sucessor && diasAtraso > 0 && <p className="talvez-feito">Pode já estar feito: “{sucessor.titulo}” foi criado depois deste, no mesmo serviço. Se a etapa aconteceu, conclua aqui — o app não fecha sozinho.</p>}
-    {aberto && <div className="compromisso-corpo">
+    {mostrar && <div className="compromisso-corpo">
       {(a.pessoal || oQueFazer !== tituloCard) && <h4 title={tituloCard}>{tituloCard}</h4>}
       {chipServico && <p className="compromisso-chip">🛋️ {chipServico}{svc?.status ? ` · ${statusLabel[svc.status] || svc.status}` : ""}</p>}
       {/* BLOQUEIO PESSOAL: a linha da agenda existe pra dizer que ele está indisponível, e o registro
@@ -6632,7 +6649,40 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       </div>
       {acoes && <AcoesDoCompromisso a={a} acoes={acoes} today={today} />}
     </div>}
-  </article>;
+  </article>
+  </>;
+}
+// O CARD SOZINHO NA TELA (ver CompromissoCard). Reusa a ListaLateral (mesmo visual, fecha no voltar, tocando fora
+// ou arrastando). Anterior/Próximo seguem os cards VISÍVEIS da mesma lista de onde este veio (os encadeados da
+// rota ficam lado a lado), sem precisar voltar: fecha este foco e toca no cabeçalho do vizinho, que abre o seu.
+function FocoDoCard({ props, onFechar }) {
+  const a = props.a;
+  const meuId = `card-${a.id}`;
+  const vizinhos = () => {
+    const el = document.getElementById(meuId); if (!el) return [];
+    const visiveis = (r) => Array.from(r.querySelectorAll('.compromisso-card[id^="card-"]')).filter((c) => c.offsetParent !== null);
+    let raiz = el.parentElement;
+    while (raiz && raiz !== document.body && visiveis(raiz).length < 2 && !raiz.matches(".lista-lateral, .grupo-corpo, main")) raiz = raiz.parentElement;
+    const lista = raiz && raiz !== document.body ? visiveis(raiz) : [];
+    return lista.length ? lista : [el];
+  };
+  const [pos, setPos] = useState({ i: 0, n: 1 });
+  useEffect(() => { const v = vizinhos(); setPos({ i: Math.max(0, v.findIndex((e) => e.id === meuId)), n: v.length }); }, [meuId]);
+  const ir = (passo) => {
+    const v = vizinhos(); const i = v.findIndex((e) => e.id === meuId); const alvo = v[i + passo];
+    if (!alvo) return;
+    vibrar(6); onFechar();
+    setTimeout(() => { const cab = alvo.querySelector(".compromisso-cab"); if (cab) cab.click(); }, 30);
+  };
+  const quando = `${compactDate(a.data)}${a.hora ? ` · ${a.hora.slice(0, 5)}` : ""}`;
+  return <ListaLateral cabecalho={<><p className="kicker">{pos.n > 1 ? `Card ${pos.i + 1} de ${pos.n}` : "Card"}</p><h2>{quando}</h2></>} onFechar={onFechar}>
+    <div className="foco-nav">
+      <button type="button" disabled={pos.i <= 0} onClick={() => ir(-1)}>‹ Anterior</button>
+      <button type="button" className="foco-voltar" onClick={onFechar}>Voltar</button>
+      <button type="button" disabled={pos.i >= pos.n - 1} onClick={() => ir(1)}>Próximo ›</button>
+    </div>
+    <CompromissoCard {...props} emFoco onSairFoco={onFechar} />
+  </ListaLateral>;
 }
 
 // COBRANÇA: linha enxuta, sem hora e sem rota. Vive num bloco próprio do Painel — é o "dia do telefone",
