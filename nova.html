@@ -1414,6 +1414,7 @@ function BotaoNotificacao({ db, demo, notify }) {
         ativo: true, falhas: 0, ultimo_erro: null,
       }, { onConflict: "endpoint" });
       if (error) throw error;
+      marcarAvisoMudo(false);
       setEstado("ligado");
       notify("Aviso ligado neste aparelho.", "ok");
     } catch (e) {
@@ -1432,8 +1433,9 @@ function BotaoNotificacao({ db, demo, notify }) {
         await db.from("push_assinaturas").update({ ativo: false }).eq("endpoint", assinatura.endpoint);
         await assinatura.unsubscribe();
       }
+      marcarAvisoMudo(true);
       setEstado("desligado");
-      notify("Aviso desligado neste aparelho.", "info");
+      notify("Aviso desligado neste aparelho: nem push, nem alarme na tela.", "info");
     } catch (e) { notify("Não deu pra desligar: " + (e?.message || e), "error"); }
   }, [db, notify]);
 
@@ -5856,6 +5858,11 @@ function PessoalDetalhe({ p, a, today }) {
 // de um toque na página, por isso o contexto é acordado no primeiro clique em qualquer lugar.
 const ALARME_JANELA_MIN = 45;      // até quanto tempo depois da hora ainda vale alarmar
 const ALARME_REPETE_MS = 6000;
+// AVISO DESLIGADO NESTE APARELHO (Diego, 15/10/2026: "mesmo desligado, quando abre o app ele notifica"): o botão
+// 🔔 do cabeçalho vale pra tudo no aparelho — push E o alarme laranja. Desligar grava a marca; ligar apaga.
+const AVISO_MUDO = "tb_aviso_mudo";
+function avisoMudoAqui() { try { return localStorage.getItem(AVISO_MUDO) === "1"; } catch (e) { return false; } }
+function marcarAvisoMudo(mudo) { try { if (mudo) localStorage.setItem(AVISO_MUDO, "1"); else localStorage.removeItem(AVISO_MUDO); } catch (e) {} try { window.dispatchEvent(new Event("tb-aviso-mudo")); } catch (e) {} }
 function alarmeSilenciados() {
   try { const o = JSON.parse(localStorage.getItem("tb_alarme_silenciados") || "{}"); const corte = Date.now() - 864e5; return Object.fromEntries(Object.entries(o).filter(([, t]) => t > corte)); } catch (e) { return {}; }
 }
@@ -5904,6 +5911,7 @@ function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppoi
     const achar = () => {
       const hoje = hojeISO();
       const agora = new Date(); const min = agora.getHours() * 60 + agora.getMinutes();
+      if (avisoMudoAqui()) { setAlvo(null); return; }
       const mudos = alarmeSilenciados();
       const devidos = (appointments || []).filter((a) => a.status === "planejado" && a.data === hoje && a.hora && !mudos[a.id])
         .map((a) => ({ a, m: minutosDaHora(a.hora) })).filter(({ m }) => m != null && m <= min && min - m <= ALARME_JANELA_MIN)
@@ -5914,7 +5922,8 @@ function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppoi
     const t = setInterval(achar, 20000);
     const aoVoltar = () => { if (document.visibilityState === "visible") achar(); };
     document.addEventListener("visibilitychange", aoVoltar);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", aoVoltar); };
+    window.addEventListener("tb-aviso-mudo", achar);
+    return () => { clearInterval(t); document.removeEventListener("visibilitychange", aoVoltar); window.removeEventListener("tb-aviso-mudo", achar); };
   }, [appointments]);
 
   // Enquanto há alvo: bipe + vibração a cada 6 s e título da aba piscando.
