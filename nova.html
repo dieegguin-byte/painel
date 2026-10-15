@@ -734,6 +734,8 @@ button.sutil{opacity:.55;font-size:12px}
 .lista-lateral.arrastando{transition:none}
 .lista-lateral.sai-baixo{transform:translateY(110%)!important}
 .lista-lateral.sai-cima{transform:translateY(-110%)!important}
+.lista-lateral.sai-esq{transform:translateX(-110%)!important}
+.lista-lateral.sai-dir{transform:translateX(110%)!important}
 @keyframes listaEntra{from{transform:translateX(-100%)}to{transform:translateX(0)}}
 .lista-lateral-topo{position:sticky;top:0;z-index:2;margin:0 -14px 10px;padding:calc(16px + env(safe-area-inset-top)) 18px 12px;border-bottom:1px solid transparent;transition:background-color .3s,border-color .3s,backdrop-filter .3s}
 .lista-lateral-topo .kicker{margin:0 0 4px;color:var(--dim)}
@@ -1278,11 +1280,12 @@ function ListaLateral({ kicker, titulo, cabecalho = null, onFechar, children }) 
   const [saindo, setSaindo] = useState(null);
   const fecharForcando = (sentido) => { setSaindo(sentido); vibrar(10); setTimeout(onFechar, 230); };
   const onScroll = (e) => { const r = e.currentTarget.scrollTop > 12; if (r !== rolou) setRolou(r); };
-  const onTouchStart = (e) => { if (e.touches.length !== 1 || saindo) { toque.current = null; return; } toque.current = { y0: e.touches[0].clientY, alem: 0 }; };
+  const onTouchStart = (e) => { if (e.touches.length !== 1 || saindo || e.target.closest("input, textarea, select")) { toque.current = null; return; } toque.current = { y0: e.touches[0].clientY, x0: e.touches[0].clientX, alem: 0, dx: 0, dyTotal: 0 }; };
   const onTouchMove = (e) => {
     const t = toque.current, el = painel.current;
     if (!t || !el) return;
     const y = e.touches[0].clientY, dy = y - t.y0;
+    t.dx = e.touches[0].clientX - t.x0; t.dyTotal = Math.max(t.dyTotal, Math.abs(dy));
     const noTopo = el.scrollTop <= 0, noFim = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
     if ((dy > 0 && noTopo) || (dy < 0 && noFim)) { t.alem = dy; setPuxado(dy); }
     else { t.y0 = y; if (t.alem) { t.alem = 0; setPuxado(0); } } // ainda rolando: a conta só começa na borda
@@ -1290,6 +1293,9 @@ function ListaLateral({ kicker, titulo, cabecalho = null, onFechar, children }) 
   const onTouchEnd = () => {
     const t = toque.current; toque.current = null;
     if (!t) return;
+    // Arrastar pra direita ou pra esquerda também fecha (Diego, 15/10/2026), desde que o gesto seja
+    // claramente de lado: rolar a lista com o polegar torto não pode fechar.
+    if (Math.abs(t.dx) >= 60 && Math.abs(t.dx) > t.dyTotal * 1.5) { setPuxado(0); fecharForcando(t.dx > 0 ? "sai-dir" : "sai-esq"); return; }
     if (t.alem >= LIMITE_FECHAR) fecharForcando("sai-baixo");
     else if (t.alem <= -LIMITE_FECHAR) fecharForcando("sai-cima");
     else setPuxado(0);
