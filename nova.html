@@ -170,6 +170,33 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .duvida.contato-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
 .compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}
 .compromisso-card .compromisso-corpo{margin-top:13px}
+/* FINANCEIRO LIMPO (Diego, 15/10/2026): três números grandes, linha curta por lançamento, observação atrás do toque. */
+.fin-topo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.fin-grande{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;padding:14px 13px;border-radius:15px;border:1px solid var(--line);background:var(--surface);color:var(--text);text-align:left;font:inherit}
+.fin-grande>span{font-size:11px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.fin-grande>b{font:500 22px Georgia,serif;line-height:1.1;overflow-wrap:anywhere}
+.fin-grande>small{font-size:11px;color:var(--dim);line-height:1.3}
+.fin-grande.caixa>b{color:var(--orange2)}.fin-grande.pagar>b{color:#e88477}.fin-grande.receber>b{color:var(--yellow)}
+.fin-grande.ativo{border-color:var(--orange);box-shadow:inset 0 0 0 1px var(--orange)}
+.fin-mes{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0 2px;font-size:13px;color:var(--muted)}
+.fin-mes button{padding:7px 11px;border-radius:999px;border:1px solid var(--line);background:#1a1512;color:var(--muted);font:inherit;font-size:13px}
+.fin-mes button.ativo{border-color:var(--orange);color:var(--text)}
+.fin-mes span{margin-left:auto}
+.fin-mes b.entrada{color:#9acaaa}.fin-mes b.saida{color:#e88477}
+.fin-lista .card-head{margin-bottom:6px}.fin-dica{margin:8px 0 6px;font-size:12px;color:var(--dim)}.fin-topo+.fin-dica{margin-top:12px}
+.fin-item{border-bottom:1px solid var(--line)}.fin-item:last-of-type{border-bottom:0}
+.fin-linha{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:11px 0;background:none;border:0;color:inherit;text-align:left;font:inherit}
+.fin-quem{display:flex;flex-direction:column;gap:2px;min-width:0}
+.fin-quem strong{font-size:15px;font-weight:600;overflow-wrap:anywhere}.fin-quem span{font-size:12px;color:var(--muted)}
+.fin-linha>b{flex:none;font-size:15px;white-space:nowrap}.fin-linha>b.entrada{color:#9acaaa}.fin-linha>b.saida{color:#e88477}
+.fin-item.aberto .fin-quem strong{color:var(--orange2)}
+.fin-detalhe{padding:0 0 12px}.fin-detalhe .kicker{margin:0 0 4px}
+.fin-obs{margin:0 0 10px;font-size:13px;line-height:1.5;color:var(--text);overflow-wrap:anywhere}
+.fin-conta{margin:0;font-size:12px;color:var(--muted)}.fin-conta b{color:var(--text);font-weight:600}
+.saldo-contas>summary{list-style:none;cursor:pointer;margin-bottom:0;display:flex;justify-content:space-between;align-items:center;gap:10px}.saldo-contas>summary h3{font-size:17px}.saldo-contas:not([open])>summary .kicker::after{content:" · toque pra abrir";color:var(--dim);letter-spacing:0;text-transform:none;font-weight:500}
+.fin-conta .ficha-link{background:none;border:0;padding:0;color:var(--orange2);text-decoration:underline;font:inherit;font-size:12px;cursor:pointer}.saldo-contas>summary::-webkit-details-marker{display:none}
+.saldo-contas[open]>summary{margin-bottom:10px}.saldo-contas-total{font:500 18px Georgia,serif;color:var(--orange2);white-space:nowrap}
+@media(max-width:560px){.fin-topo{grid-template-columns:1fr 1fr}.fin-grande.caixa{grid-column:1/-1}.fin-grande>b{font-size:20px}}
 /* CARD EM FOCO (Diego, 15/10/2026): o card abre sozinho por cima, na ListaLateral; a lista de trás não se mexe. */
 .foco-nav{display:flex;gap:8px;margin:0 0 12px}
 .foco-nav button{flex:1;padding:10px 6px;border-radius:12px;border:1px solid var(--line2);background:#1d1714;color:var(--text);font-size:13px;font-weight:600}
@@ -9623,10 +9650,13 @@ function SaldoContasCard({ finances, db, demo, notify }) {
     } catch (e) { notify && notify("Não consegui salvar o saldo: " + (e.message || e)); }
   };
   if (erro || (!contas.length && !demo)) return erro ? <p className="ficha-note">Saldo por conta indisponível: {erro}</p> : null;
-  return <section className="content-card saldo-contas"><div className="card-head"><div><p className="kicker">SALDO POR CONTA</p><h3>Quanto tem em cada conta</h3></div></div>
+  const totalContas = saldos.reduce((soma, c) => soma + (c.saldo == null ? 0 : c.saldo), 0);
+  // RECOLHIDO (15/10/2026, Financeiro limpo): fechado mostra só o total; abre no toque. `details` conta como
+  // "algo aberto" pro botão voltar (ver a guarda do histórico).
+  return <details className="content-card saldo-contas"><summary className="card-head"><div><p className="kicker">SALDO POR CONTA</p><h3>Quanto tem em cada conta</h3></div><b className="saldo-contas-total">{money(totalContas)}</b></summary>
     {saldos.map((c) => <div className="finance-row" key={c.conta}><div><strong>{c.nome}</strong><span>{c.saldo_inicial == null ? "Conte e informe o saldo inicial" : `Inicial ${money(c.saldo_inicial)} em ${compactDate(c.data_inicial)} · ${c.movs} lançamento(s) depois`}</span></div><div className="conta-linha"><b>{c.saldo == null ? "—" : money(c.saldo)}</b><button type="button" className="ghost" onClick={() => ajustar(c)}>Ajustar</button></div></div>)}
-    {semConta > 0 && <p className="ficha-note">{semConta} lançamento(s) pago(s) desde {compactDate(desde)} ainda estão sem conta e não entram nesses saldos. Escolha a conta na linha de cada um em “Lançamentos realizados”.</p>}
-  </section>;
+    {semConta > 0 && <p className="ficha-note">{semConta} lançamento(s) pago(s) desde {compactDate(desde)} ainda estão sem conta e não entram nesses saldos. A Manu preenche a conta pelo comprovante.</p>}
+  </details>;
 }
 function FinanceView({ finances, dividas, services, db, demo, mode, notify, onChanged, onVerAPagar }) {
   const [aba, setAba] = useState("todos");
@@ -9685,34 +9715,83 @@ function FinanceView({ finances, dividas, services, db, demo, mode, notify, onCh
   // de outra aba, cai pra lista normal aqui, senão a lista de baixo mostraria o que o card de cima não mostra.
   const ehProLabore = aba === "pro_labore";
   const focoAtivo = ehProLabore && (foco === "saida" || foco === "receber") ? "todos" : foco;
-  const noFoco = focoAtivo === "entrada" ? visiveis.filter((i) => i.tipo === "entrada") : focoAtivo === "saida" ? visiveis.filter((i) => i.tipo === "saida") : visiveis;
-  return <div className="page-grid"><div className="funil-filtros">{FINANCE_ABAS.map((a) => <button key={a.id} className={aba === a.id ? "active" : ""} onClick={() => setAba(a.id)}>{a.label}</button>)}</div>
+  let noFoco = focoAtivo === "entrada" ? visiveis.filter((i) => i.tipo === "entrada") : focoAtivo === "saida" ? visiveis.filter((i) => i.tipo === "saida") : visiveis;
+  // Mais novo em cima (15/10/2026): é o de hoje que ele confere.
+  noFoco = [...noFoco]; noFoco.sort((x, y) => String(y.data || "").localeCompare(String(x.data || "")) || String(y.criado_em || "").localeCompare(String(x.criado_em || "")));
+  // FINANCEIRO LIMPO (Diego, 15/10/2026, 20h39: "muita informação, não estou entendendo nada", "poderia ter
+  // observação recolhível", "dá pra melhorar e muito"). Mesmos dados e mesmas contas de antes; mudou só a tela:
+  // três números grandes (Em caixa, A pagar, A receber), Entradas/Saídas do mês numa linha, e cada lançamento numa
+  // linha curta (quem · valor · data). A observação inteira e o seletor de conta ficam ATRÁS de um toque — o
+  // seletor exposto em toda linha era onde ele clicava errado sem querer.
+  const [abertoId, setAbertoId] = useState(null);
+  const [trocandoConta, setTrocandoConta] = useState(null); // o seletor só aparece depois de tocar em "trocar"
+  const contaNome = (id) => (CONTAS_BANCARIAS.find((c) => c.id === id) || {}).nome || "";
+  const tituloLista = ehProLabore ? "Retiradas de pró-labore" : focoAtivo === "entrada" ? "Entradas confirmadas" : focoAtivo === "saida" ? "Saídas confirmadas" : "Lançamentos";
+  return <div className="page-grid fin-limpa"><div className="funil-filtros">{FINANCE_ABAS.map((a) => <button key={a.id} className={aba === a.id ? "active" : ""} onClick={() => setAba(a.id)}>{a.label}</button>)}</div>
     <div className="mes-nav">
       <button type="button" className="ghost" onClick={() => andarMes(-1)} disabled={!mesSel} title="Mês anterior">‹</button>
       <strong>{mesSel ? mesLabel(mesSel) : "Todo o histórico"}</strong>
       <button type="button" className="ghost" onClick={() => andarMes(1)} disabled={!mesSel} title="Próximo mês">›</button>
       <button type="button" className={`ghost${mesSel ? "" : " active"}`} onClick={() => setMesSel(mesSel ? "" : mesISO(hojeISO()))}>{mesSel ? "Ver tudo" : "Voltar pro mês"}</button>
     </div>
-    {resumo.aPagar.length > 0 && <p className="ficha-note">{money(resumo.totalAPagar)} em {resumo.aPagar.length} conta(s) ainda por pagar
-      {resumo.vencidas.length ? ` · ${resumo.vencidas.length} já vencida(s)` : ""}
-      {onVerAPagar && <> · <button type="button" className="ficha-link" onClick={onVerAPagar}>ver em A pagar</button></>}</p>}
-    {/* Dívida sem vencimento não entra na linha de cima (que é conta com data), mas não pode morar só na outra
-        aba: foi olhando o Financeiro que o Diego concluiu que não devia nada à Raquel (13/09). */}
-    {!!dividasAbertas.length && <p className="ficha-note">{money(totalDividas)} em {dividasAbertas.length} dívida(s) em aberto, sem vencimento
-      {onVerAPagar && <> · <button type="button" className="ficha-link" onClick={onVerAPagar}>ver em A pagar</button></>}</p>}
-    {!ehProLabore && <SaldoContasCard finances={finances} db={db} demo={demo} notify={notify} />}
-    {/* 4 CARDS CLICÁVEIS. O de "A receber" é amarelo de propósito: é o único que NÃO é dinheiro no caixa. */}
     {ehProLabore ? <section className="metric-grid finance-metrics">
       <Metric label={mesSel ? "Pró-labore do mês" : "Pró-labore — todo o histórico"} value={money(paidIn)} detail={`${visiveis.length} retirada(s) · gastos pessoais e dízimo ficam na aba Pessoal`} tone="green" />
-    </section> : <section className="metric-grid finance-metrics">
-      <Metric label="Entradas" value={money(paidIn)} detail={foco === "entrada" ? "▾ mostrando só estas" : "Confirmadas · toque para ver"} tone="green" onClick={() => setFoco(foco === "entrada" ? "todos" : "entrada")} />
-      <Metric label="Saídas" value={money(paidOut)} detail={foco === "saida" ? "▾ mostrando só estas" : "Confirmadas · toque para ver"} tone="red" onClick={() => setFoco(foco === "saida" ? "todos" : "saida")} />
-      <Metric label={mesSel ? "Resultado do mês" : "Saldo"} value={money(paidIn - paidOut)} detail={mesSel ? `Em caixa hoje (empresa): ${money(caixaEmpresa)}` : (foco === "todos" ? "▾ tudo que já aconteceu" : "Toque para ver tudo")} tone="orange" onClick={() => setFoco("todos")} />
-      <Metric label="A receber" value={money(totalAReceber)} detail={foco === "receber" ? "▾ ainda fora do caixa" : `${resumo.aReceber.length} saldo(s) · toque para ver`} tone="yellow" onClick={() => setFoco(foco === "receber" ? "todos" : "receber")} />
-    </section>}
+    </section> : <>
+      <p className="fin-dica">O que a empresa tem, o que deve e o que ainda vai receber.</p>
+      <section className="fin-topo">
+        <button type="button" className={`fin-grande caixa${focoAtivo === "todos" ? " ativo" : ""}`} onClick={() => setFoco("todos")}>
+          <span>Em caixa</span><b><NumeroAnimado valor={money(caixaEmpresa)} /></b><small>dinheiro da empresa hoje</small>
+        </button>
+        <button type="button" className="fin-grande pagar" onClick={onVerAPagar || undefined}>
+          <span>A pagar</span><b><NumeroAnimado valor={money(resumo.totalAPagar)} /></b>
+          <small>{resumo.aPagar.length ? `${resumo.aPagar.length} conta(s)${resumo.vencidas.length ? ` · ${resumo.vencidas.length} vencida(s)` : ""}` : "nada por vencer"}{dividasAbertas.length ? ` · ${money(totalDividas)} sem data` : ""}</small>
+        </button>
+        <button type="button" className={`fin-grande receber${focoAtivo === "receber" ? " ativo" : ""}`} onClick={() => setFoco(foco === "receber" ? "todos" : "receber")}>
+          <span>A receber</span><b><NumeroAnimado valor={money(totalAReceber)} /></b><small>{resumo.aReceber.length} saldo(s) de cliente</small>
+        </button>
+      </section>
+      <p className="fin-dica">{mesSel ? "Neste mês:" : "No total:"} o que entrou e o que saiu do caixa.</p>
+      <div className="fin-mes">
+        <button type="button" className={focoAtivo === "entrada" ? "ativo" : ""} onClick={() => setFoco(foco === "entrada" ? "todos" : "entrada")}>Entradas <b className="entrada">+ {money(paidIn)}</b></button>
+        <button type="button" className={focoAtivo === "saida" ? "ativo" : ""} onClick={() => setFoco(foco === "saida" ? "todos" : "saida")}>Saídas <b className="saida">− {money(paidOut)}</b></button>
+        <span>{mesSel ? "Resultado do mês" : "Resultado"} <b className={paidIn - paidOut < 0 ? "saida" : "entrada"}>{money(paidIn - paidOut)}</b></span>
+      </div>
+    </>}
+    {!ehProLabore && <SaldoContasCard finances={finances} db={db} demo={demo} notify={notify} />}
     {focoAtivo === "receber"
       ? <AReceberBloco finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={onChanged} />
-      : <section className="content-card"><div className="card-head"><div><p className="kicker">DIEGO E CLAUDE · MESMA OPERAÇÃO TIPADA</p><h3>{ehProLabore ? "Retiradas de pró-labore" : focoAtivo === "entrada" ? "Entradas confirmadas" : focoAtivo === "saida" ? "Saídas confirmadas" : "Lançamentos realizados"}</h3></div></div>{noFoco.map((item) => <div className="finance-row" key={item.id}><div><strong>{descricaoFinanceiraVisivel(item.descricao) || item.categoria || "Lançamento"}</strong><span>{compactDate(item.data)} · {item.status || "pago"}</span></div><div className="conta-linha"><b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b><select className="conta-select" aria-label="Conta" value={item.conta || ""} onChange={(e) => definirContaDoLancamento(db, demo, item, e.target.value, notify, onChanged)}><option value="">Sem conta</option>{CONTAS_BANCARIAS.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></div></div>)}{!noFoco.length && <div className="empty-state"><b>{mesSel ? `Nenhum lançamento em ${mesLabel(mesSel)}.` : "Nada por aqui ainda."}</b>{mesSel && <span>Use as setas pra ver outro mês, ou “Ver tudo”.</span>}</div>}</section>}</div>;
+      : <section className="content-card fin-lista"><div className="card-head"><div><h3>{tituloLista}</h3><p className="fin-dica">Tudo que a Manu lançou, do mais novo pro mais antigo. Toque numa linha pra ver a observação.</p></div></div>
+        {noFoco.map((item) => {
+          const aberto = abertoId === item.id;
+          const texto = descricaoFinanceiraVisivel(item.descricao);
+          const extras = [compactDate(item.data), item.categoria, item.conta ? contaNome(item.conta) : null, item.status && item.status !== "pago" ? item.status : null].filter(Boolean).join(" · ");
+          return <div className={`fin-item${aberto ? " aberto" : ""}`} key={item.id}>
+            <button type="button" className="fin-linha" aria-expanded={aberto} onClick={() => setAbertoId(aberto ? null : item.id)}>
+              <span className="fin-quem"><strong>{tituloCurtoFinanceiro(texto) || item.categoria || "Lançamento"}</strong><span>{extras}</span></span>
+              <b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b>
+            </button>
+            {aberto && <div className="fin-detalhe">
+              <p className="kicker">Observação</p>
+              <p className="fin-obs">{texto || "Sem observação."}</p>
+              {/* CONTA SÓ COMO INFORMAÇÃO (Diego, 15/10/2026, 20h41: "tinha uma caixinha falando em qual conta, não sei pra
+                  quê, coloquei duas manualmente"). Quem preenche a conta é a Manu, pelo comprovante; aqui ele só lê. */}
+              {trocandoConta === item.id
+                ? <label className="fin-conta">Conta <select className="conta-select" aria-label="Conta" value={item.conta || ""} onChange={(e) => { setTrocandoConta(null); definirContaDoLancamento(db, demo, item, e.target.value, notify, onChanged); }}><option value="">Sem conta</option>{CONTAS_BANCARIAS.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>
+                : <p className="fin-conta">Conta: <b>{item.conta ? contaNome(item.conta) : "ainda não informada"}</b>{item.conta ? "" : " · a Manu preenche pelo comprovante"} · <button type="button" className="ficha-link" onClick={() => setTrocandoConta(item.id)}>trocar</button></p>}
+            </div>}
+          </div>;
+        })}
+        {!noFoco.length && <div className="empty-state"><b>{mesSel ? `Nenhum lançamento em ${mesLabel(mesSel)}.` : "Nada por aqui ainda."}</b>{mesSel && <span>Use as setas pra ver outro mês, ou “Ver tudo”.</span>}</div>}
+      </section>}</div>;
+}
+// Linha curta do lançamento: a descrição que a Manu grava é a observação inteira ("Frete de material - motoboy
+// Baiano (Cleverson…), metade do Pix de 100 reais…, ID E1823…"). Na lista só entra o começo: tira o prefixo de
+// quem escreveu, corta no primeiro ":", ",", "(", "·" ou travessão, e limita a ~48 letras. O resto fica no toque.
+function tituloCurtoFinanceiro(texto) {
+  let t = String(texto || "").trim().replace(/^(manu|diego|claude|auditoria|agente)\s*:\s*/i, "");
+  t = t.split(/\s*[:,(·—–]\s*|\s+-\s+(?=.{0,12}$)/)[0].trim();
+  if (t.length > 48) { const corte = t.lastIndexOf(" ", 46); t = (corte > 20 ? t.slice(0, corte) : t.slice(0, 46)) + "…"; }
+  return t;
 }
 
 function nomeFornecedorVale(descricao) {
