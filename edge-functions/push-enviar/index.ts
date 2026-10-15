@@ -343,7 +343,7 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
 // (é pra sair de casa); quando a hora CHEGA, cada card com hora vira um aviso próprio com dois botões:
 // Feito (mesmo caminho do botão Feito do app: recado + status, a Manu enxerga igual) e Adiar 1h (empurra a hora
 // e lembra de novo). Um por card, nunca agrupado: botão só faz sentido por compromisso. Mesma tag do lembrete,
-// então substitui o aviso anterior na tela em vez de empilhar. Chave agenda-hora:<id>.
+// então substitui o aviso anterior na tela em vez de empilhar. Chave agenda-hora:<id>:<hora>:<n> (ver abaixo).
 // Os dois botões de todo aviso de compromisso (lembrete de 60 min e na hora): Feito e Adiar 1h.
 // TEXTO LEGÍVEL SEM ABRIR (Diego, 15/10/2026, print do Niagara: "Agora 09:00 · Diego…" cortado e o corpo gasto com
 // "Feito marca no app · Adiar empurra 1 hora"; ele compara com o WhatsApp, que mostra a mensagem inteira). O título
@@ -359,11 +359,23 @@ const botoesDoCompromisso = (a: any): Botao[] => [
   { action: "a1", title: "Adiar 1h", plano: { tabela: "agenda", id: String(a.id), resposta: "adiar" } },
 ];
 
+// AVISO INSISTENTE (Diego, 15/10/2026: "meu celular tá do meu lado, mas tá carregando" e o aviso passa
+// despercebido; esqueceu a Luana). Enquanto o card segue planejado e ele NÃO tocou no aviso (corpo ou botão —
+// `visto`, que o push_pendencias lê dos recibos da tag), a varredura manda o mesmo aviso de novo a cada 5 min,
+// até 5 vezes dentro dos 30 min da janela: mesma tag, então substitui na tela, mas toca e vibra outra vez.
+// A chave leva a hora e a vez (agenda-hora:<id>:<hora>:<n>): Adiar 1h muda a hora, logo a nova hora avisa
+// de novo sem precisar soltar chave nenhuma.
+const REPETE_A_CADA_MIN = 5;
+const REPETE_MAX = 5;
+const vezDoAviso = (a: any) => Math.floor(Math.max(0, Number(a.passaram || 0)) / REPETE_A_CADA_MIN);
+const chaveNaHora = (a: any) => `agenda-hora:${a.id}:${a.hora}:${vezDoAviso(a)}`;
+const aindaInsiste = (a: any) => vezDoAviso(a) < REPETE_MAX && (vezDoAviso(a) === 0 || !a.visto);
+
 function avisosNaHora(lista: any[]): Envio[] {
   return lista.map((a) => {
     const acoes = botoesDoCompromisso(a);
     return {
-      chaves: [`agenda-hora:${a.id}`],
+      chaves: [chaveNaHora(a)],
       aviso: {
         titulo: `Agora ${a.hora} · ${nomeCurto(a.titulo)}`,
         corpo: textoDoCompromisso(a),
@@ -623,17 +635,17 @@ Deno.serve(async (req) => {
       const contas = horaDeDia ? contasComPrazo(pendencias).filter(naJanela) : [];
       const duvidas = horaDeDia ? (pendencias.duvidas || []) : [];
       // Na hora, com botões (15/10/2026). Mesma janela de dia dos cartões: fora dela o card fica no app.
-      const naHora = horaDeDia ? (pendencias.agenda_na_hora || []) : [];
+      const naHora = horaDeDia ? (pendencias.agenda_na_hora || []).filter(aindaInsiste) : [];
       candidatos = leva.length + caixa.length + contas.length + duvidas.length + naHora.length;
       if (candidatos) {
-        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...naHora.map((a: any) => `agenda-hora:${a.id}`), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`)];
+        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...naHora.map(chaveNaHora), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`)];
         const liberadas = new Set<string>(await rpc("push_reservar", { chaves }));
         envios = [
           ...avisosDaVarredura(
             leva.filter((a: any) => liberadas.has(`agenda:${a.id}`)),
             caixa.filter((c: any) => liberadas.has(`caixa:${c.id}`)),
           ),
-          ...avisosNaHora(naHora.filter((a: any) => liberadas.has(`agenda-hora:${a.id}`))),
+          ...avisosNaHora(naHora.filter((a: any) => liberadas.has(chaveNaHora(a)))),
           ...avisoContasD3(contas.filter((c: any) => liberadas.has(chaveConta(c)))),
           ...avisosDosCartoes(duvidas.filter((d: any) => liberadas.has(`duvida:${d.id}`))),
         ];
