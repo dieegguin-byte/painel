@@ -765,13 +765,12 @@ button.sutil{opacity:.55;font-size:12px}
 .grupo-corpo>.encaixes-card .card-toggle .kicker{display:none}
 .grupo-corpo>.encaixes-card .card-toggle h3{font-size:15px;font-weight:600;color:var(--cream)}
 .pend-linha.com-selo .linha-sub{display:block;font-size:11px;font-weight:500;color:var(--dim);margin-top:2px;line-height:1.3}
-/* Botão flutuante "Anotar": fica acima da barra de baixo, sempre à mão; abre a mesma caixa de sempre numa gaveta */
-.anotar-fab{position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:150;height:52px;padding:0 20px 0 16px;border-radius:999px;border:1px solid #ffb07a66;background:linear-gradient(145deg,#f09a5c,#c8551f);color:#fff8f0;display:flex;align-items:center;gap:8px;font:800 14px/1 Inter,system-ui,sans-serif;letter-spacing:.3px;box-shadow:0 10px 26px -6px #d86d36cc,inset 0 1px 0 #ffffff55;cursor:pointer;animation:seloPop .55s .6s cubic-bezier(.2,.9,.3,1.3) backwards;transition:transform .15s,box-shadow .2s}
-.anotar-fab::after{content:"";position:absolute;inset:-5px;border-radius:999px;border:2px solid #ed905766;animation:fabOnda 2.6s ease-out infinite;pointer-events:none}
+/* Botão flutuante de anotar: SÓ O "+", redondo e pequeno (Diego 15/10/2026: "está tampando a Manu, deixe só o Mais").
+   Sem texto e sem a onda em volta, pra cobrir o mínimo possível dos cards; abre a mesma caixa de sempre numa gaveta */
+.anotar-fab{position:fixed;right:16px;bottom:calc(80px + env(safe-area-inset-bottom));z-index:150;width:44px;height:44px;padding:0;border-radius:50%;border:1px solid #ffb07a66;background:linear-gradient(145deg,#f09a5c,#c8551f);color:#fff8f0;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -6px #d86d36cc,inset 0 1px 0 #ffffff55;cursor:pointer;transition:transform .15s,box-shadow .2s}
 .anotar-fab:active{transform:scale(.94);box-shadow:0 4px 12px -4px #d86d36cc}
-.anotar-fab b{font:300 30px/1 Inter,system-ui,sans-serif;margin-top:-3px}
-@keyframes fabOnda{0%{transform:scale(.9);opacity:.9}100%{transform:scale(1.45);opacity:0}}
-@media(min-width:851px){.anotar-fab{bottom:28px}}
+.anotar-fab b{font:300 26px/1 Inter,system-ui,sans-serif;margin-top:-2px}
+@media(min-width:851px){.anotar-fab{bottom:24px}}
 .anotar-card .modal-head h2{font-size:22px}
 .anotar-card .composer textarea{min-height:120px}
 /* Hoje em destaque: degradê laranja, data grande e um reflexo de luz passando devagar */
@@ -8674,7 +8673,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     {/* ANOTAR AGORA virou botão flutuante (Painel único, etapa 2, 11/10/2026): o card no meio da página só era
         visto quando ele rolava até lá; o botão fica sempre no mesmo canto, acima da barra, e abre a mesma caixa
         numa gaveta. Tudo igual por dentro: mesmo composer, mesma fila da Caixa. */}
-    {addInbox && <button type="button" className="anotar-fab" aria-label="Anotar agora" onClick={() => { vibrar(8); setAnotarAberto(true); }}><b>+</b>Anotar</button>}
+    {addInbox && <button type="button" className="anotar-fab" aria-label="Anotar agora" onClick={() => { vibrar(8); setAnotarAberto(true); }}><b>+</b></button>}
     {addInbox && anotarAberto && <div className="modal-overlay" onClick={() => setAnotarAberto(false)}><div className="modal-card small anotar-card" onClick={(e) => e.stopPropagation()}>
       <div className="modal-head"><div><p className="kicker">ANOTAR AGORA</p><h2>O que aconteceu?</h2></div><button className="ghost" onClick={() => setAnotarAberto(false)}>Fechar</button></div>
       <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={async () => { await addInbox(); setAnotarAberto(false); }} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />
