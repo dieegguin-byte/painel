@@ -149,8 +149,10 @@ begin
       update agenda set hora = nova_hora where id = ag.id;
       insert into agenda_recados (agenda_id, acao, texto)
       values (ag.id, 'recado', 'Adiou 1 hora pela notificação (era ' || to_char(ag.hora, 'HH24:MI') || ', agora ' || to_char(nova_hora, 'HH24:MI') || ')');
-      -- Solta as chaves de aviso: a nova hora lembra de novo (60 min antes e na hora).
-      perform push_soltar(array['agenda:' || ag.id::text, 'agenda-hora:' || ag.id::text]);
+      -- Some agora e volta só NA HORA nova (Diego 15/10: "some por enquanto, depois volta, mais limpo").
+      -- O aviso de 60 min antes fica segurado pra não tocar de novo logo em seguida.
+      perform push_reservar(array['agenda:' || ag.id::text]);
+      perform push_soltar(array['agenda-hora:' || ag.id::text]);
       insert into historico (o_que, por, detalhe)
       values ('Adiou 1h pela notificação: ' || left(coalesce(ag.titulo, ''), 80), 'diego',
               'agenda ' || ag.id::text || ' · antes: ' || to_char(ag.hora, 'HH24:MI') || ' → depois: ' || to_char(nova_hora, 'HH24:MI'));
