@@ -853,7 +853,17 @@ button.sutil{opacity:.55;font-size:12px}
 .ficha-contato .ficha-loc{font-size:12px;color:var(--muted)}
 .ficha-contato .ficha-loc.falta{color:#e4bd72}
 .ficha-contato .ficha-obs{font-size:12px;color:var(--muted);border-top:1px dashed var(--line);padding-top:6px;margin-top:2px}
-.ficha-botoes{display:grid;grid-template-columns:1fr 1fr 1fr 56px;gap:6px;margin-bottom:8px}
+.ficha-botoes{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 48px;gap:6px;margin-bottom:8px}
+/* Falar com a Manu (15/10/2026): caixa de texto abaixo da fileira e a lista de recados do cliente */
+.ficha-botao.aberto{border-color:#75a98799;background:#16241b}
+.recado-manu-caixa{margin:2px 0 8px}
+.recado-manu-caixa textarea{width:100%;min-height:72px;margin-bottom:6px}
+.recados-manu{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.recado-manu{display:flex;flex-direction:column;gap:3px;padding:9px 11px;border-radius:12px;border:1px solid #75a98755;border-left:3px solid #75a987;background:linear-gradient(150deg,#16241b,#121a14);font-size:13px}
+.recado-manu.visto{opacity:.72;border-left-color:#6b7f70}
+.recado-manu-texto{color:var(--cream)}
+.recado-manu-estado{font-size:11px;color:#9fc7ad;font-weight:600}
+.recado-manu-resposta{font-size:12px;color:var(--dim)}
 .ficha-botao{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;border-radius:14px;background:#1f1714;border:1px solid var(--line2);color:var(--cream);font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;padding:6px 4px}
 .ficha-botao i{font-style:normal;font-size:18px;line-height:1}
 .ficha-botao:active{transform:scale(.97)}
@@ -11532,6 +11542,13 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
   const [colarLink, setColarLink] = useState(false);
   const [maisAcoes, setMaisAcoes] = useState(false); // linha extra da ficha (Capturar, Colar link, Maps, ChatGPT)
   const [linkDraft, setLinkDraft] = useState("");
+  // FALAR COM A MANU (Diego, 15/10/2026, na ficha da Bruna: "eu deveria ter um botão aqui pra falar pra Manu o que
+  // fazer sobre essa cliente"). O recado vai pra caixa_entrada, que a Manu lê todo ciclo, com meta.cliente_id (e o
+  // servico_id quando dá pra saber qual é). A ficha lista os recados do cliente: aguardando ou já visto pela Manu.
+  const [falarManu, setFalarManu] = useState(false);
+  const [recadoManu, setRecadoManu] = useState("");
+  const [enviandoManu, setEnviandoManu] = useState(false);
+  const [recadosManu, setRecadosManu] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -11541,18 +11558,49 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
       if (c) setForm({ nome: c.nome || "", telefone: c.telefone || "", cidade: c.cidade || "", endereco: c.endereco || "", obs: c.obs || "" });
       setLoading(false); return;
     }
-    const [c, sv, ft] = await Promise.all([
+    const [c, sv, ft, rc] = await Promise.all([
       db.from("clientes").select("*").eq("id", clienteId).single(),
       db.from("servicos").select("*").eq("cliente_id", clienteId).order("criado_em", { ascending: false }),
       db.from("fotos").select("*").eq("cliente_id", clienteId).order("criado_em", { ascending: false }),
+      // Recados deste cliente pra Manu: só os que ainda interessam (abertos, ou vistos nos últimos 7 dias).
+      db.from("caixa_entrada").select("id,texto,processado,processado_em,criado_em,conversa").contains("conversa", [{ meta: { tipo_operacional: "recado_manu", cliente_id: clienteId } }]).order("criado_em", { ascending: false }).limit(8),
     ]);
     if (c.error) { notify("Erro ao abrir ficha: " + c.error.message, "error"); setLoading(false); return; }
     setCliente(c.data); setServicos(sv.data || []); setFotos(ft.data || []);
+    const corte = Date.now() - 7 * 86400000;
+    setRecadosManu((rc.data || []).filter((r) => !r.processado || new Date(r.processado_em || r.criado_em).getTime() > corte));
     setForm({ nome: c.data.nome || "", telefone: c.data.telefone || "", cidade: c.data.cidade || "", endereco: c.data.endereco || "", obs: c.data.obs || "" });
     setLoading(false);
   }, [db, demo, clienteId, notify]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Manda o recado pra Manu. O serviço só vai junto quando não é chute: cliente com um serviço só, ou com um
+  // único serviço em aberto. Com mais de um, a Manu lê o texto e decide (a ficha é nível cliente).
+  async function enviarRecadoManu() {
+    const texto = recadoManu.trim();
+    if (!texto || !cliente) return;
+    if (demo) { notify("Na demonstração o recado não vai.", "error"); return; }
+    const fechado = (st) => /conclu|entreg|cancel|perdid|fechad/i.test(String(st || ""));
+    const abertos = servicos.filter((sv) => !fechado(sv.status));
+    const servicoId = servicos.length === 1 ? servicos[0].id : abertos.length === 1 ? abertos[0].id : null;
+    const servico = servicos.find((sv) => sv.id === servicoId);
+    setEnviandoManu(true);
+    try {
+      const nome = nomeDoCliente(cliente);
+      const agora = new Date().toISOString();
+      const { error } = await db.from("caixa_entrada").insert({
+        texto: `Recado do Diego pra Manu sobre ${nome}${servico ? ` (${servico.titulo || "serviço"})` : ""}: ${texto}`,
+        status: "novo", processado: false,
+        conversa: [{ de: "diego", tipo: "recado_manu", texto, em: agora, meta: { tipo_operacional: "recado_manu", versao: 1, cliente_id: cliente.id, cliente_nome: nome, servico_id: servicoId } }],
+      });
+      if (error) throw error;
+      setRecadoManu(""); setFalarManu(false);
+      notify("Recado deixado pra Manu. Ela lê no próximo ciclo.", "ok");
+      await load();
+    } catch (e) { notify(e.message, "error"); }
+    finally { setEnviandoManu(false); }
+  }
 
   // IDENTIDADE DE CLIENTE É O TELEFONE, NÃO O NOME. A triagem já avisava de ficha repetida
   // (duplicateCustomers), mas a ficha não avisava nada: dava pra digitar aqui um número que já é de outro
@@ -11718,9 +11766,22 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
             {cliente.latitude != null
               ? <a className="ficha-botao" href={urlWaze({ ll: `${cliente.latitude},${cliente.longitude}` })} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer"><i>🧭</i>Rota</a>
               : <button type="button" className="ficha-botao" onClick={capturarGPS} disabled={capturando}><i>⌖</i>{capturando ? "Buscando…" : "Capturar aqui"}</button>}
+            <button type="button" className={`ficha-botao${falarManu ? " aberto" : ""}`} onClick={() => setFalarManu((v) => !v)}><i>🗣</i>Manu</button>
             <button type="button" className="ficha-botao" onClick={() => setEditing(true)}><i>✎</i>Editar</button>
             <button type="button" className={`ficha-botao mais${maisAcoes ? " aberto" : ""}`} aria-label="Mais ações" aria-expanded={maisAcoes} onClick={() => setMaisAcoes((v) => !v)}><i>⋯</i>mais</button>
           </div>
+          {falarManu && <div className="recado-manu-caixa">
+            <textarea value={recadoManu} onChange={(e) => setRecadoManu(e.target.value)} autoFocus rows={3} placeholder={`O que a Manu deve fazer com ${nomeDoCliente(cliente)}? Pode ditar.`} />
+            <div className="ficha-actions"><button className="primary" onClick={enviarRecadoManu} disabled={enviandoManu || !recadoManu.trim()}>{enviandoManu ? "Enviando…" : "Mandar pra Manu"}</button><button className="ghost" onClick={() => { setFalarManu(false); setRecadoManu(""); }}>Cancelar</button></div>
+          </div>}
+          {recadosManu.length > 0 && <div className="recados-manu">{recadosManu.map((r) => {
+            const pedido = (r.conversa || []).find((m) => m?.tipo === "recado_manu");
+            const respostas = (r.conversa || []).filter((m) => m && m.de !== "diego" && m.tipo !== "sistema" && m.texto).slice(-1);
+            return <div key={r.id} className={`recado-manu${r.processado ? " visto" : ""}`}>
+              <span className="recado-manu-texto">🗣 {pedido?.texto || r.texto}</span>
+              <span className="recado-manu-estado">{r.processado ? `✓ Manu viu${r.processado_em ? " · " + new Date(r.processado_em).toLocaleDateString("pt-BR") : ""}` : "aguardando a Manu"}</span>
+              {respostas.map((m, i) => <span key={i} className="recado-manu-resposta">Manu: {String(m.texto).slice(0, 240)}</span>)}
+            </div>; })}</div>}
           {maisAcoes && <div className="ficha-actions">
             <button className="ghost" onClick={capturarGPS} disabled={capturando}>{capturando ? "Procurando sinal…" : cliente.latitude != null ? "⌖ Atualizar aqui" : "⌖ Capturar aqui"}</button>
             <button className="ghost" onClick={() => { setColarLink((v) => !v); setLinkDraft(""); }}>{colarLink ? "Cancelar" : "Colar link do Maps"}</button>
