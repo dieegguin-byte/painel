@@ -789,6 +789,11 @@ button.sutil{opacity:.55;font-size:12px}
 .lista-lateral-fundo{display:block;padding:0;place-items:unset}
 .lista-lateral{position:absolute;top:0;bottom:0;left:0;width:min(92vw,440px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:linear-gradient(160deg,#1c1613,#141110);border-right:1px solid var(--line2);box-shadow:var(--shadow);padding:0 14px calc(60px + env(safe-area-inset-bottom));animation:listaEntra .3s cubic-bezier(.2,.8,.3,1) backwards;transition:transform .22s ease}
 .lista-lateral.arrastando{transition:none}
+/* CARD EM FOCO SEM ARRASTO (Diego, 15/10/2026, 20h52: "ele voltava para a tela inicial"). Dentro do foco o dedo só rola:
+   nada de gesto pro lado e, no topo, o puxar-pra-baixo não pode virar o "atualizar" do Chrome (que recarrega o app e
+   cai no Painel). Enquanto qualquer lista/modal está aberto, a página de trás também não entra no puxar-pra-atualizar. */
+.lista-lateral.sem-gestos{touch-action:pan-y;overscroll-behavior:contain}
+body:has(.modal-overlay){overscroll-behavior-y:contain}
 .lista-lateral.sai-baixo{transform:translateY(110%)!important}
 .lista-lateral.sai-cima{transform:translateY(-110%)!important}
 .lista-lateral.sai-esq{transform:translateX(-110%)!important}
@@ -1393,7 +1398,7 @@ function ListaLateral({ kicker, titulo, cabecalho = null, onFechar, semGestos = 
   return <div className="modal-overlay lista-lateral-fundo" onClick={onFechar}>
     {!semGestos && aviso("topo", puxado > 30)}
     {!semGestos && aviso("fim", puxado < -30)}
-    <div ref={painel} className={`lista-lateral${arrastando ? " arrastando" : ""}${saindo ? ` ${saindo}` : ""}`} style={semGestos ? undefined : estilo} onClick={(e) => e.stopPropagation()} onScroll={onScroll} {...gestos}>
+    <div ref={painel} className={`lista-lateral${semGestos ? " sem-gestos" : ""}${arrastando ? " arrastando" : ""}${saindo ? ` ${saindo}` : ""}`} style={semGestos ? undefined : estilo} onClick={(e) => e.stopPropagation()} onScroll={onScroll} {...gestos}>
       <div className={`lista-lateral-topo${rolou ? " rolou" : ""}`}>{cabecalho || <>{kicker && <p className="kicker">{kicker}</p>}<h2>{titulo}</h2></>}</div>
       <DentroDaLista.Provider value={true}>{children}</DentroDaLista.Provider>
     </div>
