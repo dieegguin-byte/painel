@@ -766,6 +766,23 @@ button.sutil{opacity:.55;font-size:12px}
 .lista-lateral-aviso.fim{bottom:calc(14px + env(safe-area-inset-bottom))}
 .lista-lateral-aviso.visivel{opacity:1}
 .lista-lateral-aviso.pronto{color:var(--orange2)}
+/* NO PC A LISTA LATERAL É GRANDE (Diego, 15/10/2026, foto do notebook: a coluna "Precisa resolver" ficava com
+   440px numa tela de 1920 e o resto preto; "que aumente bem mais"). Com mouse e tela larga ela toma 62% da
+   largura, com letra e cards maiores; o fundo preto continua fechando no clique. */
+@media (min-width:1024px) and (pointer:fine){
+  .lista-lateral,.lista-lateral-aviso{width:min(62vw,1100px)}
+  .lista-lateral{padding:0 28px calc(60px + env(safe-area-inset-bottom));font-size:17px}
+  .lista-lateral-topo{margin:0 -28px 14px;padding:22px 32px 14px}
+  .lista-lateral-topo h2,.lista-lateral-topo h3{font-size:38px}
+  .lista-lateral .compromisso-card{padding:18px 20px;margin-bottom:14px}
+  .lista-lateral .compromisso-cab{grid-template-columns:104px minmax(0,1fr) 24px;gap:18px}
+  .lista-lateral .compromisso-idc strong{font-size:20px}
+  .lista-lateral .compromisso-idc>span{font-size:15px}
+  .lista-lateral .compromisso-quando b{font-size:24px}
+  .lista-lateral .compromisso-quando span{font-size:12px}
+  .lista-lateral .compromisso-quando em,.lista-lateral .compromisso-quando .idade-atraso{font-size:12px}
+  .lista-lateral .compromisso-corpo,.lista-lateral .warning-card,.lista-lateral .content-card{font-size:16px}
+}
 .mais-grade{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .mais-grade button{position:relative;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:14px;padding:12px 6px;font-size:11px;display:grid;gap:4px;justify-items:center}
 .mais-grade button i{font-style:normal;font-size:24px;color:#987665}
