@@ -5486,6 +5486,25 @@ function statusRotina(rotina, hoje, agoraHHMM = null) {
   return { estado: diff < 0 ? "vencida" : diff === 0 ? "hoje" : "futura", dias: diff, prox, passouHora };
 }
 function rotinaAtrasada(st) { return st.estado === "vencida" || !!st.passouHora; }
+// ROTINA NA ORDEM DA HORA (Diego, 15/10/2026: "rotina não entrou antes dos primeiros compromissos"). Até aqui a
+// Agenda de hoje mostrava todos os compromissos e só depois o bloco de rotinas; a flexão das 8h30 ficava embaixo
+// do compromisso das 14h. Agora cada rotina entra antes do primeiro compromisso cuja hora é depois da dela
+// (os compromissos seguem a ordem de sempre: presencial antes de remoto); rotina sem hora vai pro fim.
+function intercalarRotinas(compromissos, rotinasDia, desenharRotinas, desenharCompromisso) {
+  const fila = [...rotinasDia].sort((a, b) => String(a.r.hora || "99").localeCompare(String(b.r.hora || "99")));
+  const saida = [];
+  let i = 0;
+  compromissos.forEach((a, n) => {
+    const corte = a.hora ? String(a.hora).slice(0, 5) : "99";
+    const ids = [];
+    while (i < fila.length && fila[i].r.hora && String(fila[i].r.hora).slice(0, 5) <= corte) ids.push(fila[i++].r.id);
+    if (ids.length) saida.push(desenharRotinas(ids, "rotinas-antes-" + n));
+    saida.push(desenharCompromisso(a));
+  });
+  const resto = fila.slice(i).map((x) => x.r.id);
+  if (resto.length) saida.push(desenharRotinas(resto, "rotinas-fim"));
+  return saida;
+}
 function textoRotina(st) {
   if (st.estado === "vencida") return st.dias === 0 ? "Nunca feita" : `Atrasada ${Math.abs(st.dias)} dia(s)`;
   if (st.estado === "hoje") return st.passouHora ? "Passou da hora" : "Fazer hoje";
@@ -6492,7 +6511,7 @@ function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = nul
 }
 // `agora` (HH:MM) liga o atraso por hora; `apenas` ("atrasadas" | "doDia") escolhe que metade da lista
 // desenhar quando ela mora dentro de outro card (Atrasados fica com as atrasadas, Hoje com o resto).
-function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = false, agora = null, apenas = null }) {
+function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = false, agora = null, apenas = null, somente = null, semTitulo = false }) {
   const [busyId, setBusyId] = useState(null);
   // A OBSERVAÇÃO NÃO CABE INTEIRA NO CARD (16/09/2026). Ela vinha grudada na linha de metadados, e as três
   // rotinas de remédio da mãe têm de 191 a 343 caracteres: no celular a coluna de texto fica estreita por
@@ -6553,10 +6572,16 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = fal
   // ATRASADA VAI PRO CARD ATRASADOS (Diego, 13/10/2026: "não apareceu o card atrasados quando passa do
   // horário"): com `apenas`, cada card desenha só a sua metade — a rotina que passou da hora (ou do dia) sobe
   // pro "PRECISA RESOLVER" e a Agenda de hoje fica com o que ainda está no prazo.
-  if (soLista) return <div className="rotinas-na-agenda">
-    <p className="kicker">{apenas === "atrasadas" ? "🔁 ROTINAS ATRASADAS" : "🔁 ROTINAS DE HOJE"}</p>
-    <div className="rotina-lista">{(apenas === "atrasadas" ? atrasadas : apenas === "doDia" ? doDia : [...atrasadas, ...doDia]).map(linha)}</div>
-  </div>;
+  // `somente` (15/10/2026): a Agenda de hoje desenha as rotinas NO LUGAR DA HORA delas, entre os compromissos
+  // (Diego: "rotina não entrou antes dos primeiros compromissos"); cada fatia recebe só os ids que cabem ali.
+  if (soLista) {
+    const lista = (apenas === "atrasadas" ? atrasadas : apenas === "doDia" ? doDia : [...atrasadas, ...doDia]).filter((x) => !somente || somente.includes(x.r.id));
+    if (!lista.length) return null;
+    return <div className="rotinas-na-agenda">
+      {!semTitulo && <p className="kicker">{apenas === "atrasadas" ? "🔁 ROTINAS ATRASADAS" : "🔁 ROTINAS DE HOJE"}</p>}
+      <div className="rotina-lista">{lista.map(linha)}</div>
+    </div>;
+  }
   return <CardRecolhivel
     cabecalho={<><p className="kicker">ROTINAS RECORRENTES</p><h3>{pendentes.length} rotina(s) pra hoje</h3></>}
     resumo={<p className="ficha-note">{atrasadas.length ? `${atrasadas.length} atrasada(s)` : "Nenhuma atrasada"}{doDia.length ? ` · ${doDia.length} pra hoje` : ""}</p>}>
@@ -8349,6 +8374,8 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
   // Rotinas: as atrasadas (de dia ou de hora) vão pro card Atrasados; Hoje conta só as que ainda estão no prazo.
   const statusRotinas = (rotinas || []).map((r) => statusRotina(r, today, agoraHHMM)).filter((st) => st.estado !== "futura");
   const rotinasAtrasadas = statusRotinas.filter(rotinaAtrasada).length;
+  // Rotinas de hoje ainda no prazo, com a rotina junto: a Agenda de hoje as desenha na hora delas (intercalarRotinas).
+  const rotinasHojeNoPrazo = (rotinas || []).map((r) => ({ r, st: statusRotina(r, today, agoraHHMM) })).filter((x) => x.st.estado === "hoje" && !rotinaAtrasada(x.st));
   const rotinasPendentesHoje = statusRotinas.length - rotinasAtrasadas;
   const totalAtrasados = atrasados.length + rotinasAtrasadas;
   const atrasadoMaisAntigo = atrasados.length ? [...atrasados].sort(ordenarCompromisso)[0] : null;
@@ -8459,9 +8486,10 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
       {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora · {hojePassouDaHora > 1 ? "estão" : "está"} em Precisa resolver</span>}{seloFiltro}</>}>
       {faixaFiltro}
       {hoje.length > 0
-        ? [...hoje].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} ligado={ligacoesHoje.get(a.id) || null} />)
+        ? intercalarRotinas([...hoje].sort(ordenarCompromisso), rotinasHojeNoPrazo, (ids, chave) => <RotinasCard key={chave} rotinas={rotinas || []} hoje={today} agora={agoraHHMM} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} soLista apenas="doDia" somente={ids} semTitulo />, (a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} ligado={ligacoesHoje.get(a.id) || null} />)
         : <div className="empty-state"><b>O dia está livre.</b><span>Nada marcado para {compactDate(today)}.</span></div>}
-      <RotinasCard rotinas={rotinas || []} hoje={today} agora={agoraHHMM} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} soLista apenas="doDia" />
+      {/* Sem compromisso, as rotinas do dia ficam no bloco de sempre; com compromisso, cada uma já entrou na hora dela. */}
+      {hoje.length === 0 && <RotinasCard rotinas={rotinas || []} hoje={today} agora={agoraHHMM} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} soLista apenas="doDia" />}
     </CardRecolhivel>
     {/* ===== COBRANÇAS: o "dia do telefone", fora da rota (Diego, 28/07) ===== */}
     {/* Bloco COBRANÇAS removido do Painel em 23/08/2026 a pedido do Diego. O ciclo de cobrança
