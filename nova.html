@@ -737,10 +737,12 @@ button.sutil{opacity:.55;font-size:12px}
 @keyframes listaEntra{from{transform:translateX(-100%)}to{transform:translateX(0)}}
 .lista-lateral-topo{position:sticky;top:0;z-index:2;margin:0 -14px 10px;padding:calc(16px + env(safe-area-inset-top)) 18px 12px;border-bottom:1px solid transparent;transition:background-color .3s,border-color .3s,backdrop-filter .3s}
 .lista-lateral-topo .kicker{margin:0 0 4px;color:var(--dim)}
-.lista-lateral-topo h2{margin:0;font:500 28px Georgia,serif;color:var(--text);transition:color .3s}
+.lista-lateral-topo h2,.lista-lateral-topo h3{margin:0;font:500 28px Georgia,serif;color:var(--text);transition:color .3s}
 .lista-lateral-topo.rolou{background:#141110f0;border-bottom-color:var(--line);backdrop-filter:blur(8px)}
-.lista-lateral-topo.rolou h2{color:var(--orange2)}
-.lista-lateral>.content-card{margin:0;padding:0;border:0;background:transparent;box-shadow:none}
+.lista-lateral-topo.rolou h2,.lista-lateral-topo.rolou h3{color:var(--orange2)}
+.lista-lateral>.content-card.full{margin:0;padding:0;border:0;background:transparent;box-shadow:none}
+.lista-lateral>.content-card,.lista-lateral>.warning-card{margin:0 0 10px}
+.lista-lateral>.grupo-ver-tudo{margin-top:8px}
 .lista-lateral-aviso{position:absolute;left:0;width:min(92vw,440px);padding:10px;text-align:center;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);pointer-events:none;opacity:0;transition:opacity .15s,color .15s}
 .lista-lateral-aviso.topo{top:calc(8px + env(safe-area-inset-top))}
 .lista-lateral-aviso.fim{bottom:calc(14px + env(safe-area-inset-bottom))}
@@ -1249,7 +1251,26 @@ function NumeroAnimado({ valor }) {
 //   quando a borda é alcançada, pra que rolar a lista normalmente nunca feche por acidente.
 // O título muda de cor assim que a lista rola (classe "rolou"), como no launcher que ele mostrou.
 const LIMITE_FECHAR = 110;
-function ListaLateral({ kicker, titulo, onFechar, children }) {
+// Dentro da lista por cima, os cards já nascem abertos (ela existe pra ler a lista, não pra abrir de novo).
+const DentroDaLista = React.createContext(false);
+// Arrastar pra direita EM CIMA de um card/bloco do Painel abre aquele card por cima (Diego, 15/10/2026:
+// "não só na agenda, todos os cards do painel"). O toque continua abrindo no lugar, como antes. Devolve os
+// handlers de toque pro elemento; `ao` recebe o gesto. Marca o evento nativo pra que o deslizar de aba do
+// documento (que roda depois) não trate o mesmo gesto. Não vale dentro de outra lista nem de modal.
+function usarArrastePraDireita(ao) {
+  const t = React.useRef(null);
+  return {
+    onTouchStart: (e) => { t.current = e.touches.length === 1 && !e.target.closest(".modal-overlay, input, textarea, select") ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; },
+    onTouchEnd: (e) => {
+      const i = t.current; t.current = null;
+      if (!i || e.nativeEvent._tbLista) return;
+      const c = e.changedTouches[0], dx = c.clientX - i.x, dy = c.clientY - i.y;
+      if (dx < 60 || dx < Math.abs(dy) * 1.5) return;
+      e.nativeEvent._tbLista = true; vibrar(8); ao();
+    },
+  };
+}
+function ListaLateral({ kicker, titulo, cabecalho = null, onFechar, children }) {
   const painel = React.useRef(null);
   const toque = React.useRef(null);
   const [rolou, setRolou] = useState(false);
@@ -1280,8 +1301,8 @@ function ListaLateral({ kicker, titulo, onFechar, children }) {
     {aviso("topo", puxado > 30)}
     {aviso("fim", puxado < -30)}
     <div ref={painel} className={`lista-lateral${arrastando ? " arrastando" : ""}${saindo ? ` ${saindo}` : ""}`} style={estilo} onClick={(e) => e.stopPropagation()} onScroll={onScroll} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
-      <div className={`lista-lateral-topo${rolou ? " rolou" : ""}`}>{kicker && <p className="kicker">{kicker}</p>}<h2>{titulo}</h2></div>
-      {children}
+      <div className={`lista-lateral-topo${rolou ? " rolou" : ""}`}>{cabecalho || <>{kicker && <p className="kicker">{kicker}</p>}<h2>{titulo}</h2></>}</div>
+      <DentroDaLista.Provider value={true}>{children}</DentroDaLista.Provider>
     </div>
   </div>;
 }
@@ -4639,7 +4660,7 @@ function Home() {
       x0 = t.clientX; y0 = t.clientY;
     };
     const fim = (e) => {
-      if (!valido) return;
+      if (!valido || e._tbLista) return; // _tbLista: um card do Painel já abriu por cima com este gesto
       valido = false;
       const t = e.changedTouches[0];
       const dx = t.clientX - x0, dy = t.clientY - y0;
@@ -6435,9 +6456,13 @@ function ComposerCaixa({ composer, setComposer, files, setFiles, addInbox, busy,
 // `selo`/`tom`/`icone` (11/10/2026, Painel premium): número grande num selo colorido à esquerda do título.
 // Só é usado dentro dos grupos do Painel; sem `selo` o card fica como sempre foi.
 function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null }) {
-  const [aberto, setAberto] = useState(false);
+  const naLista = React.useContext(DentroDaLista);
+  const [aberto, setAberto] = useState(naLista);
+  const [porCima, setPorCima] = useState(false); // arrastou pra direita: este card abre por cima (ListaLateral)
+  const arraste = usarArrastePraDireita(() => setPorCima(true));
   const comSelo = (selo !== null && selo !== undefined) || !!seloTexto;
-  return <section id={id} className={`${className || "content-card"}${comSelo ? ` com-selo tom-${tom}` : ""}${aberto ? " aberto" : ""}`}>
+  return <section id={id} className={`${className || "content-card"}${comSelo ? ` com-selo tom-${tom}` : ""}${aberto ? " aberto" : ""}`} {...(naLista ? {} : arraste)}>
+    {porCima && !naLista && ReactDOM.createPortal(<ListaLateral cabecalho={<>{cabecalho}</>} onFechar={() => setPorCima(false)}>{children}</ListaLateral>, document.body)}
     <button type="button" className="card-toggle" aria-expanded={aberto} onClick={() => setAberto((v) => !v)}>
       {comSelo && <span className={`selo-num${seloTexto ? " selo-txt" : ""}`} aria-hidden="true"><b>{seloTexto || selo}</b>{icone && <small>{icone}</small>}</span>}
       <div>{cabecalho}</div>
@@ -7740,7 +7765,14 @@ function GrupoRecolhivel({ titulo, legenda = null, resumo = null, contagem = nul
   // Os dados chegam depois do primeiro render; quando `abertoInicial` vira true (chegou pergunta da Manu), o grupo
   // abre sozinho. Fechar com o dedo continua valendo até a próxima pergunta nova.
   useEffect(() => { if (abertoInicial) setAberto(true); }, [abertoInicial]);
-  return <section id={id} className={`content-card grupo-card ${className}${aberto ? " aberto" : " fechado"}${semContador ? " sem-contador" : ""}`}>
+  const [porCima, setPorCima] = useState(false); // arrastou pra direita: o grupo inteiro abre por cima (ListaLateral)
+  const arraste = usarArrastePraDireita(() => setPorCima(true));
+  return <section id={id} className={`content-card grupo-card ${className}${aberto ? " aberto" : " fechado"}${semContador ? " sem-contador" : ""}`} {...arraste}>
+    {porCima && ReactDOM.createPortal(<ListaLateral kicker={legenda || "ARRASTOU PARA A DIREITA"} titulo={titulo} onFechar={() => setPorCima(false)}>
+      {children}
+      {verTudo && onVerTudo && <button type="button" className="grupo-ver-tudo" onClick={onVerTudo}>{verTudo}</button>}
+      {maisLinks.filter((l) => l && l.texto && l.onClick).map((l) => <button key={l.texto} type="button" className="grupo-ver-tudo grupo-ver-mais" onClick={l.onClick}>{l.texto}</button>)}
+    </ListaLateral>, document.body)}
     <button type="button" className="grupo-cabecalho" aria-expanded={aberto} onClick={() => { vibrar(6); setAberto((v) => !v); }}>
       <p className="kicker grupo-titulo">{titulo}{legenda && <small className="grupo-legenda">{legenda}</small>}</p>
       {resumo && <b className="grupo-resumo">{resumo}</b>}
