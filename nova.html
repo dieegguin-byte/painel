@@ -5631,13 +5631,8 @@ function ligacoesDaLista(lista) {
     const cor = ((corPorDia[g.data] - 1) % LIGA_CORES) + 1;
     g.cards.forEach((a, i) => mapa.set(a.id, { cor, pos: i === 0 ? "ini" : i === g.cards.length - 1 ? "fim" : "meio", n: g.cards.length, indice: i + 1 }));
   }
-  // Duplicado: mesmo serviço, mesmo dia, dois cards de buscar/entregar.
-  const porServicoDia = new Map();
-  for (const a of cards) { if (!a.servico_id || !TITULO_BUSCA_ENTREGA.test(a.titulo || "")) continue; const k = a.servico_id + "|" + a.data; if (!porServicoDia.has(k)) porServicoDia.set(k, []); porServicoDia.get(k).push(a); }
-  for (const lista2 of porServicoDia.values()) {
-    if (lista2.length < 2) continue;
-    for (const a of lista2) { const outro = lista2.find((b) => b.id !== a.id); mapa.set(a.id, { ...(mapa.get(a.id) || {}), duplicadoDe: outro ? (outro.titulo || "outro card") : "" }); }
-  }
+  // Duplicado (mesmo serviço, mesmo dia, dois cards de buscar/entregar) não é mais marcado na tela: a regra vive
+  // na view agenda_parece_duplicado e quem resolve é a Manu (Diego, 15/10/2026).
   return mapa;
 }
 function classeLigado(l) { return l && l.cor ? ` ligado liga-cor-${l.cor} liga-${l.pos}` : ""; }
@@ -6532,7 +6527,8 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
     </button>
     {revisaoData && <p className="revisao-data">Remarcação pendente · idade calculada pela data original. A data precisa de revisão.</p>}
     {acoes && <SelosClaudeDoCard a={a} acoes={acoes} onMudar={() => setAberto(true)} />}
-    {ligado && ligado.duplicadoDe !== undefined && <p className="aviso-duplicado">⚠ Parece duplicado: este serviço já tem “{ligado.duplicadoDe}” no mesmo dia. Buscar no profissional e entregar a mesma peça é um card só — cancele o que sobrou como “Duplicado”.</p>}
+    {/* "⚠ Parece duplicado" SAIU DO CARD (Diego, 15/10/2026: "se tá uma coisa em dúvida, não deveria voltar para você?").
+        Dúvida não chega nele: a view agenda_parece_duplicado tem a mesma regra e a Manu resolve na rodada de hora em hora. */}
     {sucessor && diasAtraso > 0 && <p className="talvez-feito">Pode já estar feito: “{sucessor.titulo}” foi criado depois deste, no mesmo serviço. Se a etapa aconteceu, conclua aqui — o app não fecha sozinho.</p>}
     {aberto && <div className="compromisso-corpo">
       {(a.pessoal || oQueFazer !== tituloCard) && <h4 title={tituloCard}>{tituloCard}</h4>}
