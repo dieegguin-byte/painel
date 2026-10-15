@@ -171,6 +171,13 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}
 .compromisso-card .compromisso-corpo{margin-top:13px}
 .compromisso-card.cor-alta{border-left-color:var(--red)}.compromisso-card.cor-media{border-left-color:var(--yellow)}.compromisso-card.cor-baixa{border-left-color:var(--green)}
+/* REMOTO COM COR PRÓPRIA (Diego, 15/10/2026: esquece de abrir o filtro Remotos e só vê a tarefa remota às 17h,
+   na rua). Todo card remoto leva o verde-água fixo; na lista "Todos", o remoto de hoje ou atrasado pulsa de leve
+   pra dizer "isso dá pra resolver agora, do celular". Filtro Presencial ou Remoto ligado = nada pulsa. */
+.compromisso-card.remoto{--remoto:#5cc3b5;background:linear-gradient(150deg,#15211f,#131a18);border-color:#5cc3b54d}
+.compromisso-card.remoto .compromisso-idc>span{color:#7fd6c9}
+body[data-filtro-tipo="todos"] .compromisso-card.remoto-pendente{animation:remotoPulsa 2.6s ease-in-out infinite}
+@keyframes remotoPulsa{0%,100%{box-shadow:inset 0 1px 0 #ffffff12,0 1px 2px #0000004d,0 10px 26px -10px #000000a6}50%{box-shadow:inset 0 1px 0 #ffffff12,0 0 0 2px #5cc3b5,0 0 22px -2px #5cc3b5b3}}
 /* CARDS LIGADOS (Diego, 14/10/2026: "são cards separados, mas é um ligado no outro, com cores iguais"). Tarefas no mesmo
    lugar ou com a mesma pessoa, no mesmo dia e a poucos minutos uma da outra, continuam um card por tarefa, mas o grupo
    ganha UMA cor (borda, fundo e selo) e os cards ficam colados. Grupos diferentes no mesmo dia, cores diferentes. */
@@ -6511,7 +6518,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   if (Number(svc?.valor_orcamento)) instrucoes.push(["VALOR DO SERVIÇO",
     money(svc.valor_orcamento) + (svc?.prazo ? " · prazo " + compactDate(svc.prazo) : "")]);
   const obsFicha = cli?.obs ? String(cli.obs).trim() : "";
-  return <article id={`card-${a.id}`} className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehFollowUpZapia(a) ? " followup-zapia" : ""}${classeLigado(ligado)}`}>
+  return <article id={`card-${a.id}`} className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehRemoto(a) ? " remoto" : ""}${ehRemoto(a) && a.data <= today ? " remoto-pendente" : ""}${ehFollowUpZapia(a) ? " followup-zapia" : ""}${classeLigado(ligado)}`}>
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
@@ -8662,6 +8669,9 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
       {Object.entries(contagemSelos).sort((x, y) => y[1] - x[1]).map(([r, n]) => <option key={r} value={r}>{r} ({n})</option>)}
     </select>}
   </div> : null;
+  // O filtro vai no <body>: a lista lateral (e qualquer card em portal) fica fora desta div, e o pulso dos
+  // remotos (ver CSS remoto-pendente) tem que apagar em todo lugar quando ele filtra Presencial ou Remoto.
+  useEffect(() => { try { document.body.dataset.filtroTipo = filtroTipo; } catch (e) {} return () => { try { delete document.body.dataset.filtroTipo; } catch (e) {} }; }, [filtroTipo]);
   return <div className="page-grid painel-rolagem">
     {/* FILTROS DENTRO DOS CARDS (Diego, 12/10/2026, foto do topo: "presencial, remoto e coisa do tipo poderia ir
         para dentro dos cards"). A linha Todos/Presencial/Remoto + Etiqueta saiu do topo e virou uma faixa
