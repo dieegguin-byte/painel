@@ -664,6 +664,10 @@ button.sutil{opacity:.55;font-size:12px}
    Tons: vermelho (atraso), âmbar (revisão/avançar), verde (retorno/leads), azul (pessoais), laranja (produção). */
 @keyframes linhaEntra{from{opacity:0;transform:translateX(-22px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes seloPop{0%{transform:scale(.3);opacity:0}70%{transform:scale(1.18);opacity:1}100%{transform:none;opacity:1}}
+/* Chegou pela notificação (Diego, 15/10/2026: "poderia ficar piscando qual é o cliente ali, só a primeira vez"):
+   o card da Agenda pisca em laranja por uns 4 s e volta ao normal. Só classe, nada de dado. */
+.compromisso-card.chegou-pelo-push{animation:cardPisca 1.1s ease-in-out 3}
+@keyframes cardPisca{0%,100%{box-shadow:none;border-color:var(--line)}50%{box-shadow:0 0 0 3px #f09a5c,0 0 28px -4px #f09a5ccc;border-color:#f09a5c;background:linear-gradient(150deg,#3a2314,#241812)}}
 @keyframes luzPassa{0%{transform:translateX(-140%) skewX(-18deg)}45%,100%{transform:translateX(340%) skewX(-18deg)}}
 @keyframes contaPulsa{0%,100%{box-shadow:0 0 0 2px #df6a5d66,0 0 18px #df6a5d33}50%{box-shadow:0 0 0 3px #df6a5dcc,0 0 36px 4px #df6a5d66}}
 .tom-vermelho{--tom:#df6a5d;--tom2:#8e3a30}.tom-ambar{--tom:#e4bd72;--tom2:#8c6a2b}.tom-verde{--tom:#9bc7a7;--tom2:#3f7a52}.tom-azul{--tom:#8fb8dc;--tom2:#35628a}.tom-laranja{--tom:#ed9057;--tom2:#9f4621}
@@ -8790,7 +8794,14 @@ function AgendaView({ appointments, services, customers, finances, fornecedores,
     if (!alvo) return;
     jaAbriuCard.current = cardInicial;
     setDiaAberto(alvo.data);
-    setTimeout(() => { document.getElementById(`card-${alvo.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 350);
+    setTimeout(() => {
+      const no = document.getElementById(`card-${alvo.id}`);
+      if (!no) return;
+      no.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Pisca pra ele achar na lista; a classe sai sozinha quando a animação acaba.
+      no.classList.add("chegou-pelo-push");
+      no.addEventListener("animationend", () => no.classList.remove("chegou-pelo-push"), { once: true });
+    }, 350);
   }, [cardInicial, appointments]);
   const hoje = hojeISO();
   const profissionais = nomesProfissionais(services);
