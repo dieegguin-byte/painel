@@ -289,9 +289,13 @@ function levaDaAgenda(agenda: any[]): any[] {
 function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
   const lista: Envio[] = [];
 
-  // COMPROMISSO DA AGENDA. Um só vira notificação individual, com lugar e quanto falta — é acionável.
-  if (agenda.length === 1) {
-    const a = agenda[0];
+  // COMPROMISSO DA AGENDA — UM AVISO POR CARD, sempre, com os botões Feito / Adiar 1h.
+  // DIEGO, 15/10/2026, print do Niagara ("Não está legal"): a leva agrupada chegou numa notificação só, tudo
+  // emendado numa linha e sem botão, e o combinado é resolver cada item pela notificação sem abrir o app.
+  // Então nada de lote: cada compromisso vem como aviso próprio, um embaixo do outro no Android. O resumo das
+  // 7h30 continua sendo a única lista. (O lote de 31/08 existia por causa dos envelopes de 15 em 15 min do
+  // Classic, que não existem mais.)
+  for (const a of agenda) {
     const onde = [a.local, a.cidade].filter(Boolean).join(" · ");
     lista.push({
       chaves: [`agenda:${a.id}`],
@@ -299,22 +303,8 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
         titulo: `${a.hora} · ${String(a.titulo || "").slice(0, 80)}`,
         corpo: [onde, a.faltam >= 0 ? `em ${a.faltam} min` : null].filter(Boolean).join(" — ") || "Compromisso agendado",
         tag: `agenda-${a.id}`,
-        url: "./nova.html?ir=agenda",
-      },
-    });
-  } else if (agenda.length > 1) {
-    // A LEVA INTEIRA NUM AVISO SÓ. Os envelopes de TRIAGEM que o Classic cria caem de 15 em 15 min —
-    // na manhã de 31/08 isso virou CINCO notificações seguidas, que é o caminho mais curto pra ele
-    // desligar a permissão. O título diz a hora do primeiro, e não "na próxima hora": a leva pode
-    // passar de uma hora quando os compromissos vêm encadeados. Agrupar não descarta nada: todos os
-    // títulos vão no corpo, e nenhum deles é notificado de novo depois.
-    lista.push({
-      chaves: agenda.map((a) => `agenda:${a.id}`),
-      aviso: {
-        titulo: `${agenda.length} compromissos a partir das ${agenda[0].hora}`,
-        corpo: linhasDaAgenda(agenda),
-        tag: "agenda-lote",
-        url: "./nova.html?ir=agenda",
+        url: a.cliente_id ? `./nova.html?ir=ficha&id=${a.cliente_id}` : `./nova.html?ir=agenda&card=${a.id}`,
+        acoes: botoesDoCompromisso(a),
       },
     });
   }
@@ -354,13 +344,16 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
 // Feito (mesmo caminho do botão Feito do app: recado + status, a Manu enxerga igual) e Adiar 1h (empurra a hora
 // e lembra de novo). Um por card, nunca agrupado: botão só faz sentido por compromisso. Mesma tag do lembrete,
 // então substitui o aviso anterior na tela em vez de empilhar. Chave agenda-hora:<id>.
+// Os dois botões de todo aviso de compromisso (lembrete de 60 min e na hora): Feito e Adiar 1h.
+const botoesDoCompromisso = (a: any): Botao[] => [
+  { action: "a0", title: "Feito", plano: { tabela: "agenda", id: String(a.id), resposta: "feito" } },
+  { action: "a1", title: "Adiar 1h", plano: { tabela: "agenda", id: String(a.id), resposta: "adiar" } },
+];
+
 function avisosNaHora(lista: any[]): Envio[] {
   return lista.map((a) => {
     const onde = [a.local, a.cidade].filter(Boolean).join(" · ");
-    const acoes: Botao[] = [
-      { action: "a0", title: "Feito", plano: { tabela: "agenda", id: String(a.id), resposta: "feito" } },
-      { action: "a1", title: "Adiar 1h", plano: { tabela: "agenda", id: String(a.id), resposta: "adiar" } },
-    ];
+    const acoes = botoesDoCompromisso(a);
     return {
       chaves: [`agenda-hora:${a.id}`],
       aviso: {
@@ -381,31 +374,22 @@ function avisosNaHora(lista: any[]): Envio[] {
 // por lá" — mostrando o Niagara. O cartão (duvidas_agente aberta) vira notificação com as duas primeiras opções
 // como botão. Tocar grava a resposta pelo recibo (ver `entregar` e modo=acao); tocar no corpo abre o Painel,
 // onde ficam as opções restantes e o 🎤. Cartão sem opção vai sem botão. Vários de uma vez (a auditoria das
-// 02h20 cria uns quatro) viram UM aviso sem botão: botão só faz sentido quando é uma pergunta só.
+// 02h20 cria uns quatro) chegam um por um, cada um com os seus botões (15/10/2026).
 // Janela de horário igual à das contas: o que a auditoria cria de madrugada chega às 08:00, não às 02:25.
 const quemPergunta = (origem: string) => ({ agente: "Manu", manu: "Manu", auditoria: "Auditoria", pix: "Pix", caixa: "Caixa", claude: "Claude" } as Record<string, string>)[String(origem || "agente").toLowerCase()] || String(origem || "Manu");
 
 function avisosDosCartoes(duvidas: any[]): Envio[] {
-  if (!duvidas.length) return [];
-  if (duvidas.length === 1) {
-    const d = duvidas[0];
+  // UM AVISO POR CARTÃO, sempre com os botões (15/10/2026, "Não está legal": três "Agendar contato com" vieram
+  // num "3 cartões pra você" sem botão nenhum). Cada um chega separado, com as duas primeiras opções.
+  return duvidas.map((d) => {
     const opcoes: string[] = (Array.isArray(d.opcoes) ? d.opcoes : []).map((o: any) => String(o)).filter(Boolean);
     const acoes: Botao[] = opcoes.slice(0, MAX_BOTOES).map((titulo, i) => ({
       action: `a${i}`, title: titulo.slice(0, 20), plano: { tabela: "duvidas_agente", id: String(d.id), resposta: titulo },
     }));
     const corpo = [String(d.pergunta || ""), d.cliente ? `(${d.cliente})` : null, opcoes.length > MAX_BOTOES ? `Mais opções no app.` : null]
       .filter(Boolean).join(" ").slice(0, 240);
-    return [{ chaves: [`duvida:${d.id}`], aviso: { titulo: `${quemPergunta(d.origem)} pergunta`, corpo, tag: `duvida-${d.id}`, url: "./nova.html", acoes } }];
-  }
-  return [{
-    chaves: duvidas.map((d) => `duvida:${d.id}`),
-    aviso: {
-      titulo: `${duvidas.length} cartões pra você`,
-      corpo: duvidas.map((d) => String(d.pergunta || "").slice(0, 60)).join(" · ").slice(0, 200),
-      tag: "duvidas-lote",
-      url: "./nova.html",
-    },
-  }];
+    return { chaves: [`duvida:${d.id}`], aviso: { titulo: `${quemPergunta(d.origem)} pergunta`, corpo, tag: `duvida-${d.id}`, url: "./nova.html", acoes } };
+  });
 }
 
 // ---------------------------------------------------------------- contas a pagar (D-3)
