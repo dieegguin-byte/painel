@@ -726,6 +726,26 @@ button.sutil{opacity:.55;font-size:12px}
 .mobile-nav button{position:relative}
 .nav-contagem{position:absolute;top:2px;right:10px;font-size:9px;font-weight:800;padding:1px 6px;border-radius:999px;background:var(--orange);color:#fff}
 .mais-card{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+/* LISTA LATERAL (Diego, 15/10/2026, ideia do launcher Niagara): arrastar pra direita no Painel abre SÓ a lista,
+   por cima, sem mover o app. O título muda de cor quando a lista rola. Fecha no voltar, tocando fora, ou
+   forçando além do fim / além do topo (de propósito, não por acidente). */
+.lista-lateral-fundo{display:block;padding:0;place-items:unset}
+.lista-lateral{position:absolute;top:0;bottom:0;left:0;width:min(92vw,440px);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:linear-gradient(160deg,#1c1613,#141110);border-right:1px solid var(--line2);box-shadow:var(--shadow);padding:0 14px calc(60px + env(safe-area-inset-bottom));animation:listaEntra .3s cubic-bezier(.2,.8,.3,1) backwards;transition:transform .22s ease}
+.lista-lateral.arrastando{transition:none}
+.lista-lateral.sai-baixo{transform:translateY(110%)!important}
+.lista-lateral.sai-cima{transform:translateY(-110%)!important}
+@keyframes listaEntra{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+.lista-lateral-topo{position:sticky;top:0;z-index:2;margin:0 -14px 10px;padding:calc(16px + env(safe-area-inset-top)) 18px 12px;border-bottom:1px solid transparent;transition:background-color .3s,border-color .3s,backdrop-filter .3s}
+.lista-lateral-topo .kicker{margin:0 0 4px;color:var(--dim)}
+.lista-lateral-topo h2{margin:0;font:500 28px Georgia,serif;color:var(--text);transition:color .3s}
+.lista-lateral-topo.rolou{background:#141110f0;border-bottom-color:var(--line);backdrop-filter:blur(8px)}
+.lista-lateral-topo.rolou h2{color:var(--orange2)}
+.lista-lateral>.content-card{margin:0;padding:0;border:0;background:transparent;box-shadow:none}
+.lista-lateral-aviso{position:absolute;left:0;width:min(92vw,440px);padding:10px;text-align:center;font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);pointer-events:none;opacity:0;transition:opacity .15s,color .15s}
+.lista-lateral-aviso.topo{top:calc(8px + env(safe-area-inset-top))}
+.lista-lateral-aviso.fim{bottom:calc(14px + env(safe-area-inset-bottom))}
+.lista-lateral-aviso.visivel{opacity:1}
+.lista-lateral-aviso.pronto{color:var(--orange2)}
 .mais-grade{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .mais-grade button{position:relative;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:14px;padding:12px 6px;font-size:11px;display:grid;gap:4px;justify-items:center}
 .mais-grade button i{font-style:normal;font-size:24px;color:#987665}
@@ -1221,6 +1241,50 @@ function NumeroAnimado({ valor }) {
     b.classList.remove("girando", "pronto"); b.style.opacity = 0; b.style.transform = "translateY(-60px)";
   }, { passive: true });
 })();
+// LISTA LATERAL (Diego, 15/10/2026): janela de lista que abre por cima sem mover o app. Quem a abre é o gesto
+// de arrastar pra direita no Painel (ver o efeito "DESLIZAR PRO LADO" do Home). Como fecha:
+// - botão voltar / tocar fora: o pano de fundo é um .modal-overlay comum, então a rotina do voltar já o fecha;
+// - FORÇANDO além do fim ou além do topo: ao bater na borda da lista, o dedo que continua puxando move o painel
+//   junto; passando de LIMITE_FECHAR px, soltar fecha (abaixo disso ele volta ao lugar). A conta começa só
+//   quando a borda é alcançada, pra que rolar a lista normalmente nunca feche por acidente.
+// O título muda de cor assim que a lista rola (classe "rolou"), como no launcher que ele mostrou.
+const LIMITE_FECHAR = 110;
+function ListaLateral({ kicker, titulo, onFechar, children }) {
+  const painel = React.useRef(null);
+  const toque = React.useRef(null);
+  const [rolou, setRolou] = useState(false);
+  const [puxado, setPuxado] = useState(0); // >0 puxando além do topo (pra baixo); <0 forçando além do fim (pra cima)
+  const [saindo, setSaindo] = useState(null);
+  const fecharForcando = (sentido) => { setSaindo(sentido); vibrar(10); setTimeout(onFechar, 230); };
+  const onScroll = (e) => { const r = e.currentTarget.scrollTop > 12; if (r !== rolou) setRolou(r); };
+  const onTouchStart = (e) => { if (e.touches.length !== 1 || saindo) { toque.current = null; return; } toque.current = { y0: e.touches[0].clientY, alem: 0 }; };
+  const onTouchMove = (e) => {
+    const t = toque.current, el = painel.current;
+    if (!t || !el) return;
+    const y = e.touches[0].clientY, dy = y - t.y0;
+    const noTopo = el.scrollTop <= 0, noFim = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+    if ((dy > 0 && noTopo) || (dy < 0 && noFim)) { t.alem = dy; setPuxado(dy); }
+    else { t.y0 = y; if (t.alem) { t.alem = 0; setPuxado(0); } } // ainda rolando: a conta só começa na borda
+  };
+  const onTouchEnd = () => {
+    const t = toque.current; toque.current = null;
+    if (!t) return;
+    if (t.alem >= LIMITE_FECHAR) fecharForcando("sai-baixo");
+    else if (t.alem <= -LIMITE_FECHAR) fecharForcando("sai-cima");
+    else setPuxado(0);
+  };
+  const arrastando = toque.current && puxado !== 0;
+  const estilo = saindo ? undefined : (puxado ? { transform: `translateY(${Math.round(puxado * 0.35)}px)` } : undefined);
+  const aviso = (lado, ativo) => <div className={`lista-lateral-aviso ${lado}${ativo ? " visivel" : ""}${Math.abs(puxado) >= LIMITE_FECHAR ? " pronto" : ""}`}>{Math.abs(puxado) >= LIMITE_FECHAR ? "Solte para fechar" : "Puxe mais para fechar"}</div>;
+  return <div className="modal-overlay lista-lateral-fundo" onClick={onFechar}>
+    {aviso("topo", puxado > 30)}
+    {aviso("fim", puxado < -30)}
+    <div ref={painel} className={`lista-lateral${arrastando ? " arrastando" : ""}${saindo ? ` ${saindo}` : ""}`} style={estilo} onClick={(e) => e.stopPropagation()} onScroll={onScroll} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
+      <div className={`lista-lateral-topo${rolou ? " rolou" : ""}`}>{kicker && <p className="kicker">{kicker}</p>}<h2>{titulo}</h2></div>
+      {children}
+    </div>
+  </div>;
+}
 function Esqueleto() { return <div className="esqueleto" aria-label="Carregando"><span /><span /><span /></div>; }
 
 const SUPABASE_URL = "https://iymlzdcloaeyybhefywp.supabase.co";
@@ -3763,6 +3827,7 @@ function Home() {
   // a aba "Conferência" no `nav`, o resumo do Painel, a renderização da aba e o `onConferir` da ficha.
   const [notice, setNotice] = useState(null);
   const [maisAberto, setMaisAberto] = useState(false); // menu "Mais" da barra de baixo (Painel único, 11/10/2026)
+  const [listaLateral, setListaLateral] = useState(false); // Agenda por cima do Painel, aberta arrastando pra direita (15/10/2026)
   const [search, setSearch] = useState("");
   const [pinState, setPinState] = useState("checking");
   const [showGuia, setShowGuia] = useState(false);
@@ -4582,6 +4647,9 @@ function Home() {
       const botoes = [...document.querySelectorAll("nav.mobile-nav button")];
       const atual = botoes.findIndex((b) => b.classList.contains("active"));
       if (atual < 0) return;
+      // No Painel não há aba à esquerda: arrastar pra direita abre a Agenda por cima, sem mover o app
+      // (Diego, 15/10/2026, ideia do launcher Niagara). Ver ListaLateral.
+      if (dx > 0 && tabRef.current === "painel") { vibrar(8); setListaLateral(true); return; }
       const vizinho = botoes[atual + (dx < 0 ? 1 : -1)];
       if (vizinho) vizinho.click();
     };
@@ -4760,6 +4828,9 @@ function Home() {
       <p className="kicker">MAIS TELAS</p>
       <div className="mais-grade">{nav.filter((item) => !NAV_BARRA.includes(item.id)).map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setMaisAberto(false); irParaAba(item); }}><i>{item.icon}</i><span>{item.label}</span>{item.count ? <b>{item.count}</b> : null}</button>)}</div>
     </div></div>}
+    {/* AGENDA POR CIMA DO PAINEL (arrastar pra direita). Fica ANTES das fichas/modais no DOM: assim o voltar fecha
+        primeiro o que foi aberto de dentro dela (reagendar, concluir, adicionar) e só depois a própria lista. */}
+    {listaLateral && <ListaLateral kicker="ARRASTOU PARA A DIREITA" titulo="Agenda" onFechar={() => setListaLateral(false)}><BarreiraDaAba nome="A agenda" onFechar={() => setListaLateral(false)}><AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} db={db} demo={demo} notify={notify} onChanged={loadAll} /></BarreiraDaAba></ListaLateral>}
     {/* As janelas por cima também têm barreira própria: ficha com dado ruim fecha sozinha, não o app. */}
     {showGuia && <BarreiraDaAba nome="O guia da IA" onFechar={() => setShowGuia(false)}><GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} /></BarreiraDaAba>}
     {compartilhamentoPendente && <ConfirmarCompartilhamento pendente={compartilhamentoPendente} customers={customers} onSalvar={salvarCompartilhamento} onFechar={fecharCompartilhamento} notify={notify} />}
