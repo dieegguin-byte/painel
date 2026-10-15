@@ -4854,7 +4854,9 @@ function Home() {
     abaAnterior.current = { tab, classe: de < 0 || para < 0 ? "" : para > de ? " vem-direita" : " vem-esquerda" };
   }
   return <AcoesAgendaCtx.Provider value={acoesAgenda}><CadastroProfissionaisCtx.Provider value={profissionais}><div className={`product-shell mode-${mode}`}>
-    <AlarmeCompromisso appointments={agendaVisivel} db={db} demo={demo} notify={notify} onChanged={loadAll} setAppointments={setAppointments} />
+    {/* ALARME DENTRO DO APP DESLIGADO (Diego, 15/10/2026 14h42: "bipar dentro do aplicativo, não"; o que ele quer é a
+        notificação do Windows no canto, que aparece em qualquer aba — o push com o 🔔 ligado no PC faz isso).
+        O componente AlarmeCompromisso fica no código, sem montar, caso ele mude de ideia. */}
     {notice && <div key={notice.id} className={`notice ${notice.kind}`}
       onTouchStart={(e) => { const t = e.touches[0]; e.currentTarget._x0 = t.clientX; e.currentTarget._y0 = t.clientY; }}
       onTouchMove={(e) => { const el = e.currentTarget, t = e.touches[0]; const dx = t.clientX - el._x0, dy = Math.min(0, t.clientY - el._y0); el.style.transform = `translate(${dx}px, ${dy}px)`; el.style.opacity = String(Math.max(0.2, 1 - Math.abs(dx) / 260)); }}
