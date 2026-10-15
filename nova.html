@@ -5897,6 +5897,9 @@ function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppoi
   const [alvo, setAlvo] = useState(null);
   const [ocupado, setOcupado] = useState(false);
   const tituloOriginal = React.useRef(typeof document !== "undefined" ? document.title : "");
+  // Minuto em que o app abriu. Card cuja hora já tinha passado quando o app abriu só aparece na faixa, sem bipe
+  // (Diego, 15/10/2026: "no PC é só abrir que ele bipa mesmo com o horário que já passou"); o push já avisou.
+  const abriuNoMin = React.useRef((() => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); })());
 
   // Acorda o áudio no primeiro toque em qualquer lugar (exigência do Chrome).
   useEffect(() => {
@@ -5933,7 +5936,9 @@ function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppoi
     const cabeca = String(alvo.titulo || "").split(/\s[—–-]\s|:\s/)[0].trim().slice(0, 32);
     const rotulo = `⏰ ${String(alvo.hora || "").slice(0, 5)} ${cabeca}`;
     let liga = false;
-    const tocar = () => { alarmeBipar(); vibrar([400, 150, 400, 150, 700]); };
+    // Só bipa se a hora chegou com o app aberto (ou até 1 min antes de abrir). Atrasado de antes: faixa muda.
+    const chegouComAppAberto = (minutosDaHora(alvo.hora) ?? -1) >= abriuNoMin.current - 1;
+    const tocar = () => { if (!chegouComAppAberto) return; alarmeBipar(); vibrar([400, 150, 400, 150, 700]); };
     tocar();
     const som = setInterval(tocar, ALARME_REPETE_MS);
     const pisca = setInterval(() => { liga = !liga; document.title = liga ? rotulo : tituloOriginal.current; }, 1000);
