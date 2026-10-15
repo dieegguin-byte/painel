@@ -296,12 +296,12 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
   // 7h30 continua sendo a única lista. (O lote de 31/08 existia por causa dos envelopes de 15 em 15 min do
   // Classic, que não existem mais.)
   for (const a of agenda) {
-    const onde = [a.local, a.cidade].filter(Boolean).join(" · ");
     lista.push({
       chaves: [`agenda:${a.id}`],
       aviso: {
-        titulo: `${a.hora} · ${String(a.titulo || "").slice(0, 80)}`,
-        corpo: [onde, a.faltam >= 0 ? `em ${a.faltam} min` : null].filter(Boolean).join(" — ") || "Compromisso agendado",
+        // Título curto (hora + quem/onde) e o card inteiro no corpo: ver textoDoCompromisso.
+        titulo: `${a.hora} · ${nomeCurto(a.titulo)}`,
+        corpo: textoDoCompromisso(a, a.faltam >= 0 ? `em ${a.faltam} min` : null),
         tag: `agenda-${a.id}`,
         url: a.cliente_id ? `./nova.html?ir=ficha&id=${a.cliente_id}` : `./nova.html?ir=agenda&card=${a.id}`,
         acoes: botoesDoCompromisso(a),
@@ -345,6 +345,15 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
 // e lembra de novo). Um por card, nunca agrupado: botão só faz sentido por compromisso. Mesma tag do lembrete,
 // então substitui o aviso anterior na tela em vez de empilhar. Chave agenda-hora:<id>.
 // Os dois botões de todo aviso de compromisso (lembrete de 60 min e na hora): Feito e Adiar 1h.
+// TEXTO LEGÍVEL SEM ABRIR (Diego, 15/10/2026, print do Niagara: "Agora 09:00 · Diego…" cortado e o corpo gasto com
+// "Feito marca no app · Adiar empurra 1 hora"; ele compara com o WhatsApp, que mostra a mensagem inteira). O título
+// fica curto, hora + quem/onde (nomeCurto), porque a barra corta em ~20 letras; o corpo leva o título INTEIRO do
+// card, mais o local, em linhas — o Android expande o corpo quando a notificação é a de cima ou ao puxar. Nada de
+// texto de ajuda dos botões: eles se explicam.
+function textoDoCompromisso(a: any, extra: string | null = null): string {
+  const onde = [a.local, a.cidade].filter(Boolean).join(" · ");
+  return [String(a.titulo || "").trim(), onde, extra].filter(Boolean).join("\n") || "Compromisso agendado";
+}
 const botoesDoCompromisso = (a: any): Botao[] => [
   { action: "a0", title: "Feito", plano: { tabela: "agenda", id: String(a.id), resposta: "feito" } },
   { action: "a1", title: "Adiar 1h", plano: { tabela: "agenda", id: String(a.id), resposta: "adiar" } },
@@ -352,13 +361,12 @@ const botoesDoCompromisso = (a: any): Botao[] => [
 
 function avisosNaHora(lista: any[]): Envio[] {
   return lista.map((a) => {
-    const onde = [a.local, a.cidade].filter(Boolean).join(" · ");
     const acoes = botoesDoCompromisso(a);
     return {
       chaves: [`agenda-hora:${a.id}`],
       aviso: {
-        titulo: `Agora ${a.hora} · ${String(a.titulo || "").slice(0, 70)}`,
-        corpo: [onde, "Feito marca no app · Adiar empurra 1 hora"].filter(Boolean).join(" — "),
+        titulo: `Agora ${a.hora} · ${nomeCurto(a.titulo)}`,
+        corpo: textoDoCompromisso(a),
         tag: `agenda-${a.id}`,
         // Tocar no corpo abre a ficha da cliente (com o WhatsApp dela); sem cliente, a Agenda no card.
         url: a.cliente_id ? `./nova.html?ir=ficha&id=${a.cliente_id}` : `./nova.html?ir=agenda&card=${a.id}`,
