@@ -245,6 +245,35 @@ const dinheiro = (v: number) => "R$ " + Number(v).toFixed(2).replace(".", ",").r
 // seguintes enquanto o intervalo entre eles for de no máximo 60 min. Uma sequência (08:00, 08:15,
 // 08:45, 09:00) vira um aviso só; um compromisso isolado às 10:30 NÃO é arrastado junto — ele ganha o
 // próprio lembrete na hora dele, que é o ponto de ter lembrete.
+// UMA LINHA POR COMPROMISSO (Diego, 15/10/2026, print do Niagara: "os compromissos estão embolados na
+// notificação"). O corpo trazia tudo numa linha só, separado por ponto, com cada título cortado no meio
+// ("Mecânico — regular a quinta marcha do Cl · 11:01 Afibracom Taguatinga — comprar 3 m de Co…"). Agora
+// cada compromisso é uma linha "HH:MM Quem/Onde": só o começo do título, até o travessão. Cards de 1 em 1
+// minuto no mesmo lugar (a Manu cria assim de propósito) viram UMA linha, com a contagem: "12:45 Marlom Júnior (3)".
+function nomeCurto(titulo: unknown): string {
+  const cabeca = String(titulo || "").split(/\s[—–-]\s|:\s/)[0].trim() || String(titulo || "").trim();
+  if (cabeca.length <= 32) return cabeca;
+  const corte = cabeca.slice(0, 32);
+  return (corte.includes(" ") ? corte.slice(0, corte.lastIndexOf(" ")) : corte) + "…";
+}
+function minutosDe(hora: unknown): number {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(hora || ""));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : -1;
+}
+function linhasDaAgenda(lista: any[], max = 8): string {
+  const linhas: { hora: string; nome: string; min: number; n: number }[] = [];
+  for (const a of lista) {
+    const nome = nomeCurto(a.titulo);
+    const min = minutosDe(a.hora);
+    const ult = linhas[linhas.length - 1];
+    if (ult && ult.nome === nome && min >= 0 && ult.min >= 0 && min - ult.min <= 5) { ult.n += 1; ult.min = min; continue; }
+    linhas.push({ hora: String(a.hora || "").slice(0, 5), nome, min, n: 1 });
+  }
+  const mostradas = linhas.slice(0, max).map((l) => `${l.hora} ${l.nome}${l.n > 1 ? ` (${l.n})` : ""}`);
+  if (linhas.length > max) mostradas.push(`+${linhas.length - max}`);
+  return mostradas.join("\n");
+}
+
 function levaDaAgenda(agenda: any[]): any[] {
   if (!agenda.length || !agenda[0].na_janela) return [];
   const leva = [agenda[0]];
@@ -283,7 +312,7 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
       chaves: agenda.map((a) => `agenda:${a.id}`),
       aviso: {
         titulo: `${agenda.length} compromissos a partir das ${agenda[0].hora}`,
-        corpo: agenda.map((a) => `${a.hora} ${String(a.titulo || "").slice(0, 40)}`).join(" · ").slice(0, 170),
+        corpo: linhasDaAgenda(agenda),
         tag: "agenda-lote",
         url: "./nova.html?ir=agenda",
       },
@@ -467,8 +496,7 @@ function avisoDoResumo(p: any): Envio[] {
   // A LISTA DO DIA primeiro: hora e título de cada compromisso, como a agenda do celular mostra.
   const dia: any[] = Array.isArray(p.agenda_hoje) ? p.agenda_hoje : [];
   if (dia.length) {
-    const nomeados = dia.slice(0, COMPROMISSOS_NO_RESUMO);
-    partes.push(`Hoje: ${nomeados.map((a) => `${a.hora} ${String(a.titulo || "").slice(0, 40)}`).join(" · ")}${dia.length > nomeados.length ? ` +${dia.length - nomeados.length}` : ""}`);
+    partes.push(`Hoje:\n${linhasDaAgenda(dia, COMPROMISSOS_NO_RESUMO)}`);
   }
   // Depois as contas: é o item do resumo que custa dinheiro se passar do dia.
   const contas = contasComPrazo(p);
@@ -485,7 +513,7 @@ function avisoDoResumo(p: any): Envio[] {
     : "Hoje sem compromisso marcado";
   return [{
     chaves: [`resumo:${p.hoje}`],
-    aviso: { titulo, corpo: partes.join(" · ") || "Nada pendente.", tag: "resumo-diario", url: "./nova.html" },
+    aviso: { titulo, corpo: partes.join("\n") || "Nada pendente.", tag: "resumo-diario", url: "./nova.html" },
     // Contas da janela D-3 que o resumo já chamou pelo nome: contam como avisadas (ver o roteador).
     d3: nomeadas.filter(naJanela).map(chaveConta),
   }];
