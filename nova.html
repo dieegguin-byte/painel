@@ -5769,7 +5769,7 @@ function PessoalDetalhe({ p, a, today }) {
 //   Feito    -> agenda.status = feito (o banco recusa data futura) + recado em agenda_recados
 //   Cancelar -> agenda.status = cancelado + recado com o motivo (motivo OPCIONAL desde 14/10/2026: "quando não
 //               quiser falar o motivo, só colocar cancelado"). Cancelar do Diego encerra o cliente.
-//   Remarcar -> só o recado. O Diego NÃO escolhe data: a rotina do Claude (8h, 12h, 16h e 18h, Brasília)
+//   Remarcar -> só o recado. O Diego NÃO escolhe data: a Manu (de hora em hora, 8h–22h, Brasília)
 //               escolhe pela rota saindo de casa em Luziânia, pelos compromissos e pela carga dos
 //               profissionais, move o card e escreve agenda.nota_claude ("Remarcado pelo Claude — motivo")
 //               com nota_claude_conferida = false. O selo amarelo fica até ele tocar Manter ou Mudar.
@@ -5798,7 +5798,8 @@ function profissionalDoCadastro(cadastro, nome) {
     || (cadastro || []).find((c) => marca && marca.test(alvoDe(c)))
     || null;
 }
-const HORARIOS_ROTINA_RECADOS = "8h, 12h, 16h e 18h";
+// A Manu lê os recados de hora em hora, das 8h às 22h (15/10/2026; antes o texto dizia "8h, 12h, 16h e 18h").
+const HORARIOS_ROTINA_RECADOS = "de hora em hora, das 8h às 22h";
 const ACAO_RECADO_ROTULO = { recado: "Recado", feito: "Feito", remarcar: "Remarcar", cancelar: "Cancelar" };
 
 function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointments, recarga = 0 }) {
@@ -8135,7 +8136,14 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
   const idsCobranca = new Set(cobrancasAll.map((entry) => entry.id));
   // Os pessoais sem bloqueio na agenda entram AQUI, junto da rota, e não num card à parte: a queixa era
   // exatamente que o compromisso não estava na fila do dia. Ver pessoaisNaFila.
-  const rotaAll = [...appointments.filter((entry) => !idsCobranca.has(entry.id)), ...pessoaisNaFila(pessoais, appointments)];
+  // REMARCAR PENDENTE SAI DA TELA (Diego, 15/10/2026, print 7h49: dois cards de ontem com "Remarcar enviado" ainda
+  // em Precisa resolver, "isso tem que sair da tela"). O toque em Remarcar já prometia "o card sai da tela e volta na
+  // data nova"; agora cumpre: card com recado de remarcar ainda não lido some do Painel (lista e contador) e só
+  // volta quando a Manu o mover (o recado processado deixa de esconder) ou se ela não conseguir.
+  const acoesCtxPainel = React.useContext(AcoesAgendaCtx);
+  const idsRemarcando = useMemo(() => new Set((acoesCtxPainel?.recados || []).filter((r) => r.acao === "remarcar" && !r.processado_em).map((r) => r.agenda_id)), [acoesCtxPainel]);
+  const semRemarcando = (lista) => idsRemarcando.size ? lista.filter((entry) => !idsRemarcando.has(entry.id)) : lista;
+  const rotaAll = [...semRemarcando(appointments).filter((entry) => !idsCobranca.has(entry.id)), ...pessoaisNaFila(pessoais, appointments)];
   // HISTÓRICO DESTA DIVISÃO, porque ela já mudou duas vezes e o motivo importa:
   // Em 24/08 ela era por DATA e o Diego reclamou do contrário — às 8h da manhã um compromisso das 14h
   // aparecia como "atrasado". A correção passou o corte pra HORA. Aí, em 25/08, apareceu o outro lado do
@@ -8157,7 +8165,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
   // `today` vem de hojeISO(), que lê o relógio local do aparelho: a virada de dia é a dele, não a do UTC.
   // Revisão visual de TODA a agenda planejada, inclusive follow-ups sem hora.
   // Origens com remarcação continuam fora da rota; aqui aparecem com aviso da data original.
-  const atrasos = separarAtrasadosPorIdade(agendaPlanejada, today);
+  const atrasos = separarAtrasadosPorIdade(semRemarcando(agendaPlanejada), today);
   const atrasadosAll = [...atrasos.recentes, ...atrasos.antigos];
   const idsRemarcacao = new Set(pendenciasRemarcacaoAbertas(inbox).map(({ meta }) => meta.agenda_origem_id).filter(Boolean));
   const pessoaisAtrasadosAll = rotaAll.filter((entry) => entry.pessoal_virtual && diasDeAtraso(entry.data, today) > 0);
