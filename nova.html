@@ -166,6 +166,8 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .selo-followup.zapia{color:#9fd4ae;background:#75a9872b;border-color:#75a98780}
 .selo-followup.compras{color:#f1a06d;background:#d86d361f;border-color:#d86d3666}.selo-followup.pagamento{color:#e4bd72;background:#d4a64e1f;border-color:#d4a64e66}.selo-followup.entrega{color:#c9a7e8;background:#9a6fc41f;border-color:#9a6fc466}.selo-followup.visita{color:#e8b0c4;background:#c46f8f1f;border-color:#c46f8f66}.selo-followup.orcamento{color:#d9cfc4;background:#8a7a6a26;border-color:#8a7a6a66}.selo-followup.servico{color:#8fd0c9;background:#4aa49a1f;border-color:#4aa49a66}.selo-followup.pessoal{color:#b8b0a8;background:#5a524a33;border-color:#6a625a66}
 .compromisso-card.followup-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
+/* CARTÃO "Agendar contato com …" (Diego, 15/10/2026): a Manu pergunta se agenda um contato pela Zapia; mesma cor do Follow-up 1. */
+.duvida.contato-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
 .compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}
 .compromisso-card .compromisso-corpo{margin-top:13px}
 .compromisso-card.cor-alta{border-left-color:var(--red)}.compromisso-card.cor-media{border-left-color:var(--yellow)}.compromisso-card.cor-baixa{border-left-color:var(--green)}
@@ -2205,6 +2207,10 @@ function ehFollowUp(a) { return /follow[\s-]?up/i.test(String((a && a.titulo) ||
 // FOLLOW-UP DA ZAPIA EM VERDE (Diego, 11/10/2026). Só o "Follow-up 1 — Nome", criado pelo agente do WhatsApp,
 // é mandado pela Zapia ao cliente; os outros follow-ups ele faz na mão. Verde = não precisa mandar, a Zapia manda.
 function ehFollowUpZapia(a) { return /^\s*follow[\s-]?up\s*1\s*[—–-]/i.test(String((a && a.titulo) || "")); }
+// CARTÃO DE CONTATO PELA ZAPIA (Diego, 15/10/2026, caso Gina: "me perguntar se agenda para entrar em contato com ela...
+// na mesma cor que o Follow-up 1"). A Manu cria a dúvida com a pergunta começando por "Agendar contato com "; o cartão
+// fica verde como o Follow-up 1, porque o "Sim, agenda" vai pra Zapia mandar.
+function ehContatoZapia(pergunta) { return /^\s*agendar contato com\s/i.test(String(pergunta || "")); }
 // SELO DO TIPO DE COMPROMISSO (Diego, 11/10/2026: "coloque compras e veja outras que identifiquem rápido").
 // Sai do título, na ordem abaixo: a primeira regra que casar vence ("Acertar com Marlom (na entrega)" é
 // pagamento, não entrega; "Follow-up orçamento" é follow-up, não orçamento). Sem regra, sem selo.
@@ -8009,8 +8015,9 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, onOpen
       if (onChanged && !demo) onChanged();
     } catch (e) { notify("Erro ao responder: " + e.message, "error"); } finally { setBusy(false); }
   };
-  return <div className="duvida">
-    <span className={`duvida-origem ${origem}`}>{rotuloOrigem(origem)}</span>
+  const contatoZapia = ehContatoZapia(d.pergunta);
+  return <div className={`duvida${contatoZapia ? " contato-zapia" : ""}`}>
+    <span className={`duvida-origem ${origem}`}>{rotuloOrigem(origem)}</span>{contatoZapia && <i className="selo-followup zapia" style={{ marginLeft: 7 }}>↻ Contato · Zapia envia</i>}
     <strong>{d.pergunta}</strong>
     {d.contexto && <span className="duvida-contexto">{d.contexto}</span>}
     <span className="duvida-quando">Perguntado {haQuanto()}{nome ? ` · ${nome}` : ""}</span>
