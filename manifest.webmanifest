@@ -15,6 +15,12 @@
     { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "./icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
   ],
+  "shortcuts": [
+    { "name": "Anotar agora", "short_name": "Anotar", "description": "Compromisso, gasto, cliente novo — o Claude organiza depois", "url": "./nova.html?ir=anotar", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Agenda", "short_name": "Agenda", "description": "Os compromissos por dia", "url": "./nova.html?ir=agenda", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Caixa", "short_name": "Caixa", "description": "O que chegou e ainda não foi organizado", "url": "./nova.html?ir=caixa", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Leads", "short_name": "Leads", "description": "Clientes e orçamentos em aberto", "url": "./nova.html?ir=leads", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ],
   "share_target": {
     "action": "./compartilhar",
     "method": "POST",
