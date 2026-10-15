@@ -338,7 +338,8 @@ function avisosNaHora(lista: any[]): Envio[] {
         titulo: `Agora ${a.hora} · ${String(a.titulo || "").slice(0, 70)}`,
         corpo: [onde, "Feito marca no app · Adiar empurra 1 hora"].filter(Boolean).join(" — "),
         tag: `agenda-${a.id}`,
-        url: "./nova.html",
+        // Tocar no corpo abre a ficha da cliente (com o WhatsApp dela); sem cliente, a Agenda no card.
+        url: a.cliente_id ? `./nova.html?ir=ficha&id=${a.cliente_id}` : `./nova.html?ir=agenda&card=${a.id}`,
         acoes,
       },
     };
@@ -555,6 +556,18 @@ Deno.serve(async (req) => {
         });
       }
       return Response.json({ modo, aparelhos: alvos.length, saidas });
+    }
+
+    // TESTE DO AVISO NA HORA (15/10/2026, "faz um de teste agora"): manda o aviso com Feito/Adiar 1h pra UM card
+    // (agenda_id no corpo), fora da janela e sem esperar a hora. Os botões fazem o de verdade naquele card.
+    if (modo === "teste-agenda") {
+      const id = String(doCorpo.agenda_id || url.searchParams.get("agenda_id") || "");
+      if (!/^[0-9a-fA-F-]{36}$/.test(id)) return Response.json({ erro: "agenda_id invalido" }, { status: 400 });
+      const linhas = await rest(`agenda?id=eq.${id}&select=id,titulo,hora,local,cidade,cliente_id,servico_id`);
+      if (!linhas?.length) return Response.json({ erro: "card nao achado" }, { status: 404 });
+      const a = { ...linhas[0], hora: String(linhas[0].hora || "").slice(0, 5) };
+      const envios = avisosNaHora([a]).map((e) => ({ ...e, chaves: [`teste-agenda:${id}:${Date.now()}`] }));
+      return Response.json({ modo, relatorio: await difundir(envios) });
     }
 
     const pendencias = await rpc("push_pendencias");

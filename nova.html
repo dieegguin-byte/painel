@@ -3775,6 +3775,10 @@ function Home() {
   // ?ir=agenda / caixa / leads / anotar. `anotar` abre o Painel já com a caixinha "Anotar agora".
   const [tab, setTab] = useState(() => { try { const ir = new URL(location.href).searchParams.get("ir"); return ["caixa", "futuro", "compras", "leads", "agenda"].includes(ir) ? ir : "painel"; } catch (e) { return "painel"; } });
   const anotarInicial = React.useRef((() => { try { return new URL(location.href).searchParams.get("ir") === "anotar"; } catch (e) { return false; } })()).current;
+  // TOQUE NA NOTIFICAÇÃO DO COMPROMISSO (Diego, 15/10/2026): abre direto na ficha da cliente daquele compromisso
+  // (?ir=ficha&id=<cliente>), onde já está o botão do WhatsApp dela; sem cliente, abre a Agenda no card
+  // (?ir=agenda&card=<id>). O endereço é limpo logo depois (efeito abaixo), como o `ir` já era.
+  const chegada = React.useRef((() => { try { const u = new URL(location.href).searchParams; return { ficha: u.get("ir") === "ficha" ? u.get("id") : null, card: u.get("ir") === "agenda" ? u.get("card") : null }; } catch (e) { return { ficha: null, card: null }; } })()).current;
   // EFEITOS PREMIUM (11/10/2026): lado de onde a aba nova entra e cabeçalho compacto ao rolar.
   const abaAnterior = React.useRef({ tab, classe: "" });
   const [rolou, setRolou] = useState(false);
@@ -3804,7 +3808,7 @@ function Home() {
     try {
       const endereco = new URL(location.href);
       if (!endereco.searchParams.has("ir")) return;
-      endereco.searchParams.delete("ir");
+      endereco.searchParams.delete("ir"); endereco.searchParams.delete("card"); endereco.searchParams.delete("id");
       history.replaceState(history.state, "", endereco.pathname + endereco.search + endereco.hash);
     } catch (e) { /* endereço estranho não pode impedir o app de abrir */ }
   }, []);
@@ -3861,7 +3865,7 @@ function Home() {
   const [search, setSearch] = useState("");
   const [pinState, setPinState] = useState("checking");
   const [showGuia, setShowGuia] = useState(false);
-  const [fichaId, setFichaId] = useState(null);
+  const [fichaId, setFichaId] = useState(() => (chegada.ficha && /^[0-9a-f-]{36}$/i.test(chegada.ficha) ? chegada.ficha : null));
   const [explicar, setExplicar] = useState(null);
   const [concluirAppt, setConcluirAppt] = useState(null);
   const [addAgendaOpen, setAddAgendaOpen] = useState(false);
@@ -4841,7 +4845,7 @@ function Home() {
           porque o Diego não lançava mais pelo app; agora ele é o botão flutuante "+ Anotar", que salva na
           fila da Caixa pro Claude organizar. Sem a prop o botão não aparece. */}
       {tab === "leads" && <LeadsView services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} inbox={inbox} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
-      {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} db={db} demo={demo} notify={notify} onChanged={loadAll} />}
+      {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} db={db} demo={demo} notify={notify} onChanged={loadAll} cardInicial={chegada.card} />}
       {tab === "financeiro" && <FinanceView finances={finances} dividas={dividas} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} dividas={dividas} services={activeServices} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
@@ -6282,7 +6286,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   if (Number(svc?.valor_orcamento)) instrucoes.push(["VALOR DO SERVIÇO",
     money(svc.valor_orcamento) + (svc?.prazo ? " · prazo " + compactDate(svc.prazo) : "")]);
   const obsFicha = cli?.obs ? String(cli.obs).trim() : "";
-  return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehFollowUpZapia(a) ? " followup-zapia" : ""}${classeLigado(ligado)}`}>
+  return <article id={`card-${a.id}`} className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehFollowUpZapia(a) ? " followup-zapia" : ""}${classeLigado(ligado)}`}>
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
@@ -8713,8 +8717,18 @@ function LeadsView({ services, appointments, agendaHistorico, inbox, search, set
 }
 
 // Colapsado: só o essencial pra bater o olho (dia + rota). Clica pra abrir os compromissos do dia.
-function AgendaView({ appointments, services, customers, finances, fornecedores, onReschedule, onConcluir, onAdd, db, demo, notify, onChanged }) {
+function AgendaView({ appointments, services, customers, finances, fornecedores, onReschedule, onConcluir, onAdd, db, demo, notify, onChanged, cardInicial = null }) {
   const [diaAberto, setDiaAberto] = useState(null);
+  // Chegou pela notificação (?ir=agenda&card=): abre o dia daquele card e rola até ele, uma vez.
+  const jaAbriuCard = React.useRef(false);
+  useEffect(() => {
+    if (!cardInicial || jaAbriuCard.current) return;
+    const alvo = (appointments || []).find((a) => a.id === cardInicial);
+    if (!alvo) return;
+    jaAbriuCard.current = true;
+    setDiaAberto(alvo.data);
+    setTimeout(() => { document.getElementById(`card-${alvo.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 350);
+  }, [cardInicial, appointments]);
   const hoje = hojeISO();
   const profissionais = nomesProfissionais(services);
   // A agenda é ROTA. Cobrança (remoto sem hora) mora no Painel, não aqui — senão um dia com 3 idas reais

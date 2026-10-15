@@ -44,10 +44,12 @@ select jsonb_build_object(
     select jsonb_agg(jsonb_build_object(
       'id', a.id, 'titulo', coalesce(nullif(btrim(pe.titulo), ''), a.titulo), 'hora', to_char(a.hora,'HH24:MI'),
       'local', a.local, 'cidade', a.cidade, 'tipo', a.tipo, 'servico_id', a.servico_id,
+      'cliente_id', coalesce(a.cliente_id, sv.cliente_id),
       'passaram', floor(extract(epoch from (agora.t - (a.data + a.hora)))/60)::int
     ) order by (a.data + a.hora))
     from agenda a
-    left join pessoais pe on pe.id = a.pessoal_id, agora
+    left join pessoais pe on pe.id = a.pessoal_id
+    left join servicos sv on sv.id = a.servico_id, agora
     where a.status = 'planejado' and a.hora is not null
       and (a.data + a.hora) <= agora.t
       and (a.data + a.hora) > agora.t - interval '30 minutes'
