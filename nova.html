@@ -1355,7 +1355,10 @@ function usarArrastePraDireita(ao) {
     },
   };
 }
-function ListaLateral({ kicker, titulo, cabecalho = null, onFechar, children }) {
+// `semGestos` (Diego, 15/10/2026, 20h51, sobre o card em foco: "o arrastar pro lado, pra cima e pra baixo no card do
+// cliente não ficou bom"): a lista abre sem os gestos de fechar por arrasto; o conteúdo só rola. Fecha pelo Voltar
+// do topo, pelo voltar do Android ou tocando fora.
+function ListaLateral({ kicker, titulo, cabecalho = null, onFechar, semGestos = false, children }) {
   const painel = React.useRef(null);
   const toque = React.useRef(null);
   const [rolou, setRolou] = useState(false);
@@ -1383,13 +1386,14 @@ function ListaLateral({ kicker, titulo, cabecalho = null, onFechar, children }) 
     else if (t.alem <= -LIMITE_FECHAR) fecharForcando("sai-cima");
     else setPuxado(0);
   };
-  const arrastando = toque.current && puxado !== 0;
+  const arrastando = !semGestos && toque.current && puxado !== 0;
+  const gestos = semGestos ? {} : { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel: onTouchEnd };
   const estilo = saindo ? undefined : (puxado ? { transform: `translateY(${Math.round(puxado * 0.35)}px)` } : undefined);
   const aviso = (lado, ativo) => <div className={`lista-lateral-aviso ${lado}${ativo ? " visivel" : ""}${Math.abs(puxado) >= LIMITE_FECHAR ? " pronto" : ""}`}>{Math.abs(puxado) >= LIMITE_FECHAR ? "Solte para fechar" : "Puxe mais para fechar"}</div>;
   return <div className="modal-overlay lista-lateral-fundo" onClick={onFechar}>
-    {aviso("topo", puxado > 30)}
-    {aviso("fim", puxado < -30)}
-    <div ref={painel} className={`lista-lateral${arrastando ? " arrastando" : ""}${saindo ? ` ${saindo}` : ""}`} style={estilo} onClick={(e) => e.stopPropagation()} onScroll={onScroll} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd}>
+    {!semGestos && aviso("topo", puxado > 30)}
+    {!semGestos && aviso("fim", puxado < -30)}
+    <div ref={painel} className={`lista-lateral${arrastando ? " arrastando" : ""}${saindo ? ` ${saindo}` : ""}`} style={semGestos ? undefined : estilo} onClick={(e) => e.stopPropagation()} onScroll={onScroll} {...gestos}>
       <div className={`lista-lateral-topo${rolou ? " rolou" : ""}`}>{cabecalho || <>{kicker && <p className="kicker">{kicker}</p>}<h2>{titulo}</h2></>}</div>
       <DentroDaLista.Provider value={true}>{children}</DentroDaLista.Provider>
     </div>
@@ -6702,7 +6706,7 @@ function FocoDoCard({ props, onFechar }) {
     setTimeout(() => { const cab = alvo.querySelector(".compromisso-cab"); if (cab) cab.click(); }, 30);
   };
   const quando = `${compactDate(a.data)}${a.hora ? ` · ${a.hora.slice(0, 5)}` : ""}`;
-  return <ListaLateral cabecalho={<><p className="kicker">{pos.n > 1 ? `Card ${pos.i + 1} de ${pos.n}` : "Card"}</p><h2>{quando}</h2></>} onFechar={onFechar}>
+  return <ListaLateral cabecalho={<><p className="kicker">{pos.n > 1 ? `Card ${pos.i + 1} de ${pos.n}` : "Card"}</p><h2>{quando}</h2></>} onFechar={onFechar} semGestos>
     <div className="foco-nav">
       <button type="button" disabled={pos.i <= 0} onClick={() => ir(-1)}>‹ Anterior</button>
       <button type="button" className="foco-voltar" onClick={onFechar}>Voltar</button>
