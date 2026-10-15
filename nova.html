@@ -171,13 +171,12 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}
 .compromisso-card .compromisso-corpo{margin-top:13px}
 .compromisso-card.cor-alta{border-left-color:var(--red)}.compromisso-card.cor-media{border-left-color:var(--yellow)}.compromisso-card.cor-baixa{border-left-color:var(--green)}
-/* REMOTO COM COR PRÓPRIA (Diego, 15/10/2026: esquece de abrir o filtro Remotos e só vê a tarefa remota às 17h,
-   na rua). Todo card remoto leva o verde-água fixo; na lista "Todos", o remoto de hoje ou atrasado pulsa de leve
-   pra dizer "isso dá pra resolver agora, do celular". Filtro Presencial ou Remoto ligado = nada pulsa. */
-.compromisso-card.remoto{--remoto:#5cc3b5;background:linear-gradient(150deg,#15211f,#131a18);border-color:#5cc3b54d}
-.compromisso-card.remoto .compromisso-idc>span{color:#7fd6c9}
-body[data-filtro-tipo="todos"] .compromisso-card.remoto-pendente{animation:remotoPulsa 2.6s ease-in-out infinite}
-@keyframes remotoPulsa{0%,100%{box-shadow:inset 0 1px 0 #ffffff12,0 1px 2px #0000004d,0 10px 26px -10px #000000a6}50%{box-shadow:inset 0 1px 0 #ffffff12,0 0 0 2px #5cc3b5,0 0 22px -2px #5cc3b5b3}}
+/* REMOTO DISCRETO (Diego, 15/10/2026, 16h34: o card inteiro em neon "fica pesado, pesa o app"). O card fica
+   normal; só a etiqueta "◌ Remoto" é verde-água e, na lista Todos, a de hoje ou atrasado pisca de leve (opacidade,
+   nada de sombra). Filtro Presencial ou Remoto ligado = nada pisca. */
+.selo-remoto{font-weight:600;color:#7fd6c9}
+body[data-filtro-tipo="todos"] .compromisso-card.remoto-pendente .selo-remoto{animation:remotoPisca 1.8s ease-in-out infinite}
+@keyframes remotoPisca{0%,100%{opacity:1}50%{opacity:.35}}
 /* CARDS LIGADOS (Diego, 14/10/2026: "são cards separados, mas é um ligado no outro, com cores iguais"). Tarefas no mesmo
    lugar ou com a mesma pessoa, no mesmo dia e a poucos minutos uma da outra, continuam um card por tarefa, mas o grupo
    ganha UMA cor (borda, fundo e selo) e os cards ficam colados. Grupos diferentes no mesmo dia, cores diferentes. */
@@ -6499,7 +6498,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   const selo = soCidade ? " (só cidade)" : "";
   const nomeCliente = cli?.nome || tituloCard;
   const seloTipo = seloCompromisso(a);
-  const cidadeCard = ehRemoto(a) ? "◌ Remoto" : `⌖ ${cli?.cidade || a.cidade || "Cidade não informada"}`;
+  const cidadeCard = ehRemoto(a) ? <b className="selo-remoto">◌ Remoto</b> : `⌖ ${cli?.cidade || a.cidade || "Cidade não informada"}`;
   // INSTRUÇÕES DO ATENDIMENTO (Diego, 23/08/2026: "cada cliente com instruções do que precisa
   // ser feito"). Reúne aqui tudo que ele precisa saber ANTES de bater na porta, sem ter que
   // abrir a ficha do cliente: o que fazer, qual é o serviço, o que ainda falta comprar e onde,
