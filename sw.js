@@ -51,7 +51,12 @@
    cartao pra voce chega com as duas primeiras opcoes como botao; o toque manda a letra do botao junto com o
    recibo pra push-enviar?modo=acao, e o banco aplica o plano que ELE gravou no envio. Se nao gravou, abre o
    app no lugar - o toque nunca some calado. */
-const VERSAO = 'tb-atendimento-v19';
+/* v20 (15/10/2026): TOQUE NO CORPO ABRE NO LUGAR CERTO E NAO APAGA. Diego: "quando clico no card da
+   notificacao, quando volta ele some, alem de abrir na tela inicial e nao no compromisso". (1) Com o app ja
+   aberto em segundo plano, `abrirApp` so focava a aba e ignorava o ?ir= - agora manda a URL pra aba por
+   postMessage e o nova.html abre a ficha/o card sem recarregar. (2) A notificacao de compromisso so fecha
+   quando um botao resolve (Feito/Adiar gravado); o toque no corpo deixa ela na barra, que e por onde ele resolve. */
+const VERSAO = 'tb-atendimento-v20';
 // Sem segredo aqui de proposito: este arquivo e publico. O que autentica o recibo e o proprio id, que
 // e um uuid que so existe dentro da carga cifrada - quem nao recebeu a notificacao nao tem como chutar.
 const PUSH_FUNCAO = 'https://iymlzdcloaeyybhefywp.supabase.co/functions/v1/push-enviar';
@@ -258,7 +263,6 @@ function responderPeloBotao(recibo, acao) {
 // TOQUE NA NOTIFICACAO. Se o app ja esta aberto numa aba, foca ela - reabrir do zero perderia o que ele
 // estava vendo e ainda faria o Babel transpilar 580 KB de novo.
 self.addEventListener('notificationclick', (e) => {
-  e.notification.close();
   const destino = new URL((e.notification.data && e.notification.data.url) || './nova.html', self.location).href;
   const recibo = e.notification.data && e.notification.data.recibo;
   // Toque num BOTAO: grava sem abrir o app. Se o banco nao confirmar (sem sinal, recibo ja usado, cartao
@@ -266,11 +270,16 @@ self.addEventListener('notificationclick', (e) => {
   if (e.action) {
     carimbarRecibo(recibo, 'aberto');
     e.waitUntil(responderPeloBotao(recibo, e.action).then(function (gravou) {
-      if (gravou) return;
+      // Gravou: resolvido, a notificacao sai. Nao gravou: fica na barra e o app abre pra ele resolver la.
+      if (gravou) { e.notification.close(); return; }
       return abrirApp(destino);
     }));
     return;
   }
+  // Toque no corpo: abre o app no lugar certo e a notificacao CONTINUA na barra (v20). Aviso sem botao
+  // (caixa, conta, resumo) fecha como antes - nao tem o que resolver por ali.
+  const temBotao = !!(e.notification.actions && e.notification.actions.length);
+  if (!temBotao) e.notification.close();
   carimbarRecibo(recibo, 'aberto');
   e.waitUntil(abrirApp(destino));
 });
@@ -282,6 +291,9 @@ function abrirApp(destino) {
       if (janela.url.indexOf(self.location.origin) !== 0) continue;
       if (janela.url.indexOf('nova.html') === -1 && 'navigate' in janela) {
         try { await janela.navigate(destino); } catch (err) { /* aba em estado que nao aceita navegar */ }
+      } else if (janela.url.indexOf('nova.html') !== -1 && destino.indexOf('ir=') !== -1) {
+        // App ja aberto: nao recarrega (Babel de novo), avisa a aba pra onde ir (v20).
+        try { janela.postMessage({ tipo: 'ir', url: destino }); } catch (err) { /* aba sem message */ }
       }
       if ('focus' in janela) return janela.focus();
     }

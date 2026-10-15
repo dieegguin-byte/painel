@@ -3873,6 +3873,24 @@ function Home() {
   const [pinState, setPinState] = useState("checking");
   const [showGuia, setShowGuia] = useState(false);
   const [fichaId, setFichaId] = useState(() => (chegada.ficha && /^[0-9a-f-]{36}$/i.test(chegada.ficha) ? chegada.ficha : null));
+  // Card da Agenda pedido pela notificação: nasce do ?ir=agenda&card= e muda quando o service worker avisa.
+  const [cardChegada, setCardChegada] = useState(chegada.card);
+  // TOQUE NA NOTIFICAÇÃO COM O APP JÁ ABERTO (15/10/2026, Diego: "abre na tela inicial e não no compromisso").
+  // O sw.js v20 só foca a aba e manda a URL por postMessage; aqui ela vira o mesmo que o ?ir= na abertura.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const ouvir = (ev) => {
+      const m = ev.data || {};
+      if (m.tipo !== "ir" || !m.url) return;
+      let u; try { u = new URL(m.url, location.href).searchParams; } catch (e) { return; }
+      const ir = u.get("ir");
+      if (ir === "ficha" && /^[0-9a-f-]{36}$/i.test(u.get("id") || "")) { setFichaId(u.get("id")); return; }
+      if (ir === "agenda") { setCardChegada(u.get("card") || null); setTab("agenda"); return; }
+      if (["caixa", "futuro", "compras", "leads"].includes(ir)) setTab(ir);
+    };
+    navigator.serviceWorker.addEventListener("message", ouvir);
+    return () => navigator.serviceWorker.removeEventListener("message", ouvir);
+  }, []);
   const [explicar, setExplicar] = useState(null);
   const [concluirAppt, setConcluirAppt] = useState(null);
   const [addAgendaOpen, setAddAgendaOpen] = useState(false);
@@ -4852,7 +4870,7 @@ function Home() {
           porque o Diego não lançava mais pelo app; agora ele é o botão flutuante "+ Anotar", que salva na
           fila da Caixa pro Claude organizar. Sem a prop o botão não aparece. */}
       {tab === "leads" && <LeadsView services={activeServices} appointments={agendaVisivel} agendaHistorico={agendaHistorico} inbox={inbox} search={search} setSearch={setSearch} onOpenFicha={setFichaId} initialFiltro={leadsFiltroInicial} onConsumedInitialFiltro={() => setLeadsFiltroInicial("todos")} />}
-      {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} db={db} demo={demo} notify={notify} onChanged={loadAll} cardInicial={chegada.card} />}
+      {tab === "agenda" && <AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} db={db} demo={demo} notify={notify} onChanged={loadAll} cardInicial={cardChegada} />}
       {tab === "financeiro" && <FinanceView finances={finances} dividas={dividas} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} dividas={dividas} services={activeServices} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
@@ -8764,12 +8782,13 @@ function LeadsView({ services, appointments, agendaHistorico, inbox, search, set
 function AgendaView({ appointments, services, customers, finances, fornecedores, onReschedule, onConcluir, onAdd, db, demo, notify, onChanged, cardInicial = null }) {
   const [diaAberto, setDiaAberto] = useState(null);
   // Chegou pela notificação (?ir=agenda&card=): abre o dia daquele card e rola até ele, uma vez.
-  const jaAbriuCard = React.useRef(false);
+  // Guarda o id já aberto (não um booleano): uma segunda notificação, de outro card, abre de novo (v20).
+  const jaAbriuCard = React.useRef(null);
   useEffect(() => {
-    if (!cardInicial || jaAbriuCard.current) return;
+    if (!cardInicial || jaAbriuCard.current === cardInicial) return;
     const alvo = (appointments || []).find((a) => a.id === cardInicial);
     if (!alvo) return;
-    jaAbriuCard.current = true;
+    jaAbriuCard.current = cardInicial;
     setDiaAberto(alvo.data);
     setTimeout(() => { document.getElementById(`card-${alvo.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 350);
   }, [cardInicial, appointments]);
@@ -11960,7 +11979,7 @@ if ('serviceWorker' in navigator) {
   };
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (tinhaControle) recarregar(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && recargaPendente) recarregar(); });
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=19').then((reg) => {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=20').then((reg) => {
     const checar = () => reg.update().catch(() => {});
     checar();
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checar(); });
