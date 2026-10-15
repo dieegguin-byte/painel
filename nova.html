@@ -5920,7 +5920,9 @@ function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppoi
   // Enquanto há alvo: bipe + vibração a cada 6 s e título da aba piscando.
   useEffect(() => {
     if (!alvo) { document.title = tituloOriginal.current; return; }
-    const rotulo = `⏰ ${String(alvo.hora || "").slice(0, 5)} ${nomeCurto(alvo.titulo)}`;
+    // Só o começo do título (até o travessão), como no push: `nomeCurto` não existe neste escopo (quebrou a tela 15/10).
+    const cabeca = String(alvo.titulo || "").split(/\s[—–-]\s|:\s/)[0].trim().slice(0, 32);
+    const rotulo = `⏰ ${String(alvo.hora || "").slice(0, 5)} ${cabeca}`;
     let liga = false;
     const tocar = () => { alarmeBipar(); vibrar([400, 150, 400, 150, 700]); };
     tocar();
