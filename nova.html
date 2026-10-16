@@ -177,6 +177,10 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .calc-grande{display:block;width:100%;padding:14px;border-radius:12px;border:1px solid var(--line2);background:#0f0d0c;color:var(--text);font:inherit;font-size:22px}
 .calc-dica{display:block;margin-top:8px;font-size:12px;color:var(--dim)}
 .calc-acoes{display:flex;flex-wrap:wrap;gap:8px}.calc-acoes .primary{margin-left:auto}
+.calc-escolha{flex-direction:column}.calc-escolha .ghost{padding:14px;font-size:15px;text-align:left}
+.calc-espuma{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.calc-espuma label{display:block;font-size:11px;color:var(--muted)}
+.calc-espuma input{display:block;width:100%;margin-top:4px;padding:10px 8px;border-radius:10px;border:1px solid var(--line2);background:#0f0d0c;color:var(--text);font:inherit;font-size:18px}
+.calc-resultado+.calc-resultado{margin-top:8px}.calc-versao{grid-column:1/-1;font-style:normal;font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
 .calc-opcoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .calc-opcoes .ghost{font-size:12px;padding:7px 10px}.calc-opcoes .ghost.ativo{border-color:var(--orange);color:var(--text);background:#d86d3622}
 .calc-conta{margin:10px 0 0;font-size:11px;line-height:1.5;color:var(--dim)}
@@ -9175,46 +9179,92 @@ function calcularOrcamento({ mo, material, divisor, frete, ajudante, viagem }) {
   return { custo, base, extraAjudante, total, pix, parcela, cartao: parcela * 6 };
 }
 function CalculadoraRapida({ onFechar, notify }) {
-  // QUIZ RÁPIDO (Diego, 16/10/2026, 21h57: "tipo eu falando contigo: tanto de tecido se houver, tanto de espuma se
-  // houver, tanto de aviamentos se houver, tanto de mão de obra, tipo um quiz rápido"). Uma pergunta por vez; o que é
-  // opcional tem "Não tem" de um toque. Cidade escolhe só o divisor; o FRETE É ELE QUEM ESCOLHE (21h58: "frete eu
-  // escolho") — a tabela da cidade entra só como sugestão no campo.
-  const [resp, setResp] = useState({ tecido: "", espuma: "", aviamentos: "", mo: "", cidadeIdx: 0, frete: "", ajudante: false, pequeno: false, divisorManual: null });
+  // QUIZ RÁPIDO (Diego, 16/10/2026, 21h57: "tipo eu falando contigo... tipo um quiz rápido"; 22h19: "quantos metros
+  // de tecido, depois o valor do metro; espuma: quantos metros e em qual cm; divisor por cidade gostei mas poder mudar
+  // ali; opção couro sintético ou tecido ou os dois — essa cliente pediu as duas vias"; 22h20: "assento e braços,
+  // encosto costuma ir no aviamento porque é mais pluma"). Espuma = metros × cm × preço por cm (começa em 27, editável).
+  // Uma pergunta por vez; o opcional tem "Não tem". Cidade escolhe o divisor, com os três à vista pra trocar ali.
+  // O FRETE É ELE QUEM ESCOLHE (21h58): a tabela da cidade é só dica. "Os dois" = duas versões com o mesmo resto.
+  const ESPUMA_POR_CM = 27; // PX1000 D33 selada, Ellis 24/09/2026 (precos/tecidos.md): ~R$ 27 por cm de espessura, por metro
+  const vazio = { material: "", tecidoM: "", tecidoV: "", couroM: "", couroV: "", espAssento: null, espBracos: null, aviamentos: "", mo: "", cidadeIdx: 0, divisorManual: null, frete: "" };
+  const [resp, setResp] = useState(vazio);
   const [passo, setPasso] = useState(0);
   const cidade = CALC_CIDADES[resp.cidadeIdx] || CALC_CIDADES[0];
   const num = (v) => { const n = parseMoedaBR(v); return Number.isFinite(n) ? n : 0; };
-  const material = num(resp.tecido) + num(resp.espuma) + num(resp.aviamentos);
-  const divisor = resp.pequeno ? 0.5 : (resp.divisorManual ?? cidade.divisor);
-  const r = calcularOrcamento({ mo: num(resp.mo), material, divisor, frete: num(resp.frete), ajudante: resp.ajudante, viagem: cidade.viagem });
-  const pronto = r.custo > 0;
-  const frase = pronto ? `Para esse serviço fica ${moneyInteiro(r.pix)} no Pix ou até 6x de ${moneyInteiro(r.parcela)} no cartão.` : "";
+  const temTecido = resp.material === "tecido" || resp.material === "ambos";
+  const temCouro = resp.material === "couro" || resp.material === "ambos";
+  const custoEspuma = (e) => e ? num(e.metros) * num(e.cm) * num(e.porCm) : 0;
+  const comum = custoEspuma(resp.espAssento) + custoEspuma(resp.espBracos) + num(resp.aviamentos);
+  const custoTecido = num(resp.tecidoM) * num(resp.tecidoV);
+  const custoCouro = num(resp.couroM) * num(resp.couroV);
+  const divisor = resp.divisorManual ?? cidade.divisor;
+  const versoes = (resp.material === "ambos" ? [["tecido", custoTecido], ["couro sintético", custoCouro]] : [[resp.material === "couro" ? "couro sintético" : "tecido", temCouro ? custoCouro : custoTecido]])
+    .map(([nome, mat]) => ({ nome, material: comum + mat, ...calcularOrcamento({ mo: num(resp.mo), material: comum + mat, divisor, frete: num(resp.frete), ajudante: false, viagem: 0 }) }));
+  const pronto = versoes.every((v) => v.custo > 0);
+  const frase = !pronto ? "" : versoes.length === 1
+    ? `Para esse serviço fica ${moneyInteiro(versoes[0].pix)} no Pix ou até 6x de ${moneyInteiro(versoes[0].parcela)} no cartão.`
+    : versoes.map((v) => `Em ${v.nome} fica ${moneyInteiro(v.pix)} no Pix ou até 6x de ${moneyInteiro(v.parcela)} no cartão.`).join(" ");
   const fmt = (v) => Math.round(v).toLocaleString("pt-BR");
+  const fmtDiv = (d) => d.toFixed(2).replace(".", ",");
   const set = (k, v) => setResp((x) => ({ ...x, [k]: v }));
   const PASSOS = [
-    { k: "tecido", pergunta: "Quanto de tecido?", opcional: true },
-    { k: "espuma", pergunta: "Quanto de espuma?", opcional: true },
-    { k: "aviamentos", pergunta: "Quanto de aviamentos?", opcional: true },
-    { k: "mo", pergunta: "Quanto de mão de obra?", opcional: false },
+    { k: "material", pergunta: "Vai de tecido ou couro sintético?" },
+    ...(temTecido ? [{ k: "tecidoM", pergunta: "Quantos metros de tecido?", dica: "Largura padrão 1,40 m." }, { k: "tecidoV", pergunta: "Qual o valor do metro do tecido?", dica: "Suede amassado: R$ 9 o metro (tabela 15/10)." }] : []),
+    ...(temCouro ? [{ k: "couroM", pergunta: "Quantos metros de couro sintético?" }, { k: "couroV", pergunta: "Qual o valor do metro do couro sintético?" }] : []),
+    { k: "espAssento", pergunta: "Espuma do assento?", opcional: true },
+    { k: "espBracos", pergunta: "Espuma dos braços?", opcional: true },
+    { k: "aviamentos", pergunta: "Quanto de aviamentos?", opcional: true, dica: "Pluma do encosto entra aqui." },
+    { k: "mo", pergunta: "Quanto de mão de obra?" },
     { k: "cidade", pergunta: "Qual cidade?" },
     { k: "frete", pergunta: "Quanto de frete (buscar e entregar)?", opcional: true },
   ];
-  // Sem pergunta de ajudante (Diego, 21h59: "coisa rápida sem complicação"): se precisar, ele soma no frete.
   const ultimo = PASSOS.length; // tela do resultado
   const avancar = () => { vibrar(6); setPasso((p) => Math.min(ultimo, p + 1)); };
   const voltar = () => setPasso((p) => Math.max(0, p - 1));
-  const naoTem = (k) => { set(k, ""); avancar(); };
+  const naoTem = (k) => { set(k, k.startsWith("esp") ? null : ""); avancar(); };
   const copiar = async () => {
     try { await navigator.clipboard.writeText(frase); notify && notify("Frase copiada. É só colar no WhatsApp.", "ok"); }
     catch (e) { notify && notify("Não consegui copiar — selecione o texto e copie.", "error"); }
   };
-  const trocarDivisor = () => { if (resp.pequeno) return; const i = CALC_DIVISORES.indexOf(divisor); set("divisorManual", CALC_DIVISORES[(i + 1) % CALC_DIVISORES.length]); };
   const atual = PASSOS[passo];
-  const campoValor = (k) => <input key={k} className="calc-grande" inputMode="decimal" placeholder="R$" value={resp[k]} autoFocus onChange={(e) => set(k, e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") avancar(); }} />;
+  const campoValor = (k, dica) => <>
+    <input key={k} className="calc-grande" inputMode="decimal" placeholder={/M$/.test(k) ? "metros" : "R$"} value={resp[k]} autoFocus onChange={(e) => set(k, e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") avancar(); }} />
+    {dica && <small className="calc-dica">{dica}</small>}
+  </>;
+  const campoEspuma = (k) => {
+    const e = resp[k] || { metros: "", cm: "", porCm: String(ESPUMA_POR_CM) };
+    const mudar = (campo, v) => set(k, { ...e, [campo]: v });
+    return <>
+      <div className="calc-espuma">
+        <label>Quantos metros<input inputMode="decimal" placeholder="m" value={e.metros} autoFocus onChange={(ev) => mudar("metros", ev.target.value)} /></label>
+        <label>Quantos cm<input inputMode="decimal" placeholder="cm" value={e.cm} onChange={(ev) => mudar("cm", ev.target.value)} /></label>
+        <label>R$ por cm<input inputMode="decimal" value={e.porCm} onChange={(ev) => mudar("porCm", ev.target.value)} /></label>
+      </div>
+      <small className="calc-dica">metros × cm × R$ por cm{custoEspuma(e) ? ` = ${moneyInteiro(custoEspuma(e))}` : ""}</small>
+    </>;
+  };
   const corpoPasso = () => {
     if (!atual) return null;
-    if (atual.k === "cidade") return <select className="calc-grande" value={resp.cidadeIdx} autoFocus onChange={(e) => setResp((x) => ({ ...x, cidadeIdx: Number(e.target.value), divisorManual: null, frete: x.frete === "" || x.frete === String(CALC_CIDADES[x.cidadeIdx].frete) ? String(CALC_CIDADES[Number(e.target.value)].frete || "") : x.frete }))}>{CALC_CIDADES.map((c, i) => <option key={c.nome} value={i}>{c.nome} (÷ {c.divisor.toFixed(2).replace(".", ",")})</option>)}</select>;
-    if (atual.k === "frete") return <>{campoValor("frete")}{cidade.frete ? <small className="calc-dica">Tabela de {cidade.nome}: {moneyInteiro(cidade.frete)}. Você decide; ajudante, se tiver, soma aqui.</small> : <small className="calc-dica">Em Luziânia costuma ser de 0 a R$ 80. Você decide; ajudante, se tiver, soma aqui.</small>}</>;
-    return campoValor(atual.k);
+    if (atual.k === "material") return <div className="calc-opcoes calc-escolha">
+      {[["tecido", "Tecido"], ["couro", "Couro sintético"], ["ambos", "Os dois (duas opções)"]].map(([v, rot]) => <button key={v} type="button" className={`ghost${resp.material === v ? " ativo" : ""}`} onClick={() => { set("material", v); avancar(); }}>{rot}</button>)}
+    </div>;
+    if (atual.k === "cidade") return <>
+      <select className="calc-grande" value={resp.cidadeIdx} autoFocus onChange={(e) => setResp((x) => ({ ...x, cidadeIdx: Number(e.target.value), divisorManual: null, frete: x.frete === "" || x.frete === String(CALC_CIDADES[x.cidadeIdx].frete) ? String(CALC_CIDADES[Number(e.target.value)].frete || "") : x.frete }))}>{CALC_CIDADES.map((c, i) => <option key={c.nome} value={i}>{c.nome}</option>)}</select>
+      <div className="calc-opcoes">
+        {CALC_DIVISORES.map((d) => <button key={d} type="button" className={`ghost${divisor === d ? " ativo" : ""}`} onClick={() => set("divisorManual", d === cidade.divisor ? null : d)}>÷ {fmtDiv(d)}{d === 0.5 ? " (serviço pequeno)" : d === cidade.divisor ? " (da cidade)" : ""}</button>)}
+      </div>
+    </>;
+    if (atual.k === "frete") return campoValor("frete", cidade.frete ? `Tabela de ${cidade.nome}: ${moneyInteiro(cidade.frete)}. Você decide; ajudante, se tiver, soma aqui.` : "Em Luziânia costuma ser de 0 a R$ 80. Você decide; ajudante, se tiver, soma aqui.");
+    if (atual.k.startsWith("esp")) return campoEspuma(atual.k);
+    return campoValor(atual.k, atual.dica);
+  };
+  const podeAvancar = () => {
+    if (!atual) return false;
+    if (atual.k === "material") return !!resp.material;
+    if (atual.k === "mo") return num(resp.mo) > 0;
+    if (/V$|M$/.test(atual.k)) return num(resp[atual.k]) > 0;
+    if (atual.k.startsWith("esp")) return !resp[atual.k] || custoEspuma(resp[atual.k]) > 0;
+    return true;
   };
   return <div className="modal-overlay" onMouseDown={onFechar}><div className="modal-card calc-card" onMouseDown={(e) => e.stopPropagation()}>
     <p className="kicker">CALCULADORA RÁPIDA{passo < ultimo ? ` · ${passo + 1} de ${ultimo}` : ""}</p>
@@ -9224,22 +9274,26 @@ function CalculadoraRapida({ onFechar, notify }) {
       <div className="ficha-actions calc-acoes">
         {passo > 0 && <button type="button" className="ghost" onClick={voltar}>‹ Voltar</button>}
         {atual.opcional && <button type="button" className="ghost" onClick={() => naoTem(atual.k)}>Não tem</button>}
-        <button type="button" className="primary" onClick={avancar} disabled={atual.k === "mo" && !num(resp.mo)}>{passo === ultimo - 1 ? "Ver o valor" : "Próximo ›"}</button>
+        {atual.k !== "material" && <button type="button" className="primary" onClick={avancar} disabled={!podeAvancar()}>{passo === ultimo - 1 ? "Ver o valor" : "Próximo ›"}</button>}
       </div>
     </> : <>
       <div className="calc-opcoes">
-        <button type="button" className={`ghost${resp.pequeno ? " ativo" : ""}`} onClick={() => set("pequeno", !resp.pequeno)}>Serviço pequeno (÷ 0,50)</button>
-        <button type="button" className="ghost" onClick={trocarDivisor} disabled={resp.pequeno} title="Toque pra trocar">{cidade.nome} ÷ {divisor.toFixed(2).replace(".", ",")}</button>
+        {CALC_DIVISORES.map((d) => <button key={d} type="button" className={`ghost${divisor === d ? " ativo" : ""}`} onClick={() => set("divisorManual", d === cidade.divisor ? null : d)}>{cidade.nome} ÷ {fmtDiv(d)}</button>)}
       </div>
-      <p className="calc-conta">custo {fmt(r.custo)} (tecido {fmt(num(resp.tecido))} · espuma {fmt(num(resp.espuma))} · aviamentos {fmt(num(resp.aviamentos))} · mão de obra {fmt(num(resp.mo))}) ÷ {divisor.toFixed(2).replace(".", ",")} = {fmt(r.base)}{num(resp.frete) ? ` + frete ${fmt(num(resp.frete))}` : ""}{r.extraAjudante ? ` + ajudante ${fmt(r.extraAjudante)}` : ""} = {fmt(r.total)} → Pix {fmt(r.pix)} · cartão {fmt(r.cartao)} (6 × {fmt(r.parcela)})</p>
-      <div className="calc-resultado">
-        {pronto ? <><b>{moneyInteiro(r.pix)}</b><span>no Pix</span><b>6x {moneyInteiro(r.parcela)}</b><span>no cartão</span></> : <em>Faltou a mão de obra ou o material.</em>}
-      </div>
+      <p className="calc-conta">
+        {temTecido ? `tecido ${fmt(num(resp.tecidoM))} m × ${fmt(num(resp.tecidoV))} = ${fmt(custoTecido)} · ` : ""}{temCouro ? `couro ${fmt(num(resp.couroM))} m × ${fmt(num(resp.couroV))} = ${fmt(custoCouro)} · ` : ""}
+        espuma {fmt(custoEspuma(resp.espAssento) + custoEspuma(resp.espBracos))} · aviamentos {fmt(num(resp.aviamentos))} · mão de obra {fmt(num(resp.mo))}
+        {versoes.map((v) => <span key={v.nome}><br />{versoes.length > 1 ? `${v.nome}: ` : ""}custo {fmt(v.custo)} ÷ {fmtDiv(divisor)} = {fmt(v.base)}{num(resp.frete) ? ` + frete ${fmt(num(resp.frete))}` : ""} = {fmt(v.total)} → Pix {fmt(v.pix)} · cartão {fmt(v.cartao)} (6 × {fmt(v.parcela)})</span>)}
+      </p>
+      {pronto ? versoes.map((v) => <div className="calc-resultado" key={v.nome}>
+        {versoes.length > 1 && <em className="calc-versao">{v.nome}</em>}
+        <b>{moneyInteiro(v.pix)}</b><span>no Pix</span><b>6x {moneyInteiro(v.parcela)}</b><span>no cartão</span>
+      </div>) : <div className="calc-resultado"><em>Faltou a mão de obra ou o material.</em></div>}
       {pronto && <p className="calc-frase">{frase}</p>}
       <div className="ficha-actions calc-acoes">
         <button type="button" className="ghost" onClick={voltar}>‹ Voltar</button>
         {pronto && <button type="button" className="primary" onClick={copiar}>📋 Copiar frase</button>}
-        <button type="button" className="ghost" onClick={() => { setResp({ tecido: "", espuma: "", aviamentos: "", mo: "", cidadeIdx: 0, frete: "", ajudante: false, pequeno: false, divisorManual: null }); setPasso(0); }}>Recomeçar</button>
+        <button type="button" className="ghost" onClick={() => { setResp(vazio); setPasso(0); }}>Recomeçar</button>
         <button type="button" className="ghost" onClick={onFechar}>Fechar</button>
       </div>
     </>}
