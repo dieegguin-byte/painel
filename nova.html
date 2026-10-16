@@ -4233,6 +4233,7 @@ function Home() {
     setOfflineDesde(null);
     const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [], duvidasAgente: da?.data || [], propostas: pr?.data || [] };
     aplicarPacote(pacote);
+    fecharAvisosDeCards(new Set((pacote.appointments || []).map((a) => a.id)));
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
     // sinal é rotina. Só leitura: gravação offline ficaria numa fila que duplicaria compromisso e bateria
@@ -6076,6 +6077,23 @@ function marcarAvisoMudo(mudo) { try { if (mudo) localStorage.setItem(AVISO_MUDO
 function alarmeSilenciados() {
   try { const o = JSON.parse(localStorage.getItem("tb_alarme_silenciados") || "{}"); const corte = Date.now() - 864e5; return Object.fromEntries(Object.entries(o).filter(([, t]) => t > corte)); } catch (e) { return {}; }
 }
+// AVISO DE CARD JÁ RESOLVIDO SAI DA BARRA (Diego, 16/10/2026: "marquei como feito várias vezes e não sai da
+// minha notificação"). O aviso do card tem botões e requireInteraction, então só sai se alguém fechar. Os botões
+// da barra fecham sozinhos, mas o Feito dentro do app, o da Manu e o toque pelos atalhos do Niagara (que abre
+// o app em vez de acionar o botão) deixavam o aviso parado. Agora, a cada carga, todo aviso "agenda-<id>" de card
+// que não está mais planejado é fechado; e Adiar 1h no app fecha o aviso daquele card na hora.
+async function fecharAvisosDeCards(manter, fechar) {
+  try {
+    if (!("serviceWorker" in navigator)) return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg || !reg.getNotifications) return;
+    for (const n of await reg.getNotifications()) {
+      const id = /^agenda-(.+)$/.exec(n.tag || "")?.[1];
+      if (!id) continue;
+      if ((fechar && fechar.includes(id)) || (manter && !manter.has(id))) n.close();
+    }
+  } catch (e) { /* sem permissão ou sem service worker: nada a fechar */ }
+}
 function alarmeSilenciar(id) {
   try { const o = alarmeSilenciados(); o[id] = Date.now(); localStorage.setItem("tb_alarme_silenciados", JSON.stringify(o)); } catch (e) {}
 }
@@ -6403,6 +6421,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     if (!gravou) throw erro || new Error("não deu pra adiar");
     try { await db.from("historico").insert({ o_que: `Adiado 1h: ${a.titulo}`, por: "diego", detalhe: `Pelo card atrasado, de ${a.data}${a.hora ? " " + String(a.hora).slice(0, 5) : ""} para hoje ${gravou.slice(0, 5)}.` }); } catch (e) { /* segue */ }
     setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, data, hora: gravou } : x));
+    fecharAvisosDeCards(null, [a.id]);
     notify(`Adiado pra ${gravou.slice(0, 5)}. Aviso de novo na hora nova.`, "ok");
     if (onChanged) onChanged();
     return true;
