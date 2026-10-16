@@ -16,10 +16,10 @@
     { "src": "./icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Anotar agora", "short_name": "Anotar", "description": "Compromisso, gasto, cliente novo — o Claude organiza depois", "url": "./nova.html?ir=anotar", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] },
-    { "name": "Agenda", "short_name": "Agenda", "description": "Os compromissos por dia", "url": "./nova.html?ir=agenda", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] },
-    { "name": "Caixa", "short_name": "Caixa", "description": "O que chegou e ainda não foi organizado", "url": "./nova.html?ir=caixa", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] },
-    { "name": "Leads", "short_name": "Leads", "description": "Clientes e orçamentos em aberto", "url": "./nova.html?ir=leads", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+    { "name": "Calculadora rápida", "short_name": "Calculadora", "description": "Quiz rápido de orçamento: Pix e 6x no cartão", "url": "./nova.html?ir=calculadora", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Atrasados", "short_name": "Atrasados", "description": "O que passou da hora e precisa resolver", "url": "./nova.html?ir=atrasados", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Compromissos de hoje", "short_name": "Hoje", "description": "A agenda de hoje, por hora", "url": "./nova.html?ir=hoje", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Anotar agora", "short_name": "Anotar", "description": "Compromisso, gasto, cliente novo — o Claude organiza depois", "url": "./nova.html?ir=anotar", "icons": [{ "src": "./icon-192.png", "sizes": "192x192", "type": "image/png" }] }
   ],
   "share_target": {
     "action": "./compartilhar",
