@@ -223,6 +223,9 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .foco-nav button{pointer-events:auto;flex:0 1 auto;min-width:92px;padding:12px 10px;border-radius:12px;border:1px solid var(--line2);background:#1d1714f2;color:var(--text);font-size:13px;font-weight:600;box-shadow:0 6px 18px #0009}
 .compromisso-card.em-foco{margin-bottom:74px}
 .foco-nav button.foco-voltar{color:var(--orange2)}
+.foco-dica{display:block;margin-top:2px;font-size:11px;color:var(--muted);opacity:.8}
+.foco-deslize{min-height:calc(100% - 140px);padding-bottom:70px}
+.proposta-wpp{display:block;margin-top:10px}
 .foco-nav button:disabled{opacity:.3;cursor:default}
 .compromisso-card.em-foco .compromisso-cab{cursor:default}
 .compromisso-card.cor-alta{border-left-color:var(--red)}.compromisso-card.cor-media{border-left-color:var(--yellow)}.compromisso-card.cor-baixa{border-left-color:var(--green)}
@@ -1790,7 +1793,7 @@ const demoDividas = [
 // sem ninguém escrever nada) e um concluído, que prova que Concluir não apaga.
 // PROPOSTAS DE ORÇAMENTO (Diego, 16/10/2026): o que a rotina de orçamento grava em `propostas` pra ele aprovar no app.
 const demoPropostas = [
-  { id: "pr1", cliente_nome: "Edna", titulo: "Sofá 3 lugares — reforma em suede amassado", texto_cliente: "Oi, Edna! Fechei aqui o orçamento do seu sofá de 3 lugares: reforma completa em suede amassado, com troca da espuma do assento, busca e entrega incluídas. Fica R$ 2.350 no Pix ou até 6x de R$ 427 no cartão. Prazo de 10 a 15 dias úteis depois que a peça chega na oficina. Posso agendar a retirada?", detalhamento: "Mão de obra: R$ 700\nTecido: 12 m × R$ 9 = R$ 108 (suede amassado)\nEspuma: assento 3 m × 7 cm × R$ 27 = R$ 567\nAviamentos: R$ 35\nCusto: R$ 1.410 ÷ 0,60 (Luziânia) = R$ 2.350\nFrete: incluído (R$ 0)\nArredondamento: Pix em passos de 50 → R$ 2.350; 6x = 2.350 ÷ 0,9172 ÷ 6 = R$ 427", valor_pix: 2350, valor_cartao: 2562, parcela: 427, versao: 1, status: "aguardando", criado_em: "2026-10-16T10:40:00Z" },
+  { id: "pr1", cliente_id: "c1", cliente_nome: "Edna", titulo: "Sofá 3 lugares — reforma em suede amassado", texto_cliente: "Oi, Edna! Fechei aqui o orçamento do seu sofá de 3 lugares: reforma completa em suede amassado, com troca da espuma do assento, busca e entrega incluídas. Fica R$ 2.350 no Pix ou até 6x de R$ 427 no cartão. Prazo de 10 a 15 dias úteis depois que a peça chega na oficina. Posso agendar a retirada?", detalhamento: "Mão de obra: R$ 700\nTecido: 12 m × R$ 9 = R$ 108 (suede amassado)\nEspuma: assento 3 m × 7 cm × R$ 27 = R$ 567\nAviamentos: R$ 35\nCusto: R$ 1.410 ÷ 0,60 (Luziânia) = R$ 2.350\nFrete: incluído (R$ 0)\nArredondamento: Pix em passos de 50 → R$ 2.350; 6x = 2.350 ÷ 0,9172 ÷ 6 = R$ 427", valor_pix: 2350, valor_cartao: 2562, parcela: 427, versao: 1, status: "aguardando", criado_em: "2026-10-16T10:40:00Z" },
   { id: "pr2", cliente_nome: "João Pereira", titulo: "2 cadeiras — assento em couro sintético", texto_cliente: "Oi, João! O orçamento das duas cadeiras: assento novo em couro sintético, espuma D33 nova, busca e entrega incluídas. Fica R$ 450 no Pix ou até 6x de R$ 82 no cartão. Prazo de 5 a 10 dias úteis. Quer que eu marque a retirada?", detalhamento: "Mão de obra: R$ 160\nCouro sintético: 2 m × R$ 40 = R$ 80\nEspuma: 2 assentos 0,5 m × 5 cm × R$ 27 = R$ 68\nCusto: R$ 308 ÷ 0,70 = R$ 440 → Pix R$ 450\nFrete: incluído", valor_pix: 450, valor_cartao: 492, parcela: 82, versao: 2, status: "aguardando", criado_em: "2026-10-16T10:52:00Z" },
   { id: "pr3", cliente_nome: "Ana Paula", titulo: "Poltrona — troca de tecido", texto_cliente: "Oi, Ana! O orçamento da poltrona ficou em R$ 650 no Pix.", valor_pix: 650, status: "enviada", enviado_em: new Date(Date.now() - 3 * 36e5).toISOString(), versao: 1 },
 ];
@@ -6924,7 +6927,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   </>;
 }
 // O CARD SOZINHO NA TELA (ver CompromissoCard). Reusa a ListaLateral (mesmo visual, fecha no voltar, tocando fora
-// ou arrastando). Anterior/Próximo seguem os cards VISÍVEIS da mesma lista de onde este veio (os encadeados da
+// ou arrastando). Deslizar pro lado segue os cards VISÍVEIS da mesma lista de onde este veio (os encadeados da
 // rota ficam lado a lado), sem precisar voltar: fecha este foco e toca no cabeçalho do vizinho, que abre o seu.
 function FocoDoCard({ props, onFechar }) {
   const a = props.a;
@@ -6953,13 +6956,26 @@ function FocoDoCard({ props, onFechar }) {
     if (!alvo) return;
     vibrar(6); FOCO.abrir(idDe(alvo));
   };
+  // DESLIZAR PRO LADO TROCA DE CARD (Diego, 16/10/2026, 20h24: "botão só de voltar e deslizar para o próximo
+  // cliente"). Pra esquerda = próximo, pra direita = anterior. Só conta o gesto bem de lado (60px e 1,5x mais
+  // horizontal que vertical), senão é rolagem do card. Campo de texto não troca de card.
+  const toque = React.useRef(null);
+  const gestoInicio = (e) => { toque.current = e.touches.length === 1 && !e.target.closest("input, textarea, select") ? { x: e.touches[0].clientX, y: e.touches[0].clientY, dy: 0 } : null; };
+  const gestoMove = (e) => { const t = toque.current; if (t && e.touches.length === 1) t.dy = Math.max(t.dy, Math.abs(e.touches[0].clientY - t.y)); };
+  const gestoFim = (e) => {
+    const t = toque.current; toque.current = null;
+    if (!t || !e.changedTouches.length) return;
+    const dx = e.changedTouches[0].clientX - t.x, dy = Math.max(t.dy, Math.abs(e.changedTouches[0].clientY - t.y));
+    if (Math.abs(dx) < 60 || Math.abs(dx) < dy * 1.5) return;
+    ir(dx < 0 ? 1 : -1);
+  };
   const quando = `${compactDate(a.data)}${a.hora ? ` · ${a.hora.slice(0, 5)}` : ""}`;
-  return <ListaLateral cabecalho={<><p className="kicker">{pos.n > 1 ? `Card ${pos.i + 1} de ${pos.n}` : "Card"}</p><h2>{quando}</h2></>} onFechar={onFechar} semGestos>
-    <CompromissoCard {...props} emFoco onSairFoco={onFechar} />
+  return <ListaLateral cabecalho={<><p className="kicker">{pos.n > 1 ? `Card ${pos.i + 1} de ${pos.n}` : "Card"}</p><h2>{quando}</h2>{pos.n > 1 && <span className="foco-dica">{pos.i > 0 ? "‹ " : ""}deslize pro lado pra trocar de card{pos.i < pos.n - 1 ? " ›" : ""}</span>}</>} onFechar={onFechar} semGestos>
+    <div className="foco-deslize" onTouchStart={gestoInicio} onTouchMove={gestoMove} onTouchEnd={gestoFim} onTouchCancel={() => { toque.current = null; }}>
+      <CompromissoCard {...props} emFoco onSairFoco={onFechar} />
+    </div>
     <div className="foco-nav">
-      <button type="button" disabled={pos.i <= 0} onClick={() => ir(-1)}>‹ Anterior</button>
       <button type="button" className="foco-voltar" onClick={onFechar}>Voltar</button>
-      <button type="button" disabled={pos.i >= pos.n - 1} onClick={() => ir(1)}>Próximo ›</button>
     </div>
   </ListaLateral>;
 }
@@ -7232,7 +7248,7 @@ const PROPOSTA_STATUS = { aguardando: "esperando você", aprovada: "aprovada · 
 const propostaJaFoi = (p) => p.status === "enviada" || !!p.enviado_em;
 const propostaDesfazivel = (p) => p.status === "aprovada" && !p.enviado_em;
 const horaCurta = (iso) => { try { return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
-function PropostasCard({ propostas, db, demo, notify, onChanged }) {
+function PropostasCard({ propostas, customers = [], services = [], db, demo, notify, onChanged }) {
   const [abertaId, setAbertaId] = useState(null);
   const [confirmando, setConfirmando] = useState(false);
   const [recadoAberto, setRecadoAberto] = useState(false);
@@ -7316,6 +7332,9 @@ function PropostasCard({ propostas, db, demo, notify, onChanged }) {
       if (onChanged && !demo) onChanged();
     } catch (e) { notify("Não desfez: " + (e.message || e), "error"); } finally { setBusy(false); }
   };
+  // WHATSAPP DO CLIENTE NA PROPOSTA (Diego, 16/10/2026: "na proposta quero botão do WhatsApp do cliente"). O número
+  // vem da ficha do cliente; sem cliente_id, do cliente do serviço da proposta.
+  const telDe = (p) => telefoneWhatsapp((customers || []).find((c) => c.id === p.cliente_id)?.telefone) || telefoneWhatsapp((services || []).find((s) => s.id === p.servico_id)?.clientes?.telefone);
   const valor = (p) => Number(p.valor_pix) ? `${moneyInteiro(Number(p.valor_pix))} Pix${Number(p.parcela) ? ` · 6x ${moneyInteiro(Number(p.parcela))}` : ""}` : "";
   const item = (p, decidida) => <article key={p.id} className={`proposta-item${decidida ? " decidida" : ""}`} onClick={() => setAbertaId(p.id)}>
     <div className="proposta-txt">
@@ -7342,6 +7361,7 @@ function PropostasCard({ propostas, db, demo, notify, onChanged }) {
         <p className="kicker">O QUE VAI PRO CLIENTE</p>
         <p className="proposta-texto">{aberta.texto_cliente}</p>
         <button type="button" className="ghost" onClick={() => copiar(aberta.texto_cliente)}>📋 Copiar o texto</button>
+        {telDe(aberta) && <a className="btn-wpp proposta-wpp" href={urlWhatsapp(telDe(aberta), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp · {String(aberta.cliente_nome || "cliente").trim().split(/\s+/)[0]}</a>}
         {aberta.detalhamento && <details className="proposta-detalhe" open><summary>Como chegou nesse valor</summary><pre>{aberta.detalhamento}</pre></details>}
         {aberta.recado && <p className="compromisso-material">✍️ Seu recado anterior: {aberta.recado}</p>}
         {aberta.status !== "aguardando" && <div className="proposta-feita">
@@ -9251,7 +9271,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
     {/* PROPOSTAS DE ORÇAMENTO (Diego, 16/10/2026, 08h46): antes da agenda do dia porque é dinheiro parado esperando um toque. */}
-    {!!propostas.length && <PropostasCard propostas={propostas} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />}
+    {!!propostas.length && <PropostasCard propostas={propostas} customers={customers} services={services} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />}
     <CardRecolhivel id="secao-hoje" className="content-card hoje-card"
       cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
       <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${rotinasPendentesHoje} rotina(s)` : ""}</h3>
