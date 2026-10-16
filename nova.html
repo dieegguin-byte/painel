@@ -169,7 +169,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-card.followup-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
 /* CARTÃO "Agendar contato com …" (Diego, 15/10/2026): a Manu pergunta se agenda um contato pela Zapia; mesma cor do Follow-up 1. */
 .duvida.contato-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
-.compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}
+.compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}.adiar-linha{display:flex;justify-content:flex-end;margin-top:8px}.adiar-linha button{min-height:40px;font-size:12px;padding:0 14px}
 .compromisso-card .compromisso-corpo{margin-top:13px}
 /* CALCULADORA RÁPIDA (Diego, 16/10/2026) */
 .calc-card{width:min(460px,100%)}
@@ -6191,6 +6191,14 @@ function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppoi
 }
 
 const AcoesAgendaCtx = React.createContext(null);
+// Botão "Adiar 1h" direto no card atrasado da lista (ver adiar1h). Fica fora do botão do cabeçalho pra não abrir o foco.
+function BotaoAdiar1h({ a, acoes }) {
+  const [ocupado, setOcupado] = useState(false);
+  return <div className="adiar-linha"><button type="button" className="ghost" disabled={ocupado} onClick={async (e) => {
+    e.stopPropagation(); if (ocupado) return; vibrar(6); setOcupado(true);
+    try { await acoes.adiar1h(a); alarmeSilenciar(a.id); } catch (err) { acoes.notify("Não deu pra adiar: " + (err?.message || err), "error"); } finally { setOcupado(false); }
+  }}>{ocupado ? "…" : "⏰ Adiar 1h"}</button></div>;
+}
 // CADASTRO DE PROFISSIONAIS NOS CARDS (Diego, 12/10/2026, "Sim, mudar"): o card de compromisso recebe só os
 // NOMES (nomesProfissionais); o telefone vem do cadastro, por contexto, pra não enfiar mais uma prop em
 // Dashboard/Agenda/Hoje. Lista de { id, nome, apelido, telefone, ativo }.
@@ -6365,7 +6373,31 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     return data?.signedUrl || null;
   }, [db, demo, notify]);
 
-  return useMemo(() => ({ recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, notify }), [recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, notify]);
+  // ADIAR 1 HORA NO CARD ATRASADO (Diego, 16/10/2026, 13h47, print da lista "Precisa resolver": "colocar um botão aqui
+  // adiar 1 hora aqui também" — o alarme já tinha). Conta de AGORA, não da hora marcada (senão o card de 08h32 adiado
+  // pra 09h32 continuaria atrasado), arredondado pros 5 min seguintes, e a data vira hoje. Mesma vaga de minuto em
+  // minuto do alarme quando bate em outro card na mesma data+hora.
+  const adiar1h = useCallback(async (a) => {
+    const agora = new Date();
+    const m = Math.min(Math.ceil((agora.getHours() * 60 + agora.getMinutes() + 60) / 5) * 5, 23 * 60 + 50);
+    const data = hojeISO();
+    if (demo) { setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, data, hora: `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}:00` } : x)); notify("Adiado 1 hora (demo).", "ok"); return true; }
+    let gravou = null, erro = null;
+    for (let extra = 0; extra < 6 && !gravou; extra++) {
+      const mm = m + extra; const hora = `${String(Math.floor(mm / 60)).padStart(2, "0")}:${String(mm % 60).padStart(2, "0")}:00`;
+      const { data: linha, error } = await db.from("agenda").update({ data, hora }).eq("id", a.id).eq("status", "planejado").select("id").maybeSingle();
+      if (!error) { if (!linha) throw new Error("esse card já saiu da agenda — recarregue o app"); gravou = hora; break; }
+      erro = error; if (!/duplicate|unique|23505/i.test(error.message || "")) break;
+    }
+    if (!gravou) throw erro || new Error("não deu pra adiar");
+    try { await db.from("historico").insert({ o_que: `Adiado 1h: ${a.titulo}`, por: "diego", detalhe: `Pelo card atrasado, de ${a.data}${a.hora ? " " + String(a.hora).slice(0, 5) : ""} para hoje ${gravou.slice(0, 5)}.` }); } catch (e) { /* segue */ }
+    setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, data, hora: gravou } : x));
+    notify(`Adiado pra ${gravou.slice(0, 5)}. Aviso de novo na hora nova.`, "ok");
+    if (onChanged) onChanged();
+    return true;
+  }, [db, demo, notify, onChanged, setAppointments]);
+
+  return useMemo(() => ({ recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify }), [recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify]);
 }
 
 // Selo SEMPRE visível (fora do corpo recolhido): remarcação do Claude esperando conferência e recados que a
@@ -6763,6 +6795,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       </span>
       <span className="compromisso-seta">{emFoco ? "" : "›"}</span>
     </button>
+    {!emFoco && acoes?.adiar1h && !a.pessoal_id && (diasAtraso > 0 || passouDaHora) && <BotaoAdiar1h a={a} acoes={acoes} />}
     {revisaoData && <p className="revisao-data">Remarcação pendente · idade calculada pela data original. A data precisa de revisão.</p>}
     {acoes && <SelosClaudeDoCard a={a} acoes={acoes} onMudar={() => { if (!emFoco) FOCO.abrir(chaveFoco); }} />}
     {/* "⚠ Parece duplicado" SAIU DO CARD (Diego, 15/10/2026: "se tá uma coisa em dúvida, não deveria voltar para você?").
