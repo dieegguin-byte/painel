@@ -925,6 +925,17 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .pessoais-card .card-toggle h3{font-size:16px;font-weight:600}
 .pessoal-alerta{color:#ff9d8f!important;font-weight:600}
 .pessoais-lista{display:flex;flex-direction:column;gap:8px}
+/* PROPOSTAS DE ORÇAMENTO (16/10/2026): lista curta; o item abre a proposta inteira por cima (ListaLateral). */
+.proposta-item{display:flex;gap:10px;background:linear-gradient(150deg,#ffffff0c,#ffffff02 50%),var(--surface);border:1px solid var(--line);border-left:3px solid var(--orange);border-radius:14px;padding:11px 12px;cursor:pointer}
+.proposta-item.decidida{opacity:.6;cursor:default;border-left-color:var(--line2)}
+.proposta-txt{flex:1;min-width:0}.proposta-txt strong{display:block;font-size:15px;line-height:1.3;color:var(--cream)}
+.proposta-txt span{display:block;font-size:12px;color:var(--muted);margin-top:2px}.proposta-txt em{display:block;font-size:11px;color:var(--orange2);font-style:normal;margin-top:4px}
+.proposta-versao{font-style:normal;font-size:10px;font-weight:800;margin-left:6px;padding:2px 7px;border-radius:999px;background:var(--orange);color:#fff}
+.proposta-aberta .proposta-texto{white-space:pre-wrap;font-size:15px;line-height:1.5;color:var(--cream);margin:6px 0 10px}
+.proposta-detalhe{margin:12px 0}.proposta-detalhe summary{cursor:pointer;color:var(--orange2);font-size:13px}.proposta-detalhe pre{white-space:pre-wrap;font:13px/1.5 Inter,system-ui,sans-serif;color:var(--muted);margin:8px 0 0}
+.proposta-acoes{margin-top:14px}.proposta-acoes .primary{flex:1 1 100%;min-height:46px;font-size:15px}
+.proposta-confirma{margin-top:14px;padding:12px;border-radius:12px;background:#d86d3618;border:1px solid #d86d3655}.proposta-confirma p{margin:0 0 10px;font-size:14px;color:var(--cream)}
+.proposta-confirma textarea{width:100%;box-sizing:border-box;margin-bottom:8px}
 .pessoal-item{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;background:linear-gradient(150deg,#ffffff0c,#ffffff02 50%),var(--surface);border:1px solid var(--line);border-left:3px solid #8fb8dc;border-radius:14px;padding:11px 12px;box-shadow:inset 0 1px 0 #ffffff10,0 1px 2px #0000004d}
 .pessoal-item.atrasado{border-left-color:var(--red);border-color:#d9534f55;background:linear-gradient(150deg,#d9534f1f,#d9534f08 60%),var(--surface)}
 .pessoal-item.encerrado{opacity:.6}
@@ -1768,6 +1779,11 @@ const demoDividas = [
 ];
 // Três casos de propósito: um pendente no futuro, um que a data já passou (tem que virar ATRASADO sozinho,
 // sem ninguém escrever nada) e um concluído, que prova que Concluir não apaga.
+// PROPOSTAS DE ORÇAMENTO (Diego, 16/10/2026): o que a rotina de orçamento grava em `propostas` pra ele aprovar no app.
+const demoPropostas = [
+  { id: "pr1", cliente_nome: "Edna", titulo: "Sofá 3 lugares — reforma em suede amassado", texto_cliente: "Oi, Edna! Fechei aqui o orçamento do seu sofá de 3 lugares: reforma completa em suede amassado, com troca da espuma do assento, busca e entrega incluídas. Fica R$ 2.350 no Pix ou até 6x de R$ 427 no cartão. Prazo de 10 a 15 dias úteis depois que a peça chega na oficina. Posso agendar a retirada?", detalhamento: "Mão de obra: R$ 700\nTecido: 12 m × R$ 9 = R$ 108 (suede amassado)\nEspuma: assento 3 m × 7 cm × R$ 27 = R$ 567\nAviamentos: R$ 35\nCusto: R$ 1.410 ÷ 0,60 (Luziânia) = R$ 2.350\nFrete: incluído (R$ 0)\nArredondamento: Pix em passos de 50 → R$ 2.350; 6x = 2.350 ÷ 0,9172 ÷ 6 = R$ 427", valor_pix: 2350, valor_cartao: 2562, parcela: 427, versao: 1, status: "aguardando", criado_em: "2026-10-16T10:40:00Z" },
+  { id: "pr2", cliente_nome: "João Pereira", titulo: "2 cadeiras — assento em couro sintético", texto_cliente: "Oi, João! O orçamento das duas cadeiras: assento novo em couro sintético, espuma D33 nova, busca e entrega incluídas. Fica R$ 450 no Pix ou até 6x de R$ 82 no cartão. Prazo de 5 a 10 dias úteis. Quer que eu marque a retirada?", detalhamento: "Mão de obra: R$ 160\nCouro sintético: 2 m × R$ 40 = R$ 80\nEspuma: 2 assentos 0,5 m × 5 cm × R$ 27 = R$ 68\nCusto: R$ 308 ÷ 0,70 = R$ 440 → Pix R$ 450\nFrete: incluído", valor_pix: 450, valor_cartao: 492, parcela: 82, versao: 2, status: "aguardando", criado_em: "2026-10-16T10:52:00Z" },
+];
 const demoPessoais = [
   { id: "p1", titulo: "Compromisso pessoal — esposa", data_alvo: "2026-11-24", hora: "20:00", cidade: "Luziânia-GO", status: "PENDENTE", impacto_operacao: "BLOQUEIA_DISPONIBILIDADE", origem: "classic", remarcacoes: 0 },
   { id: "p2", titulo: "Apresentação na escola do filho", data_alvo: "2026-08-10", hora: null, cidade: "Luziânia-GO", status: "PENDENTE", impacto_operacao: "A_CONFIRMAR", origem: "grupo", referencia_origem: "grupo da escola", remarcacoes: 0 },
@@ -4009,6 +4025,7 @@ function Home() {
   // O QUE O AGENTE FEZ (Diego 12/10/2026): linhas de `historico` escritas pelas rotinas (por agente/auditoria/claude).
   const [atividadeAgente, setAtividadeAgente] = useState([]);
   const [duvidasAgente, setDuvidasAgente] = useState([]);
+  const [propostas, setPropostas] = useState([]); // propostas de orçamento esperando o Aprovar/Recado dele (16/10/2026)
   const [menuTopo, setMenuTopo] = useState(false);
   // DÍVIDAS (recado de 13/09/2026, caso Raquel R$ 1.489,89). Obrigação viva sem vencimento — não é linha de
   // financeiro. Até aqui o app nunca lia a tabela: a dívida existia certa no banco e invisível na tela.
@@ -4114,6 +4131,7 @@ function Home() {
     setAvisos(p.avisos || []);
     setAtividadeAgente(p.atividadeAgente || []);
     setDuvidasAgente(p.duvidasAgente || []);
+    setPropostas(p.propostas || []);
     // Dívidas entram no pacote (e no cache offline): sem sinal, a dívida não pode sumir e parecer quitada.
     setDividas(p.dividas || []);
     setProfissionais(p.profissionais || []);
@@ -4124,13 +4142,13 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setAtividadeAgente(demoAtividadeAgente); setDuvidasAgente(demoDuvidas); setDividas(demoDividas); setProfissionais(demoProfissionais); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setAtividadeAgente(demoAtividadeAgente); setDuvidasAgente(demoDuvidas); setPropostas(demoPropostas); setDividas(demoDividas); setProfissionais(demoProfissionais); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
-    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da, firstError;
+    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da, pr, firstError;
     try {
-      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da] = await Promise.all([
+      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da, pr] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
@@ -4182,6 +4200,9 @@ function Home() {
         // DÚVIDAS DO AGENTE (Diego, 12/10/2026): as abertas (ele responde no Painel), as respondidas que o
         // agente ainda não aplicou, e as que viraram regra (vale_sempre). Camada de apoio como `av`/`hs`.
         db.from("duvidas_agente").select("*").or("status.in.(aberta,respondida),vale_sempre.eq.true").order("criado_em", { ascending: false }).limit(80),
+        // PROPOSTAS DE ORÇAMENTO (Diego, 16/10/2026): camada de apoio como `da`. As que esperam o Aprovar/Recado dele e
+        // as já decididas que a Manu ainda não passou adiante. Se a tabela ainda não existir, o app abre normal sem o card.
+        db.from("propostas").select("*").in("status", ["aguardando", "aprovada", "recado"]).order("criado_em", { ascending: false }).limit(40),
       ]);
       // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
       // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
@@ -4200,7 +4221,7 @@ function Home() {
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
     setOfflineDesde(null);
-    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [], duvidasAgente: da?.data || [] };
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [], duvidasAgente: da?.data || [], propostas: pr?.data || [] };
     aplicarPacote(pacote);
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
@@ -5058,7 +5079,7 @@ function Home() {
           antes a aba trocava a página inteira por ./estoque.html; se ela não carregasse, ficava branco e sem volta.
           Agora é um quadro dentro da tela, e as outras abas continuam a um toque. */}
       {tab === "estoque" && <iframe title="Estoque" src="./estoque.html" style={{ width: "100%", height: "calc(100dvh - 150px)", minHeight: 480, border: 0, borderRadius: 12, background: "transparent" }} />}
-      {tab === "painel" && <Dashboard anotarInicial={anotarInicial} inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} atividadeAgente={atividadeAgente} duvidasAgente={duvidasAgente} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} onVerClientes={() => setTab("clientes")} onVerFornecedores={() => setTab("fornecedores")} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
+      {tab === "painel" && <Dashboard anotarInicial={anotarInicial} inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} atividadeAgente={atividadeAgente} duvidasAgente={duvidasAgente} propostas={propostas} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} onVerClientes={() => setTab("clientes")} onVerFornecedores={() => setTab("fornecedores")} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
       {tab === "caixa" && <CaixaView inbox={inbox} abrirId={caixaAbrirId} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
       {/* `addInbox` VOLTOU pro Painel (Painel único, etapa 2, 11/10/2026): o card "Anotar agora" tinha saído
           porque o Diego não lançava mais pelo app; agora ele é o botão flutuante "+ Anotar", que salva na
@@ -7096,6 +7117,92 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = fal
 // lembrete que ele vê passar e ignora — a data chegar não prova que a coisa foi feita. Por isso ATRASADO
 // é DERIVADO, nunca gravado: a passagem da data não escreve nada no banco. Se escrevesse, "venceu" viraria
 // um evento, e um dia alguém confundiria evento com cumprimento. Só ação explícita muda o estado.
+// PROPOSTA DE ORÇAMENTO COMO CARD (Diego, 16/10/2026, 08h46: "botões aprovar com confirmação... se aprovar, a Manu manda
+// pra Zapia, a Zapia manda pro cliente. Se tem algo pra mudar, eu deixo só o recado; a Manu volta com a proposta
+// corrigida e eu aprovo"). NAVEGAÇÃO (08h48): primeiro a lista; o item abre uma camada por cima, como aba nova, com
+// Voltar/Fechar, pra nada ficar cortado. O toque em Aprovar (confirmado) vale como o "manda" dele para AQUELE texto:
+// o app grava status=aprovada e também deixa uma linha na Caixa, que a Manu já lê de hora em hora — assim o pedido
+// chega mesmo antes de a rotina dela aprender a tabela `propostas`. O recado faz o mesmo com status=recado.
+const PROPOSTA_STATUS = { aguardando: "esperando você", aprovada: "aprovada · a Manu passa pra Zapia", recado: "com recado · o orçamento refaz", enviada: "enviada ao cliente" };
+function PropostasCard({ propostas, db, demo, notify, onChanged }) {
+  const [abertaId, setAbertaId] = useState(null);
+  const [confirmando, setConfirmando] = useState(false);
+  const [recadoAberto, setRecadoAberto] = useState(false);
+  const [recado, setRecado] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [feitas, setFeitas] = useState({}); // id → status já gravado neste aparelho (a lista não espera o reload)
+  const lista = (propostas || []).map((p) => feitas[p.id] ? { ...p, status: feitas[p.id] } : p);
+  const esperando = lista.filter((p) => p.status === "aguardando");
+  const decididas = lista.filter((p) => p.status !== "aguardando");
+  const aberta = lista.find((p) => p.id === abertaId) || null;
+  const fechar = () => { setAbertaId(null); setConfirmando(false); setRecadoAberto(false); setRecado(""); };
+  const copiar = async (texto) => { try { await navigator.clipboard.writeText(texto); vibrar(6); notify("Texto copiado.", "ok"); } catch (e) { notify("Não consegui copiar — segure no texto.", "error"); } };
+  const gravar = async (p, status, extra, linhaCaixa) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      if (!demo) {
+        const agora = new Date().toISOString();
+        const { data, error } = await db.from("propostas").update({ status, decidido_em: agora, ...extra }).eq("id", p.id).eq("status", "aguardando").select("id").maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error("essa proposta já foi decidida ou substituída — recarregue o app");
+        const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: linhaCaixa, status: "novo", conversa: [], processado: false });
+        if (cxErr) throw cxErr;
+        try { await db.from("historico").insert({ o_que: `${status === "aprovada" ? "Aprovou" : "Recado na"} proposta: ${p.cliente_nome}${p.titulo ? " — " + p.titulo : ""}`, por: "diego", detalhe: status === "aprovada" ? "Pelo card do app; a Manu passa pra Zapia." : extra.recado }); } catch (e) { /* segue */ }
+      }
+      setFeitas((f) => ({ ...f, [p.id]: status }));
+      notify(status === "aprovada" ? "Aprovada. A Manu passa pra Zapia na próxima rodada e ela manda pro cliente." : "Recado guardado. O orçamento refaz e a proposta corrigida volta aqui.", "ok");
+      fechar();
+      if (onChanged && !demo) onChanged();
+    } catch (e) { notify("Não salvou: " + (e.message || e), "error"); } finally { setBusy(false); }
+  };
+  const aprovar = (p) => gravar(p, "aprovada", {}, `PROPOSTA APROVADA — ${p.cliente_nome}${p.titulo ? " — " + p.titulo : ""} (propostas.id ${p.id}, v${p.versao || 1}). O Diego aprovou pelo card: passar o texto_cliente EXATO pra Zapia por recado, pra ela mandar ao cliente, e marcar propostas.status = enviada com enviado_em.`);
+  const mandarRecado = (p) => { const t = recado.trim(); if (!t) { notify("Escreva o que mudar primeiro.", "error"); return; } gravar(p, "recado", { recado: t }, `PROPOSTA — RECADO DO DIEGO — ${p.cliente_nome}${p.titulo ? " — " + p.titulo : ""} (propostas.id ${p.id}, v${p.versao || 1}): "${t}". Levar ao orçamento: refazer e gravar a proposta corrigida como nova linha em propostas (substitui_id = esta, versao + 1, status aguardando).`); };
+  const valor = (p) => Number(p.valor_pix) ? `${moneyInteiro(Number(p.valor_pix))} Pix${Number(p.parcela) ? ` · 6x ${moneyInteiro(Number(p.parcela))}` : ""}` : "";
+  const item = (p, decidida) => <article key={p.id} className={`proposta-item${decidida ? " decidida" : ""}`} onClick={() => !decidida && setAbertaId(p.id)}>
+    <div className="proposta-txt">
+      <strong>{p.cliente_nome}{p.versao > 1 ? <i className="proposta-versao">v{p.versao}</i> : null}</strong>
+      <span>{p.titulo || "proposta"}{valor(p) ? " · " + valor(p) : ""}</span>
+      {decidida ? <em>{PROPOSTA_STATUS[p.status] || p.status}</em> : <em>toque pra ler e aprovar ›</em>}
+    </div>
+  </article>;
+  return <>
+    <section className="content-card propostas-card com-selo tom-laranja">
+      <div className="card-head"><div><p className="kicker">PROPOSTAS DE ORÇAMENTO</p>
+        <h3>{esperando.length ? `${esperando.length} esperando você` : "Nenhuma esperando você"}</h3>
+        {!!decididas.length && <span className="ficha-note" style={{ margin: 0 }}>{decididas.length} já decidida(s), a caminho</span>}</div></div>
+      <div className="pessoais-lista">{esperando.map((p) => item(p, false))}{decididas.map((p) => item(p, true))}</div>
+    </section>
+    {aberta && ReactDOM.createPortal(<ListaLateral cabecalho={<><p className="kicker">PROPOSTA{aberta.versao > 1 ? ` · V${aberta.versao} (CORRIGIDA)` : ""}</p><h2>{aberta.cliente_nome}</h2>{aberta.titulo && <span className="ficha-note" style={{ margin: 0 }}>{aberta.titulo}</span>}</>} onFechar={fechar} semGestos>
+      <section className="content-card proposta-aberta">
+        <p className="kicker">O QUE VAI PRO CLIENTE</p>
+        <p className="proposta-texto">{aberta.texto_cliente}</p>
+        <button type="button" className="ghost" onClick={() => copiar(aberta.texto_cliente)}>📋 Copiar o texto</button>
+        {aberta.detalhamento && <details className="proposta-detalhe" open><summary>Como chegou nesse valor</summary><pre>{aberta.detalhamento}</pre></details>}
+        {aberta.recado && <p className="compromisso-material">✍️ Seu recado anterior: {aberta.recado}</p>}
+        {!confirmando && !recadoAberto && <div className="ficha-actions proposta-acoes">
+          <button type="button" className="primary" disabled={busy} onClick={() => setConfirmando(true)}>✅ Aprovar e mandar</button>
+          <button type="button" className="ghost" disabled={busy} onClick={() => setRecadoAberto(true)}>✍️ Recado pra mudar</button>
+        </div>}
+        {confirmando && <div className="proposta-confirma">
+          <p>Tem certeza? A Manu passa esse texto pra Zapia e ela manda pro cliente. Depois não dá pra mudar.</p>
+          <div className="ficha-actions">
+            <button type="button" className="primary" disabled={busy} onClick={() => aprovar(aberta)}>{busy ? "…" : "Sim, manda"}</button>
+            <button type="button" className="ghost" disabled={busy} onClick={() => setConfirmando(false)}>Voltar</button>
+          </div>
+        </div>}
+        {recadoAberto && <div className="proposta-confirma">
+          <textarea rows={4} value={recado} placeholder="O que mudar? Ex.: tira a espuma do braço, deixa o prazo em 20 dias, sobe pra 2.500." onChange={(e) => setRecado(e.target.value)} autoFocus />
+          <div className="ficha-actions">
+            <button type="button" className="primary" disabled={busy} onClick={() => mandarRecado(aberta)}>{busy ? "…" : "Enviar recado"}</button>
+            <button type="button" className="ghost" disabled={busy} onClick={() => { setRecadoAberto(false); setRecado(""); }}>Voltar</button>
+          </div>
+        </div>}
+      </section>
+      <div className="foco-nav"><button type="button" className="foco-voltar" onClick={fechar}>Voltar</button></div>
+    </ListaLateral>, document.body)}
+  </>;
+}
 function pessoalAtrasado(p, hoje) { return p.status === "PENDENTE" && !!p.data_alvo && p.data_alvo < hoje; }
 const PESSOAL_ASSINATURA_GPT = "PAINEL — ABRIR COMPROMISSO PESSOAL";
 const PESSOAL_INSTRUCAO_GPT = "Localize o compromisso pessoal atual pelo identificador acima antes de responder. Se qualquer ação puder alterar a disponibilidade da Operação Bahia, considere também o bloqueio operacional vinculado. Não trate este texto compartilhado como prova de estado atual e não invente detalhes pessoais ausentes.";
@@ -8594,7 +8701,7 @@ function RegrasAprendidasCard({ duvidas, db, demo, notify, onChanged }) {
     </div>)}
   </CardRecolhivel>;
 }
-function Dashboard({ anotarInicial = false, inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, atividadeAgente = [], duvidasAgente = [], finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, onVerLeads, onVerOrcamentos, onVerAgenda, onVerEstoque, onVerClientes, onVerFornecedores, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+function Dashboard({ anotarInicial = false, inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, atividadeAgente = [], duvidasAgente = [], propostas = [], finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, onVerLeads, onVerOrcamentos, onVerAgenda, onVerEstoque, onVerClientes, onVerFornecedores, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
   const [filtroTipo, setFiltroTipo] = useState("todos");
   // Gaveta do botão flutuante "Anotar" (Painel único, etapa 2, 11/10/2026).
   const [anotarAberto, setAnotarAberto] = useState(!!anotarInicial);
@@ -8972,6 +9079,8 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     </CardRecolhivel>}
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
+    {/* PROPOSTAS DE ORÇAMENTO (Diego, 16/10/2026, 08h46): antes da agenda do dia porque é dinheiro parado esperando um toque. */}
+    {!!propostas.length && <PropostasCard propostas={propostas} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />}
     <CardRecolhivel id="secao-hoje" className="content-card hoje-card"
       cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
       <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${rotinasPendentesHoje} rotina(s)` : ""}</h3>
