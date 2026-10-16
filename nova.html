@@ -169,7 +169,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-card.followup-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
 /* CARTÃO "Agendar contato com …" (Diego, 15/10/2026): a Manu pergunta se agenda um contato pela Zapia; mesma cor do Follow-up 1. */
 .duvida.contato-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
-.compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}.adiar-linha{display:flex;justify-content:flex-end;margin-top:8px}.adiar-linha button{min-height:40px;font-size:12px;padding:0 14px}
+.compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}.adiar-linha{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}.adiar-linha button{min-height:40px;font-size:12px;padding:0 14px}
 .compromisso-card .compromisso-corpo{margin-top:13px}
 /* CALCULADORA RÁPIDA (Diego, 16/10/2026) */
 .calc-card{width:min(460px,100%)}
@@ -6191,13 +6191,20 @@ function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppoi
 }
 
 const AcoesAgendaCtx = React.createContext(null);
-// Botão "Adiar 1h" direto no card atrasado da lista (ver adiar1h). Fica fora do botão do cabeçalho pra não abrir o foco.
+// Botões "Feito" e "Adiar 1h" direto no card atrasado da lista, iguais aos da notificação do celular (Diego, 16/10/2026,
+// 14h14: "tem que colocar um botão lá feito, porque é coisa rápida"). O Feito é o mesmo de dentro do card (acoes.enviar,
+// sem confirmação, com o ↶ Desfazer da faixa "Enviado ao Claude"; card de pagar ligado já baixa a conta em Dinheiro).
+// Ficam fora do botão do cabeçalho pra não abrir o foco; tocar no resto do card continua abrindo o card.
 function BotaoAdiar1h({ a, acoes }) {
-  const [ocupado, setOcupado] = useState(false);
-  return <div className="adiar-linha"><button type="button" className="ghost" disabled={ocupado} onClick={async (e) => {
-    e.stopPropagation(); if (ocupado) return; vibrar(6); setOcupado(true);
-    try { await acoes.adiar1h(a); alarmeSilenciar(a.id); } catch (err) { acoes.notify("Não deu pra adiar: " + (err?.message || err), "error"); } finally { setOcupado(false); }
-  }}>{ocupado ? "…" : "⏰ Adiar 1h"}</button></div>;
+  const [ocupado, setOcupado] = useState(null);
+  const tocar = (qual, fn) => async (e) => {
+    e.stopPropagation(); if (ocupado) return; vibrar(6); setOcupado(qual);
+    try { await fn(); alarmeSilenciar(a.id); } catch (err) { acoes.notify((qual === "feito" ? "Não salvou: " : "Não deu pra adiar: ") + (err?.message || err), "error"); } finally { setOcupado(null); }
+  };
+  return <div className="adiar-linha">
+    {acoes.enviar && <button type="button" className="primary" disabled={!!ocupado} onClick={tocar("feito", () => acoes.enviar(a, { acao: "feito" }))}>{ocupado === "feito" ? "…" : "✅ Feito"}</button>}
+    <button type="button" className="ghost" disabled={!!ocupado} onClick={tocar("adiar", () => acoes.adiar1h(a))}>{ocupado === "adiar" ? "…" : "⏰ Adiar 1h"}</button>
+  </div>;
 }
 // CADASTRO DE PROFISSIONAIS NOS CARDS (Diego, 12/10/2026, "Sim, mudar"): o card de compromisso recebe só os
 // NOMES (nomesProfissionais); o telefone vem do cadastro, por contexto, pra não enfiar mais uma prop em
