@@ -5997,7 +5997,8 @@ function PessoalDetalhe({ p, a, today }) {
   // aqui é o único jeito de ele perceber — o card mostra a data da agenda no cabeçalho.
   if (a && !a.pessoal_virtual && p.data_alvo && a.data !== p.data_alvo) linhas.push(["⚠ DATA DIFERENTE", `a agenda está em ${compactDate(a.data)}, o registro pessoal em ${compactDate(p.data_alvo)}`]);
   linhas.push(["SITUAÇÃO", pessoalAtrasado(p, today) ? "⚠ ATRASADO" : (p.status || "—")]);
-  linhas.push(["IMPACTO", IMPACTO_PESSOAL_ROTULO[p.impacto_operacao] || p.impacto_operacao || "não informado"]);
+  // Só o que muda a agenda dele; "a confirmar" é dúvida do sistema e não aparece no card (regra do projeto).
+  if (p.impacto_operacao === "BLOQUEIA_DISPONIBILIDADE") linhas.push(["IMPACTO", IMPACTO_PESSOAL_ROTULO[p.impacto_operacao]]);
   if (Number(p.remarcacoes) > 0) linhas.push(["REMARCADO", `${p.remarcacoes}x${p.remarcado_de ? " · antes era " + compactDate(p.remarcado_de) : ""}`]);
   if (p.referencia_origem) linhas.push(["DE ONDE VEIO", p.referencia_origem]);
   return <div className="compromisso-info">{linhas.map(([rotulo, texto]) => <React.Fragment key={rotulo}>
@@ -6256,6 +6257,36 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     return true;
   }, [db, demo, notify, onChanged, setAppointments]);
 
+  // PESSOAL ENTRA NORMAL NOS COMPROMISSOS (Diego, 16/10/2026, 08h04: "Pessoal tem que entrar normal nos compromissos";
+  // "atrasado me pede dia pra remarcar"). Cancelar encerra o registro pessoal (e o bloqueio da agenda, se houver).
+  // Remarcar NÃO pergunta data: com bloqueio na agenda vai pelo recado normal (a Manu escolhe o dia); sem bloqueio
+  // vira um pedido na Caixa pra Manu, e o item some da tela deste aparelho até ela mover.
+  const [pessoaisRemarcando, setPessoaisRemarcando] = useState(() => new Set());
+  const cancelarPessoal = useCallback(async (a) => {
+    if (demo) { setAppointments((prev) => prev.filter((x) => x.id !== a.id)); notify("Cancelado (demo).", "ok"); return true; }
+    const agora = new Date().toISOString();
+    const { error } = await db.from("pessoais").update({ status: "CANCELADO", atualizado_em: agora }).eq("id", a.pessoal_id).eq("status", "PENDENTE");
+    if (error) throw error;
+    await db.from("agenda").update({ status: "cancelado" }).eq("pessoal_id", a.pessoal_id).eq("status", "planejado");
+    try { await db.from("historico").insert({ o_que: `Cancelado: ${a.titulo}`, por: "diego", detalhe: "Pessoal, pelo card." }); } catch (e) { /* segue */ }
+    notify("Cancelado. Saiu da agenda.", "ok");
+    if (onChanged) onChanged();
+    return true;
+  }, [db, demo, notify, onChanged, setAppointments]);
+  const remarcarPessoal = useCallback(async (a, texto = "") => {
+    if (demo) { setAppointments((prev) => prev.filter((x) => x.id !== a.id)); setPessoaisRemarcando((prev) => new Set([...prev, a.pessoal_id])); notify("Anotado (demo).", "ok"); return true; }
+    const { data: bloqueio } = await db.from("agenda").select("*").eq("pessoal_id", a.pessoal_id).eq("status", "planejado").order("data").limit(1).maybeSingle();
+    if (bloqueio) return enviar(bloqueio, { acao: "remarcar", texto });
+    const quando = `${a.data || "sem data"}${a.hora ? " " + String(a.hora).slice(0, 5) : ""}`;
+    const pedido = `REMARCAR PESSOAL — ${a.titulo} (pessoais.id ${a.pessoal_id}, estava em ${quando}). O Diego pediu Remarcar pelo card e não escolhe data: escolher a próxima data livre, atualizar pessoais.data_alvo (e hora) e, se precisar segurar horário, criar o bloqueio na agenda com pessoal_id.${texto ? " Recado dele: " + texto : ""}`;
+    const { error } = await db.from("caixa_entrada").insert({ texto: pedido, status: "novo", conversa: [], processado: false });
+    if (error) throw error;
+    setPessoaisRemarcando((prev) => new Set([...prev, a.pessoal_id]));
+    notify(`Anotado. Sai da tela e volta na data nova que o Claude escolher (${HORARIOS_ROTINA_RECADOS}).`, "ok");
+    if (onChanged) onChanged();
+    return true;
+  }, [db, demo, notify, onChanged, setAppointments, enviar]);
+
   const manter = useCallback(async (a) => {
     if (demo) { setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, nota_claude_conferida: true } : x)); return; }
     const { error } = await db.from("agenda").update({ nota_claude_conferida: true }).eq("id", a.id);
@@ -6299,7 +6330,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     return data?.signedUrl || null;
   }, [db, demo, notify]);
 
-  return useMemo(() => ({ recados, enviar, concluirPessoal, manter, ouvir, desfazer, notify }), [recados, enviar, concluirPessoal, manter, ouvir, desfazer, notify]);
+  return useMemo(() => ({ recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, notify }), [recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, notify]);
 }
 
 // Selo SEMPRE visível (fora do corpo recolhido): remarcação do Claude esperando conferência e recados que a
@@ -6516,11 +6547,12 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   // ITEM PESSOAL PROJETADO (ver pessoaisNaFila): não existe linha de agenda por trás dele. Remarcar continua
   // no card Pessoais (é lá que mora a data), mas o FEITO escreve direto em `pessoais` (Diego, 13/10/2026:
   // "não tem como eu marcar feito naquele compromisso do carro" — o botão tem que estar onde o card está).
-  const feitoPessoal = async () => {
-    if (busyPessoal || !acoes?.concluirPessoal) return;
+  const acaoPessoal = (fn) => async () => {
+    if (busyPessoal || !fn) return;
     setBusyPessoal(true);
-    try { await acoes.concluirPessoal(a); } catch (e) { acoes.notify("Não salvou: " + (e.message || e), "error"); } finally { setBusyPessoal(false); }
+    try { await fn(a); } catch (e) { acoes.notify("Não salvou: " + (e.message || e), "error"); } finally { setBusyPessoal(false); }
   };
+  const feitoPessoal = acaoPessoal(acoes?.concluirPessoal);
   if (a.pessoal_virtual) return <article className={`compromisso-card cor-${corCompromisso(a.data, today)}${classeLigado(ligado)}`}>
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
@@ -6534,12 +6566,14 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       </span>
       <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
     </button>
-    <p className="compromisso-material">⛔ Pessoal{a.hora ? "" : " · sem hora marcada, por isso não bloqueia horário na agenda"}. Remarcar é no card Pessoais.</p>
+    <p className="compromisso-material">⛔ Pessoal{a.hora ? "" : " · sem hora marcada, por isso não segura horário na agenda"}.</p>
     {aberto && <div className="compromisso-corpo">{a.pessoal
       ? <PessoalDetalhe p={a.pessoal} a={a} today={today} />
       : a.detalhe_visivel && <p className="compromisso-material">{a.detalhe_visivel}</p>}
       {acoes?.concluirPessoal && <div className="card-acoes"><div className="card-acoes-botoes linha">
         <button type="button" className="primary" onClick={feitoPessoal} disabled={busyPessoal}>{busyPessoal ? "…" : "✅ Feito"}</button>
+        <button type="button" className="secondary" onClick={acaoPessoal(acoes.remarcarPessoal)} disabled={busyPessoal}>🔁 Remarcar</button>
+        <button type="button" className="ghost" onClick={acaoPessoal(acoes.cancelarPessoal)} disabled={busyPessoal}>✖ Cancelar</button>
       </div></div>}</div>}
   </article>;
   // A sugestão GRAVADA vence sempre: ela nasce da conversa real, com julgamento comercial.
@@ -7066,14 +7100,18 @@ function pessoalAtrasado(p, hoje) { return p.status === "PENDENTE" && !!p.data_a
 const PESSOAL_ASSINATURA_GPT = "PAINEL — ABRIR COMPROMISSO PESSOAL";
 const PESSOAL_INSTRUCAO_GPT = "Localize o compromisso pessoal atual pelo identificador acima antes de responder. Se qualquer ação puder alterar a disponibilidade da Operação Bahia, considere também o bloqueio operacional vinculado. Não trate este texto compartilhado como prova de estado atual e não invente detalhes pessoais ausentes.";
 
-function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
+function PessoaisCard({ pessoais, bloqueios = [], hoje, db, demo, notify, onChanged }) {
   const [verConcluidos, setVerConcluidos] = useState(false);
-  const [remarcando, setRemarcando] = useState(null);
-  const [dataDraft, setDataDraft] = useState("");
   const [busy, setBusy] = useState(null);
   const [avisoGPT, setAvisoGPT] = useState("");
-
-  const ativos = (pessoais || []).filter((p) => p.status === "PENDENTE");
+  const acoes = React.useContext(AcoesAgendaCtx);
+  // A DATA QUE VALE É A DA AGENDA (Diego, 16/10/2026, print 08h03: o registro pessoal dizia 15/10 e "atrasado há 1 dia",
+  // o bloqueio da agenda já estava em 20/10 — a Manu moveu um lado só). Com bloqueio planejado, a lista mostra a
+  // data e a hora do bloqueio; o registro pessoal só manda quando não existe bloqueio.
+  const bloqueioDe = (p) => (bloqueios || []).filter((a) => a.pessoal_id === p.id && a.status === "planejado").sort((a, b) => String(a.data).localeCompare(String(b.data)))[0] || null;
+  const efetivo = (p) => { const b = bloqueioDe(p); return b ? { ...p, data_alvo: b.data, hora: b.hora, cidade: b.cidade || p.cidade } : p; };
+  const esperandoData = acoes?.pessoaisRemarcando;
+  const ativos = (pessoais || []).filter((p) => p.status === "PENDENTE" && !(esperandoData && esperandoData.has(p.id))).map(efetivo);
   const encerrados = (pessoais || []).filter((p) => p.status !== "PENDENTE");
   const atrasados = ativos.filter((p) => pessoalAtrasado(p, hoje));
   const proximo = ativos.filter((p) => !pessoalAtrasado(p, hoje)).sort((a, b) => String(a.data_alvo || "9999").localeCompare(String(b.data_alvo || "9999")))[0];
@@ -7101,24 +7139,12 @@ function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
     } catch (e) { notify("Não concluí: " + e.message, "error"); } finally { setBusy(null); }
   };
 
-  const remarcar = async (p) => {
-    if (!dataDraft) { notify("Escolha a data nova.", "error"); return; }
-    if (demo) { notify("Na demonstração não salva.", "info"); setRemarcando(null); return; }
+  // REMARCAR E CANCELAR IGUAIS AOS CARDS DA AGENDA (Diego, 16/10/2026): sem pedir data. Ver remarcarPessoal/cancelarPessoal.
+  const comoCard = (p) => ({ id: "pessoal:" + p.id, pessoal_id: p.id, titulo: p.titulo, data: p.data_alvo, hora: p.hora });
+  const viaAcoes = (fn, p) => async () => {
+    if (!fn) return;
     setBusy(p.id);
-    try {
-      const agora = new Date().toISOString();
-      // Rastreável de propósito: guarda de onde veio e conta quantas vezes já andou. Item que remarca
-      // toda semana é informação sobre a vida dele, não ruído.
-      const { error } = await db.from("pessoais").update({
-        data_alvo: dataDraft, remarcado_de: p.data_alvo || null,
-        remarcacoes: Number(p.remarcacoes || 0) + 1, atualizado_em: agora,
-      }).eq("id", p.id);
-      if (error) throw error;
-      await sincronizarBloqueio(p.id, { data: dataDraft });
-      notify("Remarcado para " + compactDate(dataDraft) + ".", "ok");
-      setRemarcando(null); setDataDraft("");
-      await onChanged?.();
-    } catch (e) { notify("Não remarquei: " + e.message, "error"); } finally { setBusy(null); }
+    try { await fn(comoCard(p)); } catch (e) { notify("Não salvou: " + (e.message || e), "error"); } finally { setBusy(null); }
   };
 
   // VISUAL NOVO (Diego, 12/10/2026: "sete pendentes, tudo muito confuso, um atrasado, nem sei qual"). Cada item
@@ -7136,17 +7162,12 @@ function PessoaisCard({ pessoais, hoje, db, demo, notify, onChanged }) {
         <span>{atrasado ? <i className="pessoal-tag vermelha">atrasado há {diasAtraso(p)} dia(s)</i> : null}{p.hora ? String(p.hora).slice(0, 5) : "sem horário"}{p.cidade ? " · " + p.cidade : ""}{p.status !== "PENDENTE" ? " · " + String(p.status).toLowerCase() : ""}</span>
         {p.descricao && <em>{p.descricao}</em>}
         {p.remarcacoes > 0 && <em>Já remarcado {p.remarcacoes}x{p.remarcado_de ? " · antes era " + compactDate(p.remarcado_de) : ""}</em>}
-        {(p.impacto_operacao === "BLOQUEIA_DISPONIBILIDADE" || (p.impacto_operacao === "A_CONFIRMAR" && p.status === "PENDENTE")) && <span><i className="pessoal-tag">{p.impacto_operacao === "BLOQUEIA_DISPONIBILIDADE" ? "⛔ bloqueia a agenda" : "? impacto a confirmar"}</i></span>}
+        {p.impacto_operacao === "BLOQUEIA_DISPONIBILIDADE" && <span><i className="pessoal-tag">⛔ bloqueia a agenda</i></span>}
       </div>
       {p.status === "PENDENTE" && <div className="ficha-actions" style={{ width: "100%" }}>
         <button className="ghost" disabled={busy === p.id} onClick={() => concluir(p)}>{busy === p.id ? "..." : "✓ Concluir"}</button>
-        <button className="ghost" disabled={busy === p.id} onClick={() => { setRemarcando(remarcando === p.id ? null : p.id); setDataDraft(p.data_alvo || ""); }}>{remarcando === p.id ? "Cancelar" : "↻ Remarcar"}</button>
-        {/* Mesmo princípio do botão do cliente: leva IDENTIDADE, não detalhe. Nada de descrição, motivo
-            médico, nome de escola ou histórico — só o id, o título e a data. */}
-      </div>}
-      {remarcando === p.id && <div className="responsavel-edit-row" style={{ width: "100%" }}>
-        <input type="date" value={dataDraft} onChange={(e) => setDataDraft(e.target.value)} autoFocus />
-        <button className="ghost" disabled={busy === p.id} onClick={() => remarcar(p)}>Salvar data</button>
+        <button className="ghost" disabled={busy === p.id} onClick={viaAcoes(acoes?.remarcarPessoal, p)}>🔁 Remarcar</button>
+        <button className="ghost" disabled={busy === p.id} onClick={viaAcoes(acoes?.cancelarPessoal, p)}>✖ Cancelar</button>
       </div>}
     </article>;
   };
@@ -8635,7 +8656,8 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
   const acoesCtxPainel = React.useContext(AcoesAgendaCtx);
   const idsRemarcando = useMemo(() => new Set((acoesCtxPainel?.recados || []).filter((r) => r.acao === "remarcar" && !r.processado_em).map((r) => r.agenda_id)), [acoesCtxPainel]);
   const semRemarcando = (lista) => idsRemarcando.size ? lista.filter((entry) => !idsRemarcando.has(entry.id)) : lista;
-  const rotaAll = [...semRemarcando(appointments).filter((entry) => !idsCobranca.has(entry.id)), ...pessoaisNaFila(pessoais, appointments)];
+  const pessoaisEsperandoData = acoesCtxPainel?.pessoaisRemarcando;
+  const rotaAll = [...semRemarcando(appointments).filter((entry) => !idsCobranca.has(entry.id)), ...pessoaisNaFila(pessoais, appointments).filter((entry) => !(pessoaisEsperandoData && pessoaisEsperandoData.has(entry.pessoal_id)))];
   // HISTÓRICO DESTA DIVISÃO, porque ela já mudou duas vezes e o motivo importa:
   // Em 24/08 ela era por DATA e o Diego reclamou do contrário — às 8h da manhã um compromisso das 14h
   // aparecia como "atrasado". A correção passou o corte pra HORA. Aí, em 25/08, apareceu o outro lado do
@@ -9144,7 +9166,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     {filtroTipo !== "todos" && atrasados.length === 0 && antigos.length === 0 && pessoaisAtrasados.length === 0 && hoje.length === 0 && futuros.length === 0 && (atrasadosAll.length > 0 || pessoaisAtrasadosAll.length > 0 || hojeAll.length > 0 || futurosAll.length > 0) && <div className="empty-state"><b>Nenhum compromisso {filtroTipo} no momento.</b></div>}
     {/* PESSOAIS mora na mesma home por conveniência dele, mas é outro domínio — e fica DEPOIS do trabalho,
         porque a primeira olhada do dia é a rota. Só sobe pra cara dele quando tem atrasado. */}
-    <PessoaisCard pessoais={pessoais} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
+    <PessoaisCard pessoais={pessoais} bloqueios={agendaPlanejada} hoje={today} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     {/* MANU, um card só (13/10/2026): perguntas respondidas aqui mesmo, respostas que dá pra desfazer, o que ela
         fez e as regras. Abre sozinho quando tem pergunta; fechado, mostra só o resumo. Fica aqui no fim, depois
         de Pessoais (onde o card Manu já ficava), porque o Diego não quer a Manu no topo. */}
