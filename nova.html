@@ -169,7 +169,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-card.followup-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
 /* CARTÃO "Agendar contato com …" (Diego, 15/10/2026): a Manu pergunta se agenda um contato pela Zapia; mesma cor do Follow-up 1. */
 .duvida.contato-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
-.compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}.adiar-linha{display:flex;justify-content:flex-end;margin-top:8px}.adiar-linha button{min-height:40px;font-size:12px;padding:0 14px}
+.compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}.adiar-linha{display:flex;justify-content:flex-end;gap:6px;margin-top:6px}.adiar-linha button{min-height:34px;font-size:12px;padding:0 12px;border-radius:10px}.talvez-feito.curto{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:8px 0 0;padding:0 10px}.compromisso-quando .idade-atraso{white-space:nowrap;margin-top:3px}
 .compromisso-card .compromisso-corpo{margin-top:13px}
 /* CALCULADORA RÁPIDA (Diego, 16/10/2026) */
 .calc-card{width:min(460px,100%)}
@@ -6191,13 +6191,20 @@ function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppoi
 }
 
 const AcoesAgendaCtx = React.createContext(null);
-// Botão "Adiar 1h" direto no card atrasado da lista (ver adiar1h). Fica fora do botão do cabeçalho pra não abrir o foco.
+// Botões "Feito" e "Adiar 1h" direto no card atrasado da lista, iguais aos da notificação do celular (Diego, 16/10/2026,
+// 14h14: "tem que colocar um botão lá feito, porque é coisa rápida"). O Feito é o mesmo de dentro do card (acoes.enviar,
+// sem confirmação, com o ↶ Desfazer da faixa "Enviado ao Claude"; card de pagar ligado já baixa a conta em Dinheiro).
+// Ficam fora do botão do cabeçalho pra não abrir o foco; tocar no resto do card continua abrindo o card.
 function BotaoAdiar1h({ a, acoes }) {
-  const [ocupado, setOcupado] = useState(false);
-  return <div className="adiar-linha"><button type="button" className="ghost" disabled={ocupado} onClick={async (e) => {
-    e.stopPropagation(); if (ocupado) return; vibrar(6); setOcupado(true);
-    try { await acoes.adiar1h(a); alarmeSilenciar(a.id); } catch (err) { acoes.notify("Não deu pra adiar: " + (err?.message || err), "error"); } finally { setOcupado(false); }
-  }}>{ocupado ? "…" : "⏰ Adiar 1h"}</button></div>;
+  const [ocupado, setOcupado] = useState(null);
+  const tocar = (qual, fn) => async (e) => {
+    e.stopPropagation(); if (ocupado) return; vibrar(6); setOcupado(qual);
+    try { await fn(); alarmeSilenciar(a.id); } catch (err) { acoes.notify((qual === "feito" ? "Não salvou: " : "Não deu pra adiar: ") + (err?.message || err), "error"); } finally { setOcupado(null); }
+  };
+  return <div className="adiar-linha">
+    {acoes.enviar && <button type="button" className="primary" disabled={!!ocupado} onClick={tocar("feito", () => acoes.enviar(a, { acao: "feito" }))}>{ocupado === "feito" ? "…" : "✅ Feito"}</button>}
+    <button type="button" className="ghost" disabled={!!ocupado} onClick={tocar("adiar", () => acoes.adiar1h(a))}>{ocupado === "adiar" ? "…" : "⏰ Adiar 1h"}</button>
+  </div>;
 }
 // CADASTRO DE PROFISSIONAIS NOS CARDS (Diego, 12/10/2026, "Sim, mudar"): o card de compromisso recebe só os
 // NOMES (nomesProfissionais); o telefone vem do cadastro, por contexto, pra não enfiar mais uma prop em
@@ -6605,9 +6612,12 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   const acoes = React.useContext(AcoesAgendaCtx);
   const diasAtraso = diasDeAtraso(a.data, today);
   // `passouDaHora` (13/10/2026): compromisso DE HOJE cuja hora já passou — é atraso de horas, não de dias.
+  // CARD PEQUENO NA LISTA DE ATRASADOS (Diego, 16/10/2026, 14h16: "coloca os cards pequenos, igual em próximo compromisso,
+  // tá muito grande agora"). O atraso ocupa UMA linha curta no lugar da data (antes eram data + duas linhas de atraso,
+  // e o quadradinho da hora esticava o card). A data inteira continua no card aberto.
   const idadeAtraso = diasAtraso > 0
-    ? <em className={`idade-atraso${diasAtraso > 30 ? " antigo" : ""}`}>{diasAtraso} {diasAtraso === 1 ? "dia de atraso" : "dias de atraso"}{diasAtraso > 30 && <small>Mais de 30 dias</small>}</em>
-    : passouDaHora ? <em className="idade-atraso">passou da hora</em> : null;
+    ? <em className={`idade-atraso${diasAtraso > 30 ? " antigo" : ""}`} title={`${diasAtraso} ${diasAtraso === 1 ? "dia" : "dias"} de atraso · ${compactDate(a.data)}`}>há {diasAtraso} {diasAtraso === 1 ? "dia" : "dias"}</em>
+    : passouDaHora ? <em className="idade-atraso" title="passou da hora">atrasado</em> : null;
   // Sem `notify` aqui (o card não recebe a prop) — o aviso da cópia vive no próprio card.
   const [avisoGPT, setAvisoGPT] = useState("");
   const [busyPessoal, setBusyPessoal] = useState(false);
@@ -6624,8 +6634,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
     <button type="button" className="compromisso-cab" onClick={() => setAberto(!aberto)} aria-expanded={aberto}>
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
-        <span>{compactDate(a.data)}</span>
-        {idadeAtraso}
+        {idadeAtraso || <span>{compactDate(a.data)}</span>}
       </span>
       <span className="compromisso-idc">
         <strong>{a.titulo || "Compromisso pessoal"}</strong>
@@ -6782,8 +6791,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
     <button type="button" className="compromisso-cab" onClick={() => { if (emFoco) { if (onSairFoco) onSairFoco(); return; } vibrar(6); FOCO.abrir(chaveFoco); }} aria-expanded={false}>
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
-        <span>{compactDate(a.data)}</span>
-        {idadeAtraso}
+        {idadeAtraso || <span>{compactDate(a.data)}</span>}
       </span>
       <span className="compromisso-idc">
         {/* TÍTULO NA FRENTE, CLIENTE EMBAIXO (Diego, 16/10/2026, 10h36, print: dois cards da Simone, 9h35 "Comprar rodinhas na
@@ -6800,7 +6808,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
     {acoes && <SelosClaudeDoCard a={a} acoes={acoes} onMudar={() => { if (!emFoco) FOCO.abrir(chaveFoco); }} />}
     {/* "⚠ Parece duplicado" SAIU DO CARD (Diego, 15/10/2026: "se tá uma coisa em dúvida, não deveria voltar para você?").
         Dúvida não chega nele: a view agenda_parece_duplicado tem a mesma regra e a Manu resolve na rodada de hora em hora. */}
-    {sucessor && diasAtraso > 0 && <p className="talvez-feito">Pode já estar feito: “{sucessor.titulo}” foi criado depois deste, no mesmo serviço. Se a etapa aconteceu, conclua aqui — o app não fecha sozinho.</p>}
+    {sucessor && diasAtraso > 0 && <p className={`talvez-feito${emFoco ? "" : " curto"}`}>Pode já estar feito: “{sucessor.titulo}” foi criado depois deste, no mesmo serviço. Se a etapa aconteceu, conclua aqui — o app não fecha sozinho.</p>}
     {mostrar && <div className="compromisso-corpo">
       {(a.pessoal || oQueFazer !== tituloCard) && <h4 title={tituloCard}>{tituloCard}</h4>}
       {chipServico && <p className="compromisso-chip">🛋️ {chipServico}{svc?.status ? ` · ${statusLabel[svc.status] || svc.status}` : ""}</p>}
