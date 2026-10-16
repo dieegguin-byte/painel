@@ -4042,7 +4042,7 @@ function Home() {
   // a aba "Conferência" no `nav`, o resumo do Painel, a renderização da aba e o `onConferir` da ficha.
   const [notice, setNotice] = useState(null);
   const [maisAberto, setMaisAberto] = useState(false); // menu "Mais" da barra de baixo (Painel único, 11/10/2026)
-  const [calcAberta, setCalcAberta] = useState(false); // Calculadora rápida de orçamento (Diego, 16/10/2026)
+  const [calcAberta, setCalcAberta] = useState(() => IR_INICIAL === "calculadora"); // Calculadora rápida (Diego, 16/10/2026); atalho do ícone abre direto nela
   const [listaLateral, setListaLateral] = useState(false); // Agenda por cima do Painel, aberta arrastando pra direita (15/10/2026)
   const [search, setSearch] = useState("");
   const [pinState, setPinState] = useState("checking");
@@ -6856,7 +6856,9 @@ function FocoGlobal() {
     return () => clearTimeout(t);
   }, [id, sumiu]);
   if (!props) return null;
-  return <FocoDoCard props={props} onFechar={() => FOCO.fechar()} />;
+  // PORTAL NO BODY (Diego, 16/10/2026, 07h19: "os cards não estão abrindo"): os grupos do Painel abrem por cima
+  // num portal no body; desenhado dentro do Home, o foco ficava ATRÁS desse portal e parecia não abrir.
+  return ReactDOM.createPortal(<FocoDoCard props={props} onFechar={() => FOCO.fechar()} />, document.body);
 }
 
 // COBRANÇA: linha enxuta, sem hora e sem rota. Vive num bloco próprio do Painel — é o "dia do telefone",
@@ -6946,13 +6948,19 @@ function ComposerCaixa({ composer, setComposer, files, setFiles, addInbox, busy,
 // aí nada é urgente — foi exatamente o que aconteceu com as rotinas atrasadas.
 // `selo`/`tom`/`icone` (11/10/2026, Painel premium): número grande num selo colorido à esquerda do título.
 // Só é usado dentro dos grupos do Painel; sem `selo` o card fica como sempre foi.
+// ?ir= da abertura (atalhos do ícone no manifest: calculadora, atrasados, hoje, anotar; e os antigos por aba).
+let IR_INICIAL = (() => { try { return new URL(location.href).searchParams.get("ir"); } catch (e) { return null; } })();
+const consumirIrInicial = () => { IR_INICIAL = null; };
+const IR_SECAO = { atrasados: "secao-vencendo", hoje: "secao-hoje" };
 function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null }) {
   const naLista = React.useContext(DentroDaLista);
   const [aberto, setAberto] = useState(false);
   // TOCAR ABRE POR CIMA (Diego, 15/10/2026, depois de testar: "clicar e abrir ela inteira"): no Painel, o toque e o
   // arrasto pra direita abrem o card inteiro na ListaLateral. Dentro da lista, cada card abre no lugar, ao toque.
   // Um card que esteja aberto no lugar (só acontece dentro da lista) fecha no toque, como sempre.
-  const [porCima, setPorCima] = useState(false);
+  // ATALHO DO ÍCONE (Diego, 16/10/2026, 07h19: "Atrasados, compromissos de hoje"): ?ir=atrasados / ?ir=hoje abre a
+  // seção inteira por cima já na chegada, uma vez só (consome o pedido pra não reabrir ao trocar de aba).
+  const [porCima, setPorCima] = useState(() => { if (naLista || !id || IR_SECAO[IR_INICIAL] !== id) return false; consumirIrInicial(); return true; });
   const abrir = () => { if (aberto) setAberto(false); else if (naLista) setAberto(true); else setPorCima(true); };
   const arraste = usarArrastePraDireita(() => setPorCima(true));
   const comSelo = (selo !== null && selo !== undefined) || !!seloTexto;
@@ -8942,7 +8950,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     </CardRecolhivel>}
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
-    <CardRecolhivel className="content-card hoje-card"
+    <CardRecolhivel id="secao-hoje" className="content-card hoje-card"
       cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
       <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${rotinasPendentesHoje} rotina(s)` : ""}</h3>
       {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora · {hojePassouDaHora > 1 ? "estão" : "está"} em Precisa resolver</span>}{seloFiltro}</>}>
