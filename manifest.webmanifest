@@ -30,7 +30,7 @@
       "text": "texto",
       "url": "link",
       "files": [
-        { "name": "arquivos", "accept": ["image/*", "text/plain", ".txt", "application/zip", "application/x-zip-compressed", ".zip", "audio/*", "video/*", "application/pdf", ".pdf"] }
+        { "name": "arquivos", "accept": ["image/*", "text/*", "text/plain", ".txt", "application/*", "application/zip", "application/x-zip-compressed", ".zip", "audio/*", "video/*", "application/pdf", ".pdf"] }
       ]
     }
   }
