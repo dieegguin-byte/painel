@@ -2130,6 +2130,48 @@ function compactDate(value) {
 function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+// CONVERSA COMPLETA DO WHATSAPP (Diego, 16/10/2026, 22h01: "meu app não aceita compartilhamento de conversas
+// completas"). "Exportar conversa > Incluir mídia" sai como .zip (o _chat.txt mais os áudios, fotos e PDFs), e o
+// manifest só aceitava imagem e .txt — o Android nem mostrava o Atendimento TB na lista. Agora o manifest aceita
+// .zip/áudio/vídeo/pdf, e aqui o .zip é aberto NO APARELHO, sem biblioteca: o navegador já sabe inflar
+// (DecompressionStream "deflate-raw"). O texto do _chat.txt entra na Caixa como antes e cada mídia sobe como
+// arquivo próprio no Storage. Se o zip não abrir, ele sobe inteiro, como evidência.
+function ehZip(f) { return /\.zip$/i.test(f?.name || "") || /\bzip\b/i.test(f?.type || ""); }
+function tipoPorNome(nome) {
+  const ext = String(nome || "").toLowerCase().split(".").pop();
+  return { txt: "text/plain", csv: "text/csv", vcf: "text/vcard", opus: "audio/ogg", ogg: "audio/ogg", oga: "audio/ogg", mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", amr: "audio/amr", wav: "audio/wav",
+    jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif", mp4: "video/mp4", "3gp": "video/3gpp", mov: "video/quicktime", pdf: "application/pdf" }[ext] || "application/octet-stream";
+}
+async function lerZip(file) {
+  const buf = await file.arrayBuffer();
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  // Fim do diretório central (assinatura 06054b50), procurado de trás pra frente (o comentário do zip pode ter até 64 KB).
+  let eocd = -1;
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) { if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+  if (eocd < 0) throw new Error("não é um zip válido");
+  const total = dv.getUint16(eocd + 10, true);
+  let pos = dv.getUint32(eocd + 16, true);
+  const dec = new TextDecoder("utf-8");
+  const itens = [];
+  for (let n = 0; n < total; n++) {
+    if (dv.getUint32(pos, true) !== 0x02014b50) break;
+    const metodo = dv.getUint16(pos + 10, true), compTam = dv.getUint32(pos + 20, true), tamNome = dv.getUint16(pos + 28, true), tamExtra = dv.getUint16(pos + 30, true), tamCom = dv.getUint16(pos + 32, true), local = dv.getUint32(pos + 42, true);
+    const nome = dec.decode(u8.subarray(pos + 46, pos + 46 + tamNome));
+    pos += 46 + tamNome + tamExtra + tamCom;
+    if (nome.endsWith("/") || /(^|\/)__MACOSX\//.test(nome)) continue;
+    if (dv.getUint32(local, true) !== 0x04034b50) continue;
+    const inicio = local + 30 + dv.getUint16(local + 26, true) + dv.getUint16(local + 28, true);
+    const bruto = u8.subarray(inicio, inicio + compTam);
+    let blob;
+    if (metodo === 0) blob = new Blob([bruto]);
+    else if (metodo === 8 && typeof DecompressionStream === "function") blob = await new Response(new Blob([bruto]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).blob();
+    else throw new Error(`compressão ${metodo} não suportada em ${nome}`);
+    const simples = nome.split("/").pop();
+    itens.push({ nome: simples, blob: new Blob([blob], { type: tipoPorNome(simples) }) });
+  }
+  return itens;
+}
+window.__tbLerZip = lerZip; // pro teste automatizado
 function eventMessage(messages, text, mode) {
   return [...(messages || []), { de: mode === "claude" ? "ia" : "diego", texto: text, em: new Date().toISOString(), tipo: "sistema" }];
 }
@@ -4703,6 +4745,21 @@ function Home() {
         // O arquivo bruto continua no Storage: isto ACRESCENTA o conteúdo, não substitui a evidência.
         const LIMITE_TEXTO = 300000;
         let textoDeArquivos = "";
+        // .zip da conversa completa: abre aqui e troca o zip pelos arquivos de dentro (ver lerZip).
+        const abertos = [];
+        for (const f of recebidos) {
+          if (!ehZip(f)) { abertos.push(f); continue; }
+          try {
+            const itens = await lerZip(f);
+            if (!itens.length) throw new Error("zip vazio");
+            itens.forEach((it) => abertos.push(new File([it.blob], it.nome, { type: it.blob.type })));
+            textoDeArquivos += `\n\n[${f.name} aberto no aparelho: ${itens.length} arquivo(s) de dentro — ${itens.map((it) => it.nome).slice(0, 12).join(", ")}${itens.length > 12 ? "…" : ""}]`;
+          } catch (e) {
+            textoDeArquivos += `\n\n[não consegui abrir ${f.name} (${e.message}); o zip inteiro está anexado]`;
+            abertos.push(f);
+          }
+        }
+        recebidos.length = 0; abertos.forEach((f) => recebidos.push(f));
         for (const f of recebidos) {
           const ehTexto = (f.type || "").startsWith("text/") || /\.(txt|csv|log)$/i.test(f.name);
           if (!ehTexto) continue;
