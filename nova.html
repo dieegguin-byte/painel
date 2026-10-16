@@ -169,7 +169,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-card.followup-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
 /* CARTÃO "Agendar contato com …" (Diego, 15/10/2026): a Manu pergunta se agenda um contato pela Zapia; mesma cor do Follow-up 1. */
 .duvida.contato-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
-.compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}
+.compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}.adiar-linha{display:flex;justify-content:flex-end;margin-top:8px}.adiar-linha button{min-height:40px;font-size:12px;padding:0 14px}
 .compromisso-card .compromisso-corpo{margin-top:13px}
 /* CALCULADORA RÁPIDA (Diego, 16/10/2026) */
 .calc-card{width:min(460px,100%)}
@@ -936,7 +936,7 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .pessoais-lista{display:flex;flex-direction:column;gap:8px}
 /* PROPOSTAS DE ORÇAMENTO (16/10/2026): lista curta; o item abre a proposta inteira por cima (ListaLateral). */
 .proposta-item{display:flex;gap:10px;background:linear-gradient(150deg,#ffffff0c,#ffffff02 50%),var(--surface);border:1px solid var(--line);border-left:3px solid var(--orange);border-radius:14px;padding:11px 12px;cursor:pointer}
-.proposta-item.decidida{opacity:.6;cursor:default;border-left-color:var(--line2)}
+.proposta-item.decidida{border-left-color:var(--line2)}.proposta-item.decidida .proposta-txt{opacity:.65}.proposta-item .proposta-desfazer{flex:none;align-self:center;min-height:40px;font-size:12px}.proposta-feita{margin-top:12px;padding:10px 12px;border-radius:12px;background:#6097c014;border:1px solid #6097c055;color:#a9c8e2;font-size:13px;line-height:1.45}.proposta-feita .ficha-actions{margin-top:8px}
 .proposta-txt{flex:1;min-width:0}.proposta-txt strong{display:block;font-size:15px;line-height:1.3;color:var(--cream)}
 .proposta-txt span{display:block;font-size:12px;color:var(--muted);margin-top:2px}.proposta-txt em{display:block;font-size:11px;color:var(--orange2);font-style:normal;margin-top:4px}
 .proposta-versao{font-style:normal;font-size:10px;font-weight:800;margin-left:6px;padding:2px 7px;border-radius:999px;background:var(--orange);color:#fff}
@@ -4211,7 +4211,8 @@ function Home() {
         db.from("duvidas_agente").select("*").or("status.in.(aberta,respondida),vale_sempre.eq.true").order("criado_em", { ascending: false }).limit(80),
         // PROPOSTAS DE ORÇAMENTO (Diego, 16/10/2026): camada de apoio como `da`. As que esperam o Aprovar/Recado dele e
         // as já decididas que a Manu ainda não passou adiante. Se a tabela ainda não existir, o app abre normal sem o card.
-        db.from("propostas").select("*").in("status", ["aguardando", "aprovada", "recado"]).order("criado_em", { ascending: false }).limit(40),
+        // + as enviadas nos últimos 2 dias, pra ele ver "já foi pra Zapia" no lugar do Desfazer (16/10/2026).
+        db.from("propostas").select("*").or(`status.in.(aguardando,aprovada,recado),and(status.eq.enviada,enviado_em.gte.${new Date(Date.now() - 2 * 864e5).toISOString()})`).order("criado_em", { ascending: false }).limit(40),
       ]);
       // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
       // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
@@ -6190,6 +6191,14 @@ function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppoi
 }
 
 const AcoesAgendaCtx = React.createContext(null);
+// Botão "Adiar 1h" direto no card atrasado da lista (ver adiar1h). Fica fora do botão do cabeçalho pra não abrir o foco.
+function BotaoAdiar1h({ a, acoes }) {
+  const [ocupado, setOcupado] = useState(false);
+  return <div className="adiar-linha"><button type="button" className="ghost" disabled={ocupado} onClick={async (e) => {
+    e.stopPropagation(); if (ocupado) return; vibrar(6); setOcupado(true);
+    try { await acoes.adiar1h(a); alarmeSilenciar(a.id); } catch (err) { acoes.notify("Não deu pra adiar: " + (err?.message || err), "error"); } finally { setOcupado(false); }
+  }}>{ocupado ? "…" : "⏰ Adiar 1h"}</button></div>;
+}
 // CADASTRO DE PROFISSIONAIS NOS CARDS (Diego, 12/10/2026, "Sim, mudar"): o card de compromisso recebe só os
 // NOMES (nomesProfissionais); o telefone vem do cadastro, por contexto, pra não enfiar mais uma prop em
 // Dashboard/Agenda/Hoje. Lista de { id, nome, apelido, telefone, ativo }.
@@ -6364,7 +6373,31 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     return data?.signedUrl || null;
   }, [db, demo, notify]);
 
-  return useMemo(() => ({ recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, notify }), [recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, notify]);
+  // ADIAR 1 HORA NO CARD ATRASADO (Diego, 16/10/2026, 13h47, print da lista "Precisa resolver": "colocar um botão aqui
+  // adiar 1 hora aqui também" — o alarme já tinha). Conta de AGORA, não da hora marcada (senão o card de 08h32 adiado
+  // pra 09h32 continuaria atrasado), arredondado pros 5 min seguintes, e a data vira hoje. Mesma vaga de minuto em
+  // minuto do alarme quando bate em outro card na mesma data+hora.
+  const adiar1h = useCallback(async (a) => {
+    const agora = new Date();
+    const m = Math.min(Math.ceil((agora.getHours() * 60 + agora.getMinutes() + 60) / 5) * 5, 23 * 60 + 50);
+    const data = hojeISO();
+    if (demo) { setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, data, hora: `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}:00` } : x)); notify("Adiado 1 hora (demo).", "ok"); return true; }
+    let gravou = null, erro = null;
+    for (let extra = 0; extra < 6 && !gravou; extra++) {
+      const mm = m + extra; const hora = `${String(Math.floor(mm / 60)).padStart(2, "0")}:${String(mm % 60).padStart(2, "0")}:00`;
+      const { data: linha, error } = await db.from("agenda").update({ data, hora }).eq("id", a.id).eq("status", "planejado").select("id").maybeSingle();
+      if (!error) { if (!linha) throw new Error("esse card já saiu da agenda — recarregue o app"); gravou = hora; break; }
+      erro = error; if (!/duplicate|unique|23505/i.test(error.message || "")) break;
+    }
+    if (!gravou) throw erro || new Error("não deu pra adiar");
+    try { await db.from("historico").insert({ o_que: `Adiado 1h: ${a.titulo}`, por: "diego", detalhe: `Pelo card atrasado, de ${a.data}${a.hora ? " " + String(a.hora).slice(0, 5) : ""} para hoje ${gravou.slice(0, 5)}.` }); } catch (e) { /* segue */ }
+    setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, data, hora: gravou } : x));
+    notify(`Adiado pra ${gravou.slice(0, 5)}. Aviso de novo na hora nova.`, "ok");
+    if (onChanged) onChanged();
+    return true;
+  }, [db, demo, notify, onChanged, setAppointments]);
+
+  return useMemo(() => ({ recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify }), [recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify]);
 }
 
 // Selo SEMPRE visível (fora do corpo recolhido): remarcação do Claude esperando conferência e recados que a
@@ -6762,6 +6795,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       </span>
       <span className="compromisso-seta">{emFoco ? "" : "›"}</span>
     </button>
+    {!emFoco && acoes?.adiar1h && !a.pessoal_id && (diasAtraso > 0 || passouDaHora) && <BotaoAdiar1h a={a} acoes={acoes} />}
     {revisaoData && <p className="revisao-data">Remarcação pendente · idade calculada pela data original. A data precisa de revisão.</p>}
     {acoes && <SelosClaudeDoCard a={a} acoes={acoes} onMudar={() => { if (!emFoco) FOCO.abrir(chaveFoco); }} />}
     {/* "⚠ Parece duplicado" SAIU DO CARD (Diego, 15/10/2026: "se tá uma coisa em dúvida, não deveria voltar para você?").
@@ -7141,14 +7175,25 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = fal
 // o app grava status=aprovada e também deixa uma linha na Caixa, que a Manu já lê de hora em hora — assim o pedido
 // chega mesmo antes de a rotina dela aprender a tabela `propostas`. O recado faz o mesmo com status=recado.
 const PROPOSTA_STATUS = { aguardando: "esperando você", aprovada: "aprovada · a Manu passa pra Zapia", recado: "com recado · o orçamento refaz", enviada: "enviada ao cliente" };
+// DESFAZER O APROVAR (Diego, 16/10/2026, 15h58: "quando eu aprovar uma proposta... também tem a opção de desfazer").
+// Vale enquanto a Manu não passou pra Zapia (status aprovada e enviado_em vazio). Depois disso o card mostra "já foi
+// pra Zapia" no lugar do botão. Desfazer volta a proposta pra aguardando, descarta a linha "PROPOSTA APROVADA" da
+// Caixa que a Manu ainda não leu (ou, se ela já leu, deixa uma linha "PROPOSTA DESFEITA — NÃO mandar") e o banco
+// reabre o card "Aprovar a proposta / Mandar orçamento" que o Aprovar tinha fechado (gatilho propostas_fecha_card).
+const propostaJaFoi = (p) => p.status === "enviada" || !!p.enviado_em;
+const propostaDesfazivel = (p) => p.status === "aprovada" && !p.enviado_em;
+const horaCurta = (iso) => { try { return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
 function PropostasCard({ propostas, db, demo, notify, onChanged }) {
   const [abertaId, setAbertaId] = useState(null);
   const [confirmando, setConfirmando] = useState(false);
   const [recadoAberto, setRecadoAberto] = useState(false);
   const [recado, setRecado] = useState("");
   const [busy, setBusy] = useState(false);
-  const [feitas, setFeitas] = useState({}); // id → status já gravado neste aparelho (a lista não espera o reload)
-  const lista = (propostas || []).map((p) => feitas[p.id] ? { ...p, status: feitas[p.id] } : p);
+  // id → {de, para}: o que este aparelho acabou de gravar (a lista não espera o reload). Só vale enquanto o banco
+  // ainda mostra o status de antes — quando a lista nova chega com outro status, quem manda é o banco.
+  const [feitas, setFeitas] = useState({});
+  const marcar = (p, para) => setFeitas((f) => ({ ...f, [p.id]: { de: p.status, para } }));
+  const lista = (propostas || []).map((p) => feitas[p.id] && feitas[p.id].de === p.status ? { ...p, status: feitas[p.id].para } : p);
   const esperando = lista.filter((p) => p.status === "aguardando");
   const decididas = lista.filter((p) => p.status !== "aguardando");
   const aberta = lista.find((p) => p.id === abertaId) || null;
@@ -7167,7 +7212,7 @@ function PropostasCard({ propostas, db, demo, notify, onChanged }) {
         if (cxErr) throw cxErr;
         try { await db.from("historico").insert({ o_que: `${status === "aprovada" ? "Aprovou" : "Recado na"} proposta: ${p.cliente_nome}${p.titulo ? " — " + p.titulo : ""}`, por: "diego", detalhe: status === "aprovada" ? "Pelo card do app; a Manu passa pra Zapia." : extra.recado }); } catch (e) { /* segue */ }
       }
-      setFeitas((f) => ({ ...f, [p.id]: status }));
+      marcar(p, status);
       notify(status === "aprovada" ? "Aprovada. A Manu passa pra Zapia na próxima rodada e ela manda pro cliente." : "Recado guardado. O orçamento refaz e a proposta corrigida volta aqui.", "ok");
       fechar();
       if (onChanged && !demo) onChanged();
@@ -7175,13 +7220,52 @@ function PropostasCard({ propostas, db, demo, notify, onChanged }) {
   };
   const aprovar = (p) => gravar(p, "aprovada", {}, `PROPOSTA APROVADA — ${p.cliente_nome}${p.titulo ? " — " + p.titulo : ""} (propostas.id ${p.id}, v${p.versao || 1}). O Diego aprovou pelo card: passar o texto_cliente EXATO pra Zapia por recado, pra ela mandar ao cliente, e marcar propostas.status = enviada com enviado_em.`);
   const mandarRecado = (p) => { const t = recado.trim(); if (!t) { notify("Escreva o que mudar primeiro.", "error"); return; } gravar(p, "recado", { recado: t }, `PROPOSTA — RECADO DO DIEGO — ${p.cliente_nome}${p.titulo ? " — " + p.titulo : ""} (propostas.id ${p.id}, v${p.versao || 1}): "${t}". Levar ao orçamento: refazer e gravar a proposta corrigida como nova linha em propostas (substitui_id = esta, versao + 1, status aguardando).`); };
+  const desfazer = async (p) => {
+    if (busy) return;
+    if (!window.confirm(`Desfazer a aprovação da proposta de ${p.cliente_nome}? Ela volta a esperar você e a Manu não manda pra Zapia.`)) return;
+    setBusy(true);
+    try {
+      let aviso = "";
+      if (!demo) {
+        const { data, error } = await db.from("propostas").update({ status: "aguardando", decidido_em: null }).eq("id", p.id).eq("status", "aprovada").is("enviado_em", null).select("id").maybeSingle();
+        if (error) throw error;
+        if (!data) {
+          const { data: atual } = await db.from("propostas").select("status,enviado_em").eq("id", p.id).maybeSingle();
+          if (atual && propostaJaFoi(atual)) { if (onChanged) onChanged(); throw new Error("a Manu já passou pra Zapia, não dá mais pra desfazer por aqui. Se precisar, mande um recado pra Manu"); }
+          throw new Error("essa proposta mudou — recarregue o app");
+        }
+        // Daqui pra baixo a proposta JÁ voltou: falha na Caixa vira aviso, não "Não desfez".
+        // A linha "PROPOSTA APROVADA" que a Manu ainda não leu é descartada, e SEMPRE vai uma linha "PROPOSTA
+        // DESFEITA" — a Manu pode estar no meio da rodada com a aprovada na mão.
+        try {
+          const { data: linhas, error: cxLerErr } = await db.from("caixa_entrada").select("id,processado").like("texto", `PROPOSTA APROVADA — %(propostas.id ${p.id},%`);
+          if (cxLerErr) throw cxLerErr;
+          const naoLidas = (linhas || []).filter((l) => !l.processado);
+          if (naoLidas.length) {
+            const { error: cxErr } = await db.from("caixa_entrada").update({ status: "descartado", processado: true, processado_em: new Date().toISOString() }).in("id", naoLidas.map((l) => l.id));
+            if (cxErr) throw cxErr;
+          }
+        } catch (e) { aviso = " A linha antiga da Caixa não saiu (" + (e.message || e) + "), mas a Manu recebe o aviso de não mandar."; }
+        const { error: insErr } = await db.from("caixa_entrada").insert({ texto: `PROPOSTA DESFEITA — ${p.cliente_nome}${p.titulo ? " — " + p.titulo : ""} (propostas.id ${p.id}, v${p.versao || 1}). O Diego desfez a aprovação pelo card antes do envio: NÃO passar pra Zapia. Se o recado já está na pasta da Zapia, apagar o recado e avisar a Zapia que não é pra mandar. A proposta voltou a esperar o Diego (status aguardando).`, status: "novo", conversa: [], processado: false });
+        if (insErr) aviso = " Mas o aviso pra Manu NÃO foi (" + insErr.message + ") — avise ela pra não mandar.";
+        try { await db.from("historico").insert({ o_que: `Desfez a aprovação da proposta: ${p.cliente_nome}${p.titulo ? " — " + p.titulo : ""}`, por: "diego", detalhe: "Pelo card do app, antes de a Manu passar pra Zapia." }); } catch (e) { /* segue */ }
+      }
+      marcar(p, "aguardando");
+      notify("Desfeito. A proposta voltou a esperar você e a Manu não manda." + aviso, aviso ? "error" : "ok");
+      fechar();
+      if (onChanged && !demo) onChanged();
+    } catch (e) { notify("Não desfez: " + (e.message || e), "error"); } finally { setBusy(false); }
+  };
   const valor = (p) => Number(p.valor_pix) ? `${moneyInteiro(Number(p.valor_pix))} Pix${Number(p.parcela) ? ` · 6x ${moneyInteiro(Number(p.parcela))}` : ""}` : "";
-  const item = (p, decidida) => <article key={p.id} className={`proposta-item${decidida ? " decidida" : ""}`} onClick={() => !decidida && setAbertaId(p.id)}>
+  const item = (p, decidida) => <article key={p.id} className={`proposta-item${decidida ? " decidida" : ""}`} onClick={() => setAbertaId(p.id)}>
     <div className="proposta-txt">
       <strong>{p.cliente_nome}{p.versao > 1 ? <i className="proposta-versao">v{p.versao}</i> : null}</strong>
       <span>{p.titulo || "proposta"}{valor(p) ? " · " + valor(p) : ""}</span>
-      {decidida ? <em>{PROPOSTA_STATUS[p.status] || p.status}</em> : <em>toque pra ler e aprovar ›</em>}
+      {!decidida ? <em>toque pra ler e aprovar ›</em>
+        : propostaJaFoi(p) ? <em>já foi pra Zapia{p.enviado_em ? " " + horaCurta(p.enviado_em) : ""} · não dá mais pra desfazer</em>
+        : <em>{PROPOSTA_STATUS[p.status] || p.status}</em>}
     </div>
+    {decidida && propostaDesfazivel(p) && <button type="button" className="ghost proposta-desfazer" disabled={busy} onClick={(e) => { e.stopPropagation(); desfazer(p); }}>{busy ? "…" : "↶ Desfazer"}</button>}
   </article>;
   return <>
     <section className="content-card propostas-card com-selo tom-laranja">
@@ -7197,12 +7281,18 @@ function PropostasCard({ propostas, db, demo, notify, onChanged }) {
         <button type="button" className="ghost" onClick={() => copiar(aberta.texto_cliente)}>📋 Copiar o texto</button>
         {aberta.detalhamento && <details className="proposta-detalhe" open><summary>Como chegou nesse valor</summary><pre>{aberta.detalhamento}</pre></details>}
         {aberta.recado && <p className="compromisso-material">✍️ Seu recado anterior: {aberta.recado}</p>}
-        {!confirmando && !recadoAberto && <div className="ficha-actions proposta-acoes">
+        {aberta.status !== "aguardando" && <div className="proposta-feita">
+          {propostaJaFoi(aberta) ? <>✓ Já foi pra Zapia{aberta.enviado_em ? " em " + horaCurta(aberta.enviado_em) : ""}. Não dá mais pra desfazer por aqui.</>
+            : aberta.status === "aprovada" ? <>✅ Você aprovou{aberta.decidido_em ? " em " + horaCurta(aberta.decidido_em) : ""}. A Manu ainda não passou pra Zapia, então dá pra desfazer.
+              <div className="ficha-actions"><button type="button" className="ghost" disabled={busy} onClick={() => desfazer(aberta)}>{busy ? "…" : "↶ Desfazer"}</button></div></>
+            : <>{PROPOSTA_STATUS[aberta.status] || aberta.status}</>}
+        </div>}
+        {aberta.status === "aguardando" && !confirmando && !recadoAberto && <div className="ficha-actions proposta-acoes">
           <button type="button" className="primary" disabled={busy} onClick={() => setConfirmando(true)}>✅ Aprovar e mandar</button>
           <button type="button" className="ghost" disabled={busy} onClick={() => setRecadoAberto(true)}>✍️ Recado pra mudar</button>
         </div>}
         {confirmando && <div className="proposta-confirma">
-          <p>Tem certeza? A Manu passa esse texto pra Zapia e ela manda pro cliente. Depois não dá pra mudar.</p>
+          <p>Tem certeza? A Manu passa esse texto pra Zapia e ela manda pro cliente. Dá pra desfazer só até a Manu passar pra Zapia.</p>
           <div className="ficha-actions">
             <button type="button" className="primary" disabled={busy} onClick={() => aprovar(aberta)}>{busy ? "…" : "Sim, manda"}</button>
             <button type="button" className="ghost" disabled={busy} onClick={() => setConfirmando(false)}>Voltar</button>
