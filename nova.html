@@ -8,7 +8,7 @@
      todo o texto já é dimensionado pra celular, ampliar não resolve nada — só atrapalha.
      Vai nas duas frentes porque uma só não segura: o meta cobre o Android, e o touch-action
      no CSS cobre navegador que ignora user-scalable. -->
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#0f0d0c">
 <title>Nova Central Operacional — Tapeçaria Bahia</title>
 <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -624,6 +624,7 @@ button.sutil{opacity:.55;font-size:12px}
 @keyframes abaDireita{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
 @keyframes abaEsquerda{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
 @keyframes gavetaSobe{from{transform:translateY(100%)}to{transform:none}}
+@keyframes gavetaDesce{from{transform:translateY(-100%)}to{transform:none}}
 @keyframes toqueBrilho{from{transform:scale(.15);opacity:1}to{transform:scale(1);opacity:0}}
 @keyframes esqueletoBrilho{from{background-position:120% 0}to{background-position:-20% 0}}
 @keyframes barraCarregando{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
@@ -639,6 +640,12 @@ button.sutil{opacity:.55;font-size:12px}
 /* 4. No celular as janelas viram gaveta: encostam no rodapé, sobem e têm puxador */
 @media(max-width:768px){
 .modal-overlay{place-items:end center;padding:0}
+/* CALCULADORA NO ALTO (Diego, 16/10/2026: "coloca a calculadora pra aparecer lá em cima, porque quando eu clico ali o
+   concluir sai, tenho que apertar Voltar toda hora"): como gaveta de baixo, o teclado numérico subia por cima do botão
+   Próximo e a folha sumia atrás dele. No alto, a pergunta, os campos e o Próximo ficam acima do teclado. */
+.modal-overlay.calc-overlay{place-items:start center}
+.modal-overlay.calc-overlay .calc-card{max-height:min(92vh,100%);border-radius:0 0 24px 24px;border-top:0;padding-top:calc(16px + env(safe-area-inset-top));padding-bottom:18px;animation:gavetaDesce .38s cubic-bezier(.2,.9,.25,1) backwards}
+.modal-overlay.calc-overlay .calc-card::before{display:none}
 .modal-card,.modal-card.small{width:100%;max-height:92vh;border-radius:24px 24px 0 0;padding-bottom:calc(18px + env(safe-area-inset-bottom));border-bottom:0;animation:gavetaSobe .38s cubic-bezier(.2,.9,.25,1) backwards}
 .modal-card::before{content:"";display:block;width:44px;height:5px;border-radius:99px;background:#ffffff2e;margin:-6px auto 12px}
 }
@@ -9454,7 +9461,7 @@ function CalculadoraRapida({ onFechar, notify }) {
     if (atual.k.startsWith("esp")) return !resp[atual.k] || custoEspuma(resp[atual.k]) > 0;
     return true;
   };
-  return <div className="modal-overlay" onMouseDown={onFechar}><div className="modal-card calc-card" onMouseDown={(e) => e.stopPropagation()}>
+  return <div className="modal-overlay calc-overlay" onMouseDown={onFechar}><div className="modal-card calc-card" onMouseDown={(e) => e.stopPropagation()}>
     <p className="kicker">CALCULADORA RÁPIDA{passo < ultimo ? ` · ${passo + 1} de ${ultimo}` : ""}</p>
     {passo < ultimo ? <>
       <h3 className="calc-pergunta">{atual.pergunta}</h3>
