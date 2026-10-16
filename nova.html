@@ -170,6 +170,20 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .duvida.contato-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
 .compromisso-seta{color:var(--muted);font-size:13px;justify-self:end}
 .compromisso-card .compromisso-corpo{margin-top:13px}
+/* CALCULADORA RÁPIDA (Diego, 16/10/2026) */
+.calc-card{width:min(460px,100%)}
+.calc-atalho{margin-top:6px;text-align:left;font-size:13px}
+.calc-pergunta{margin:6px 0 12px;font:500 24px Georgia,serif;color:var(--text)}
+.calc-grande{display:block;width:100%;padding:14px;border-radius:12px;border:1px solid var(--line2);background:#0f0d0c;color:var(--text);font:inherit;font-size:22px}
+.calc-dica{display:block;margin-top:8px;font-size:12px;color:var(--dim)}
+.calc-acoes{display:flex;flex-wrap:wrap;gap:8px}.calc-acoes .primary{margin-left:auto}
+.calc-opcoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.calc-opcoes .ghost{font-size:12px;padding:7px 10px}.calc-opcoes .ghost.ativo{border-color:var(--orange);color:var(--text);background:#d86d3622}
+.calc-conta{margin:10px 0 0;font-size:11px;line-height:1.5;color:var(--dim)}
+.calc-resultado{display:grid;grid-template-columns:auto 1fr auto 1fr;align-items:baseline;gap:4px 8px;margin-top:12px;padding:12px;border-radius:12px;background:var(--surface2);border:1px solid var(--line)}
+.calc-resultado b{font:500 24px Georgia,serif;color:var(--orange2)}.calc-resultado span{font-size:12px;color:var(--muted)}.calc-resultado em{grid-column:1/-1;font-style:normal;font-size:13px;color:var(--muted)}
+.calc-frase{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#00000040;font-size:14px;line-height:1.5;user-select:all}
+.calc-card .ficha-actions{margin-top:12px}
 /* FINANCEIRO LIMPO (Diego, 15/10/2026): três números grandes, linha curta por lançamento, observação atrás do toque. */
 .fin-topo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .fin-grande{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;padding:14px 13px;border-radius:15px;border:1px solid var(--line);background:var(--surface);color:var(--text);text-align:left;font:inherit}
@@ -3980,6 +3994,7 @@ function Home() {
   // a aba "Conferência" no `nav`, o resumo do Painel, a renderização da aba e o `onConferir` da ficha.
   const [notice, setNotice] = useState(null);
   const [maisAberto, setMaisAberto] = useState(false); // menu "Mais" da barra de baixo (Painel único, 11/10/2026)
+  const [calcAberta, setCalcAberta] = useState(false); // Calculadora rápida de orçamento (Diego, 16/10/2026)
   const [listaLateral, setListaLateral] = useState(false); // Agenda por cima do Painel, aberta arrastando pra direita (15/10/2026)
   const [search, setSearch] = useState("");
   const [pinState, setPinState] = useState("checking");
@@ -4955,6 +4970,7 @@ function Home() {
           <div className="menu-topo" onClick={() => setMenuTopo(false)}>
             <BotaoNotificacao db={db} demo={demo} notify={notify} />
             <button className="ghost" onClick={() => setAddAgendaOpen(true)}>📅 Novo compromisso</button>
+            <button className="ghost" onClick={() => setCalcAberta(true)}>🧮 Calculadora</button>
             <button className="ghost" onClick={() => setShowGuia(true)}>📖 Guia da IA</button>
             <button className="ghost" onClick={copyContext}>Copiar contexto</button>
             {!demo && <button className="ghost" onClick={backupAll}>⬇ Backup</button>}
@@ -5000,12 +5016,14 @@ function Home() {
       <button className={!NAV_BARRA.includes(tab) ? "active" : ""} onClick={() => { vibrar(8); setMaisAberto((v) => !v); }}><i>☰</i><span>Mais</span>{(() => { const n = nav.filter((item) => !NAV_BARRA.includes(item.id)).reduce((soma, item) => soma + (item.count || 0), 0); return n ? <b className="nav-contagem">{n}</b> : null; })()}</button></nav>
     {maisAberto && <div className="modal-overlay mais-overlay" onClick={() => setMaisAberto(false)}><div className="modal-card mais-card" onClick={(e) => e.stopPropagation()}>
       <p className="kicker">MAIS TELAS</p>
+      <button type="button" className="ghost wide calc-atalho" onClick={() => { setMaisAberto(false); setCalcAberta(true); }}>🧮 Calculadora rápida de orçamento</button>
       <div className="mais-grade">{nav.filter((item) => !NAV_BARRA.includes(item.id)).map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setMaisAberto(false); irParaAba(item); }}><i>{item.icon}</i><span>{item.label}</span>{item.count ? <b>{item.count}</b> : null}</button>)}</div>
     </div></div>}
     {/* AGENDA POR CIMA DO PAINEL (arrastar pra direita). Fica ANTES das fichas/modais no DOM: assim o voltar fecha
         primeiro o que foi aberto de dentro dela (reagendar, concluir, adicionar) e só depois a própria lista. */}
     {listaLateral && <ListaLateral kicker="ARRASTOU PARA A DIREITA" titulo="Agenda" onFechar={() => setListaLateral(false)}><BarreiraDaAba nome="A agenda" onFechar={() => setListaLateral(false)}><AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} db={db} demo={demo} notify={notify} onChanged={loadAll} /></BarreiraDaAba></ListaLateral>}
     {/* As janelas por cima também têm barreira própria: ficha com dado ruim fecha sozinha, não o app. */}
+    {calcAberta && <BarreiraDaAba nome="A calculadora" onFechar={() => setCalcAberta(false)}><CalculadoraRapida onFechar={() => setCalcAberta(false)} notify={notify} /></BarreiraDaAba>}
     {showGuia && <BarreiraDaAba nome="O guia da IA" onFechar={() => setShowGuia(false)}><GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} /></BarreiraDaAba>}
     {compartilhamentoPendente && <ConfirmarCompartilhamento pendente={compartilhamentoPendente} customers={customers} onSalvar={salvarCompartilhamento} onFechar={fecharCompartilhamento} notify={notify} />}
     {fichaId && <BarreiraDaAba nome="A ficha do cliente" onFechar={() => setFichaId(null)}><FichaModal db={db} demo={demo} notify={notify} clienteId={fichaId} fornecedores={fornecedores} onClose={() => setFichaId(null)} onChanged={loadAll} /></BarreiraDaAba>}
@@ -9059,6 +9077,116 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     {/* O card de Compras subiu pro grupo Produção (Painel único, 11/10/2026). */}
     {/* SAIU o aviso financeiro do rodapé: era o mesmo assunto do card "a pagar" lá em cima, só que sem o
         valor e sem o caixa possível — repetia a preocupação sem ajudar a decidir. Diego, 25/07. */}</div>;
+}
+// ===== CALCULADORA RÁPIDA DE ORÇAMENTO (Diego, 16/10/2026: "uma calculadora rápida sem muita complicação com taxas
+// da máquina e já sair a mensagem... com os divisores") =====
+// Regras que ele aprovou entre 12 e 14/10 (vieram pelo coordenador): custo = mão de obra + material, dividido pelo
+// divisor da cidade (Luziânia 0,60; Entorno GO e DF 0,55; serviço pequeno 0,50 em qualquer cidade). Depois soma o
+// frete de buscar e entregar da cidade e o ajudante, se marcar (R$ 35 por viagem em Luziânia e Ingá, R$ 50 mais longe;
+// buscar e entregar = 2 viagens). Pix arredondado de 50 em 50; cartão = Pix ÷ 0,9172 ÷ 6 com parcela inteira.
+// A conta aparece só pra ele, pequena. A frase pra copiar mostra só os valores — nunca custo nem divisor.
+const CALC_CIDADES = [
+  { nome: "Luziânia", divisor: 0.6, frete: 0, viagem: 35 },
+  { nome: "Ingá", divisor: 0.55, frete: 150, viagem: 35 },
+  { nome: "Valparaíso", divisor: 0.55, frete: 150, viagem: 50 },
+  { nome: "Cidade Ocidental", divisor: 0.55, frete: 150, viagem: 50 },
+  { nome: "Novo Gama", divisor: 0.55, frete: 200, viagem: 50 },
+  { nome: "Gama", divisor: 0.55, frete: 200, viagem: 50 },
+  { nome: "Santa Maria", divisor: 0.55, frete: 200, viagem: 50 },
+  { nome: "Riacho Fundo", divisor: 0.55, frete: 300, viagem: 50 },
+  { nome: "Recanto das Emas", divisor: 0.55, frete: 300, viagem: 50 },
+  { nome: "Samambaia", divisor: 0.55, frete: 300, viagem: 50 },
+  { nome: "Guará", divisor: 0.55, frete: 300, viagem: 50 },
+  { nome: "Taguatinga", divisor: 0.55, frete: 400, viagem: 50 },
+  { nome: "Águas Claras", divisor: 0.55, frete: 400, viagem: 50 },
+  { nome: "Plano Piloto", divisor: 0.55, frete: 400, viagem: 50 },
+  { nome: "Sudoeste", divisor: 0.55, frete: 400, viagem: 50 },
+  { nome: "Lago Norte", divisor: 0.55, frete: 500, viagem: 50 },
+  { nome: "Sobradinho", divisor: 0.55, frete: 500, viagem: 50 },
+  { nome: "Águas Lindas", divisor: 0.55, frete: 500, viagem: 50 },
+];
+const CALC_DIVISORES = [0.6, 0.55, 0.5];
+const CALC_TAXA_CARTAO = 0.9172;
+function moneyInteiro(v) { return "R$ " + Math.round(Number(v) || 0).toLocaleString("pt-BR"); }
+function calcularOrcamento({ mo, material, divisor, frete, ajudante, viagem }) {
+  const custo = (Number(mo) || 0) + (Number(material) || 0);
+  const base = divisor ? custo / divisor : 0;
+  const extraAjudante = ajudante ? 2 * (Number(viagem) || 0) : 0;
+  const total = base + (Number(frete) || 0) + extraAjudante;
+  const pix = Math.round(total / 50) * 50;
+  const parcela = Math.round(pix / CALC_TAXA_CARTAO / 6);
+  return { custo, base, extraAjudante, total, pix, parcela, cartao: parcela * 6 };
+}
+function CalculadoraRapida({ onFechar, notify }) {
+  // QUIZ RÁPIDO (Diego, 16/10/2026, 21h57: "tipo eu falando contigo: tanto de tecido se houver, tanto de espuma se
+  // houver, tanto de aviamentos se houver, tanto de mão de obra, tipo um quiz rápido"). Uma pergunta por vez; o que é
+  // opcional tem "Não tem" de um toque. Cidade escolhe só o divisor; o FRETE É ELE QUEM ESCOLHE (21h58: "frete eu
+  // escolho") — a tabela da cidade entra só como sugestão no campo.
+  const [resp, setResp] = useState({ tecido: "", espuma: "", aviamentos: "", mo: "", cidadeIdx: 0, frete: "", ajudante: false, pequeno: false, divisorManual: null });
+  const [passo, setPasso] = useState(0);
+  const cidade = CALC_CIDADES[resp.cidadeIdx] || CALC_CIDADES[0];
+  const num = (v) => { const n = parseMoedaBR(v); return Number.isFinite(n) ? n : 0; };
+  const material = num(resp.tecido) + num(resp.espuma) + num(resp.aviamentos);
+  const divisor = resp.pequeno ? 0.5 : (resp.divisorManual ?? cidade.divisor);
+  const r = calcularOrcamento({ mo: num(resp.mo), material, divisor, frete: num(resp.frete), ajudante: resp.ajudante, viagem: cidade.viagem });
+  const pronto = r.custo > 0;
+  const frase = pronto ? `Para esse serviço fica ${moneyInteiro(r.pix)} no Pix ou até 6x de ${moneyInteiro(r.parcela)} no cartão.` : "";
+  const fmt = (v) => Math.round(v).toLocaleString("pt-BR");
+  const set = (k, v) => setResp((x) => ({ ...x, [k]: v }));
+  const PASSOS = [
+    { k: "tecido", pergunta: "Quanto de tecido?", opcional: true },
+    { k: "espuma", pergunta: "Quanto de espuma?", opcional: true },
+    { k: "aviamentos", pergunta: "Quanto de aviamentos?", opcional: true },
+    { k: "mo", pergunta: "Quanto de mão de obra?", opcional: false },
+    { k: "cidade", pergunta: "Qual cidade?" },
+    { k: "frete", pergunta: "Quanto de frete (buscar e entregar)?", opcional: true },
+  ];
+  // Sem pergunta de ajudante (Diego, 21h59: "coisa rápida sem complicação"): se precisar, ele soma no frete.
+  const ultimo = PASSOS.length; // tela do resultado
+  const avancar = () => { vibrar(6); setPasso((p) => Math.min(ultimo, p + 1)); };
+  const voltar = () => setPasso((p) => Math.max(0, p - 1));
+  const naoTem = (k) => { set(k, ""); avancar(); };
+  const copiar = async () => {
+    try { await navigator.clipboard.writeText(frase); notify && notify("Frase copiada. É só colar no WhatsApp.", "ok"); }
+    catch (e) { notify && notify("Não consegui copiar — selecione o texto e copie.", "error"); }
+  };
+  const trocarDivisor = () => { if (resp.pequeno) return; const i = CALC_DIVISORES.indexOf(divisor); set("divisorManual", CALC_DIVISORES[(i + 1) % CALC_DIVISORES.length]); };
+  const atual = PASSOS[passo];
+  const campoValor = (k) => <input key={k} className="calc-grande" inputMode="decimal" placeholder="R$" value={resp[k]} autoFocus onChange={(e) => set(k, e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") avancar(); }} />;
+  const corpoPasso = () => {
+    if (!atual) return null;
+    if (atual.k === "cidade") return <select className="calc-grande" value={resp.cidadeIdx} autoFocus onChange={(e) => setResp((x) => ({ ...x, cidadeIdx: Number(e.target.value), divisorManual: null, frete: x.frete === "" || x.frete === String(CALC_CIDADES[x.cidadeIdx].frete) ? String(CALC_CIDADES[Number(e.target.value)].frete || "") : x.frete }))}>{CALC_CIDADES.map((c, i) => <option key={c.nome} value={i}>{c.nome} (÷ {c.divisor.toFixed(2).replace(".", ",")})</option>)}</select>;
+    if (atual.k === "frete") return <>{campoValor("frete")}{cidade.frete ? <small className="calc-dica">Tabela de {cidade.nome}: {moneyInteiro(cidade.frete)}. Você decide; ajudante, se tiver, soma aqui.</small> : <small className="calc-dica">Em Luziânia costuma ser de 0 a R$ 80. Você decide; ajudante, se tiver, soma aqui.</small>}</>;
+    return campoValor(atual.k);
+  };
+  return <div className="modal-overlay" onMouseDown={onFechar}><div className="modal-card calc-card" onMouseDown={(e) => e.stopPropagation()}>
+    <p className="kicker">CALCULADORA RÁPIDA{passo < ultimo ? ` · ${passo + 1} de ${ultimo}` : ""}</p>
+    {passo < ultimo ? <>
+      <h3 className="calc-pergunta">{atual.pergunta}</h3>
+      {corpoPasso()}
+      <div className="ficha-actions calc-acoes">
+        {passo > 0 && <button type="button" className="ghost" onClick={voltar}>‹ Voltar</button>}
+        {atual.opcional && <button type="button" className="ghost" onClick={() => naoTem(atual.k)}>Não tem</button>}
+        <button type="button" className="primary" onClick={avancar} disabled={atual.k === "mo" && !num(resp.mo)}>{passo === ultimo - 1 ? "Ver o valor" : "Próximo ›"}</button>
+      </div>
+    </> : <>
+      <div className="calc-opcoes">
+        <button type="button" className={`ghost${resp.pequeno ? " ativo" : ""}`} onClick={() => set("pequeno", !resp.pequeno)}>Serviço pequeno (÷ 0,50)</button>
+        <button type="button" className="ghost" onClick={trocarDivisor} disabled={resp.pequeno} title="Toque pra trocar">{cidade.nome} ÷ {divisor.toFixed(2).replace(".", ",")}</button>
+      </div>
+      <p className="calc-conta">custo {fmt(r.custo)} (tecido {fmt(num(resp.tecido))} · espuma {fmt(num(resp.espuma))} · aviamentos {fmt(num(resp.aviamentos))} · mão de obra {fmt(num(resp.mo))}) ÷ {divisor.toFixed(2).replace(".", ",")} = {fmt(r.base)}{num(resp.frete) ? ` + frete ${fmt(num(resp.frete))}` : ""}{r.extraAjudante ? ` + ajudante ${fmt(r.extraAjudante)}` : ""} = {fmt(r.total)} → Pix {fmt(r.pix)} · cartão {fmt(r.cartao)} (6 × {fmt(r.parcela)})</p>
+      <div className="calc-resultado">
+        {pronto ? <><b>{moneyInteiro(r.pix)}</b><span>no Pix</span><b>6x {moneyInteiro(r.parcela)}</b><span>no cartão</span></> : <em>Faltou a mão de obra ou o material.</em>}
+      </div>
+      {pronto && <p className="calc-frase">{frase}</p>}
+      <div className="ficha-actions calc-acoes">
+        <button type="button" className="ghost" onClick={voltar}>‹ Voltar</button>
+        {pronto && <button type="button" className="primary" onClick={copiar}>📋 Copiar frase</button>}
+        <button type="button" className="ghost" onClick={() => { setResp({ tecido: "", espuma: "", aviamentos: "", mo: "", cidadeIdx: 0, frete: "", ajudante: false, pequeno: false, divisorManual: null }); setPasso(0); }}>Recomeçar</button>
+        <button type="button" className="ghost" onClick={onFechar}>Fechar</button>
+      </div>
+    </>}
+  </div></div>;
 }
 function Metric({ label, value, detail, tone, onClick }) { return <article className={`metric-card ${tone}${onClick ? " clickable" : ""}`} onClick={onClick || undefined}><span>{label}</span><b><NumeroAnimado valor={value} /></b><small>{detail}</small></article>; }
 
