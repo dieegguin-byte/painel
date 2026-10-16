@@ -161,6 +161,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-cab{display:grid;grid-template-columns:88px minmax(0,1fr) 20px;gap:13px;align-items:center;width:100%;background:none;border:0;color:inherit;text-align:left;padding:0;cursor:pointer;font:inherit}
 .compromisso-idc{display:flex;flex-direction:column;gap:3px;min-width:0}
 .compromisso-idc strong{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.compromisso-cliente{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .compromisso-idc>span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .selo-followup{display:inline-block;font-style:normal;font-size:11px;font-weight:700;color:#8fc3e6;background:#4a90c41f;border:1px solid #4a90c459;border-radius:999px;padding:1px 8px;margin-right:7px;vertical-align:1px}
 .selo-followup.zapia{color:#9fd4ae;background:#75a9872b;border-color:#75a98780}
@@ -6740,7 +6741,11 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         {idadeAtraso}
       </span>
       <span className="compromisso-idc">
-        <strong>{nomeCliente}</strong>
+        {/* TÍTULO NA FRENTE, CLIENTE EMBAIXO (Diego, 16/10/2026, 10h36, print: dois cards da Simone, 9h35 "Comprar rodinhas na
+            Pau Brasil" e 9h50 "Marlom Júnior — levar Colorado e rodinhas", apareciam os dois só como "Simone Batista Pinheiro"
+            e ele achou que era duplicado). O título já diz quem + o quê; o nome da cliente vira a linha de baixo. */}
+        <strong>{tituloCard || nomeCliente}</strong>
+        {cli?.nome && tituloCard && !tituloCard.toLowerCase().includes(cli.nome.split(" ")[0].toLowerCase()) && <small className="compromisso-cliente">{cli.nome}</small>}
         <span>{ligado && ligado.cor && <i className="selo-ligado" title="Mesma parada: cards separados, mas ligados">⛓ {ligado.indice}/{ligado.n}</i>}{ehQuente(a) && <i className="selo-quente">🔥 Quente</i>}{seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
       </span>
       <span className="compromisso-seta">{emFoco ? "" : "›"}</span>
