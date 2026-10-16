@@ -209,6 +209,10 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
    normal; só a etiqueta "◌ Remoto" é verde-água e, na lista Todos, a de hoje ou atrasado pisca de leve (opacidade,
    nada de sombra). Filtro Presencial ou Remoto ligado = nada pisca. */
 .selo-remoto{font-weight:600;color:#7fd6c9}
+/* CLIENTE QUENTE (Diego, 16/10/2026): só a etiqueta, âmbar, piscando de leve; card normal, nada de vermelho (vermelho é urgente). */
+.selo-quente{display:inline-block;font-style:normal;font-size:11px;font-weight:800;color:#ffb454;background:#f0921f24;border:1px solid #f0921f80;border-radius:999px;padding:1px 8px;margin-right:7px;vertical-align:1px;animation:remotoPisca 1.6s ease-in-out infinite}
+.compromisso-card.quente{border-left-color:#f0921f}
+@media(prefers-reduced-motion:reduce){.selo-quente{animation:none}}
 body[data-filtro-tipo="todos"] .compromisso-card.remoto-pendente .selo-remoto{animation:remotoPisca 1.8s ease-in-out infinite}
 @keyframes remotoPisca{0%,100%{opacity:1}50%{opacity:.35}}
 /* CARDS LIGADOS (Diego, 14/10/2026: "são cards separados, mas é um ligado no outro, com cores iguais"). Tarefas no mesmo
@@ -1667,7 +1671,8 @@ const demoAppointments = [
   { id: "a0", titulo: "Comprar material Ana Paula — Plástico & Tal", data: hojeISO(), hora: "08:00", cidade: "Valparaíso de Goiás", local: "Plástico & Tal - Av. Marginal, Qd. 45, lote 32 B - Jardim Ipanema", tipo: "presencial", status: "planejado", servico_id: null },
   { id: "a1", titulo: "Ana Paula — entregar poltrona", data: hojeISO(), hora: "14:00", cidade: "Valparaíso", local: "Valparaíso", tipo: "presencial", status: "planejado", servico_id: "s4" },
   // Demo do card de pagamento (15/10/2026): WhatsApp de quem recebe (Afibracom) na frente + chave Pix com copiar.
-  { id: "a12", titulo: "Pagar Pix — Afibracom — R$ 100 (pedido 84697, 3 m Colorado Preto)", data: hojeISO(), hora: "14:27", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", servico_id: "s1" },
+  { id: "a13", titulo: "🔥 Ligar pra Eloisa — fechar o sofá (aceitou a faixa da IA às 8h37)", data: hojeISO(), hora: "18:21", cidade: "Cidade Ocidental", local: "", tipo: "remoto", status: "planejado", servico_id: null },
+      { id: "a12", titulo: "Pagar Pix — Afibracom — R$ 100 (pedido 84697, 3 m Colorado Preto)", data: hojeISO(), hora: "14:27", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", servico_id: "s1" },
   { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", local: "Remoto / WhatsApp", tipo: "remoto", status: "planejado", servico_id: "s2" },
   // CARDS LIGADOS (14/10/2026): duas tarefas na mesma parada, 1 minuto uma da outra, título começando pela pessoa.
   // A demo tem que mostrar os dois com a MESMA cor e colados — e, no a1/a9, o aviso de duplicado (buscar e entregar a
@@ -2300,6 +2305,12 @@ const COBRANCA_TETO_TENTATIVAS = 3;
 // mesma pergunta é como duas telas divergem em silêncio — o mesmo motivo que fez soTexto() subir
 // pro topo do arquivo em 03/09. Quem precisa saber de modalidade usa ESTAS duas funções.
 function ehRemoto(a) { return (a && a.tipo) === "remoto"; }
+// CLIENTE QUENTE (Diego, 16/10/2026, caso Eloisa: aceitou a faixa da IA às 8h37, o card existia mas se perdeu no meio
+// dos remotos e ele só falou com ela 21h41 — "esse tipo de card deveria ser sinalizado... um cardzinho piscando,
+// não vermelho, vermelho é urgente"). Marcador: o título começa com 🔥 (a Manu escreve "🔥 Ligar pra Eloisa — …").
+// Sem coluna nova. O card fica normal; só a etiqueta "Quente" é âmbar e pisca de leve, e o card sobe pro topo da
+// lista dele (Atrasados, Hoje ou Próximos) — ver ordenarCompromisso.
+function ehQuente(a) { return /^\s*🔥/.test(String((a && a.titulo) || "")); }
 // FOLLOW-UP À VISTA (Diego, 11/10/2026: "identificação rápida sem precisar abrir"). O card mostra só hora,
 // nome e cidade; o que diz que é follow-up mora no título ("Follow-up 1 — Hugo", "Follow-up — Cleia — ...").
 // Selo no cabeçalho do card, sem mexer na cor da borda, que continua dizendo a urgência.
@@ -5691,7 +5702,10 @@ function classeLigado(l) { return l && l.cor ? ` ligado liga-cor-${l.cor} liga-$
 function corCompromisso(data, hoje) { const amanha = new Date(hoje + "T12:00:00"); amanha.setDate(amanha.getDate() + 1); const amanhaISO = amanha.toISOString().slice(0, 10); return data <= hoje ? "alta" : data === amanhaISO ? "media" : "baixa"; }
 
 // Presencial antes de remoto no mesmo dia, depois por hora.
-function ordenarCompromisso(a, b) { return (a.data + (ehRemoto(a) ? "1" : "0") + (a.hora || "99")).localeCompare(b.data + (ehRemoto(b) ? "1" : "0") + (b.hora || "99")); }
+function ordenarPorHora(a, b) { return (a.data + (ehRemoto(a) ? "1" : "0") + (a.hora || "99")).localeCompare(b.data + (ehRemoto(b) ? "1" : "0") + (b.hora || "99")); }
+// Nas listas, o cliente QUENTE (ver ehQuente) vai pro topo; entre os demais vale a hora. "Quem espera há mais tempo"
+// no cabeçalho continua usando ordenarPorHora, pra não dizer que o quente é o mais antigo.
+function ordenarCompromisso(a, b) { const q = (ehQuente(b) ? 1 : 0) - (ehQuente(a) ? 1 : 0); return q || ordenarPorHora(a, b); }
 
 function horaFalada(hora) {
   if (!hora) return "";
@@ -6577,7 +6591,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   const obsFicha = cli?.obs ? String(cli.obs).trim() : "";
   return <>
     {foco && !emFoco && ReactDOM.createPortal(<FocoDoCard props={propsCard} onFechar={() => setFoco(false)} />, document.body)}
-    <article id={emFoco ? undefined : `card-${a.id}`} className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehRemoto(a) ? " remoto" : ""}${ehRemoto(a) && a.data <= today ? " remoto-pendente" : ""}${ehFollowUpZapia(a) ? " followup-zapia" : ""}${classeLigado(ligado)}${emFoco ? " em-foco" : ""}`}>
+    <article id={emFoco ? undefined : `card-${a.id}`} className={`compromisso-card cor-${corCompromisso(a.data, today)}${ehRemoto(a) ? " remoto" : ""}${ehRemoto(a) && a.data <= today ? " remoto-pendente" : ""}${ehFollowUpZapia(a) ? " followup-zapia" : ""}${ehQuente(a) ? " quente" : ""}${classeLigado(ligado)}${emFoco ? " em-foco" : ""}`}>
     <button type="button" className="compromisso-cab" onClick={() => { if (emFoco) { if (onSairFoco) onSairFoco(); return; } vibrar(6); setFoco(true); }} aria-expanded={false}>
       <span className="compromisso-quando">
         <b>{a.hora ? a.hora.slice(0, 5) : "—"}</b>
@@ -6586,7 +6600,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       </span>
       <span className="compromisso-idc">
         <strong>{nomeCliente}</strong>
-        <span>{ligado && ligado.cor && <i className="selo-ligado" title="Mesma parada: cards separados, mas ligados">⛓ {ligado.indice}/{ligado.n}</i>}{seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
+        <span>{ligado && ligado.cor && <i className="selo-ligado" title="Mesma parada: cards separados, mas ligados">⛓ {ligado.indice}/{ligado.n}</i>}{ehQuente(a) && <i className="selo-quente">🔥 Quente</i>}{seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
       </span>
       <span className="compromisso-seta">{emFoco ? "" : "›"}</span>
     </button>
@@ -8705,7 +8719,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
   const rotinasHojeNoPrazo = (rotinas || []).map((r) => ({ r, st: statusRotina(r, today, agoraHHMM) })).filter((x) => x.st.estado === "hoje" && !rotinaAtrasada(x.st));
   const rotinasPendentesHoje = statusRotinas.length - rotinasAtrasadas;
   const totalAtrasados = atrasados.length + rotinasAtrasadas;
-  const atrasadoMaisAntigo = atrasados.length ? [...atrasados].sort(ordenarCompromisso)[0] : null;
+  const atrasadoMaisAntigo = atrasados.length ? [...atrasados].sort(ordenarPorHora)[0] : null;
   const diasMaisAntigo = atrasadoMaisAntigo ? diasDeAtraso(atrasadoMaisAntigo.data, today) : 0;
   /* ===== ENCAIXES DE ROTA (item ENCAIXES-ROTA-20260908) ===== */
     /* FICA ANTES DO FILTRO presencial/remoto, DE PROPÓSITO: encaixe não tem tipo nem data, então ele não
