@@ -1393,9 +1393,15 @@ function ListaLateral({ kicker, titulo, cabecalho = null, onFechar, semGestos = 
   };
   const arrastando = !semGestos && toque.current && puxado !== 0;
   const gestos = semGestos ? {} : { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel: onTouchEnd };
+  // O PORTAL NÃO ISOLA O TOQUE (Diego, 16/10/2026, 00h08: "para os lados não travou"). O card em foco é desenhado por
+  // portal, mas no React o evento sobe pela ÁRVORE DE COMPONENTES: o deslizar lateral dentro do foco chegava à
+  // ListaLateral do grupo (que fecha com arrasto lateral) e ao "arrastar pra direita" do card do Painel. Sem gestos,
+  // o toque morre aqui e não sobe pra ninguém.
+  const pararToque = (e) => e.stopPropagation();
+  const isolar = semGestos ? { onTouchStart: pararToque, onTouchMove: pararToque, onTouchEnd: pararToque, onTouchCancel: pararToque } : {};
   const estilo = saindo ? undefined : (puxado ? { transform: `translateY(${Math.round(puxado * 0.35)}px)` } : undefined);
   const aviso = (lado, ativo) => <div className={`lista-lateral-aviso ${lado}${ativo ? " visivel" : ""}${Math.abs(puxado) >= LIMITE_FECHAR ? " pronto" : ""}`}>{Math.abs(puxado) >= LIMITE_FECHAR ? "Solte para fechar" : "Puxe mais para fechar"}</div>;
-  return <div className="modal-overlay lista-lateral-fundo" onClick={onFechar}>
+  return <div className="modal-overlay lista-lateral-fundo" onClick={onFechar} {...isolar}>
     {!semGestos && aviso("topo", puxado > 30)}
     {!semGestos && aviso("fim", puxado < -30)}
     <div ref={painel} className={`lista-lateral${semGestos ? " sem-gestos" : ""}${arrastando ? " arrastando" : ""}${saindo ? ` ${saindo}` : ""}`} style={semGestos ? undefined : estilo} onClick={(e) => e.stopPropagation()} onScroll={onScroll} {...gestos}>
