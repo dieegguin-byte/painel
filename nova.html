@@ -4213,7 +4213,7 @@ function Home() {
         // PROPOSTAS DE ORÇAMENTO (Diego, 16/10/2026): camada de apoio como `da`. As que esperam o Aprovar/Recado dele e
         // as já decididas que a Manu ainda não passou adiante. Se a tabela ainda não existir, o app abre normal sem o card.
         // + as enviadas nos últimos 2 dias, pra ele ver "já foi pra Zapia" no lugar do Desfazer (16/10/2026).
-        db.from("propostas").select("*").or(`status.in.(aguardando,aprovada),and(status.eq.recado,recado_pelo_app.is.true),and(status.eq.enviada,enviado_em.gte.${new Date(Date.now() - 2 * 864e5).toISOString()})`).order("criado_em", { ascending: false }).limit(40),
+        db.from("propostas").select("*").or(`status.in.(aguardando,aprovada),and(status.eq.recado,recado_pelo_app.is.true),and(status.eq.enviada,enviado_em.gte.${new Date(Date.now() - 7 * 864e5).toISOString()}),and(status.eq.cancelada,decidido_em.gte.${new Date(Date.now() - 7 * 864e5).toISOString()})`).order("criado_em", { ascending: false }).limit(40),
       ]);
       // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
       // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
@@ -7220,9 +7220,10 @@ function seloProposta(p) {
   if (p.status === "aguardando") return { tom: "laranja", texto: "Esperando você" };
   if (p.status === "aprovada") return { tom: "cinza", texto: "Aprovada · ainda não enviada" };
   if (p.status === "recado") return { tom: "cinza", texto: "Seu recado · refazendo" };
+  if (p.status === "cancelada") return { tom: "cinza", texto: "✕ Descartada" };
   return null;
 }
-const PROPOSTA_STATUS = { aguardando: "esperando você", aprovada: "aprovada · a Manu passa pra Zapia", recado: "com recado · o orçamento refaz", enviada: "enviada ao cliente" };
+const PROPOSTA_STATUS = { aguardando: "esperando você", aprovada: "aprovada · a Manu passa pra Zapia", recado: "com recado · o orçamento refaz", enviada: "enviada ao cliente", cancelada: "descartada · nada foi pro cliente" };
 // DESFAZER O APROVAR (Diego, 16/10/2026, 15h58: "quando eu aprovar uma proposta... também tem a opção de desfazer").
 // Vale enquanto a Manu não passou pra Zapia (status aprovada e enviado_em vazio). Depois disso o card mostra "já foi
 // pra Zapia" no lugar do botão. Desfazer volta a proposta pra aguardando, descarta a linha "PROPOSTA APROVADA" da
@@ -7241,9 +7242,14 @@ function PropostasCard({ propostas, db, demo, notify, onChanged }) {
   // ainda mostra o status de antes — quando a lista nova chega com outro status, quem manda é o banco.
   const [feitas, setFeitas] = useState({});
   const marcar = (p, para) => setFeitas((f) => ({ ...f, [p.id]: { de: p.status, para } }));
-  const lista = (propostas || []).map((p) => feitas[p.id] && feitas[p.id].de === p.status ? { ...p, status: feitas[p.id].para } : p).filter((p) => p.status !== "cancelada");
+  const lista = (propostas || []).map((p) => feitas[p.id] && feitas[p.id].de === p.status ? { ...p, status: feitas[p.id].para } : p);
   const esperando = lista.filter((p) => p.status === "aguardando");
-  const decididas = lista.filter((p) => p.status !== "aguardando");
+  // CARD RECOLHIDO "Propostas de orçamento" (Diego, 16/10/2026: "um card recolhido pra eu abrir e saber se foi
+  // enviado, se não foi"; "pode estar enviada, cancelada, descartada, aprovada"). Fechado mostra só o nome e as
+  // contas; aberto, cada proposta com a situação dela. Enviadas e descartadas ficam 7 dias.
+  const enviadas = lista.filter((p) => p.status === "enviada");
+  const descartadas = lista.filter((p) => p.status === "cancelada");
+  const decididas = lista.filter((p) => p.status === "aprovada" || p.status === "recado");
   const aberta = lista.find((p) => p.id === abertaId) || null;
   const fechar = () => { setAbertaId(null); setConfirmando(false); setRecadoAberto(false); setRecado(""); };
   const copiar = async (texto) => { try { await navigator.clipboard.writeText(texto); vibrar(6); notify("Texto copiado.", "ok"); } catch (e) { notify("Não consegui copiar — segure no texto.", "error"); } };
@@ -7322,12 +7328,15 @@ function PropostasCard({ propostas, db, demo, notify, onChanged }) {
     {decidida && propostaDesfazivel(p) && <button type="button" className="ghost proposta-desfazer" disabled={busy} onClick={(e) => { e.stopPropagation(); desfazer(p); }}>{busy ? "…" : "↶ Desfazer"}</button>}
   </article>;
   return <>
-    <section className="content-card propostas-card com-selo tom-laranja">
-      <div className="card-head"><div><p className="kicker">PROPOSTAS DE ORÇAMENTO</p>
-        <h3>{esperando.length ? `${esperando.length} esperando você` : "Nenhuma esperando você"}</h3>
-        {!!decididas.length && <span className="ficha-note" style={{ margin: 0 }}>{decididas.length} já decidida(s), a caminho</span>}</div></div>
-      <div className="pessoais-lista">{esperando.map((p) => item(p, false))}{decididas.map((p) => item(p, true))}</div>
-    </section>
+    <CardRecolhivel className="content-card propostas-card" selo={esperando.length || null} tom="laranja" icone="📄"
+      cabecalho={<h3>Propostas de orçamento</h3>}
+      resumo={<p className="ficha-note" style={{ margin: 0 }}>{[esperando.length ? `${esperando.length} esperando você` : "nenhuma esperando você", decididas.length ? `${decididas.length} a caminho` : "", enviadas.length ? `${enviadas.length} enviada(s)` : "", descartadas.length ? `${descartadas.length} descartada(s)` : ""].filter(Boolean).join(" · ")}</p>}>
+      {!!esperando.length && <><p className="kicker">ESPERANDO VOCÊ</p><div className="pessoais-lista">{esperando.map((p) => item(p, false))}</div></>}
+      {!!decididas.length && <><p className="kicker" style={{ marginTop: 12 }}>A CAMINHO</p><div className="pessoais-lista">{decididas.map((p) => item(p, true))}</div></>}
+      {!!enviadas.length && <><p className="kicker" style={{ marginTop: 12 }}>✓ ENVIADAS AO CLIENTE · 7 DIAS</p><div className="pessoais-lista">{enviadas.map((p) => item(p, true))}</div></>}
+      {!!descartadas.length && <><p className="kicker" style={{ marginTop: 12 }}>✕ DESCARTADAS · 7 DIAS</p><div className="pessoais-lista">{descartadas.map((p) => item(p, true))}</div></>}
+      {!lista.length && <p className="ficha-note">Nenhuma proposta nos últimos 7 dias.</p>}
+    </CardRecolhivel>
     {aberta && ReactDOM.createPortal(<ListaLateral cabecalho={<><p className="kicker">PROPOSTA{aberta.versao > 1 ? ` · V${aberta.versao} (CORRIGIDA)` : ""}</p><h2>{aberta.cliente_nome}</h2>{aberta.titulo && <span className="ficha-note" style={{ margin: 0 }}>{aberta.titulo}</span>}</>} onFechar={fechar} semGestos>
       <section className="content-card proposta-aberta">
         <p className="kicker">O QUE VAI PRO CLIENTE</p>
