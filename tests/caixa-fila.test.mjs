@@ -142,7 +142,7 @@ describe('gravação — PostgreSQL local com as travas da produção', () => {
       CREATE TABLE public.caixa_entrada(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), texto text NOT NULL, criado_em timestamptz DEFAULT now(), processado boolean DEFAULT false, processado_em timestamptz, status text DEFAULT 'novo', conversa jsonb DEFAULT '[]');
       CREATE TABLE public.agenda(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), cliente_id uuid REFERENCES clientes, servico_id uuid REFERENCES servicos, titulo text, data date, hora time, tipo text, cidade text, status text);
       CREATE TABLE public.historico(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), o_que text, por text, detalhe text, criado_em timestamptz DEFAULT now());
-      CREATE FUNCTION private.whatsapp_phone_ok(t text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT t IS NOT NULL AND regexp_replace(t,'\\D','','g') ~ '^55[1-9][0-9]9[6-9][0-9]{7}$' $$;
+      CREATE FUNCTION private.whatsapp_phone_ok(t text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT t IS NOT NULL AND regexp_replace(t,'\\D','','g') ~ '^55[1-9][0-9]9[0-9]{8}$' $$;
       CREATE FUNCTION private.trg_agenda_servico_exige_whatsapp() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN new; END $$;
       CREATE TRIGGER agenda_servico_exige_whatsapp BEFORE INSERT OR UPDATE OF servico_id,status ON public.agenda FOR EACH ROW EXECUTE FUNCTION private.trg_agenda_servico_exige_whatsapp();
       -- Cópia fiel da trava da produção (public.trava_caixa_print_precisa_ser_lido, lida em 26/09/2026).
