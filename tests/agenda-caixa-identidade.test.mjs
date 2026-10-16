@@ -29,7 +29,7 @@ describe('Caixa -> Agenda — PostgreSQL local, sem conexão externa',()=>{
       CREATE TABLE public.servicos(id uuid PRIMARY KEY, cliente_id uuid REFERENCES clientes, titulo text, status text);
       CREATE TABLE public.caixa_entrada(id uuid PRIMARY KEY, texto text, conversa jsonb DEFAULT '[]', processado boolean DEFAULT false, status text DEFAULT 'novo');
       CREATE TABLE public.agenda(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), cliente_id uuid REFERENCES clientes, servico_id uuid REFERENCES servicos, titulo text, data date, hora time, tipo text, cidade text, status text);
-      CREATE FUNCTION private.whatsapp_phone_ok(t text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT t IS NOT NULL AND regexp_replace(t,'\\D','','g') ~ '^55[1-9][0-9]9[6-9][0-9]{7}$' $$;
+      CREATE FUNCTION private.whatsapp_phone_ok(t text) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT t IS NOT NULL AND regexp_replace(t,'\\D','','g') ~ '^55[1-9][0-9]9[0-9]{8}$' $$;
       CREATE FUNCTION private.trg_agenda_servico_exige_whatsapp() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN new; END $$;
       CREATE TRIGGER agenda_servico_exige_whatsapp BEFORE INSERT OR UPDATE OF servico_id,status ON public.agenda FOR EACH ROW EXECUTE FUNCTION private.trg_agenda_servico_exige_whatsapp();
       ${['clientes','servicos','caixa_entrada','agenda'].map(t=>`ALTER TABLE public.${t} ENABLE ROW LEVEL SECURITY; GRANT SELECT,INSERT,UPDATE,DELETE ON public.${t} TO authenticated; CREATE POLICY operador ON public.${t} TO authenticated USING (public.usuario_autorizado()) WITH CHECK (public.usuario_autorizado());`).join('\n')}
@@ -149,6 +149,8 @@ test('formatação comercial nunca inventa nono dígito e mantém país explíci
   assert.equal(helper.telefoneCadastroEstrito('+55 61 9671-8270'),null);
   assert.equal(helper.telefoneCadastroEstrito('61 99999-9999'),'+5561999999999');
   assert.equal(helper.telefoneCadastroEstrito('+55 61 99999-9999'),'+5561999999999');
+  assert.equal(helper.telefoneCadastroEstrito('+55 61 92002-4804'),'+5561920024804'); // celular novo começa com 92..95
+  assert.equal(helper.telefoneCadastroEstrito('+55 61 8200-2480'),null);
 });
 
 function mockDb({invalid=false,wrongReadback=false,emptyResolve=false,priorHour=null}={}){

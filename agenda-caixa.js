@@ -4,7 +4,7 @@
   function telefoneCadastroEstrito(valor) {
     let digitos = String(valor || '').replace(/\D/g, '');
     if (digitos.length === 11) digitos = '55' + digitos;
-    if (!/^55[1-9][0-9]9[6-9][0-9]{7}$/.test(digitos)) return null;
+    if (!/^55[1-9][0-9]9[0-9]{8}$/.test(digitos)) return null;
     return '+' + digitos;
   }
   function estadoCadastro(item) {

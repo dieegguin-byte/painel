@@ -57,7 +57,7 @@
    postMessage e o nova.html abre a ficha/o card sem recarregar. (2) A notificacao de compromisso so fecha
    quando um botao resolve (Feito/Adiar gravado); o toque no corpo deixa ela na barra, que e por onde ele resolve. */
 /* v21 (15/10/2026): aviso com botao vibra forte e fica na barra ate ele mexer (requireInteraction). */
-const VERSAO = 'tb-atendimento-v24'; // v24 (16/10/2026): atalhos do icone (Calculadora, Atrasados, Hoje, Anotar) no manifest
+const VERSAO = 'tb-atendimento-v25'; // v25 (16/10/2026): celular 9[0-9] depois do DDD (92..95 eram recusados)
 // Sem segredo aqui de proposito: este arquivo e publico. O que autentica o recibo e o proprio id, que
 // e um uuid que so existe dentro da carga cifrada - quem nao recebeu a notificacao nao tem como chutar.
 const PUSH_FUNCAO = 'https://iymlzdcloaeyybhefywp.supabase.co/functions/v1/push-enviar';
