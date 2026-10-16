@@ -236,9 +236,10 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 @media(prefers-reduced-motion:reduce){.selo-quente{animation:none}}
 body[data-filtro-tipo="todos"] .compromisso-card.remoto-pendente .selo-remoto{animation:remotoPisca 1.8s ease-in-out infinite}
 @keyframes remotoPisca{0%,100%{opacity:1}50%{opacity:.35}}
-/* CARDS LIGADOS (Diego, 14/10/2026: "são cards separados, mas é um ligado no outro, com cores iguais"). Tarefas no mesmo
-   lugar ou com a mesma pessoa, no mesmo dia e a poucos minutos uma da outra, continuam um card por tarefa, mas o grupo
-   ganha UMA cor (borda, fundo e selo) e os cards ficam colados. Grupos diferentes no mesmo dia, cores diferentes. */
+/* CARDS LIGADOS (Diego, 14/10/2026: "são cards separados, mas é um ligado no outro, com cores iguais"; 16/10: a saída
+   inteira é uma viagem só, mesmo com cliente diferente ou sem cliente). Presenciais do mesmo dia, um atrás do outro a
+   poucos minutos, continuam um card por tarefa, mas o grupo ganha UMA cor (borda, fundo e selo) e os cards ficam
+   colados. Saídas diferentes no mesmo dia (mais de 20 min entre uma e outra), cores diferentes. */
 .compromisso-card.ligado{--liga:#e0b04a;border-color:color-mix(in srgb,var(--liga) 55%,transparent);border-left-color:var(--liga);background:linear-gradient(150deg,color-mix(in srgb,var(--liga) 13%,#1a1512),color-mix(in srgb,var(--liga) 5%,#151210));box-shadow:0 0 0 1px color-mix(in srgb,var(--liga) 22%,transparent)}
 .compromisso-card.ligado.liga-ini,.compromisso-card.ligado.liga-meio{margin-bottom:4px;border-bottom-left-radius:6px;border-bottom-right-radius:6px}
 .compromisso-card.ligado.liga-meio,.compromisso-card.ligado.liga-fim{border-top-left-radius:6px;border-top-right-radius:6px}
@@ -5781,15 +5782,19 @@ function ligacoesDaLista(lista) {
   const ordenados = [...presenciais].sort((a, b) => (a.data + (a.hora || "99")).localeCompare(b.data + (b.hora || "99")));
   const grupos = []; const corPorDia = {};
   for (const a of ordenados) {
-    const inicio = inicioDoTitulo(a.titulo); const min = minutosDaHora(a.hora);
+    const min = minutosDaHora(a.hora); const cidade = semAcento(a.cidade || "");
     let dono = null;
+    // UMA SAÍDA SÓ (Diego, 16/10/2026: "não ligou a Marlom Júnior... levar as rodinhas lá nele e pegar a cola, ainda o
+    // aditivo dividiu"): presenciais do mesmo dia, um atrás do outro com até LIGA_MINUTOS entre um e o próximo, são a
+    // mesma viagem — com cliente diferente ou sem cliente (Pau Brasil 9h35 → Marlom 9h50 → cola 9h51 → aditivo 9h52).
+    // Até 15/10 só ligava mesma parada (mesmo começo de título ou mesmo cliente), e a saída aparecia partida em 3.
     if (min !== null) for (const g of grupos) {
       if (g.data !== a.data || g.ultimo === null || min - g.ultimo > LIGA_MINUTOS || min < g.ultimo) continue;
-      const mesmaParada = (inicio && g.inicio === inicio) || (a.cliente_id && g.cliente_id === a.cliente_id);
-      if (mesmaParada) { dono = g; break; }
+      if (cidade && g.cidade && g.cidade !== cidade) continue;
+      dono = g; break;
     }
-    if (dono) { dono.cards.push(a); dono.ultimo = min; }
-    else grupos.push({ data: a.data, inicio, cliente_id: a.cliente_id || null, ultimo: min, cards: [a] });
+    if (dono) { dono.cards.push(a); dono.ultimo = min; if (!dono.cidade) dono.cidade = cidade; }
+    else grupos.push({ data: a.data, cidade, ultimo: min, cards: [a] });
   }
   for (const g of grupos) {
     if (g.cards.length < 2) continue;
@@ -6746,7 +6751,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
             e ele achou que era duplicado). O título já diz quem + o quê; o nome da cliente vira a linha de baixo. */}
         <strong>{tituloCard || nomeCliente}</strong>
         {cli?.nome && tituloCard && !tituloCard.toLowerCase().includes(cli.nome.split(" ")[0].toLowerCase()) && <small className="compromisso-cliente">{cli.nome}</small>}
-        <span>{ligado && ligado.cor && <i className="selo-ligado" title="Mesma parada: cards separados, mas ligados">⛓ {ligado.indice}/{ligado.n}</i>}{ehQuente(a) && <i className="selo-quente">🔥 Quente</i>}{seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
+        <span>{ligado && ligado.cor && <i className="selo-ligado" title="Mesma saída: cards separados, mas é uma viagem só">⛓ {ligado.indice}/{ligado.n}</i>}{ehQuente(a) && <i className="selo-quente">🔥 Quente</i>}{seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
       </span>
       <span className="compromisso-seta">{emFoco ? "" : "›"}</span>
     </button>
