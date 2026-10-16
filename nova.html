@@ -5936,6 +5936,9 @@ function mensagemPadraoCompromisso(a, svc, hoje) {
   const nome = primeiroNomeCliente(svc);
   const oi = `Oi${nome ? " " + nome : ""}, tudo bem?`;
   const alvo = semAcento(`${svc?.proxima_acao || ""} ${a.titulo || ""}`);
+  // Foto já recebida (dito na próxima ação ou no título) nunca vira "me manda uma foto" (Isa, 16/10/2026:
+  // "Montar o valor com a foto que ela mandou" e o texto pronto pedia foto de novo).
+  const temFoto = /(com|recebi|recebemos|chegou|chegaram|veio|vieram|(?<!nao |sem |falta )(ja )?(mandou|mandaram|enviou|enviaram))( a| as| uma| umas)? fotos?\b|fotos?( que)?( ela| ele| o cliente| a cliente| ja)? (mandou|mandaram|enviou|enviaram|recebida|chegou|veio)/.test(alvo);
   const peca = pecaDoServico(svc);
   const Peca = peca.com[0].toUpperCase() + peca.com.slice(1);
   const valor = Number(svc?.valor_orcamento) > 0 ? money(svc.valor_orcamento) : "";
@@ -5958,8 +5961,8 @@ function mensagemPadraoCompromisso(a, svc, hoje) {
   if (/confirmar hor[a]rio|encaixar na rota|confirmar data/.test(alvo)) return `${oi} Consegue me confirmar um horário bom pra você? É pra eu encaixar direito na rota.`;
   if (/video|pedir (as )?medidas|mandar (as )?medidas|enviar (as )?medidas/.test(alvo)) return `${oi}${/video/.test(alvo) ? " Vi o vídeo aqui." : ""} Consegue me mandar as medidas ${deDa(peca)} (largura, profundidade e altura)? Com elas já te passo o valor.`;
   if (/medi(r|da|cao)/.test(alvo)) return `${oi} Preciso tirar as medidas ${deDa(peca)} pra fechar seu orçamento. Que dia e horário ficam bons pra você?`;
-  if (/identificar|a confirmar|a identificar|o que precisa|escopo/.test(alvo)) return `${oi} Consegue me mandar uma foto ${deDa(peca)} e me contar o que você quer fazer? Assim já te passo o valor.${/visita/.test(alvo) ? " Se preferir, posso passar aí pra ver." : ""}`;
-  if (/or[c]amento pendente|mandar or[c]amento|enviar or[c]amento|passar or[c]amento|mandar preco|(mandar|passar|responder\b.*\b)valor/.test(alvo)) return valor
+  if (!temFoto && /identificar|a confirmar|a identificar|o que precisa|escopo/.test(alvo)) return `${oi} Consegue me mandar uma foto ${deDa(peca)} e me contar o que você quer fazer? Assim já te passo o valor.${/visita/.test(alvo) ? " Se preferir, posso passar aí pra ver." : ""}`;
+  if (/or[c]amento pendente|mandar or[c]amento|enviar or[c]amento|passar or[c]amento|mandar preco|(mandar|passar|responder\b.*\b)valor|(montar|fazer|fechar|calcular) (o |a )?(valor|or[c]amento|preco|proposta)/.test(alvo)) return valor
     ? `${oi} Terminei seu orçamento ${deDa(peca)} aqui. Posso te mandar?`
     : `${oi} Estou fechando seu orçamento ${deDa(peca)} e já te mando por aqui.`;
   // Daqui pra baixo é retomada. Com orçamento enviado, a conversa é sobre ELE (com o valor); sem
@@ -5972,6 +5975,7 @@ function mensagemPadraoCompromisso(a, svc, hoje) {
   if (/decidir|marido|esposa|pensar|ver com/.test(alvo)) return `${oi} Passando pra saber se vocês já conseguiram decidir sobre ${peca.com}. Qualquer dúvida eu explico.`;
   // Com valor já passado, nunca pedir foto de novo: o assunto é o orçamento.
   if (valor) return `${oi} Passando pra saber se ficou alguma dúvida no orçamento ${deDa(peca)} (${valor}). Posso te ajudar a decidir?`;
+  if (temFoto) return `${oi} Recebi a foto ${deDa(peca)}. Estou fechando seu orçamento e já te mando por aqui.`;
   return `${oi} Passando pra saber se você ainda tem interesse no serviço ${deDa(peca)}. Se me mandar uma foto, já te passo um valor.`;
 }
 
