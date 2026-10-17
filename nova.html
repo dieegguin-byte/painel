@@ -887,8 +887,6 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 /* Botão flutuante de anotar: SÓ O "+", redondo e pequeno (Diego 15/10/2026: "está tampando a Manu, deixe só o Mais").
    Sem texto e sem a onda em volta, pra cobrir o mínimo possível dos cards; abre a mesma caixa de sempre numa gaveta */
 .anotar-fab{position:fixed;right:16px;bottom:calc(80px + env(safe-area-inset-bottom));z-index:150;width:44px;height:44px;padding:0;border-radius:50%;border:1px solid #ffb07a66;background:linear-gradient(145deg,#f09a5c,#c8551f);color:#fff8f0;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px -6px #d86d36cc,inset 0 1px 0 #ffffff55;cursor:pointer;transition:transform .15s,box-shadow .2s}
-.claude-fab{position:fixed;right:16px;bottom:calc(132px + env(safe-area-inset-bottom));z-index:150;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1px solid #47785a;background:#1f422d;color:#dff5e5;font-size:20px;font-weight:700;text-decoration:none;box-shadow:0 8px 20px -6px #000c}
-@media(min-width:851px){.claude-fab{bottom:76px}}
 .anotar-fab:active{transform:scale(.94);box-shadow:0 4px 12px -4px #d86d36cc}
 .anotar-fab b{font:300 26px/1 Inter,system-ui,sans-serif;margin-top:-2px}
 @media(min-width:851px){.anotar-fab{bottom:24px}}
@@ -1089,6 +1087,8 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .card-acoes-botoes.linha{grid-template-columns:1fr 1.25fr 1.2fr 44px}
 .botao-claude{display:flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:6px 12px;border-radius:12px;border:1px solid #47785a;background:#1f422d;color:#dff5e5;font-size:13px;font-weight:700;text-decoration:none}
 .botao-claude small{font-size:10px;font-weight:500;color:#9fc7ab}
+.botao-manu{margin:0 0 10px}
+.recado-manu-secao{margin:0 0 12px}
 .botao-claude.compacto{flex:none;align-self:flex-start;min-height:34px;padding:4px 12px;font-size:12px}
 .card-acoes-botoes.linha button{padding:0 4px;font-size:11px;letter-spacing:0;white-space:nowrap;min-width:0;overflow:hidden}
 .card-acoes-botoes button.ativo{border-color:var(--orange);color:var(--orange2)}
@@ -6624,9 +6624,9 @@ function RecadoEnviado({ r, acoes }) {
 const LINK_CLAUDE = "https://claude.ai/code/project/chan_01SdFSA5KsWwgW6FGEucUZeN";
 function BotaoClaude({ copiar = "", className = "" }) {
   const abrir = async () => { vibrar(6); if (copiar) { try { await navigator.clipboard.writeText(copiar); } catch (e) { /* abre mesmo sem copiar */ } } };
-  return <a className={`botao-claude ${className}`} href={LINK_CLAUDE} target="_blank" rel="noreferrer" onClick={abrir}>✳ Claude{copiar ? <small>o card vai copiado pra colar</small> : null}</a>;
+  return <a className={`botao-claude ${className}`} href={LINK_CLAUDE} target="_blank" rel="noreferrer" onClick={abrir}>✳ Claude{copiar ? <small>o card vai copiado, é só colar na conversa</small> : null}</a>;
 }
-function AcoesDoCompromisso({ a, acoes, today }) {
+function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
   const [texto, setTexto] = useState("");
   const [audio, setAudio] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -6671,7 +6671,9 @@ function AcoesDoCompromisso({ a, acoes, today }) {
       {modo === "remarcar" && <small>Você só explica: o Claude escolhe o dia e a hora ({HORARIOS_ROTINA_RECADOS}) e move o card.</small>}
     </div>}
     {!modo && futuro && <small>Feito antes do dia: a data vira hoje.</small>}
-    {!modo && <BotaoClaude copiar={`Sobre o card "${a.titulo_visivel || a.titulo || ""}"${a.data ? ` de ${compactDate(a.data)}${a.hora ? " " + a.hora.slice(0, 5) : ""}` : ""}: `} />}
+    {/* O CONTEXTO DO CARD VAI JUNTO (Diego, 17/10/2026: "se conseguisse carregar o contexto do card seria bem melhor"):
+        título, data, cliente, serviço, o que fazer e o id curto vão copiados; ele só cola na conversa. */}
+    {!modo && <BotaoClaude copiar={contextoClaude || `Sobre o card "${a.titulo_visivel || a.titulo || ""}"\n\n`} />}
   </div>;
 }
 
@@ -6979,7 +6981,15 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         })()}
         {avisoGPT && <p className="compromisso-material">{avisoGPT}</p>}
       </div>
-      {acoes && <AcoesDoCompromisso a={a} acoes={acoes} today={today} />}
+      {acoes && <AcoesDoCompromisso a={a} acoes={acoes} today={today} contextoClaude={[
+        `Sobre o card "${tituloCard || ""}"${a.data ? ` de ${compactDate(a.data)}${a.hora ? " " + a.hora.slice(0, 5) : ""}` : ""}`,
+        cli?.nome ? `Cliente: ${cli.nome}${cli.cidade ? " (" + cli.cidade + ")" : ""}${cli.telefone ? " · " + cli.telefone : ""}` : "",
+        svc?.titulo ? `Serviço: ${svc.titulo}${svc.status ? " · " + (statusLabel[svc.status] || svc.status) : ""}${Number(svc.valor_orcamento) ? " · " + money(svc.valor_orcamento) : ""}` : "",
+        oQueFazer && oQueFazer !== tituloCard ? `O que fazer: ${oQueFazer}` : "",
+        a.local ? `Local: ${a.local}` : "",
+        a.nota_claude ? `Nota: ${String(a.nota_claude).slice(0, 300)}` : "",
+        `Card ${String(a.id || "").slice(0, 8)}`,
+      ].filter(Boolean).join("\n") + "\n\n"} />}
     </div>}
   </article>
   </>;
@@ -8908,6 +8918,55 @@ function RespondidasAoClaude({ duvidas, inbox = [], db, demo, notify, onChanged 
     {linhas.length > 8 && <small>+{linhas.length - 8} mais</small>}
   </CardRecolhivel>;
 }
+// RECADO PRA MANU (Diego, 17/10/2026: "dentro da seção Manu um botão para deixar recado para ela"). É o mesmo recado
+// da ficha do cliente (caixa_entrada, tipo recado_manu), só que sem cliente: a Manu lê no próximo ciclo e a resposta
+// dela aparece aqui embaixo como "Manu: ...", igual na ficha.
+function RecadoPraManu({ db, demo, notify }) {
+  const [aberto, setAberto] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [recados, setRecados] = useState([]);
+  const carregar = useCallback(async () => {
+    if (demo || !db) return;
+    const { data } = await db.from("caixa_entrada").select("id,texto,processado,processado_em,criado_em,conversa").contains("conversa", [{ meta: { tipo_operacional: "recado_manu", origem: "secao_manu" } }]).order("criado_em", { ascending: false }).limit(8);
+    const corte = Date.now() - 7 * 86400000;
+    setRecados((data || []).filter((r) => !r.processado || new Date(r.processado_em || r.criado_em).getTime() > corte));
+  }, [db, demo]);
+  useEffect(() => { carregar(); }, [carregar]);
+  async function enviar() {
+    const t = texto.trim();
+    if (!t) return;
+    if (demo) { notify("Na demonstração o recado não vai.", "error"); return; }
+    setEnviando(true);
+    try {
+      const { error } = await db.from("caixa_entrada").insert({
+        texto: `Recado do Diego pra Manu: ${t}`, status: "novo", processado: false,
+        conversa: [{ de: "diego", tipo: "recado_manu", texto: t, em: new Date().toISOString(), meta: { tipo_operacional: "recado_manu", versao: 1, origem: "secao_manu", cliente_id: null } }],
+      });
+      if (error) throw error;
+      setTexto(""); setAberto(false); vibrar(8);
+      notify("Recado deixado pra Manu. Ela lê no próximo ciclo.", "ok");
+      await carregar();
+    } catch (e) { notify(e.message, "error"); }
+    finally { setEnviando(false); }
+  }
+  return <div className="recado-manu-secao">
+    {!aberto
+      ? <button type="button" className="botao-claude botao-manu" onClick={() => { vibrar(6); setAberto(true); }}>🗣 Deixar recado pra Manu</button>
+      : <div className="recado-manu-caixa">
+        <textarea value={texto} onChange={(e) => setTexto(e.target.value)} autoFocus rows={3} placeholder="O que a Manu deve fazer? Pode ditar." />
+        <div className="ficha-actions"><button className="primary" onClick={enviar} disabled={enviando || !texto.trim()}>{enviando ? "Enviando…" : "Mandar pra Manu"}</button><button className="ghost" onClick={() => { setAberto(false); setTexto(""); }}>Cancelar</button></div>
+      </div>}
+    {recados.length > 0 && <div className="recados-manu">{recados.map((r) => {
+      const pedido = (r.conversa || []).find((m) => m?.tipo === "recado_manu");
+      const respostas = (r.conversa || []).filter((m) => m && m.de !== "diego" && m.tipo !== "sistema" && m.texto).slice(-1);
+      return <div key={r.id} className={`recado-manu${r.processado ? " visto" : ""}`}>
+        <span className="recado-manu-texto">🗣 {pedido?.texto || r.texto}</span>
+        <span className="recado-manu-estado">{r.processado ? `✓ Manu viu${r.processado_em ? " · " + new Date(r.processado_em).toLocaleDateString("pt-BR") : ""}` : "aguardando a Manu"}</span>
+        {respostas.map((m, i) => <span key={i} className="recado-manu-resposta">Manu: {String(m.texto).slice(0, 240)}</span>)}
+      </div>; })}</div>}
+  </div>;
+}
 // ===== MANU, UM CARD SÓ (Diego, 13/10/2026: "o da Manu tem que responder, não precisa ir para lá, e tudo da Manu em
 // um card só") =====
 // Antes eram quatro blocos espalhados: "Cartões pra você" no alto, "Respondido à Manu" logo abaixo, e "Manu" e
@@ -8923,6 +8982,7 @@ function ManuCard({ duvidas, inbox = [], atividadeAgente = [], today, db, demo, 
   // derrubar o Painel inteiro — se algo quebrar aqui dentro, só este card avisa, e Atrasados/Hoje seguem na tela.
   return <GrupoRecolhivel id="grupo-manu" titulo="Manu" className={`grupo-agente grupo-manu${abertas ? " com-perguntas" : ""}`} semContador resumo={resumo} abertoInicial={abertas > 0}>
     <BarreiraDaAba nome="O card da Manu">
+      <RecadoPraManu db={db} demo={demo} notify={notify} />
       <DuvidasAgenteCard duvidas={duvidas} inbox={inbox} today={today} db={db} demo={demo} notify={notify} customers={customers} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />
       <RespondidasAoClaude duvidas={duvidas} inbox={inbox} db={db} demo={demo} notify={notify} onChanged={onChanged} />
       <AgenteCard itens={atividadeAgente} today={today} services={services} appointments={appointments} customers={customers} finances={finances} onOpenFicha={onOpenFicha} />
@@ -9515,9 +9575,10 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     {/* ANOTAR AGORA virou botão flutuante (Painel único, etapa 2, 11/10/2026): o card no meio da página só era
         visto quando ele rolava até lá; o botão fica sempre no mesmo canto, acima da barra, e abre a mesma caixa
         numa gaveta. Tudo igual por dentro: mesmo composer, mesma fila da Caixa. */}
-    {addInbox && <button type="button" className="anotar-fab" aria-label="Anotar agora" onClick={() => { vibrar(8); setAnotarAberto(true); }}><b>+</b></button>}
+    {/* O + LARANJA ABRE O CLAUDE (Diego, 17/10/2026: "a ideia é o + ser o link pra cá"). O Anotar continua no atalho
+        "Anotar agora" do ícone do app (nova.html?ir=anotar) e nos botões de anotar do Painel. */}
+    <a className="anotar-fab" href={LINK_CLAUDE} target="_blank" rel="noreferrer" aria-label="Abrir o Claude" onClick={() => vibrar(8)}><b>+</b></a>
     {/* CLAUDE FLUTUANTE (Diego, 17/10/2026: "acho melhor ir para você porque é rápido"): logo acima do + de anotar. */}
-    <a className="claude-fab" href={LINK_CLAUDE} target="_blank" rel="noreferrer" aria-label="Abrir o Claude" onClick={() => vibrar(8)}>✳</a>
     {addInbox && anotarAberto && <div className="modal-overlay" onClick={() => setAnotarAberto(false)}><div className="modal-card small anotar-card" onClick={(e) => e.stopPropagation()}>
       <div className="modal-head"><div><p className="kicker">ANOTAR AGORA</p><h2>O que aconteceu?</h2></div><button className="ghost" onClick={() => setAnotarAberto(false)}>Fechar</button></div>
       <ComposerCaixa composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={async () => { await addInbox(); setAnotarAberto(false); }} busy={busyInbox} placeholder="Compromisso, gasto, cliente novo, o que for — eu organizo depois." />
