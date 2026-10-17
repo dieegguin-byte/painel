@@ -4129,6 +4129,16 @@ function Home() {
   const [fichaId, setFichaId] = useState(() => (chegada.ficha && /^[0-9a-f-]{36}$/i.test(chegada.ficha) ? chegada.ficha : null));
   // Card da Agenda pedido pela notificação: nasce do ?ir=agenda&card= e muda quando o service worker avisa.
   const [cardChegada, setCardChegada] = useState(chegada.card);
+  // LINK DIRETO DE UM CARD (?ir=card&id=, 17/10/2026): quando a agenda chega, abre o card em foco, uma vez.
+  useEffect(() => {
+    if (IR_INICIAL !== "card" || !IR_ID || !(appointments || []).some((a) => String(a.id) === IR_ID)) return;
+    consumirIrInicial(); FOCO.chegada = IR_ID; FOCO.abrir(IR_ID);
+  }, [appointments]);
+  const montarCardDoLink = useCallback((id) => {
+    const a = (appointments || []).find((x) => String(x.id) === id);
+    if (!a) return null;
+    return { a, svc: (services || []).find((sv) => sv.id === a.servico_id) || null, cliente: (customers || []).find((c) => c.id === a.cliente_id) || null, today: hojeISO(), materiais: materiaisDoCompromisso(finances, a.id), fornecedores, profissionais: nomesProfissionais(services) };
+  }, [appointments, services, customers, finances, fornecedores]);
   // TOQUE NA NOTIFICAÇÃO COM O APP JÁ ABERTO (15/10/2026, Diego: "abre na tela inicial e não no compromisso").
   // O sw.js v20 só foca a aba e manda a URL por postMessage; aqui ela vira o mesmo que o ?ir= na abertura.
   useEffect(() => {
@@ -5178,7 +5188,7 @@ function Home() {
     {explicar && <BarreiraDaAba nome="A explicação" onFechar={() => setExplicar(null)}><ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
     {concluirAppt && <BarreiraDaAba nome="A conclusão do compromisso" onFechar={() => setConcluirAppt(null)}><ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} services={services} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
     {addAgendaOpen && <BarreiraDaAba nome="O novo compromisso" onFechar={() => setAddAgendaOpen(false)}><AddAgendaModal appointments={agendaVisivel} avisos={avisos} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} /></BarreiraDaAba>}
-  </div><FocoGlobal /></CadastroProfissionaisCtx.Provider></AcoesAgendaCtx.Provider>;
+  </div><FocoGlobal montar={montarCardDoLink} /></CadastroProfissionaisCtx.Provider></AcoesAgendaCtx.Provider>;
 }
 
 function agenteTexto(valor, vazio = "Não registrado") {
@@ -7056,16 +7066,18 @@ const FOCO = {
   id: null, lados: { antes: null, depois: null }, ouvintes: new Set(),
   avisar() { this.ouvintes.forEach((f) => f()); },
   abrir(id) { this.id = id; this.avisar(); },
-  fechar() { this.id = null; this.avisar(); },
+  fechar() { this.id = null; this.chegada = null; this.avisar(); },
+  chegada: null, // card pedido por link direto (?ir=card&id=): desenhado mesmo sem estar em nenhuma lista aberta
   registrar(id, props) { CARDS_EM_TELA.set(id, props); if (this.id != null) this.avisar(); },
   esquecer(id) { CARDS_EM_TELA.delete(id); if (this.id != null) this.avisar(); },
 };
 window.__tbFoco = { FOCO, CARDS_EM_TELA }; // só pra teste automatizado
-function FocoGlobal() {
+function FocoGlobal({ montar = null }) {
   const [, repintar] = React.useReducer((n) => n + 1, 0);
   useEffect(() => { FOCO.ouvintes.add(repintar); return () => FOCO.ouvintes.delete(repintar); }, []);
   const id = FOCO.id;
-  const props = id != null ? CARDS_EM_TELA.get(id) : null;
+  // Link direto: o card costuma estar num grupo fechado (não registrado); aí o próprio foco monta os props dele.
+  const props = id != null ? CARDS_EM_TELA.get(id) || (id === FOCO.chegada && montar ? montar(id) : null) : null;
   const sumiu = id != null && !props;
   useEffect(() => {
     if (!sumiu) return;
@@ -7173,7 +7185,15 @@ function ComposerCaixa({ composer, setComposer, files, setFiles, addInbox, busy,
 // ?ir= da abertura (atalhos do ícone no manifest: calculadora, atrasados, hoje, anotar; e os antigos por aba).
 let IR_INICIAL = (() => { try { return new URL(location.href).searchParams.get("ir"); } catch (e) { return null; } })();
 const consumirIrInicial = () => { IR_INICIAL = null; };
-const IR_SECAO = { atrasados: "secao-vencendo", hoje: "secao-hoje" };
+const IR_SECAO = { atrasados: "secao-vencendo", hoje: "secao-hoje", propostas: "card-propostas" };
+// LINK DIRETO (Diego, 17/10/2026: "qualquer coisa que eu tiver que ver no app você já me traz o link"). O Claude manda
+// o endereço e o app abre em cima da coisa, sem passar pela tela inicial:
+//   ?ir=card&id=<agenda.id>         o card sozinho, em foco (mesmo de tocar nele)
+//   ?ir=proposta&id=<propostas.id>  a proposta aberta · ?ir=propostas  o card das propostas
+//   ?ir=manu                        a seção da Manu (Cartões pra você, recado)
+//   ?ir=caixa&id=<caixa_entrada.id> o item da Caixa · ?ir=ficha&id=<clientes.id>  a ficha
+const IR_ID = (() => { try { return new URL(location.href).searchParams.get("id"); } catch (e) { return null; } })();
+const IR_GRUPO = { manu: "grupo-manu" };
 function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null }) {
   const naLista = React.useContext(DentroDaLista);
   const [aberto, setAberto] = useState(false);
@@ -7317,7 +7337,7 @@ const propostaJaFoi = (p) => p.status === "enviada" || !!p.enviado_em;
 const propostaDesfazivel = (p) => p.status === "aprovada" && !p.enviado_em;
 const horaCurta = (iso) => { try { return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
 function PropostasCard({ propostas, customers = [], services = [], db, demo, notify, onChanged }) {
-  const [abertaId, setAbertaId] = useState(null);
+  const [abertaId, setAbertaId] = useState(() => { if (IR_INICIAL !== "proposta" || !IR_ID) return null; consumirIrInicial(); return IR_ID; });
   const [confirmando, setConfirmando] = useState(false);
   const [recadoAberto, setRecadoAberto] = useState(false);
   const [recado, setRecado] = useState("");
@@ -7415,7 +7435,7 @@ function PropostasCard({ propostas, customers = [], services = [], db, demo, not
     {decidida && propostaDesfazivel(p) && <button type="button" className="ghost proposta-desfazer" disabled={busy} onClick={(e) => { e.stopPropagation(); desfazer(p); }}>{busy ? "…" : "↶ Desfazer"}</button>}
   </article>;
   return <>
-    <CardRecolhivel className="content-card propostas-card" selo={esperando.length || null} tom="laranja" icone="📄"
+    <CardRecolhivel id="card-propostas" className="content-card propostas-card" selo={esperando.length || null} tom="laranja" icone="📄"
       cabecalho={<h3>Propostas de orçamento</h3>}
       resumo={<p className="ficha-note" style={{ margin: 0 }}>{[esperando.length ? `${esperando.length} esperando você` : "nenhuma esperando você", decididas.length ? `${decididas.length} a caminho` : "", enviadas.length ? `${enviadas.length} enviada(s)` : "", descartadas.length ? `${descartadas.length} descartada(s)` : ""].filter(Boolean).join(" · ")}</p>}>
       {!!esperando.length && <><p className="kicker">ESPERANDO VOCÊ</p><div className="pessoais-lista">{esperando.map((p) => item(p, false))}</div></>}
@@ -7952,7 +7972,7 @@ function remarcarDaCaixa(db, item, { data, hora, tipo, cidade, titulo }) {
 function CaixaView({ inbox, abrirId, customers, services, agenda, agendaBruta, db, demo, notify, onChanged, onDemoProcessado }) {
   const [agora, setAgora] = useState(() => Date.now());
   const fila = useMemo(() => itensDaFilaDaCaixa(inbox, agora), [inbox, agora]);
-  const [atualId, setAtualId] = useState(abrirId || null);
+  const [atualId, setAtualId] = useState(() => (IR_INICIAL === "caixa" && IR_ID ? IR_ID : abrirId || null)); // ?ir=caixa&id= abre direto no item
   useEffect(() => { if (abrirId) setAtualId(abrirId); }, [abrirId]);
   const [acao, setAcao] = useState(null);
   const achado = fila.findIndex((i) => i.id === atualId);
@@ -8661,7 +8681,7 @@ function GrupoRecolhivel({ titulo, legenda = null, resumo = null, contagem = nul
   // Os dados chegam depois do primeiro render; quando `abertoInicial` vira true (chegou pergunta da Manu), o grupo
   // abre sozinho. Fechar com o dedo continua valendo até a próxima pergunta nova.
   useEffect(() => { if (abertoInicial) setAberto(true); }, [abertoInicial]);
-  const [porCima, setPorCima] = useState(false); // arrastou pra direita: o grupo inteiro abre por cima (ListaLateral)
+  const [porCima, setPorCima] = useState(() => { if (!id || IR_GRUPO[IR_INICIAL] !== id) return false; consumirIrInicial(); return true; }); // arrastou pra direita (ou link direto): o grupo inteiro abre por cima (ListaLateral)
   const arraste = usarArrastePraDireita(() => setPorCima(true));
   return <section id={id} className={`content-card grupo-card ${className}${aberto ? " aberto" : " fechado"}${semContador ? " sem-contador" : ""}`} {...arraste}>
     {porCima && ReactDOM.createPortal(<ListaLateral kicker={legenda || "ARRASTOU PARA A DIREITA"} titulo={titulo} onFechar={() => setPorCima(false)}>
