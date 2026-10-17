@@ -263,6 +263,12 @@ body[data-filtro-tipo="todos"] .compromisso-card.remoto-pendente .selo-remoto{an
 .ci-label{display:block;font-size:9px;font-weight:800;letter-spacing:1.1px;color:var(--orange2);margin-bottom:3px}
 .compromisso-info strong{display:block;font-size:13px;margin-bottom:10px;line-height:1.45}
 .dica-enter{display:block;font-size:11px;color:var(--dim);margin-top:4px}.compromisso-msg .compromisso-pix b{user-select:all;word-break:break-all}
+.codigo-pagamento{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:6px 0 10px;padding:9px 11px;border-radius:10px;background:#1a1512;border:1px dashed var(--line2);font-size:12px;color:var(--muted)}
+.codigo-pagamento span{font-weight:700;color:var(--cream)}
+.codigo-pagamento b{flex:1 1 100%;order:3;font-family:ui-monospace,Menlo,monospace;font-size:12px;font-weight:600;color:var(--cream);word-break:break-all;user-select:all}
+.copiar-codigo{margin-left:auto;min-height:32px;padding:4px 12px;border-radius:999px;background:var(--surface2);border:1px solid var(--line2);color:var(--cream);font-size:12px;font-weight:700}
+.copiar-codigo.ok{background:#1f9d55;border-color:#1f9d55;color:#fff}
+.contas-card .codigo-pagamento span,.contas-card .codigo-pagamento b{display:inline;margin:0;font-size:13px;color:var(--cream)}.contas-card .codigo-pagamento b{display:block;font-size:13px}
 .copiar-sugestao{display:inline-block;margin-left:8px;font-style:normal;font-size:11px;min-height:28px;padding:3px 9px;border-radius:999px;background:var(--surface2);border:1px solid var(--line2);color:var(--muted);vertical-align:middle}.compromisso-msg{display:block;font-style:italic;color:var(--cream);font-size:12px;line-height:1.55;background:#1a1512;border-left:2px solid #5a3b2b;padding:9px 11px;border-radius:8px;margin:0 0 12px;quotes:none}
 .compromisso-acoes{display:flex;gap:7px;flex-wrap:wrap}
 .btn-wpp{flex:1;min-width:170px;text-align:center;text-decoration:none;background:linear-gradient(135deg,#2f7d4f,#1f5a38);color:#eafff0;border-radius:10px;padding:12px 14px;font-size:12px;font-weight:750;border:1px solid #3f9160}
@@ -1715,6 +1721,7 @@ const demoAppointments = [
   { id: "a1", titulo: "Ana Paula — entregar poltrona", data: hojeISO(), hora: "14:00", cidade: "Valparaíso", local: "Valparaíso", tipo: "presencial", status: "planejado", servico_id: "s4" },
   // Demo do card de pagamento (15/10/2026): WhatsApp de quem recebe (Afibracom) na frente + chave Pix com copiar.
   { id: "a13", titulo: "🔥 Ligar pra Eloisa — fechar o sofá (aceitou a faixa da IA às 8h37)", data: hojeISO(), hora: "18:21", cidade: "Cidade Ocidental", local: "", tipo: "remoto", status: "planejado", servico_id: null },
+      { id: "a12b", titulo: "Pagar a proteção do carro — boleto de outubro 190,70", data: hojeISO(), hora: "15:10", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", financeiro_id: "f4b" },
       { id: "a12", titulo: "Pagar Pix — Afibracom — R$ 100 (pedido 84697, 3 m Colorado Preto)", data: hojeISO(), hora: "14:27", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", servico_id: "s1" },
   { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", local: "Remoto / WhatsApp", tipo: "remoto", status: "planejado", servico_id: "s2" },
   // CARDS LIGADOS (14/10/2026): duas tarefas na mesma parada, 1 minuto uma da outra, título começando pela pessoa.
@@ -1753,6 +1760,7 @@ const demoFinance = [
   { id: "f1", tipo: "entrada", valor: 675, descricao: "Entrada 50% — Carlos", status: "pago", data: "2026-07-09" },
   { id: "f2", tipo: "entrada", valor: 675, descricao: "Saldo na entrega — Carlos", status: "a_receber", data: "2026-07-15" },
   { id: "f3", tipo: "saida", escopo: "empresa", categoria: "Material", valor: 480, descricao: "6m de linho Klee", status: "pago", data: "2026-07-08", fornecedor_id: "f1", servico_id: "s1" },
+  { id: "f4b", tipo: "saida", escopo: "pessoal", categoria: "Veículo", valor: 190.7, descricao: "Proteção do carro — boleto de outubro", status: "a_pagar", data: somarDias(hojeISO(), -1), codigo_pagamento: "34191.79001 01043.510047 91020.150008 1 12340000019070" },
   { id: "f4", tipo: "saida", escopo: "empresa", categoria: "Material", valor: 210, descricao: "Espuma D40 — estoque", status: "pago", data: "2026-07-09", fornecedor_id: "f2", servico_id: null },
   // A aba Profissionais ficava VAZIA na demo, então não dava pra testar como ela se comporta
   // com descrição longa — que é o formato real dos lançamentos do acerto. Estas quatro linhas
@@ -2026,6 +2034,40 @@ function telefoneDaTriagem(a) {
 // próxima nasceria errada de novo. Campo NOVO e derivado (`titulo_visivel`) de propósito — `titulo`
 // continua sendo o dado do banco, porque é ele que a remarcação persiste no sucessor. Tela lê o visível,
 // gravação lê o original.
+// CONTA DO CARD (Diego, 17/10/2026, boleto da ADARCO). O card "Pagar a ..." ganha a linha do Dinheiro dele em `conta`
+// (pelo agenda.financeiro_id; sem ele, a conta com código que aponta pro card em financeiro.agenda_id). Derivado,
+// nunca gravado.
+function comConta(appointments, finances) {
+  const porId = new Map((finances || []).map((f) => [f.id, f]));
+  const porAgenda = new Map((finances || []).filter((f) => f.agenda_id && String(f.codigo_pagamento || "").trim()).map((f) => [f.agenda_id, f]));
+  return (appointments || []).map((a) => {
+    const conta = (a.financeiro_id && porId.get(a.financeiro_id)) || porAgenda.get(a.id) || null;
+    return conta ? { ...a, conta } : a;
+  });
+}
+// Boleto (linha digitável, 44 a 48 números), Pix copia e cola (começa com 000201) ou chave Pix.
+function tipoCodigoPagamento(codigo) {
+  const c = String(codigo || "").trim();
+  if (/^000201/.test(c) && c.length > 40) return { icone: "💠", rotulo: "Pix copia e cola", copiar: c };
+  const numeros = c.replace(/\D/g, "");
+  if (numeros.length >= 44 && numeros.length <= 48 && /^[\d\s.\-]+$/.test(c)) return { icone: "🧾", rotulo: "Boleto", copiar: numeros };
+  return { icone: "💠", rotulo: "Chave Pix", copiar: c };
+}
+function CodigoPagamento({ codigo }) {
+  const [copiado, setCopiado] = useState(false);
+  const c = String(codigo || "").trim();
+  if (!c) return null;
+  const t = tipoCodigoPagamento(c);
+  const copiar = async (e) => {
+    e.preventDefault(); e.stopPropagation();
+    try { await navigator.clipboard.writeText(t.copiar); vibrar(6); setCopiado(true); setTimeout(() => setCopiado(false), 2500); } catch (err) { /* segure no código pra copiar */ }
+  };
+  return <p className="codigo-pagamento" onClick={(e) => e.stopPropagation()}>
+    <span>{t.icone} {t.rotulo}</span>
+    <b>{c}</b>
+    <button type="button" className={`copiar-codigo${copiado ? " ok" : ""}`} onClick={copiar}>{copiado ? "Copiado ✓" : "📋 Copiar"}</button>
+  </p>;
+}
 function comTituloVisivel(appointments, pessoais) {
   const porId = new Map((pessoais || []).map((p) => [p.id, p]));
   return (appointments || []).map((a) => {
@@ -4134,7 +4176,7 @@ function Home() {
   const aplicarPacote = useCallback((p) => {
     setInbox((p.inbox || []).map((item) => ({ ...item, conversa: comoLista(item.conversa) })));
     setCustomers(p.customers || []); setServices(p.services || []);
-    setAppointments(comTituloVisivel(p.appointments, p.pessoais)); setFinances(p.finances || []); setRotinas(p.rotinas || []);
+    setAppointments(comConta(comTituloVisivel(p.appointments, p.pessoais), p.finances)); setFinances(p.finances || []); setRotinas(p.rotinas || []);
     setFornecedores(p.fornecedores || []); setPessoais(p.pessoais || []); setAgendaHistorico(p.agendaHistorico || []);
     // Estoque entra no pacote (e portanto no cache offline) porque o aviso "isso você já tem" precisa
     // existir JUSTAMENTE na estrada, sem sinal, que é quando ele decide desviar pra loja.
@@ -4155,7 +4197,7 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comTituloVisivel(demoAppointments, demoPessoais)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setAtividadeAgente(demoAtividadeAgente); setDuvidasAgente(demoDuvidas); setPropostas(demoPropostas); setDividas(demoDividas); setProfissionais(demoProfissionais); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comConta(comTituloVisivel(demoAppointments, demoPessoais), demoFinance)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setAtividadeAgente(demoAtividadeAgente); setDuvidasAgente(demoDuvidas); setPropostas(demoPropostas); setDividas(demoDividas); setProfissionais(demoProfissionais); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
@@ -6856,6 +6898,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       {!tel && (svc?.cliente_id || a.cliente_id) && <p className="compromisso-material">⚠ Sem telefone na ficha — não dá pra fazer esse contato. Pegue o número antes.</p>}
       {triagemSemTelefone && <p className="compromisso-material">⚠ Envelope de triagem com telefone técnico inválido — o app não vai adivinhar o número. Corrija a triagem.</p>}
       {tel && ehEnvelopeDeTriagem(a) && <p className="compromisso-material">✎ Conversa ainda não triada — o WhatsApp abre vazio de propósito. Leia antes de escrever.</p>}
+      <CodigoPagamento codigo={a.conta?.status === "a_pagar" ? a.conta.codigo_pagamento : ""} />
       {/* CHAVE PIX DE QUEM RECEBE (Diego, 15/10/2026: "a chave Pix também, com copia e cola, quando eu estiver devendo
           alguém"). Só em compromisso de pagamento e só com chave GRAVADA no cadastro do fornecedor/profissional
           (coluna chave_pix); sem chave, o card diz que falta, pra Manu completar. Nunca adivinha. */}
@@ -9396,10 +9439,10 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
         resumo={r.potencialCaixa > 0
           ? <span>💰 Dá pra levantar {money(r.potencialCaixa)}{r.prontosSemCobranca.length ? ` — ${r.prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")} sem pagamento registrado` : ""}</span>
           : <span>Nenhum serviço pronto pra cobrar no momento.</span>}>
-        {alerta.map((f) => { const rv = rotuloVencimento(f, today); const armado = armadoId === f.id; const pagando = pagandoId === f.id; return <span className="conta-linha conta-linha-paguei" key={f.id}>
+        {alerta.map((f) => { const rv = rotuloVencimento(f, today); const armado = armadoId === f.id; const pagando = pagandoId === f.id; return <React.Fragment key={f.id}><span className="conta-linha conta-linha-paguei">
           <em className={`conta-prazo ${rv.nivel}`}>{rv.texto}</em><strong>{curto(f)}</strong><b>{money(f.valor)}</b>
           <button type="button" className={`paguei-btn${armado ? " armado" : ""}`} disabled={pagando} onClick={() => pagarConta(f)}>{pagando ? "Salvando…" : armado ? "Confirmar ✓" : "Paguei"}</button>
-        </span>; })}
+        </span><CodigoPagamento codigo={f.codigo_pagamento} /></React.Fragment>; })}
         {onVerAPagar && <button type="button" className="ghost" onClick={onVerAPagar}>Ver todas em A pagar</button>}
         {/* SEM PRAZO fica no Painel de propósito: foi assim que a dívida do Ozair saiu da rotina — o lembrete
             irmão não nasceu e só o Financeiro guardou. Aqui ela não vence, não cobra e não some. */}
@@ -9413,7 +9456,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
         const total = futuras.reduce((soma, f) => soma + Number(f.valor || 0), 0);
         return <CardRecolhivel seloTexto={money(total)} tom="ambar" icone="◷"
           cabecalho={<><p className="kicker">A PAGAR</p><h3>{futuras.length} conta(s) a pagar</h3><span className="ficha-note" style={{ margin: 0 }}>Próxima: {descricaoFinanceiraVisivel(futuras[0].descricao) || futuras[0].categoria} · {compactDate(futuras[0].data)}</span></>}>
-          {futuras.slice(0, 6).map((f) => <span className="dinheiro-linha" key={f.id}><em>{compactDate(f.data)}</em><strong>{descricaoFinanceiraVisivel(f.descricao) || f.categoria}</strong><b>{money(f.valor)}</b></span>)}
+          {futuras.slice(0, 6).map((f) => <React.Fragment key={f.id}><span className="dinheiro-linha"><em>{compactDate(f.data)}</em><strong>{descricaoFinanceiraVisivel(f.descricao) || f.categoria}</strong><b>{money(f.valor)}</b></span><CodigoPagamento codigo={f.codigo_pagamento} /></React.Fragment>)}
           {futuras.length > 6 && <span className="ficha-note">e mais {futuras.length - 6}</span>}
           {onVerAPagar && <button type="button" className="ghost" style={{ width: "100%", marginTop: 10 }} onClick={onVerAPagar}>Ver tudo em A pagar</button>}
         </CardRecolhivel>;
@@ -12351,7 +12394,7 @@ function FuturoView({ finances, dividas, services, db, demo, mode, notify, onCha
               </div>
             </div>
           : <div className="finance-row" key={c.id}>
-              <div><strong>{c.descricao || c.categoria}</strong><span>Vence {compactDate(c.data)} · {c.escopo === "pessoal" ? "Pessoal" : "Empresa"} · {c.categoria}{(c.data || "") < hoje ? " · ATRASADA" : ""}</span></div>
+              <div><strong>{c.descricao || c.categoria}</strong><span>Vence {compactDate(c.data)} · {c.escopo === "pessoal" ? "Pessoal" : "Empresa"} · {c.categoria}{(c.data || "") < hoje ? " · ATRASADA" : ""}</span><CodigoPagamento codigo={c.codigo_pagamento} /></div>
               <div className="agenda-acoes"><b className="saida">{money(c.valor)}</b>
                 <button className="ghost" disabled={busy || mode === "claude"} onClick={() => { setEditando(c.id); setDraftEdit({ descricao: descricaoFinanceiraVisivel(c.descricao) || "", valor: String(c.valor), data: c.data || hoje }); }}>Editar</button>
                 <button className="ghost" disabled={busy || mode === "claude"} onClick={() => pagar(c)}>Marcar pago</button></div>
