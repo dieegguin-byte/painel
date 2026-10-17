@@ -1085,6 +1085,9 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .compromisso-botoes .btn-maps{background:#1f1714;border:1px solid var(--line2);color:var(--text)}
 .compromisso-botoes .btn-wpp,.compromisso-botoes .btn-rota{min-width:0;padding:12px 8px;font-size:13px;display:flex;align-items:center;justify-content:center;min-height:48px}
 .card-acoes-botoes.linha{grid-template-columns:1fr 1.25fr 1.2fr 44px}
+.botao-claude{display:flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:6px 12px;border-radius:12px;border:1px solid #47785a;background:#1f422d;color:#dff5e5;font-size:13px;font-weight:700;text-decoration:none}
+.botao-claude small{font-size:10px;font-weight:500;color:#9fc7ab}
+.botao-claude.compacto{flex:none;align-self:flex-start;min-height:34px;padding:4px 12px;font-size:12px}
 .card-acoes-botoes.linha button{padding:0 4px;font-size:11px;letter-spacing:0;white-space:nowrap;min-width:0;overflow:hidden}
 .card-acoes-botoes button.ativo{border-color:var(--orange);color:var(--orange2)}
 .card-recado{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:#ffffff06;border:1px dashed var(--line2)}
@@ -1174,7 +1177,9 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 </style>
 </head>
 <body>
-<div id="classic-bridge-badge" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9999;pointer-events:none;padding:5px 9px;border-radius:999px;background:#1f422d;border:1px solid #47785a;color:#dff5e5;font:700 10px/1.2 Inter,system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 6px 18px #0006;white-space:nowrap">Claude conectado ✓</div>
+<!-- BOTÃO CLAUDE (Diego, 17/10/2026: "coloque ele como botão em lugares que você achar bom dentro do app com o nome
+     Claude"): o selo do topo abre o projeto do Claude numa aba nova. -->
+<a id="classic-bridge-badge" href="https://claude.ai/code/project/chan_01SdFSA5KsWwgW6FGEucUZeN" target="_blank" rel="noreferrer" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9999;text-decoration:none;padding:5px 9px;border-radius:999px;background:#1f422d;border:1px solid #47785a;color:#dff5e5;font:700 10px/1.2 Inter,system-ui,-apple-system,Segoe UI,sans-serif;box-shadow:0 6px 18px #0006;white-space:nowrap">✳ Claude ↗</a>
 <!-- Este "Carregando" é de propósito HTML puro, sem depender de nada: é a primeira coisa que aparece,
      mesmo que todo o resto falhe. O React limpa a #root quando desenha, então ele some sozinho. -->
 <div id="root"><div class="loading-screen" id="tb-carregando"><div><div class="brand-seal">TB</div><p class="abertura-nome">Tapeçaria Bahia</p><p class="abertura-pontos" aria-label="Carregando o painel"><span></span><span></span><span></span></p></div></div></div>
@@ -6612,6 +6617,13 @@ function RecadoEnviado({ r, acoes }) {
   </div>;
 }
 
+// BOTÃO CLAUDE (Diego, 17/10/2026). Abre o projeto do Claude numa aba nova; quando é sobre um card, o título dele
+// vai copiado junto, pra colar na conversa.
+const LINK_CLAUDE = "https://claude.ai/code/project/chan_01SdFSA5KsWwgW6FGEucUZeN";
+function BotaoClaude({ copiar = "", className = "" }) {
+  const abrir = async () => { vibrar(6); if (copiar) { try { await navigator.clipboard.writeText(copiar); } catch (e) { /* abre mesmo sem copiar */ } } };
+  return <a className={`botao-claude ${className}`} href={LINK_CLAUDE} target="_blank" rel="noreferrer" onClick={abrir}>✳ Claude{copiar ? <small>o card vai copiado pra colar</small> : null}</a>;
+}
 function AcoesDoCompromisso({ a, acoes, today }) {
   const [texto, setTexto] = useState("");
   const [audio, setAudio] = useState(null);
@@ -6657,6 +6669,7 @@ function AcoesDoCompromisso({ a, acoes, today }) {
       {modo === "remarcar" && <small>Você só explica: o Claude escolhe o dia e a hora ({HORARIOS_ROTINA_RECADOS}) e move o card.</small>}
     </div>}
     {!modo && futuro && <small>Feito antes do dia: a data vira hoje.</small>}
+    {!modo && <BotaoClaude copiar={`Sobre o card "${a.titulo_visivel || a.titulo || ""}"${a.data ? ` de ${compactDate(a.data)}${a.hora ? " " + a.hora.slice(0, 5) : ""}` : ""}: `} />}
   </div>;
 }
 
@@ -8799,7 +8812,7 @@ function DuvidasAgenteCard({ duvidas, inbox = [], today, db, demo, notify, custo
   return <section className="content-card resumo-card duvidas-card">
     <div className="resumo-topo"><div><p className="kicker">CARTÕES PRA VOCÊ</p>
       <h3>{total} pergunta{total === 1 ? "" : "s"} pra você</h3>
-      <small>Toque numa opção ou fale no 🎤. Respondeu, some daqui e a Manu aplica na próxima rodada.</small></div></div>
+      <small>Toque numa opção ou fale no 🎤. Respondeu, some daqui e a Manu aplica na próxima rodada.</small></div><BotaoClaude className="compacto" /></div>
     {abertas.map((d) => <DuvidaItem key={d.id} d={d} today={today} db={db} demo={demo} notify={notify} nome={d.cliente_id ? nomeDe(d.cliente_id) : null} onOpenFicha={onOpenFicha} onChanged={onChanged} />)}
     {caixa.map((it) => <DuvidaItem key={"cx-" + it.id} d={{ id: it.id, origem: "caixa", pergunta: perguntaDaCaixa(it), contexto: null, opcoes: /lan[cç]o assim/i.test(perguntaDaCaixa(it)) ? ["Sim, lança assim", "Não"] : [], criado_em: it.criado_em, cliente_id: null }} caixaItem={it} today={today} db={db} demo={demo} notify={notify} nome={null} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />)}
   </section>;
