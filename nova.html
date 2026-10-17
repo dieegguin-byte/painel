@@ -2441,8 +2441,8 @@ function ehRemoto(a) { return (a && a.tipo) === "remoto"; }
 // CLIENTE QUENTE (Diego, 16/10/2026, caso Eloisa: aceitou a faixa da IA às 8h37, o card existia mas se perdeu no meio
 // dos remotos e ele só falou com ela 21h41 — "esse tipo de card deveria ser sinalizado... um cardzinho piscando,
 // não vermelho, vermelho é urgente"). Marcador: o título começa com 🔥 (a Manu escreve "🔥 Ligar pra Eloisa — …").
-// Sem coluna nova. O card fica normal; só a etiqueta "Quente" é âmbar e pisca de leve, e o card sobe pro topo da
-// lista dele (Atrasados, Hoje ou Próximos) — ver ordenarCompromisso.
+// Sem coluna nova. O card fica normal; só a etiqueta "Quente" é âmbar e pisca de leve. Desde 17/10 o card NÃO sobe
+// na lista: a ordem é só data e hora (ver ordenarCompromisso).
 function ehQuente(a) { return /^\s*🔥/.test(String((a && a.titulo) || "")); }
 // FOLLOW-UP À VISTA (Diego, 11/10/2026: "identificação rápida sem precisar abrir"). O card mostra só hora,
 // nome e cidade; o que diz que é follow-up mora no título ("Follow-up 1 — Hugo", "Follow-up — Cleia — ...").
@@ -5864,11 +5864,11 @@ function ligacoesDaLista(lista) {
 function classeLigado(l) { return l && l.cor ? ` ligado liga-cor-${l.cor} liga-${l.pos}` : ""; }
 function corCompromisso(data, hoje) { const amanha = new Date(hoje + "T12:00:00"); amanha.setDate(amanha.getDate() + 1); const amanhaISO = amanha.toISOString().slice(0, 10); return data <= hoje ? "alta" : data === amanhaISO ? "media" : "baixa"; }
 
-// Presencial antes de remoto no mesmo dia, depois por hora.
-function ordenarPorHora(a, b) { return (a.data + (ehRemoto(a) ? "1" : "0") + (a.hora || "99")).localeCompare(b.data + (ehRemoto(b) ? "1" : "0") + (b.hora || "99")); }
-// Nas listas, o cliente QUENTE (ver ehQuente) vai pro topo; entre os demais vale a hora. "Quem espera há mais tempo"
-// no cabeçalho continua usando ordenarPorHora, pra não dizer que o quente é o mais antigo.
-function ordenarCompromisso(a, b) { const q = (ehQuente(b) ? 1 : 0) - (ehQuente(a) ? 1 : 0); return q || ordenarPorHora(a, b); }
+// ORDEM SÓ POR DATA E HORA (Diego, 17/10/2026, print dos Próximos: "o compromisso de segunda não muda a ordem das
+// datas por ser quente"). Dia, depois hora (sem hora vai pro fim do dia); presencial antes de remoto só desempata
+// a mesma hora. O Quente só mostra a etiqueta, não sobe o card.
+function ordenarPorHora(a, b) { return (a.data + (a.hora || "99") + (ehRemoto(a) ? "1" : "0")).localeCompare(b.data + (b.hora || "99") + (ehRemoto(b) ? "1" : "0")); }
+function ordenarCompromisso(a, b) { return ordenarPorHora(a, b); }
 
 function horaFalada(hora) {
   if (!hora) return "";
