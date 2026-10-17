@@ -1116,6 +1116,9 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .agente-mudanca em{font-style:normal;color:var(--orange2);font-weight:800}
 .agente-mudanca b{color:#a9e7c2;font-weight:600}
 .agente-registro{font-size:12px!important;color:var(--text)!important;background:#ffffff08;border-radius:6px;padding:4px 8px;margin-top:5px!important;display:inline-block!important}
+.duvida-links{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.duvida-links:empty{display:none}
+.duvida a.duvida-wpp{display:inline-flex;align-items:center;margin:7px 0 0;min-height:34px;padding:6px 14px;font-size:12px;width:auto;flex:none;border-radius:999px;min-width:0}
 .agente-abrir{display:inline-block;margin-top:7px;background:none;border:1px solid var(--line2);color:var(--orange2);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;min-height:34px;cursor:pointer}
 /* DÚVIDAS DO AGENTE (12/10/2026): o agente pergunta, o Diego responde no Painel, a resposta vira regra */
 .duvidas-card{position:relative;overflow:hidden;background:linear-gradient(160deg,#2a2416 0,#201c14 40%,#141110 100%);border-color:#d4a64e55;box-shadow:inset 0 1px 0 #ffffff1a,0 1px 2px #0000004d,0 18px 40px -18px #000000cc}
@@ -8845,11 +8848,11 @@ function DuvidasAgenteCard({ duvidas, inbox = [], today, db, demo, notify, custo
     <div className="resumo-topo"><div><p className="kicker">CARTÕES PRA VOCÊ</p>
       <h3>{total} pergunta{total === 1 ? "" : "s"} pra você</h3>
       <small>Toque numa opção ou fale no 🎤. Respondeu, some daqui e a Manu aplica na próxima rodada.</small></div><BotaoClaude className="compacto" /></div>
-    {abertas.map((d) => <DuvidaItem key={d.id} d={d} today={today} db={db} demo={demo} notify={notify} nome={d.cliente_id ? nomeDe(d.cliente_id) : null} onOpenFicha={onOpenFicha} onChanged={onChanged} />)}
+    {abertas.map((d) => <DuvidaItem key={d.id} d={d} today={today} db={db} demo={demo} notify={notify} nome={d.cliente_id ? nomeDe(d.cliente_id) : null} telefone={d.cliente_id ? ((customers || []).find((x) => x.id === d.cliente_id) || {}).telefone : null} onOpenFicha={onOpenFicha} onChanged={onChanged} />)}
     {caixa.map((it) => <DuvidaItem key={"cx-" + it.id} d={{ id: it.id, origem: "caixa", pergunta: perguntaDaCaixa(it), contexto: null, opcoes: /lan[cç]o assim/i.test(perguntaDaCaixa(it)) ? ["Sim, lança assim", "Não"] : [], criado_em: it.criado_em, cliente_id: null }} caixaItem={it} today={today} db={db} demo={demo} notify={notify} nome={null} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />)}
   </section>;
 }
-function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, onOpenFicha, onAbrirCaixa, onChanged }) {
+function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, telefone = null, onOpenFicha, onAbrirCaixa, onChanged }) {
   const [texto, setTexto] = useState("");
   const [opcao, setOpcao] = useState(null);
   const [sempre, setSempre] = useState(false);
@@ -8888,7 +8891,12 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, onOpen
     <strong>{d.pergunta}</strong>
     {d.contexto && <span className="duvida-contexto">{d.contexto}</span>}
     <span className="duvida-quando">Perguntado {haQuanto()}{nome ? ` · ${nome}` : ""}</span>
+    <div className="duvida-links">
     {d.cliente_id && onOpenFicha && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onOpenFicha(d.cliente_id); }}>Abrir ficha{nome ? ` de ${nome.split(" ")[0]}` : ""} ›</button>}
+    {/* CONFERIR A CONVERSA ANTES (Diego, 17/10/2026: "no card botão com WhatsApp do cliente para eu conferir se falo
+        com ele ou não"). Mesmo transporte dos outros botões: Business, ou o WhatsApp comum pra quem é exceção. */}
+    {telefoneWhatsapp(telefone) && <a className="btn-wpp duvida-wpp" href={urlWhatsapp(telefoneWhatsapp(telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => vibrar(6)}>WhatsApp{nome ? ` · ${nome.split(" ")[0]}` : ""}</a>}
+    </div>
     {caixaItem && onAbrirCaixa && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onAbrirCaixa(); }}>Ver na Caixa ›</button>}
     {opcoes.length > 0 && <div className="duvida-opcoes">{opcoes.map((o) => <button type="button" key={o} className={opcao === o ? "ativo" : ""} onClick={() => { vibrar(6); setOpcao(opcao === o ? null : o); }}>{o}</button>)}</div>}
     <textarea value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy && resposta) gravar("respondida"); })} placeholder={opcoes.length ? "Quer explicar mais? (opcional)" : "Sua resposta pra Manu"} />
