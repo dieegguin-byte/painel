@@ -57,7 +57,8 @@
    postMessage e o nova.html abre a ficha/o card sem recarregar. (2) A notificacao de compromisso so fecha
    quando um botao resolve (Feito/Adiar gravado); o toque no corpo deixa ela na barra, que e por onde ele resolve. */
 /* v21 (15/10/2026): aviso com botao vibra forte e fica na barra ate ele mexer (requireInteraction). */
-const VERSAO = 'tb-atendimento-v25'; // v25 (16/10/2026): celular 9[0-9] depois do DDD (92..95 eram recusados)
+/* v25 (16/10/2026): celular 9[0-9] depois do DDD (92..95 eram recusados). */
+const VERSAO = 'tb-atendimento-v26'; // v26 (18/10/2026): não apaga o transformers-cache (Whisper da Caixa)
 // Sem segredo aqui de proposito: este arquivo e publico. O que autentica o recibo e o proprio id, que
 // e um uuid que so existe dentro da carga cifrada - quem nao recebeu a notificacao nao tem como chutar.
 const PUSH_FUNCAO = 'https://iymlzdcloaeyybhefywp.supabase.co/functions/v1/push-enviar';
@@ -108,7 +109,8 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((chaves) =>
-      Promise.all(chaves.filter((k) => k !== VERSAO).map((k) => caches.delete(k)))
+      // Só apaga cache NOSSO de versão velha: o "transformers-cache" guarda o Whisper (~80 MB) baixado uma vez.
+      Promise.all(chaves.filter((k) => k !== VERSAO && k.startsWith('tb-')).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });

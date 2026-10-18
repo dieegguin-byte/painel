@@ -589,6 +589,17 @@ button.sutil{opacity:.55;font-size:12px}
 .caixa-item-topo time{font-size:11px;color:var(--muted)}
 .caixa-texto{white-space:pre-wrap;word-break:break-word;margin:0;font-size:14px;line-height:1.45}
 .caixa-prints{display:flex;gap:8px;flex-wrap:wrap}
+.caixa-prints:empty{display:none}
+.caixa-audios{border:1px solid var(--line2);border-radius:12px;padding:8px 10px}
+.caixa-audios summary{cursor:pointer;font-weight:700;font-size:13px}
+.caixa-audios>button{margin:8px 0 4px}
+.caixa-audio{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
+.caixa-audio audio{width:100%;height:36px}
+.caixa-audio small{color:var(--muted,#a99);font-size:11px}
+.caixa-audio p{margin:0;font-size:14px;line-height:1.4}
+.faixa-transcricao{position:fixed;left:12px;right:12px;bottom:calc(132px + env(safe-area-inset-bottom));z-index:160;display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:12px;background:#24304a;border:1px solid #4a6290;color:#e6eeff;font-size:13px;font-weight:700;box-shadow:0 8px 20px -8px #000c}
+.faixa-transcricao small{font-weight:500;color:#b9c6e6}
+@media(min-width:851px){.faixa-transcricao{left:auto;width:340px;bottom:76px}}
 .caixa-prints img{max-width:100%;max-height:360px;border-radius:10px;border:1px solid var(--line2)}
 .caixa-conversa{border-top:1px solid var(--line);padding-top:8px}
 .caixa-conversa summary{cursor:pointer;font-size:12px;color:var(--muted)}
@@ -2233,6 +2244,111 @@ function money(value) {
 // .zip/áudio/vídeo/pdf, e aqui o .zip é aberto NO APARELHO, sem biblioteca: o navegador já sabe inflar
 // (DecompressionStream "deflate-raw"). O texto do _chat.txt entra na Caixa como antes e cada mídia sobe como
 // arquivo próprio no Storage. Se o zip não abrir, ele sobe inteiro, como evidência.
+// ===== ÁUDIO DA CAIXA VIRA TEXTO (Diego, 16/10/2026: "um Whisper dentro do meu aplicativo pra transcrever os áudios que
+// caem na caixa"). Roda NO CELULAR, sem chave de API e sem mandar o áudio do cliente pra ninguém: o Whisper (modelo
+// onnx-community/whisper-base, ~80 MB, baixado uma vez e guardado no aparelho) trabalha num Worker, fora da tela.
+// O áudio é aberto aqui (OfflineAudioContext a 16 kHz, que é o que o Whisper espera) e o texto entra na conversa do
+// item da Caixa como {de:"sistema", tipo:"transcricao", meta:{tipo_operacional:"transcricao_audio", arquivo}} — é por
+// ali que a Manu lê. Áudio já transcrito em outra exportação (mesmo nome de arquivo) não é transcrito de novo.
+const WHISPER_MODELO = "onnx-community/whisper-base";
+const WHISPER_LIB = "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js";
+const EXT_AUDIO_CAIXA = /\.(opus|ogg|oga|mp3|m4a|aac|amr|wav|webm)$/i;
+function ehAudioDaCaixa(nome) { return EXT_AUDIO_CAIXA.test(String(nome || "")); }
+// PTT-20261016-WA0012.opus → 2026-10-16. Sem data no nome, conta como recente.
+function dataDoAudio(nome) { const m = String(nome || "").match(/(20\d{2})(\d{2})(\d{2})/); return m ? `${m[1]}-${m[2]}-${m[3]}` : null; }
+function transcricaoDoArquivo(conversa, arquivo) {
+  const m = comoLista(conversa).find((x) => x?.meta?.tipo_operacional === "transcricao_audio" && x.meta.arquivo === arquivo);
+  return m ? String(m.meta.texto ?? m.texto ?? "") : null;
+}
+// Estado da fila, pra faixa "Transcrevendo áudio 2 de 7" (FaixaTranscricao).
+const TRANSCRICAO = { estado: null, ouvintes: new Set(), mudar(e) { this.estado = e; this.ouvintes.forEach((f) => f()); } };
+let whisperWorker = null; const whisperPedidos = new Map(); let whisperSeq = 0;
+function workerWhisper() {
+  if (whisperWorker) return whisperWorker;
+  const codigo = `import { pipeline, env } from "${WHISPER_LIB}";
+env.allowLocalModels = false;
+let asr = null;
+self.onmessage = async (e) => {
+  const { id, audio } = e.data;
+  try {
+    if (!asr) asr = await pipeline("automatic-speech-recognition", "${WHISPER_MODELO}", { dtype: "q8", device: "wasm",
+      progress_callback: (p) => { if (p && p.status === "progress") self.postMessage({ tipo: "baixando", pct: Math.round(p.progress || 0), arquivo: p.file }); } });
+    const r = await asr(audio, { language: "portuguese", task: "transcribe", chunk_length_s: 30, stride_length_s: 5 });
+    self.postMessage({ tipo: "ok", id, texto: String((r && r.text) || "").trim() });
+  } catch (err) { self.postMessage({ tipo: "erro", id, erro: String((err && err.message) || err) }); }
+};`;
+  whisperWorker = new Worker(URL.createObjectURL(new Blob([codigo], { type: "text/javascript" })), { type: "module" });
+  whisperWorker.onmessage = (e) => {
+    const m = e.data || {};
+    if (m.tipo === "baixando") { if (TRANSCRICAO.estado) TRANSCRICAO.mudar({ ...TRANSCRICAO.estado, baixando: m.pct < 100 ? m.pct : null }); return; }
+    const pedido = whisperPedidos.get(m.id); if (!pedido) return;
+    whisperPedidos.delete(m.id);
+    if (m.tipo === "ok") pedido.resolve(m.texto); else pedido.reject(new Error(m.erro || "o Whisper falhou"));
+  };
+  whisperWorker.onerror = (e) => {
+    const erro = new Error((e && e.message) || "o Whisper não abriu (sem internet na primeira vez?)");
+    whisperPedidos.forEach((p) => p.reject(erro)); whisperPedidos.clear(); whisperWorker = null;
+  };
+  return whisperWorker;
+}
+async function audioPara16k(blob) {
+  const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const ab = await new Ctx(1, 16000, 16000).decodeAudioData(await blob.arrayBuffer());
+  if (ab.numberOfChannels === 1) return ab.getChannelData(0).slice();
+  const a = ab.getChannelData(0), b = ab.getChannelData(1), out = new Float32Array(a.length);
+  for (let i = 0; i < a.length; i++) out[i] = (a[i] + b[i]) / 2;
+  return out;
+}
+function transcreverAudio(audio) {
+  const w = workerWhisper(); const id = ++whisperSeq;
+  return new Promise((resolve, reject) => { whisperPedidos.set(id, { resolve, reject }); w.postMessage({ id, audio }, [audio.buffer]); });
+}
+// Relê a linha antes de gravar (a Manu pode ter escrito na conversa enquanto o Whisper trabalhava).
+async function gravarTranscricao(db, itemId, arquivo, texto) {
+  const { data, error } = await db.from("caixa_entrada").select("conversa").eq("id", itemId).single();
+  if (error) throw error;
+  const conversa = comoLista(data?.conversa);
+  if (transcricaoDoArquivo(conversa, arquivo) !== null) return;
+  conversa.push({ de: "sistema", tipo: "transcricao", texto: `🎤 Áudio ${arquivo}: ${texto || "(sem fala)"}`, em: new Date().toISOString(),
+    meta: { tipo_operacional: "transcricao_audio", arquivo, texto: texto || "", modelo: WHISPER_MODELO } });
+  const up = await db.from("caixa_entrada").update({ conversa }).eq("id", itemId);
+  if (up.error) throw up.error;
+}
+// Fila única: um áudio por vez, na ordem em que chegaram. `fontes` = [{ nome, blob }] ou [{ nome, url }].
+let filaTranscricao = Promise.resolve();
+function transcreverAudiosDaCaixa({ db, itemId, fontes, notify, onFeito }) {
+  const lista = (fontes || []).filter((f) => f && ehAudioDaCaixa(f.nome));
+  if (!db || !itemId || !lista.length) return Promise.resolve(0);
+  filaTranscricao = filaTranscricao.then(async () => {
+    let feitos = 0, falhas = 0;
+    for (let i = 0; i < lista.length; i++) {
+      const f = lista[i];
+      TRANSCRICAO.mudar({ atual: i + 1, total: lista.length, arquivo: f.nome, baixando: TRANSCRICAO.estado?.baixando ?? null });
+      try {
+        const anterior = await db.from("caixa_entrada").select("conversa").contains("conversa", [{ meta: { tipo_operacional: "transcricao_audio", arquivo: f.nome } }]).limit(1);
+        let texto = anterior.data?.length ? transcricaoDoArquivo(anterior.data[0].conversa, f.nome) : null;
+        if (texto === null) {
+          const blob = f.blob || await (await fetch(f.url)).blob();
+          texto = await transcreverAudio(await audioPara16k(blob));
+        }
+        await gravarTranscricao(db, itemId, f.nome, texto);
+        feitos++;
+      } catch (e) { falhas++; console.warn("transcrição", f.nome, e); }
+    }
+    TRANSCRICAO.mudar(null);
+    if (notify) notify(falhas ? `Transcrevi ${feitos} áudio(s); ${falhas} não deu (o arquivo fica na Caixa pra ouvir).` : `${feitos} áudio(s) da Caixa viraram texto.`, falhas ? "error" : "ok");
+    if (onFeito) onFeito();
+    return feitos;
+  });
+  return filaTranscricao;
+}
+function FaixaTranscricao() {
+  const [, repintar] = React.useReducer((n) => n + 1, 0);
+  useEffect(() => { TRANSCRICAO.ouvintes.add(repintar); return () => TRANSCRICAO.ouvintes.delete(repintar); }, []);
+  const e = TRANSCRICAO.estado;
+  if (!e) return null;
+  return <div className="faixa-transcricao" role="status">🎤 {e.baixando != null ? `Baixando o Whisper ${e.baixando}% (só na primeira vez, melhor no Wi-Fi)` : `Transcrevendo áudio ${e.atual} de ${e.total}`}<small>deixe o app aberto</small></div>;
+}
 function ehZip(f) { return /\.zip$/i.test(f?.name || "") || /\bzip\b/i.test(f?.type || ""); }
 function tipoPorNome(nome) {
   const ext = String(nome || "").toLowerCase().split(".").pop();
@@ -4943,6 +5059,10 @@ function Home() {
     setCaixaAbrirId(id);
     setTab("caixa");
     await loadAll();
+    // Áudios dos últimos 7 dias viram texto já (os mais antigos têm o botão "Transcrever" no item da Caixa).
+    const corteAudio = somarDias(hojeISO(), -7);
+    const audiosRecentes = recebidos.filter((f) => ehAudioDaCaixa(f.name) && (dataDoAudio(f.name) || corteAudio) >= corteAudio).map((f) => ({ nome: f.name, blob: f }));
+    if (audiosRecentes.length) transcreverAudiosDaCaixa({ db, itemId: id, fontes: audiosRecentes, notify, onFeito: loadAll });
     notify(jaExistia ? "Esse compartilhamento já estava na Caixa."
       : `Salvo na Caixa${uploaded.length ? ` com ${uploaded.length} arquivo(s)` : ""}${partes.length ? ", com o seu recado" : ""}. Fica na fila até o Claude processar.`, "ok");
   }, [compartilhamentoPendente, db, customers, loadAll, notify]);
@@ -5201,7 +5321,7 @@ function Home() {
     {explicar && <BarreiraDaAba nome="A explicação" onFechar={() => setExplicar(null)}><ExplicarModal db={db} demo={demo} notify={notify} item={explicar.item} kind={explicar.kind} onClose={() => setExplicar(null)} onDone={(patch) => { setExplicar(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
     {concluirAppt && <BarreiraDaAba nome="A conclusão do compromisso" onFechar={() => setConcluirAppt(null)}><ConcluirModal db={db} demo={demo} notify={notify} appt={concluirAppt} materiais={materiaisDoCompromisso(finances, concluirAppt.id)} fornecedores={fornecedores} services={services} svc={services.find((s) => s.id === concluirAppt.servico_id)} onClose={() => setConcluirAppt(null)} onDone={(patch) => { setConcluirAppt(null); aplicarResolucao(patch); if (!demo) loadAll(); }} /></BarreiraDaAba>}
     {addAgendaOpen && <BarreiraDaAba nome="O novo compromisso" onFechar={() => setAddAgendaOpen(false)}><AddAgendaModal appointments={agendaVisivel} avisos={avisos} db={db} demo={demo} notify={notify} onClose={() => setAddAgendaOpen(false)} onDone={() => { setAddAgendaOpen(false); loadAll(); }} /></BarreiraDaAba>}
-  </div><FocoGlobal montar={montarCardDoLink} /></CadastroProfissionaisCtx.Provider></AcoesAgendaCtx.Provider>;
+  </div><FocoGlobal montar={montarCardDoLink} /><FaixaTranscricao /></CadastroProfissionaisCtx.Provider></AcoesAgendaCtx.Provider>;
 }
 
 function agenteTexto(valor, vazio = "Não registrado") {
@@ -8087,7 +8207,8 @@ function CaixaView({ inbox, abrirId, customers, services, agenda, agendaBruta, d
     <article className="caixa-item">
       <div className="caixa-item-topo"><span className="status-pill">{info.icone} {info.rotulo}</span><time>{criado ? `${criado.toLocaleDateString("pt-BR")} · ${dias === 0 ? "hoje" : `há ${dias} dia(s)`}` : "sem data"}</time></div>
       <p className="caixa-texto">{p.text || "(sem texto — só arquivo)"}</p>
-      {!!p.images.length && <div className="caixa-prints">{p.images.map((img) => <a key={img.url} href={img.url} target="_blank" rel="noreferrer"><img src={img.url} alt={img.fileName} /></a>)}</div>}
+      {!!p.images.length && <div className="caixa-prints">{p.images.filter((img) => !ehAudioDaCaixa(img.fileName)).map((img) => <a key={img.url} href={img.url} target="_blank" rel="noreferrer"><img src={img.url} alt={img.fileName} /></a>)}</div>}
+      <AudiosDaCaixa item={item} imagens={p.images} db={db} demo={demo} notify={notify} onChanged={onChanged} />
       {meta && <p className="ficha-note" style={{ margin: 0 }}>Compromisso original: {meta.titulo_original || "—"}{meta.data_original ? " · " + compactDate(meta.data_original) : ""}{origem ? ` · está ${origem.status}` : ""}{meta.motivo ? ` · motivo: ${meta.motivo}` : ""}</p>}
       {!!mensagens.length && <details className="caixa-conversa" open={tipo === "pergunta"}><summary>Conversa ({mensagens.length})</summary>
         {mensagens.map((m, i) => <p key={i}><b>{m.de || "?"}</b>{m.em ? " · " + new Date(m.em).toLocaleDateString("pt-BR") : ""}: {parseInbox(String(m.texto)).text || "(arquivo)"}</p>)}
@@ -8112,6 +8233,28 @@ function CaixaView({ inbox, abrirId, customers, services, agenda, agendaBruta, d
 // TELA DE CONFIRMAÇÃO DO COMPARTILHAMENTO (12/10/2026). Mostra o que chegou do WhatsApp (print, comprovante,
 // conversa exportada), pergunta "de quem é / o que é" e só salva no "Salvar na Caixa". É a mesma pergunta do
 // CaixaRecado, feita na hora certa: quando ele ainda lembra de que cliente é aquele comprovante.
+// Áudios do item da Caixa: tocar aqui mesmo e ler o que o Whisper escreveu. Os que ainda não têm texto ganham o botão.
+function AudiosDaCaixa({ item, imagens, db, demo, notify, onChanged }) {
+  const audios = (imagens || []).filter((img) => ehAudioDaCaixa(img.fileName));
+  const [rodando, setRodando] = useState(false);
+  if (!audios.length) return null;
+  const semTexto = audios.filter((img) => transcricaoDoArquivo(item.conversa, img.fileName) === null);
+  const transcrever = async () => {
+    if (demo) { notify("Na demonstração não transcreve.", "info"); return; }
+    setRodando(true);
+    try { await transcreverAudiosDaCaixa({ db, itemId: item.id, fontes: semTexto.map((img) => ({ nome: img.fileName, url: img.url })), notify, onFeito: onChanged }); }
+    finally { setRodando(false); }
+  };
+  return <details className="caixa-audios" open={audios.length <= 6}>
+    <summary>🎤 {audios.length} áudio(s){semTexto.length ? ` · ${semTexto.length} sem texto` : " · todos com texto"}</summary>
+    {semTexto.length > 0 && <button type="button" className="secondary" disabled={rodando} onClick={transcrever}>{rodando ? "Transcrevendo…" : `🎤 Transcrever ${semTexto.length} áudio(s)`}</button>}
+    {audios.map((img) => { const t = transcricaoDoArquivo(item.conversa, img.fileName); return <div key={img.url} className="caixa-audio">
+      <small>{img.fileName}</small>
+      <audio controls preload="none" src={img.url} />
+      {t !== null && <p>{t || "(sem fala)"}</p>}
+    </div>; })}
+  </details>;
+}
 function ConfirmarCompartilhamento({ pendente, customers, onSalvar, onFechar, notify }) {
   const [clienteId, setClienteId] = useState("");
   const [texto, setTexto] = useState("");
