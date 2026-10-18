@@ -596,6 +596,8 @@ button.sutil{opacity:.55;font-size:12px}
 .caixa-audio{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-top:1px solid var(--line)}
 .caixa-audio audio{width:100%;height:36px}
 .caixa-audio small{color:var(--muted,#a99);font-size:11px}
+.caixa-audios-conversa{display:grid;gap:6px;margin-top:10px}
+.caixa-audios-conversa small{color:var(--muted,#a99);font-size:11px}
 .caixa-audio p{margin:0;font-size:14px;line-height:1.4}
 .faixa-transcricao{position:fixed;left:12px;right:12px;bottom:calc(132px + env(safe-area-inset-bottom));z-index:160;display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:12px;background:#24304a;border:1px solid #4a6290;color:#e6eeff;font-size:13px;font-weight:700;box-shadow:0 8px 20px -8px #000c}
 .faixa-transcricao small{font-weight:500;color:#b9c6e6}
@@ -2341,6 +2343,32 @@ function transcreverAudiosDaCaixa({ db, itemId, fontes, notify, onFeito }) {
     return feitos;
   });
   return filaTranscricao;
+}
+// Itens da Caixa dos últimos 7 dias com áudio — inclusive os que a Manu já processou (somem da fila "um por vez").
+const FILTRO_AUDIO_CAIXA = "texto.ilike.%.opus%,texto.ilike.%.ogg%,texto.ilike.%.m4a%,texto.ilike.%.mp3%,texto.ilike.%.aac%,texto.ilike.%.amr%,texto.ilike.%.wav%";
+async function itensComAudioRecentes(db) {
+  const desde = new Date(Date.now() - 7 * 86400000).toISOString();
+  const { data, error } = await db.from("caixa_entrada").select("id,texto,conversa,criado_em,processado").gte("criado_em", desde).or(FILTRO_AUDIO_CAIXA).order("criado_em", { ascending: false });
+  if (error) throw error;
+  return (data || []).map((item) => ({ ...item, audios: parseInbox(item.texto || "").images.filter((img) => ehAudioDaCaixa(img.fileName)) })).filter((item) => item.audios.length);
+}
+// Ao abrir o app: o que chegou antes do Whisper existir (ou com o app fechado no meio) vira texto também.
+let atrasadosJaRodou = false;
+async function transcreverAudiosAtrasados(db, notify) {
+  if (atrasadosJaRodou || !db) return;
+  atrasadosJaRodou = true;
+  try {
+    const corte = somarDias(hojeISO(), -7);
+    const pendentes = (await itensComAudioRecentes(db)).map((item) => ({ item, fontes: item.audios
+      .filter((img) => transcricaoDoArquivo(item.conversa, img.fileName) === null && (dataDoAudio(img.fileName) || corte) >= corte)
+      .map((img) => ({ nome: img.fileName, url: img.url })) })).filter((x) => x.fontes.length);
+    if (!pendentes.length) return;
+    const total = pendentes.reduce((n, x) => n + x.fontes.length, 0);
+    notify(`🎤 Transcrevendo ${total} áudio(s) da Caixa — deixe o app aberto.`, "info");
+    let feitos = 0;
+    for (const x of pendentes) feitos += await transcreverAudiosDaCaixa({ db, itemId: x.item.id, fontes: x.fontes, notify: null });
+    notify(`${feitos} de ${total} áudio(s) da Caixa viraram texto. Estão em Caixa › Áudios recentes.`, feitos === total ? "ok" : "error");
+  } catch (e) { console.warn("áudios atrasados", e); }
 }
 function FaixaTranscricao() {
   const [, repintar] = React.useReducer((n) => n + 1, 0);
@@ -4517,6 +4545,7 @@ function Home() {
   }, [tab]);
 
   useEffect(() => { if (demo || session) loadAll(); }, [demo, session, loadAll]);
+  useEffect(() => { if (!demo && session && db) transcreverAudiosAtrasados(db, notify); }, [demo, session, db, notify]);
 
   // O APP EM TEMPO REAL (recado de 04/09: "compromisso gravado na fonte oficial e ainda assim não
   // aparece"). O Classic grava direto no Supabase; até aqui o app só via isso se o Diego lembrasse de
@@ -5288,6 +5317,7 @@ function Home() {
       {tab === "estoque" && <iframe title="Estoque" src="./estoque.html" style={{ width: "100%", height: "calc(100dvh - 150px)", minHeight: 480, border: 0, borderRadius: 12, background: "transparent" }} />}
       {tab === "painel" && <Dashboard anotarInicial={anotarInicial} inbox={inbox} services={activeServices} appointments={agendaVisivel} agendaPlanejada={appointments} agendaHistorico={agendaHistorico} avisos={avisos} atividadeAgente={atividadeAgente} duvidasAgente={duvidasAgente} propostas={propostas} finances={finances} rotinas={rotinas} customers={customers} fornecedores={fornecedores} pessoais={pessoais} estoque={estoque} db={db} demo={demo} notify={notify} onRotinaChanged={loadAll} onServicoChanged={loadAll} onOpenFicha={setFichaId} onConcluir={setConcluirAppt} onReschedule={abrirReagendar} onSemProximaAcao={() => { setLeadsFiltroInicial("sem_acao"); setTab("leads"); }} onVerRetornosVencidos={() => { setLeadsFiltroInicial("retorno_vencido"); setTab("leads"); }} onVerCompras={() => setTab("compras")} onVerAPagar={() => setTab("futuro")} onAbrirCaixa={() => setTab("caixa")} onVerFinanceiro={() => setTab("financeiro")} onVerProfissionais={() => setTab("vales")} onVerLeads={() => setTab("leads")} onVerOrcamentos={() => { setLeadsFiltroInicial("orcamento"); setTab("leads"); }} onVerAgenda={() => setTab("agenda")} onVerEstoque={() => irParaAba(nav.find((item) => item.id === "estoque"))} onVerClientes={() => setTab("clientes")} onVerFornecedores={() => setTab("fornecedores")} cadastroProfissionais={profissionais} composer={composer} setComposer={setComposer} files={files} setFiles={setFiles} addInbox={addInbox} busyInbox={busy} />}
       {tab === "caixa" && <CaixaView inbox={inbox} abrirId={caixaAbrirId} customers={customers} services={services} agenda={agendaVisivel} agendaBruta={appointments} db={db} demo={demo} notify={notify} onChanged={loadAll} onDemoProcessado={(id) => setInbox((items) => items.filter((entry) => entry.id !== id))} />}
+      {tab === "caixa" && <AudiosRecentesDaCaixa db={db} demo={demo} notify={notify} />}
       {/* `addInbox` VOLTOU pro Painel (Painel único, etapa 2, 11/10/2026): o card "Anotar agora" tinha saído
           porque o Diego não lançava mais pelo app; agora ele é o botão flutuante "+ Anotar", que salva na
           fila da Caixa pro Claude organizar. Sem a prop o botão não aparece. */}
@@ -8254,6 +8284,30 @@ function AudiosDaCaixa({ item, imagens, db, demo, notify, onChanged }) {
       {t !== null && <p>{t || "(sem fala)"}</p>}
     </div>; })}
   </details>;
+}
+// Caixa › Áudios recentes: todo item com áudio dos últimos 7 dias, processado ou não, com o texto do Whisper.
+function AudiosRecentesDaCaixa({ db, demo, notify }) {
+  const [itens, setItens] = useState(null);
+  const carregar = useCallback(async () => {
+    if (demo || !db) { setItens([]); return; }
+    try { setItens(await itensComAudioRecentes(db)); } catch (e) { notify("Não consegui ler os áudios da Caixa: " + e.message, "error"); setItens([]); }
+  }, [db, demo, notify]);
+  useEffect(() => { carregar(); }, [carregar]);
+  // Recarrega quando a fila do Whisper termina (inclusive a que roda sozinha ao abrir o app).
+  useEffect(() => { let antes = TRANSCRICAO.estado; const f = () => { if (antes && !TRANSCRICAO.estado) carregar(); antes = TRANSCRICAO.estado; }; TRANSCRICAO.ouvintes.add(f); return () => TRANSCRICAO.ouvintes.delete(f); }, [carregar]);
+  if (!itens || !itens.length) return null;
+  const nomeDaConversa = (item) => {
+    const txt = parseInbox(item.texto || "").images.find((img) => /\.txt$/i.test(img.fileName));
+    const nome = txt ? txt.fileName.replace(/^\d+_/, "").replace(/\.txt$/i, "").replace(/_/g, " ").replace(/^Conversa do WhatsApp com\s*/i, "").trim() : "";
+    return nome || "Conversa sem nome";
+  };
+  return <section className="content-card full" id="caixa-audios-recentes">
+    <div className="card-head"><div><p className="kicker">CAIXA · ÁUDIOS RECENTES</p><h3>🎤 Áudios dos últimos 7 dias</h3></div></div>
+    {itens.map((item) => <div key={item.id} className="caixa-audios-conversa">
+      <b>{nomeDaConversa(item)}</b> <small>{item.criado_em ? new Date(item.criado_em).toLocaleDateString("pt-BR") : ""}{item.processado ? " · já processado" : ""}</small>
+      <AudiosDaCaixa item={item} imagens={item.audios} db={db} demo={demo} notify={notify} onChanged={carregar} />
+    </div>)}
+  </section>;
 }
 function ConfirmarCompartilhamento({ pendente, customers, onSalvar, onFechar, notify }) {
   const [clienteId, setClienteId] = useState("");
