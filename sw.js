@@ -58,7 +58,9 @@
    quando um botao resolve (Feito/Adiar gravado); o toque no corpo deixa ela na barra, que e por onde ele resolve. */
 /* v21 (15/10/2026): aviso com botao vibra forte e fica na barra ate ele mexer (requireInteraction). */
 /* v25 (16/10/2026): celular 9[0-9] depois do DDD (92..95 eram recusados). */
-const VERSAO = 'tb-atendimento-v26'; // v26 (18/10/2026): não apaga o transformers-cache (Whisper da Caixa)
+/* v27 (18/10/2026): CONTA PERGUNTA ANTES. O Feito da notificacao num card de conta nao grava: o banco responde
+   ok:false com `abrir` (o card com ?pagou=1) e o app abre ali perguntando "Pagou?". */
+const VERSAO = 'tb-atendimento-v27'; // v26 (18/10/2026): não apaga o transformers-cache (Whisper da Caixa)
 // Sem segredo aqui de proposito: este arquivo e publico. O que autentica o recibo e o proprio id, que
 // e um uuid que so existe dentro da carga cifrada - quem nao recebeu a notificacao nao tem como chutar.
 const PUSH_FUNCAO = 'https://iymlzdcloaeyybhefywp.supabase.co/functions/v1/push-enviar';
@@ -256,13 +258,14 @@ function botoesDe(aviso) {
     .map(function (b) { return { action: String(b.action), title: String(b.title).slice(0, 20) }; });
 }
 // BOTAO TOCADO (v19). Vai com modo cors de proposito: preciso LER a resposta pra saber se gravou. GET sem
-// cabecalho extra nao dispara preflight, entao continua uma requisicao so. Devolve true se o banco aplicou.
+// cabecalho extra nao dispara preflight, entao continua uma requisicao so. Devolve true se o banco aplicou; o link a abrir se o
+// banco pediu (card de conta, v27); false se nao gravou.
 function responderPeloBotao(recibo, acao) {
   if (!recibo) return Promise.resolve(false);
   return fetch(PUSH_FUNCAO + '?modo=acao&recibo=' + encodeURIComponent(recibo) + '&acao=' + encodeURIComponent(acao),
     { mode: 'cors', cache: 'no-store' })
     .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (j) { return !!(j && j.ok); })
+    .then(function (j) { return j && j.ok ? true : (j && j.abrir ? j.abrir : false); })
     .catch(function () { return false; });
 }
 
@@ -277,8 +280,9 @@ self.addEventListener('notificationclick', (e) => {
     carimbarRecibo(recibo, 'aberto');
     e.waitUntil(responderPeloBotao(recibo, e.action).then(function (gravou) {
       // Gravou: resolvido, a notificacao sai. Nao gravou: fica na barra e o app abre pra ele resolver la.
-      if (gravou) { e.notification.close(); return; }
-      return abrirApp(destino);
+      if (gravou === true) { e.notification.close(); return; }
+      // Card de conta (v27): o banco manda abrir o card com a pergunta "Pagou?" em vez de dar baixa.
+      return abrirApp(typeof gravou === 'string' ? new URL(gravou, self.location).href : destino);
     }));
     return;
   }
