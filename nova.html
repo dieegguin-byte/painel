@@ -1087,6 +1087,11 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .card-acoes-botoes.linha{grid-template-columns:1fr 1.25fr 1.2fr 44px}
 .botao-claude{display:flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:6px 12px;border-radius:12px;border:1px solid #47785a;background:#1f422d;color:#dff5e5;font-size:13px;font-weight:700;text-decoration:none}
 .botao-claude small{font-size:10px;font-weight:500;color:#9fc7ab}
+.checklist-entrega{margin:4px 0 2px;padding:10px 12px;border-radius:12px;border:1px solid #3f6b52;background:#13241a}
+.checklist-entrega ul{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.checklist-entrega li{position:relative;padding-left:22px;font-size:14px;line-height:1.35;color:var(--text,#f3ece4)}
+.checklist-entrega li::before{content:"☐";position:absolute;left:0;top:0;color:#8fd0a8}
+.checklist-entrega p{margin:8px 0 0;font-size:13px;color:#cfe6d6}
 .botao-manu{margin:0 0 10px}
 .recado-manu-secao{margin:0 0 12px}
 .botao-claude.compacto{flex:none;align-self:flex-start;min-height:34px;padding:4px 12px;font-size:12px}
@@ -6498,7 +6503,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
 function SelosClaudeDoCard({ a, acoes, onMudar }) {
   const abertos = acoes.recados.filter((r) => r.agenda_id === a.id && !r.processado_em);
   return <>
-    {a.nota_claude && a.nota_claude_conferida === false && <div className="selo-claude">
+    {a.nota_claude && a.nota_claude_conferida === false && !checklistDaNota(a.nota_claude) && <div className="selo-claude">
       <b>🔁 Remarcado pelo Claude</b>
       <span>{a.nota_claude}</span>
       <div className="selo-botoes">
@@ -6687,6 +6692,19 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
   </div>;
 }
 
+// CHECK-LIST ANTES DA ENTREGA (Diego, 17/10/2026: "não vejo esse checklist aí no card dela"). A Manu escreve o check-list
+// no agenda.nota_claude ("Manu: CHECK-LIST ANTES DA ENTREGA" + linhas "☐ ..."). O selo de nota só aparecia enquanto a
+// nota não era conferida, então o check-list sumia. Agora ele vira um bloco próprio, sempre visível, só leitura.
+function checklistDaNota(nota) {
+  const t = String(nota || "");
+  const i = t.search(/check-?\s?list/i);
+  if (i < 0) return null;
+  const linhas = t.slice(i).split(/\n+/).slice(1).map((l) => l.trim()).filter(Boolean);
+  if (!linhas.length) return null;
+  const itens = linhas.filter((l) => /^[☐☑✅✔\-•*]/.test(l)).map((l) => l.replace(/^[☐☑✅✔\-•*]\s*/, ""));
+  const resto = linhas.filter((l) => !/^[☐☑✅✔\-•*]/.test(l));
+  return { itens: itens.length ? itens : linhas, resto: itens.length ? resto : [] };
+}
 function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, profissionais, revisaoData = false, sucessor = null, passouDaHora = false, ligado = null, emFoco = false, onSairFoco = null }) {
   const [aberto, setAberto] = useState(false);
   // CARD EM FOCO (Diego, 15/10/2026, 20h29: "clicar no card ter foco de ficar só nele, não mover até embaixo"):
@@ -6942,6 +6960,11 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         {instrucoes.map(([rotulo, texto]) => <React.Fragment key={rotulo}>
           <span className="ci-label">{rotulo}</span><strong>{texto}</strong>
         </React.Fragment>)}
+        {(() => { const ck = checklistDaNota(a.nota_claude); return ck && <div className="checklist-entrega">
+          <span className="ci-label">✓ CHECK-LIST ANTES DA ENTREGA</span>
+          <ul>{ck.itens.map((t, i) => <li key={i}>{t}</li>)}</ul>
+          {ck.resto.map((t, i) => <p key={i}>{t}</p>)}
+        </div>; })()}
         {/* SUGESTÃO SÓ PRA LER/COPIAR (Diego, 12/10/2026): o WhatsApp abre LIMPO, sem texto pré-preenchido — ele decide
             se manda áudio ou texto. A sugestão fica aqui como instrução, com um botão de copiar. */}
         {sugestao && <q className="compromisso-msg">{sugestao}<button type="button" className="copiar-sugestao" title="Copiar sugestão" onClick={async (e) => { e.preventDefault(); try { await navigator.clipboard.writeText(sugestao); vibrar(6); } catch (err) { /* segure no texto pra copiar */ } }}>📋 Copiar</button></q>}
