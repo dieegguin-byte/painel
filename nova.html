@@ -821,6 +821,20 @@ button.sutil{opacity:.55;font-size:12px}
 .dinheiro-linha em{font-style:normal;font-size:11px;color:var(--dim);white-space:nowrap}
 .dinheiro-linha strong{flex:1 1 120px;min-width:0;font-weight:600;overflow-wrap:anywhere}
 .dinheiro-linha b{white-space:nowrap}
+button.dinheiro-linha.prof-linha{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:10px;background:none;border:0;border-top:1px solid var(--line);color:var(--text);text-align:left;cursor:pointer;font:inherit;font-size:14px}
+.prof-linha strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prof-linha .prof-linha-num{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+.prof-linha .prof-linha-num small{font-size:11px;color:var(--muted);letter-spacing:.02em}
+.prof-linha .prof-linha-num b{font-size:14px;color:var(--text)}
+.prof-linha .prof-linha-num b.saida{color:var(--red,#df6a5d)}
+.prof-linha i{font-style:normal;font-size:12px;color:var(--orange2);white-space:nowrap}
+.prof-detalhe{display:grid;gap:14px;padding-bottom:80px}
+.prof-bloco{display:grid;gap:8px;padding:12px;border:1px solid var(--line2);border-radius:14px}
+.prof-item{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding-top:8px;border-top:1px solid var(--line)}
+.prof-item div{min-width:0}.prof-item strong{display:block;font-size:15px}.prof-item span{display:block;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.prof-item b{font-size:16px;white-space:nowrap}.prof-item b.saida{color:var(--red,#df6a5d)}
+.prof-saldo{display:grid;gap:4px;padding:12px;border-radius:14px;background:#df6a5d14;border:1px solid #df6a5d55}
+.prof-saldo span{font-size:13px;color:var(--muted)}.prof-saldo b{font-size:18px}
 .mat-loja{border-left:3px solid #ed9057}
 .mat-loja-head b{font-size:12px;font-weight:800;padding:2px 9px;border-radius:999px;background:#d86d3626;border:1px solid #d86d3666;color:#ffcfac}
 .mat-item{align-items:center}
@@ -1452,6 +1466,45 @@ function usarArrastePraDireita(ao) {
 // `semGestos` (Diego, 15/10/2026, 20h51, sobre o card em foco: "o arrastar pro lado, pra cima e pra baixo no card do
 // cliente não ficou bom"): a lista abre sem os gestos de fechar por arrasto; o conteúdo só rola. Fecha pelo Voltar
 // do topo, pelo voltar do Android ou tocando fora.
+// CONTA DE UM PROFISSIONAL (Diego, 18/10/2026: "vale do Marcão apagado, não sei facilmente do que se trata, deveria
+// abrir outra aba como nos outros lugares"). Só leitura: o que falta pagar serviço por serviço, os vales que ele pegou
+// e o saldo. Mexer (amarrar vale, acertar) continua na aba Profissionais.
+function DetalheProfissional({ conta, onFechar, onVerProfissionais }) {
+  const abertos = conta.servicos.filter((l) => l.situacao === "aberto");
+  const semValor = conta.servicos.filter((l) => l.visivel && l.situacao === "sem_valor");
+  const clienteDe = (s) => s.clientes?.nome || s.titulo || "Serviço";
+  return <ListaLateral kicker="PROFISSIONAL" titulo={conta.nome} onFechar={onFechar} semGestos>
+    <div className="prof-detalhe">
+      <section className="prof-bloco">
+        <p className="kicker">FALTA PAGAR A ELE</p>
+        {!abertos.length && !conta.avulsos.length && <p className="ficha-note">Nenhum serviço em aberto.</p>}
+        {abertos.map((l) => <div className="prof-item" key={l.servico.id}>
+          <div><strong>{clienteDe(l.servico)}</strong><span>{l.servico.prazo ? `prazo ${compactDate(l.servico.prazo)} · ` : ""}combinado {money(l.combinado)}{l.pago ? ` · já pago ${money(l.pago)}` : ""}{l.vale ? ` · vale deste serviço ${money(l.vale)}` : ""}</span></div>
+          <b>{money(l.saldo)}</b>
+        </div>)}
+        {conta.avulsos.map((f) => <div className="prof-item" key={f.id}>
+          <div><strong>{descricaoFinanceiraVisivel(f.descricao) || "Trabalho avulso"}</strong><span>{compactDate(f.data)} · trabalho avulso</span></div>
+          <b>{money(f.valor)}</b>
+        </div>)}
+        {semValor.length > 0 && <p className="ficha-note">{semValor.length} serviço(s) ainda sem valor de mão de obra anotado ({semValor.map((l) => clienteDe(l.servico)).join(", ")}). Não entram na conta.</p>}
+      </section>
+      <section className="prof-bloco">
+        <p className="kicker">VALES QUE ELE JÁ PEGOU</p>
+        {!conta.valesSoltos.length && <p className="ficha-note">Nenhum vale solto.</p>}
+        {conta.valesSoltos.map((f) => <div className="prof-item" key={f.id}>
+          <div><strong>{compactDate(f.data)}</strong><span>{descricaoFinanceiraVisivel(f.descricao) || "Vale"}</span></div>
+          <b className="saida">− {money(f.valor)}</b>
+        </div>)}
+      </section>
+      <div className="prof-saldo">
+        <span>{money(conta.faltaServicos + conta.somaAvulsos)} a pagar − {money(conta.somaVales)} de vales =</span>
+        <b>{conta.total >= 0 ? `${money(conta.total)} a pagar a ele` : `${money(-conta.total)} que ele te deve (adiantado)`}</b>
+      </div>
+      {onVerProfissionais && <button type="button" className="ghost" style={{ width: "100%" }} onClick={() => { onFechar(); onVerProfissionais(); }}>Mexer em Profissionais</button>}
+    </div>
+    <div className="foco-nav"><button type="button" className="foco-voltar" onClick={onFechar}>Voltar</button></div>
+  </ListaLateral>;
+}
 function ListaLateral({ kicker, titulo, cabecalho = null, onFechar, semGestos = false, children }) {
   const painel = React.useRef(null);
   const toque = React.useRef(null);
@@ -9306,6 +9359,7 @@ function RegrasAprendidasCard({ duvidas, db, demo, notify, onChanged }) {
   </CardRecolhivel>;
 }
 function Dashboard({ anotarInicial = false, inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, atividadeAgente = [], duvidasAgente = [], propostas = [], finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, onVerLeads, onVerOrcamentos, onVerAgenda, onVerEstoque, onVerClientes, onVerFornecedores, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+  const [profAberto, setProfAberto] = useState(null); // Dinheiro › Profissionais: a conta de um profissional aberta por cima
   const [filtroTipo, setFiltroTipo] = useState("todos");
   // Gaveta do botão flutuante "Anotar" (Painel único, etapa 2, 11/10/2026).
   const [anotarAberto, setAnotarAberto] = useState(!!anotarInicial);
@@ -9841,7 +9895,13 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
         const vales = contas.reduce((soma, c) => soma + c.somaVales, 0);
         return <CardRecolhivel seloTexto={money(falta)} tom="laranja" icone="✎"
           cabecalho={<><p className="kicker">PROFISSIONAIS</p><h3>Falta pagar {money(falta)}{vales > 0 ? ` · vales soltos ${money(vales)}` : ""}</h3><span className="ficha-note" style={{ margin: 0 }}>{contas.map((c) => c.nome).join(", ")}</span></>}>
-          {contas.map((c) => <span className="dinheiro-linha" key={c.chave}><strong>{c.nome}</strong><b>{money(c.faltaServicos + c.somaAvulsos)}</b>{c.somaVales > 0 && <em>vales {money(c.somaVales)}</em>}</span>)}
+          {contas.map((c) => <button type="button" className="dinheiro-linha prof-linha" key={c.chave} onClick={() => setProfAberto(c.chave)}>
+            <strong>{c.nome}</strong>
+            <span className="prof-linha-num"><small>falta pagar</small><b>{money(c.faltaServicos + c.somaAvulsos)}</b></span>
+            {c.somaVales > 0 && <span className="prof-linha-num"><small>vales</small><b className="saida">− {money(c.somaVales)}</b></span>}
+            <i>ver ›</i>
+          </button>)}
+          {(() => { const c = contas.find((x) => x.chave === profAberto); return c && ReactDOM.createPortal(<DetalheProfissional conta={c} onFechar={() => setProfAberto(null)} onVerProfissionais={onVerProfissionais} />, document.body); })()}
           {onVerProfissionais && <button type="button" className="ghost" style={{ width: "100%", marginTop: 10 }} onClick={onVerProfissionais}>Ver tudo em Profissionais</button>}
         </CardRecolhivel>;
       })()}
