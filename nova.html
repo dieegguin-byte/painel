@@ -1087,6 +1087,11 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .card-acoes-botoes.linha{grid-template-columns:1fr 1.25fr 1.2fr 44px}
 .botao-claude{display:flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:6px 12px;border-radius:12px;border:1px solid #47785a;background:#1f422d;color:#dff5e5;font-size:13px;font-weight:700;text-decoration:none}
 .botao-claude small{font-size:10px;font-weight:500;color:#9fc7ab}
+.botao-manu-resolve{display:flex;align-items:center;gap:10px;width:100%;margin-top:8px;padding:12px 14px;border-radius:12px;border:1px solid #6d5a9c;background:#2c2342;color:#e9e1ff;font-weight:750;font-size:14px;cursor:pointer;text-align:left}
+.botao-manu-resolve small{font-weight:500;font-size:12px;color:#bfb3e0}
+.com-manu{display:flex;flex-direction:column;gap:3px;margin-top:8px;padding:10px 12px;border-radius:12px;border:1px solid #6d5a9c;background:#241d36;color:#e9e1ff;font-size:13px}
+.com-manu span{color:#cfc4ee;font-size:12.5px}
+.com-manu.visto{opacity:.8}
 .checklist-entrega{margin:4px 0 2px;padding:10px 12px;border-radius:12px;border:1px solid #3f6b52;background:#13241a}
 .checklist-entrega ul{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
 .checklist-entrega li{position:relative;padding-left:22px;font-size:14px;line-height:1.35;color:var(--text,#f3ece4)}
@@ -1121,6 +1126,9 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .agente-mudanca em{font-style:normal;color:var(--orange2);font-weight:800}
 .agente-mudanca b{color:#a9e7c2;font-weight:600}
 .agente-registro{font-size:12px!important;color:var(--text)!important;background:#ffffff08;border-radius:6px;padding:4px 8px;margin-top:5px!important;display:inline-block!important}
+.duvida-links{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.duvida-links:empty{display:none}
+.duvida a.duvida-wpp{display:inline-flex;align-items:center;margin:7px 0 0;min-height:34px;padding:6px 14px;font-size:12px;width:auto;flex:none;border-radius:999px;min-width:0}
 .agente-abrir{display:inline-block;margin-top:7px;background:none;border:1px solid var(--line2);color:var(--orange2);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:700;min-height:34px;cursor:pointer}
 /* DÚVIDAS DO AGENTE (12/10/2026): o agente pergunta, o Diego responde no Painel, a resposta vira regra */
 .duvidas-card{position:relative;overflow:hidden;background:linear-gradient(160deg,#2a2416 0,#201c14 40%,#141110 100%);border-color:#d4a64e55;box-shadow:inset 0 1px 0 #ffffff1a,0 1px 2px #0000004d,0 18px 40px -18px #000000cc}
@@ -6320,6 +6328,7 @@ const ACAO_RECADO_ROTULO = { recado: "Recado", feito: "Feito", remarcar: "Remarc
 
 function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointments, recarga = 0 }) {
   const [recados, setRecados] = useState([]);
+  const [comManu, setComManu] = useState([]); // pedidos "Manu resolve" (ver pedirManu)
   // `recarga` muda a cada loadAll (canal vivo, volta ao primeiro plano, puxar pra atualizar): a lista é relida do banco,
   // que é a fonte — a faixa não pode confiar só no que este aparelho mandou (14/10/2026).
   const carregar = useCallback(async () => {
@@ -6328,7 +6337,24 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     const desde = new Date(Date.now() - 3 * 864e5).toISOString();
     const { data, error } = await db.from("agenda_recados").select("*, agenda(titulo,data,hora,status,pessoal_id)").or(`processado_em.is.null,processado_em.gte.${desde}`).order("criado_em", { ascending: true });
     if (!error) setRecados(data || []);
+    const mr = await db.from("caixa_entrada").select("id,processado,processado_em,criado_em,conversa").contains("conversa", [{ meta: { origem: "manu_resolve" } }]).or(`processado.eq.false,processado_em.gte.${desde}`).order("criado_em", { ascending: true });
+    if (!mr.error) setComManu(mr.data || []);
   }, [db, demo, session, recarga]);
+  // MANU RESOLVE (Diego, 17/10/2026: "um botão Manu resolve... sempre me falando que vai fazer, eu confirmo, cancelo,
+  // falo pra falar diferente"). O card vai pra Manu como recado (caixa_entrada, recado_manu, origem manu_resolve) e
+  // fica marcado "Com a Manu". Ela responde nos Cartões pra você dizendo como vai falar; quem fecha o card é ela.
+  const pedirManu = useCallback(async (a, { nota, contexto, clienteId, servicoId }) => {
+    const limpo = (nota || "").trim();
+    const meta = { tipo_operacional: "recado_manu", versao: 1, origem: "manu_resolve", manu_resolve: true, agenda_id: a.id, cliente_id: clienteId || null, servico_id: servicoId || null };
+    const item = { texto: `Manu resolve — card "${a.titulo_visivel || a.titulo || ""}"${limpo ? `. Como o Diego quer: ${limpo}` : ""}\n${contexto || ""}`.trim(), status: "novo", processado: false,
+      conversa: [{ de: "diego", tipo: "recado_manu", texto: limpo || "Manu, resolve este card.", em: new Date().toISOString(), meta }] };
+    if (demo) { setComManu((prev) => [...prev, { id: "demo-mr-" + Date.now(), processado: false, criado_em: new Date().toISOString(), conversa: item.conversa }]); notify("Com a Manu (demo).", "ok"); return true; }
+    const { error } = await db.from("caixa_entrada").insert(item);
+    if (error) throw error;
+    notify("Com a Manu. Ela te diz como vai falar antes de mandar.", "ok");
+    await carregar();
+    return true;
+  }, [db, demo, notify, carregar]);
   useEffect(() => { carregar(); }, [carregar]);
 
   const enviar = useCallback(async (a, { acao, texto, audio }) => {
@@ -6495,7 +6521,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     return true;
   }, [db, demo, notify, onChanged, setAppointments]);
 
-  return useMemo(() => ({ recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify }), [recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify]);
+  return useMemo(() => ({ recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify, comManu, pedirManu }), [recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify, comManu, pedirManu]);
 }
 
 // Selo SEMPRE visível (fora do corpo recolhido): remarcação do Claude esperando conferência e recados que a
@@ -6647,6 +6673,17 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
   const [busy, setBusy] = useState(null);
   const futuro = !!a.data && a.data > today;
   const doCard = acoes.recados.filter((r) => r.agenda_id === a.id);
+  const pedidoManu = [...(acoes.comManu || [])].reverse().find((r) => (r.conversa || []).some((m) => m?.meta?.agenda_id === a.id));
+  const respostaManu = pedidoManu ? (pedidoManu.conversa || []).filter((m) => m && m.de !== "diego" && m.tipo !== "sistema" && m.texto).slice(-1)[0] : null;
+  const [manuAberto, setManuAberto] = useState(false);
+  const [notaManu, setNotaManu] = useState("");
+  const [mandandoManu, setMandandoManu] = useState(false);
+  const mandarManu = async () => {
+    setMandandoManu(true);
+    try { await acoes.pedirManu(a, { nota: notaManu, contexto: contextoClaude, clienteId: a.cliente_id || null, servicoId: a.servico_id || null }); vibrar(8); setManuAberto(false); setNotaManu(""); }
+    catch (e) { acoes.notify("Não foi pra Manu: " + e.message, "error"); }
+    finally { setMandandoManu(false); }
+  };
   const enviar = async (acao) => {
     if (busy) return;
     if (acao === "recado" && !texto.trim() && !audio) { acoes.notify("Escreva ou grave o recado primeiro.", "error"); return; }
@@ -6689,6 +6726,16 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
     {/* O CONTEXTO DO CARD VAI JUNTO (Diego, 17/10/2026: "se conseguisse carregar o contexto do card seria bem melhor"):
         título, data, cliente, serviço, o que fazer e o id curto vão copiados; ele só cola na conversa. */}
     {!modo && <BotaoClaude copiar={contextoClaude || `Sobre o card "${a.titulo_visivel || a.titulo || ""}"\n\n`} />}
+    {!modo && !a.pessoal && acoes.pedirManu && (pedidoManu
+      ? <div className={`com-manu${pedidoManu.processado ? " visto" : ""}`}><b>🤖 Com a Manu</b>
+        <span>{respostaManu ? `Manu: ${String(respostaManu.texto).slice(0, 240)}` : pedidoManu.processado ? "✓ Manu viu." : "Ela te mostra nos Cartões pra você como vai falar, e você confirma, muda ou cancela."}</span></div>
+      : manuAberto
+        ? <div className="card-recado">
+          <p className="kicker" style={{ margin: 0 }}>MANU RESOLVE</p>
+          <textarea autoFocus value={notaManu} onChange={(e) => setNotaManu(e.target.value)} placeholder="Quer dizer como? (opcional) Ela te mostra o texto antes de mandar." />
+          <div className="ficha-actions"><button type="button" className="primary" onClick={mandarManu} disabled={mandandoManu}>{mandandoManu ? "…" : "Mandar pra Manu"}</button><button type="button" className="ghost" onClick={() => { setManuAberto(false); setNotaManu(""); }}>Cancelar</button></div>
+        </div>
+        : <button type="button" className="botao-manu-resolve" onClick={() => { vibrar(6); setManuAberto(true); }}>🤖 Manu resolve<small>ela te diz como vai falar antes</small></button>)}
   </div>;
 }
 
@@ -8868,11 +8915,11 @@ function DuvidasAgenteCard({ duvidas, inbox = [], today, db, demo, notify, custo
     <div className="resumo-topo"><div><p className="kicker">CARTÕES PRA VOCÊ</p>
       <h3>{total} pergunta{total === 1 ? "" : "s"} pra você</h3>
       <small>Toque numa opção ou fale no 🎤. Respondeu, some daqui e a Manu aplica na próxima rodada.</small></div><BotaoClaude className="compacto" /></div>
-    {abertas.map((d) => <DuvidaItem key={d.id} d={d} today={today} db={db} demo={demo} notify={notify} nome={d.cliente_id ? nomeDe(d.cliente_id) : null} onOpenFicha={onOpenFicha} onChanged={onChanged} />)}
+    {abertas.map((d) => <DuvidaItem key={d.id} d={d} today={today} db={db} demo={demo} notify={notify} nome={d.cliente_id ? nomeDe(d.cliente_id) : null} telefone={d.cliente_id ? ((customers || []).find((x) => x.id === d.cliente_id) || {}).telefone : null} onOpenFicha={onOpenFicha} onChanged={onChanged} />)}
     {caixa.map((it) => <DuvidaItem key={"cx-" + it.id} d={{ id: it.id, origem: "caixa", pergunta: perguntaDaCaixa(it), contexto: null, opcoes: /lan[cç]o assim/i.test(perguntaDaCaixa(it)) ? ["Sim, lança assim", "Não"] : [], criado_em: it.criado_em, cliente_id: null }} caixaItem={it} today={today} db={db} demo={demo} notify={notify} nome={null} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />)}
   </section>;
 }
-function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, onOpenFicha, onAbrirCaixa, onChanged }) {
+function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, telefone = null, onOpenFicha, onAbrirCaixa, onChanged }) {
   const [texto, setTexto] = useState("");
   const [opcao, setOpcao] = useState(null);
   const [sempre, setSempre] = useState(false);
@@ -8911,7 +8958,12 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, onOpen
     <strong>{d.pergunta}</strong>
     {d.contexto && <span className="duvida-contexto">{d.contexto}</span>}
     <span className="duvida-quando">Perguntado {haQuanto()}{nome ? ` · ${nome}` : ""}</span>
+    <div className="duvida-links">
     {d.cliente_id && onOpenFicha && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onOpenFicha(d.cliente_id); }}>Abrir ficha{nome ? ` de ${nome.split(" ")[0]}` : ""} ›</button>}
+    {/* CONFERIR A CONVERSA ANTES (Diego, 17/10/2026: "no card botão com WhatsApp do cliente para eu conferir se falo
+        com ele ou não"). Mesmo transporte dos outros botões: Business, ou o WhatsApp comum pra quem é exceção. */}
+    {telefoneWhatsapp(telefone) && <a className="btn-wpp duvida-wpp" href={urlWhatsapp(telefoneWhatsapp(telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => vibrar(6)}>WhatsApp{nome ? ` · ${nome.split(" ")[0]}` : ""}</a>}
+    </div>
     {caixaItem && onAbrirCaixa && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onAbrirCaixa(); }}>Ver na Caixa ›</button>}
     {opcoes.length > 0 && <div className="duvida-opcoes">{opcoes.map((o) => <button type="button" key={o} className={opcao === o ? "ativo" : ""} onClick={() => { vibrar(6); setOpcao(opcao === o ? null : o); }}>{o}</button>)}</div>}
     <textarea value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy && resposta) gravar("respondida"); })} placeholder={opcoes.length ? "Quer explicar mais? (opcional)" : "Sua resposta pra Manu"} />
