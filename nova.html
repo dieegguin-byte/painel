@@ -7397,10 +7397,10 @@ function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = nul
   const arraste = usarArrastePraDireita(() => setPorCima(true));
   const comSelo = (selo !== null && selo !== undefined) || !!seloTexto;
   return <section id={id} className={`${className || "content-card"}${comSelo ? ` com-selo tom-${tom}` : ""}${aberto ? " aberto" : ""}`} {...(naLista ? {} : arraste)}>
-    {porCima && !naLista && ReactDOM.createPortal(<ListaLateral cabecalho={<>{cabecalho}</>} onFechar={() => setPorCima(false)}>{children}</ListaLateral>, document.body)}
+    {porCima && !naLista && ReactDOM.createPortal(<ListaLateral cabecalho={<>{typeof cabecalho === "function" ? cabecalho(true) : cabecalho}</>} onFechar={() => setPorCima(false)}>{children}</ListaLateral>, document.body)}
     <button type="button" className="card-toggle" aria-expanded={aberto} onClick={abrir}>
       {comSelo && <span className={`selo-num${seloTexto ? " selo-txt" : ""}`} aria-hidden="true"><b>{seloTexto || selo}</b>{icone && <small>{icone}</small>}</span>}
-      <div>{cabecalho}</div>
+      <div>{typeof cabecalho === "function" ? cabecalho(aberto) : cabecalho}</div>
       <i>{aberto ? "▾ fechar" : "▸ abrir"}</i>
     </button>
     {resumo}
@@ -9744,10 +9744,12 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
         <em className={`conta-prazo ${rv.nivel}`}>{rv.texto}</em><strong>{curto(f)}</strong><b>{money(f.valor)}</b>
       </span>; };
       return <CardRecolhivel className="warning-card contas-card"
-        cabecalho={temPrazo
-          ? <><b>{money(r.totalVencidas + r.totalUrgentes)} a pagar {r.vencidas.length ? "— tem conta vencida" : `nos próximos ${DIAS_ANTECEDENCIA_CONTAS} dias`}</b>
-              {linhaConta(alerta[0])}
-              {alerta.length > 1 && <span>e mais {alerta.length - 1} conta(s) — toque em abrir</span>}</>
+        // FECHADO JÁ MOSTRA A SEMANA (Diego, 18/10/2026): todas as vencidas e as dos próximos 7 dias, sem tocar.
+        // Aberto, a lista com "Paguei" fica no corpo e o cabeçalho guarda só o total, pra não repetir.
+        cabecalho={(aberto) => temPrazo
+          ? <><b>{money(r.totalVencidas + r.totalUrgentes)} a pagar {r.vencidas.length ? `— tem conta vencida · próximos ${DIAS_ANTECEDENCIA_CONTAS} dias` : `nos próximos ${DIAS_ANTECEDENCIA_CONTAS} dias`}</b>
+              {!aberto && alerta.slice(0, 8).map(linhaConta)}
+              {!aberto && alerta.length > 8 && <span>e mais {alerta.length - 8} conta(s) — toque em abrir</span>}</>
           : <b>{money(r.totalSemVencimento)} a pagar quando houver saldo</b>}
         resumo={r.potencialCaixa > 0
           ? <span>💰 Dá pra levantar {money(r.potencialCaixa)}{r.prontosSemCobranca.length ? ` — ${r.prontosSemCobranca.slice(0, 3).map((s) => s.clientes?.nome || s.titulo).join(", ")} sem pagamento registrado` : ""}</span>
@@ -11279,7 +11281,7 @@ const COMPRA_CONFERIDA_TAG = "[CONFERIDO] ";
 // A palavra "vencimento" sozinha NÃO basta: a mensalidade da contabilidade diz "vencimento todo dia 20" e
 // tem prazo de verdade. Só conta quando ela vem NEGADA na mesma frase.
 const SEM_VENCIMENTO = /(vencimento|data (exata )?de pagamento|data exata)[^.;]{0,60}n[ãa]o (informad|confirmad|definid)|sem vencimento|(assim que|quando)[^.;]{0,40}(houver|tiver) saldo|assim que poss[íi]vel|a pagar (ap[óo]s|depois d)|pagar (ap[óo]s|depois d)[^.;]{0,50}(servi[çc]o|entrega|receb)|quando (eu )?(tiver|receber) dinheiro/i;
-const DIAS_ANTECEDENCIA_CONTAS = 3;
+const DIAS_ANTECEDENCIA_CONTAS = 7;
 // Quanto falta pro vencimento, dito em palavra: "vence em 2 dias" se lê de relance; "16/09" obriga a fazer conta.
 function diasAteVencer(f, hoje) { return Math.round((new Date((f.data || hoje) + "T12:00:00") - new Date(hoje + "T12:00:00")) / 86400000); }
 function rotuloVencimento(f, hoje) {
@@ -11306,6 +11308,8 @@ function resumoContas(finances, services, hoje) {
   const semVencimento = aPagar.filter(semPrazoMarcado);
   const comPrazo = aPagar.filter((f) => !semPrazoMarcado(f));
   const vencidas = comPrazo.filter((f) => (f.data || "") < hoje);
+  // 7 DIAS (Diego, 18/10/2026: "eu não sei que eu tenho que pagar as outras contas nos próximos dias"): a semana
+  // inteira aparece no card fechado, sem tocar.
   // 3 DIAS DE ANTECEDÊNCIA (recado de 14/09/2026). Era 1 dia — entrava na véspera — e a parcela da Havan de
   // 10/09 foi paga dia 13, três dias atrasada: o aviso de véspera, miúdo, não deu tempo de ver nem de juntar o
   // dinheiro. Agora entra em D-3 e fica até ser paga. Ordem: vencidas primeiro (a mais antiga na frente),
