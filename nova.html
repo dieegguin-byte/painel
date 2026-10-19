@@ -821,6 +821,8 @@ button.sutil{opacity:.55;font-size:12px}
 .dinheiro-linha em{font-style:normal;font-size:11px;color:var(--dim);white-space:nowrap}
 .dinheiro-linha strong{flex:1 1 120px;min-width:0;font-weight:600;overflow-wrap:anywhere}
 .dinheiro-linha b{white-space:nowrap}
+.pergunta-pagou{display:grid;gap:6px;margin-top:10px;padding:12px;border-radius:14px;border:1px solid #6fcf9780;background:#6fcf9714}
+.pergunta-pagou b{font-size:17px}.pergunta-pagou-botoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}.pergunta-pagou-botoes button{min-height:46px;white-space:nowrap;font-size:15px}.pergunta-pagou small{color:var(--muted);font-size:12px}
 button.dinheiro-linha.prof-linha{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:10px;background:none;border:0;border-top:1px solid var(--line);color:var(--text);text-align:left;cursor:pointer;font:inherit;font-size:14px}
 .prof-linha strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prof-linha .prof-linha-num{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15}
@@ -4363,6 +4365,7 @@ function Home() {
       const ir = u.get("ir");
       if (ir === "ficha" && /^[0-9a-f-]{36}$/i.test(u.get("id") || "")) { setFichaId(u.get("id")); return; }
       if (ir === "agenda") { setCardChegada(u.get("card") || null); setTab("agenda"); return; }
+      if (ir === "card" && /^[0-9a-f-]{36}$/i.test(u.get("id") || "")) { if (u.get("pagou")) PERGUNTA_PAGOU.pedir(u.get("id")); FOCO.chegada = u.get("id"); FOCO.abrir(u.get("id")); return; }
       if (["caixa", "futuro", "compras", "leads"].includes(ir)) setTab(ir);
     };
     navigator.serviceWorker.addEventListener("message", ouvir);
@@ -6879,6 +6882,19 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
   const [busy, setBusy] = useState(null);
   const futuro = !!a.data && a.data > today;
   const doCard = acoes.recados.filter((r) => r.agenda_id === a.id);
+  // Card ligado a conta ainda aberta: o Feito baixa a conta junto (gatilho do banco), então pergunta antes.
+  const contaAberta = !!a.financeiro_id && (!a.conta || ["a_pagar", "a_receber"].includes(a.conta.status));
+  const ehReceber = a.conta?.status === "a_receber";
+  const [perguntaPago, setPerguntaPago] = useState(() => contaAberta && PERGUNTA_PAGOU.id === String(a.id));
+  useEffect(() => {
+    const f = () => { if (contaAberta && PERGUNTA_PAGOU.id === String(a.id)) setPerguntaPago(true); };
+    PERGUNTA_PAGOU.ouvintes.add(f); return () => PERGUNTA_PAGOU.ouvintes.delete(f);
+  }, [a.id, contaAberta]);
+  const respostaPago = (sim) => {
+    vibrar(6); setPerguntaPago(false); PERGUNTA_PAGOU.limpar(String(a.id));
+    if (sim) enviar("feito");
+    else acoes.notify(ehReceber ? "Continua a receber. O card fica aberto." : "Continua a pagar. O card fica aberto.", "info");
+  };
   const pedidoManu = [...(acoes.comManu || [])].reverse().find((r) => (r.conversa || []).some((m) => m?.meta?.agenda_id === a.id));
   const respostaManu = pedidoManu ? (pedidoManu.conversa || []).filter((m) => m && m.de !== "diego" && m.tipo !== "sistema" && m.texto).slice(-1)[0] : null;
   const [manuAberto, setManuAberto] = useState(false);
@@ -6912,11 +6928,19 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
   return <div className="card-acoes">
     {doCard.length > 0 && <div className="recados-do-card">{doCard.map((r) => <RecadoEnviado key={r.id} r={r} acoes={acoes} />)}</div>}
     <div className="card-acoes-botoes linha">
-      <button type="button" className="primary" onClick={() => enviar("feito")} disabled={!!busy}>{busy === "feito" ? "…" : "✅ Feito"}</button>
+      <button type="button" className="primary" onClick={() => (contaAberta ? (vibrar(6), setPerguntaPago(true)) : enviar("feito"))} disabled={!!busy || perguntaPago}>{busy === "feito" ? "…" : "✅ Feito"}</button>
       <button type="button" className={`secondary${modo === "remarcar" ? " ativo" : ""}`} onClick={() => abrir("remarcar")} disabled={!!busy}>🔁 Remarcar</button>
       <button type="button" className={`ghost perigo${modo === "cancelar" ? " ativo" : ""}`} onClick={() => abrir("cancelar")} disabled={!!busy}>✖ Cancelar</button>
       <button type="button" className={`ghost${modo === "recado" ? " ativo" : ""}`} onClick={() => abrir("recado")} disabled={!!busy} aria-label="Só recado">💬</button>
     </div>
+    {perguntaPago && <div className="pergunta-pagou" role="group" aria-label={ehReceber ? "Recebeu?" : "Pagou?"}>
+      <b>{ehReceber ? "Recebeu" : "Pagou"}{a.conta && Number(a.conta.valor) > 0 ? ` ${money(a.conta.valor)}` : ""}?</b>
+      <small>{ehReceber ? "Só o Sim dá a conta como recebida." : "Só o Sim dá a conta como paga."}</small>
+      <div className="pergunta-pagou-botoes">
+        <button type="button" className="primary" onClick={() => respostaPago(true)}>{ehReceber ? "Sim, recebi" : "Sim, paguei"}</button>
+        <button type="button" className="ghost" onClick={() => respostaPago(false)}>Ainda não</button>
+      </div>
+    </div>}
     {modo && <div className="card-recado">
       <p className="kicker" style={{ margin: 0 }}>RECADO PRO CLAUDE · {ROTULO[modo]}</p>
       <textarea autoFocus value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy) enviar(modo); })} placeholder={modo === "remarcar" ? "Ex.: cliente pediu pra passar depois das 14h" : modo === "cancelar" ? "Motivo do cancelamento" : "O que o Claude precisa saber"} />
@@ -7348,6 +7372,16 @@ const FOCO = {
   esquecer(id) { CARDS_EM_TELA.delete(id); if (this.id != null) this.avisar(); },
 };
 window.__tbFoco = { FOCO, CARDS_EM_TELA }; // só pra teste automatizado
+// "PAGOU?" ANTES DE DAR BAIXA (Diego, 18/10/2026, depois do boleto da ADARCO: o Feito da notificação deu a conta de
+// outubro como paga sem comprovante). Feito em card ligado a uma conta (agenda.financeiro_id, que o banco baixa junto)
+// pergunta primeiro. O Feito da notificação num card desses não grava nada: o banco devolve o link
+// ?ir=card&id=<id>&pagou=1 e o app abre o card já com a pergunta. `id` é o card que deve chegar perguntando.
+const PERGUNTA_PAGOU = {
+  id: (() => { try { const u = new URL(location.href).searchParams; return u.get("ir") === "card" && u.get("pagou") ? u.get("id") : null; } catch (e) { return null; } })(),
+  ouvintes: new Set(),
+  pedir(id) { this.id = id; this.ouvintes.forEach((f) => f()); },
+  limpar(id) { if (this.id === id) this.pedir(null); },
+};
 function FocoGlobal({ montar = null }) {
   const [, repintar] = React.useReducer((n) => n + 1, 0);
   useEffect(() => { FOCO.ouvintes.add(repintar); return () => FOCO.ouvintes.delete(repintar); }, []);
