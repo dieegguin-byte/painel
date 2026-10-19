@@ -1131,7 +1131,7 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .checklist-entrega p{margin:8px 0 0;font-size:13px;color:#cfe6d6}
 .botao-manu{margin:0 0 10px}
 .recado-manu-secao{margin:0 0 12px}
-.botao-claude.compacto{flex:none;align-self:flex-start;min-height:34px;padding:4px 12px;font-size:12px}
+.botao-claude.botao-orcamento{margin-bottom:12px}.botao-claude.botao-orcamento-proposta{flex-direction:column;gap:2px;margin-top:10px;padding:10px 12px;text-align:center}.botao-claude.compacto{flex:none;align-self:flex-start;min-height:34px;padding:4px 12px;font-size:12px}
 .card-acoes-botoes.linha button{padding:0 4px;font-size:11px;letter-spacing:0;white-space:nowrap;min-width:0;overflow:hidden}
 .card-acoes-botoes button.ativo{border-color:var(--orange);color:var(--orange2)}
 .card-recado{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:#ffffff06;border:1px dashed var(--line2)}
@@ -6872,9 +6872,27 @@ function RecadoEnviado({ r, acoes }) {
 // BOTÃO CLAUDE (Diego, 17/10/2026). Abre o projeto do Claude numa aba nova; quando é sobre um card, o título dele
 // vai copiado junto, pra colar na conversa.
 const LINK_CLAUDE = "https://claude.ai/code/project/chan_01SdFSA5KsWwgW6FGEucUZeN";
-function BotaoClaude({ copiar = "", className = "" }) {
+function BotaoClaude({ copiar = "", className = "", href = LINK_CLAUDE, rotulo = "✳ Claude", dica = "o card vai copiado, é só colar na conversa" }) {
   const abrir = async () => { vibrar(6); if (copiar) { try { await navigator.clipboard.writeText(copiar); } catch (e) { /* abre mesmo sem copiar */ } } };
-  return <a className={`botao-claude ${className}`} href={LINK_CLAUDE} target="_blank" rel="noreferrer" onClick={abrir}>✳ Claude{copiar ? <small>o card vai copiado, é só colar na conversa</small> : null}</a>;
+  return <a className={`botao-claude ${className}`} href={href} target="_blank" rel="noreferrer" onClick={abrir}>{rotulo}{copiar && dica ? <small>{dica}</small> : null}</a>;
+}
+// LINK DE TÓPICO QUE MUDA (Diego, 19/10/2026: "coloque um botão lá para ir diretamente para ele e se fizer uma nova
+// thread o link do botão mudar também"). O endereço mora em config.ajustes.links.<chave>.url. Quando nascer um tópico
+// novo, a sessão que assumir troca com um UPDATE no banco e o botão já abre o tópico novo, sem publicar o app. O valor
+// fixo aqui é só a reserva pra quando o banco não responde.
+const TOPICO_ORCAMENTO_PADRAO = "https://claude.ai/code/project/chan_01SdFSA5KsWwgW6FGEucUZeN?thread=cmsg_01SdFSA5KsWwgW6FGEucUZeN9GQSBQ7dSbFXEq8fssKRaQ";
+function useLinkDoTopico(db, demo, chave, padrao) {
+  const [url, setUrl] = useState(padrao);
+  useEffect(() => {
+    if (demo || !db) return;
+    let vivo = true;
+    db.from("config").select("ajustes").eq("id", 1).maybeSingle().then(({ data }) => {
+      const u = data && data.ajustes && data.ajustes.links && data.ajustes.links[chave] && data.ajustes.links[chave].url;
+      if (vivo && /^https:\/\/claude\.ai\//.test(u || "")) setUrl(u);
+    }, () => {});
+    return () => { vivo = false; };
+  }, [db, demo, chave]);
+  return url;
 }
 function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
   const [texto, setTexto] = useState("");
@@ -7666,6 +7684,7 @@ function PropostasCard({ propostas, customers = [], services = [], db, demo, not
   const decididas = lista.filter((p) => p.status === "aprovada" || p.status === "recado");
   const aberta = lista.find((p) => p.id === abertaId) || null;
   const fechar = () => { setAbertaId(null); setConfirmando(false); setRecadoAberto(false); setRecado(""); };
+  const linkOrcamento = useLinkDoTopico(db, demo, "orcamento", TOPICO_ORCAMENTO_PADRAO);
   const copiar = async (texto) => { try { await navigator.clipboard.writeText(texto); vibrar(6); notify("Texto copiado.", "ok"); } catch (e) { notify("Não consegui copiar — segure no texto.", "error"); } };
   const gravar = async (p, status, extra, linhaCaixa) => {
     if (busy) return;
@@ -7748,6 +7767,7 @@ function PropostasCard({ propostas, customers = [], services = [], db, demo, not
     <CardRecolhivel id="card-propostas" className="content-card propostas-card" selo={esperando.length || null} tom="laranja" icone="📄"
       cabecalho={<h3>Propostas de orçamento</h3>}
       resumo={<p className="ficha-note" style={{ margin: 0 }}>{[esperando.length ? `${esperando.length} esperando você` : "nenhuma esperando você", decididas.length ? `${decididas.length} a caminho` : "", enviadas.length ? `${enviadas.length} enviada(s)` : "", descartadas.length ? `${descartadas.length} descartada(s)` : ""].filter(Boolean).join(" · ")}</p>}>
+      <BotaoClaude href={linkOrcamento} rotulo="✳ Falar com o orçamento" className="compacto botao-orcamento" />
       {!!esperando.length && <><p className="kicker">ESPERANDO VOCÊ</p><div className="pessoais-lista">{esperando.map((p) => item(p, false))}</div></>}
       {!!decididas.length && <><p className="kicker" style={{ marginTop: 12 }}>A CAMINHO</p><div className="pessoais-lista">{decididas.map((p) => item(p, true))}</div></>}
       {!!enviadas.length && <><p className="kicker" style={{ marginTop: 12 }}>✓ ENVIADAS AO CLIENTE · 7 DIAS</p><div className="pessoais-lista">{enviadas.map((p) => item(p, true))}</div></>}
@@ -7760,6 +7780,7 @@ function PropostasCard({ propostas, customers = [], services = [], db, demo, not
         <p className="proposta-texto">{aberta.texto_cliente}</p>
         <button type="button" className="ghost" onClick={() => copiar(aberta.texto_cliente)}>📋 Copiar o texto</button>
         {telDe(aberta) && <a className="btn-wpp proposta-wpp" href={urlWhatsapp(telDe(aberta), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp · {String(aberta.cliente_nome || "cliente").trim().split(/\s+/)[0]}</a>}
+        <BotaoClaude className="botao-orcamento-proposta" href={linkOrcamento} rotulo="✳ Falar com o orçamento sobre esta proposta" dica="a proposta vai copiada, é só colar na conversa" copiar={`Proposta de ${aberta.cliente_nome}${aberta.titulo ? " — " + aberta.titulo : ""}${aberta.versao > 1 ? " (V" + aberta.versao + ")" : ""} · código ${String(aberta.id).slice(0, 8)}`} />
         {aberta.detalhamento && <details className="proposta-detalhe" open><summary>Como chegou nesse valor</summary><pre>{aberta.detalhamento}</pre></details>}
         {aberta.recado && <p className="compromisso-material">✍️ Seu recado anterior: {aberta.recado}</p>}
         {aberta.status !== "aguardando" && <div className="proposta-feita">
@@ -9772,7 +9793,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
     {/* PROPOSTAS DE ORÇAMENTO (Diego, 16/10/2026, 08h46): antes da agenda do dia porque é dinheiro parado esperando um toque. */}
-    {!!propostas.length && <PropostasCard propostas={propostas} customers={customers} services={services} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />}
+    <PropostasCard propostas={propostas} customers={customers} services={services} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CardRecolhivel id="secao-hoje" className="content-card hoje-card"
       cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
       <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${rotinasPendentesHoje} rotina(s)` : ""}</h3>
