@@ -822,7 +822,7 @@ button.sutil{opacity:.55;font-size:12px}
 .dinheiro-linha strong{flex:1 1 120px;min-width:0;font-weight:600;overflow-wrap:anywhere}
 .dinheiro-linha b{white-space:nowrap}
 .pergunta-pagou{display:grid;gap:6px;margin-top:10px;padding:12px;border-radius:14px;border:1px solid #6fcf9780;background:#6fcf9714}
-.pergunta-pagou b{font-size:17px}.pergunta-pagou-botoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}.pergunta-pagou-botoes button{min-height:46px;white-space:nowrap;font-size:15px}.pergunta-pagou small{color:var(--muted);font-size:12px}.recebimento-valor{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line2);background:#0f0d0c;color:var(--text);font-size:20px;font-weight:700}.pergunta-pagou.recebimento>.ghost{margin-top:4px}
+.pergunta-pagou b{font-size:17px}.pergunta-pagou-botoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}.pergunta-pagou-botoes button{min-height:46px;white-space:nowrap;font-size:15px}.pergunta-pagou small{color:var(--muted);font-size:12px}.recebimento-valor{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line2);background:#0f0d0c;color:var(--text);font-size:20px;font-weight:700}.pergunta-pagou.recebimento>.ghost{margin-top:4px}.pergunta-pagou.compra{grid-template-columns:minmax(0,1fr)}.pergunta-pagou.compra .recebimento-valor{box-sizing:border-box;min-width:0}.pergunta-pagou.compra .pergunta-pagou-botoes{grid-template-columns:repeat(2,minmax(0,1fr))}.pergunta-pagou.compra .formas-compra{grid-template-columns:repeat(3,minmax(0,1fr))}.pergunta-pagou.compra button{min-width:0;padding:0 6px;font-size:14px}
 button.dinheiro-linha.prof-linha{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:10px;background:none;border:0;border-top:1px solid var(--line);color:var(--text);text-align:left;cursor:pointer;font:inherit;font-size:14px}
 .prof-linha strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prof-linha .prof-linha-num{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15}
@@ -1814,6 +1814,7 @@ const demoAppointments = [
   { id: "a13", titulo: "🔥 Ligar pra Eloisa — fechar o sofá (aceitou a faixa da IA às 8h37)", data: hojeISO(), hora: "18:21", cidade: "Cidade Ocidental", local: "", tipo: "remoto", status: "planejado", servico_id: null },
       { id: "a12b", titulo: "Pagar a proteção do carro — boleto de outubro 190,70", data: hojeISO(), hora: "15:10", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", financeiro_id: "f4b" },
       { id: "a12", titulo: "Pagar Pix — Afibracom — R$ 100 (pedido 84697, 3 m Colorado Preto)", data: hojeISO(), hora: "14:27", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", servico_id: "s1" },
+  { id: "a14", titulo: "Comprar aditivo Paraflu Ecoflu rosa", data: hojeISO(), hora: "12:30", cidade: "Luziânia", local: "", tipo: "presencial", status: "planejado", servico_id: null },
   { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", local: "Remoto / WhatsApp", tipo: "remoto", status: "planejado", servico_id: "s2" },
   // CARDS LIGADOS (14/10/2026): duas tarefas na mesma parada, 1 minuto uma da outra, título começando pela pessoa.
   // A demo tem que mostrar os dois com a MESMA cor e colados — e, no a1/a9, o aviso de duplicado (buscar e entregar a
@@ -6683,6 +6684,12 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
         const volta = { status: "planejado", ...(m ? { data: m[1], ...(m[2] ? { hora: m[2] } : {}) } : {}) };
         const { error: agErr } = await db.from("agenda").update(volta).eq("id", r.agenda_id).eq("status", r.acao === "feito" ? "feito" : "cancelado");
         if (agErr) throw agErr;
+        // Feito de card de compra: a saída paga que nasceu junto sai também (ver pagarCompra).
+        const saida = /\[saida ([0-9a-f-]{36})\]/i.exec(r.texto || "");
+        if (r.acao === "feito" && saida) {
+          const { error: fErr } = await db.from("financeiro").delete().eq("id", saida[1]).eq("agenda_id", r.agenda_id);
+          if (fErr) notify("O card voltou, mas a saída NÃO saiu do financeiro (" + fErr.message + ") — confira lá.", "error");
+        }
         // O registro pessoal volta junto com o bloqueio (ver enviar).
         if (r.agenda?.pessoal_id) {
           const { error: pErr } = await db.from("pessoais").update({ status: "PENDENTE", concluido_em: null, atualizado_em: new Date().toISOString() }).eq("id", r.agenda.pessoal_id).neq("status", "PENDENTE");
@@ -6765,7 +6772,31 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     return true;
   }, [db, demo, notify, onChanged, setAppointments, enviar]);
 
-  return useMemo(() => ({ recados, enviar, receber, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify, comManu, pedirManu }), [recados, enviar, receber, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify, comManu, pedirManu]);
+  // PAGOU PELO CARD DE COMPRA (ver ehCardDeCompra). A saída nasce PAGA, com a conta de onde saiu, ligada ao card
+  // (agenda_id) e com a descrição começando por "Pago pelo card": é por isso que o balanço de domingo casa com a
+  // linha do extrato em vez de lançar de novo. O id da saída vai no recado do Feito, e o Desfazer apaga ela junto.
+  const pagarCompra = useCallback(async (a, { valor, forma }) => {
+    const v = Number(Number(valor).toFixed(2));
+    if (!(v > 0)) throw new Error("escreva quanto pagou");
+    const pessoalCard = ehCardPessoal(a);
+    const escopo = forma.escopo || (pessoalCard ? "pessoal" : "empresa");
+    const conta = typeof forma.conta === "function" ? forma.conta(escopo === "pessoal") : forma.conta;
+    const titulo = a.titulo_visivel || a.titulo || "";
+    const categoria = /abastec|gasolin|etanol|combust/i.test(titulo) ? "Combustível"
+      : escopo === "pessoal" ? "Pessoal"
+      : /^\s*(?:🔥\s*)?comprar\b/i.test(titulo) && a.servico_id ? CATEGORIA_MATERIAL
+      : /^\s*(?:🔥\s*)?comprar\b/i.test(titulo) ? "Despesa" : "A classificar";
+    const hoje = hojeISO();
+    if (demo) { setAppointments((prev) => prev.filter((x) => x.id !== a.id)); notify(`Pago ${money(v)} (${forma.nome}) (demo).`, "ok"); return true; }
+    const { data: saida, error } = await db.from("financeiro").insert({ tipo: "saida", escopo, categoria, valor: v, status: "pago", conta, data: hoje, agenda_id: a.id, servico_id: a.servico_id || null, descricao: `Pago pelo card · ${forma.nome} · ${titulo}` }).select("id").single();
+    if (error) throw error;
+    try { await enviar(a, { acao: "feito", texto: `Pagou ${money(v)} (${forma.nome}). [saida ${saida.id}]` }); }
+    catch (e) { await db.from("financeiro").delete().eq("id", saida.id); throw e; }
+    notify(`Pago ${money(v)} (${forma.nome}). Entrou no financeiro${escopo === "pessoal" ? " pessoal" : ""}.`, "ok");
+    return true;
+  }, [db, demo, notify, setAppointments, enviar]);
+
+  return useMemo(() => ({ recados, enviar, receber, pagarCompra, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify, comManu, pedirManu }), [recados, enviar, receber, pagarCompra, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify, comManu, pedirManu]);
 }
 
 // Selo SEMPRE visível (fora do corpo recolhido): remarcação do Claude esperando conferência e recados que a
@@ -6897,7 +6928,7 @@ function RecadoEnviado({ r, acoes }) {
   const [url, setUrl] = useState(null);
   return <div>
     <em>{ACAO_RECADO_ROTULO[r.acao] || r.acao} · {new Date(r.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}{r.processado_em ? " · lido pelo Claude" : " · esperando o Claude"}</em>
-    {r.texto && <span>{r.texto}</span>}
+    {r.texto && <span>{r.texto.replace(/\s*\[saida [0-9a-f-]{36}\]/i, "")}</span>}
     {r.audio_path && (url ? <audio controls src={url} style={{ display: "block", maxWidth: "100%", marginTop: 4 }} />
       : <button type="button" className="ghost" onClick={async () => setUrl(await acoes.ouvir(r.audio_path))}>🔊 Ouvir áudio</button>)}
     {r.resultado && <span style={{ display: "block", marginTop: 4, color: "#e8c06d" }}>Claude: {r.resultado}</span>}
@@ -6936,7 +6967,24 @@ const FORMAS_RECEBIMENTO = [
   { nome: "Pix Nubank PJ", conta: "nubank_pj" },
   { nome: "Dinheiro", conta: "dinheiro_pj" },
 ];
-function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
+// CARD DE COMPRA PERGUNTA QUANTO E DE ONDE SAIU (Diego, 19/10/2026: "sempre que eu falar me lembra de tal coisa o card
+// perguntar feito foi em pix dinheiro infinite pay pessoal ou PJ para adiantar a conferência do fim de semana").
+// Vale pro card que começa com Comprar, Pagar, Abastecer ou Pix pro/pra e que NÃO tem conta ligada (o "Pagar a" ligado
+// a um a_pagar segue com o Sim/Ainda não de sempre) nem material a pagar ligado (esse fecha pela conclusão de material).
+// Lembrete sem dinheiro (ligar, calibrar) continua só com Feito.
+const RE_CARD_DE_COMPRA = /^\s*(?:🔥\s*)?(?:comprar|abastecer|pagar|pix\s+(?:pro|pra|para))\b/i;
+function ehCardDeCompra(a) { return !a.financeiro_id && RE_CARD_DE_COMPRA.test(a.titulo || ""); }
+function ehCardPessoal(a) { return !!(a.pessoal_id || a.pessoal || a.tipo === "pessoal" || a.tipo === "bloqueio_pessoal"); }
+// De onde saiu. Pix pessoal é sempre gasto pessoal; dinheiro segue o card (pessoal ou empresa). Cartão de crédito não
+// mexe em saldo nenhum hoje: sai na fatura, que é paga depois (conta cartao_credito não está em contas_saldo).
+const FORMAS_PAGAMENTO_COMPRA = [
+  { nome: "Pix PJ", conta: "nubank_pj" },
+  { nome: "Pix pessoal", conta: "nubank_pf", escopo: "pessoal" },
+  { nome: "InfinitePay", conta: "infinitepay" },
+  { nome: "Dinheiro", conta: (pessoal) => (pessoal ? "dinheiro_pessoal" : "dinheiro_pj") },
+  { nome: "Cartão", conta: "cartao_credito" },
+];
+function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "", temMaterial = false }) {
   const [texto, setTexto] = useState("");
   const [audio, setAudio] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -6954,6 +7002,18 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
   // com o valor continuando a receber. Card de pagar segue como antes: Sim dá Feito, Ainda não deixa o card aberto.
   const [recebendo, setRecebendo] = useState(false);
   const [valorRecebido, setValorRecebido] = useState("");
+  const compra = !contaAberta && !temMaterial && ehCardDeCompra(a);
+  const [pagando, setPagando] = useState(false);
+  const [valorPago, setValorPago] = useState("");
+  const confirmarPago = async (forma) => {
+    if (busy) return;
+    const v = parseMoedaBR(valorPago);
+    if (!Number.isFinite(v) || v <= 0) { acoes.notify("Escreva quanto pagou.", "error"); return; }
+    setBusy("pagar");
+    try { await acoes.pagarCompra(a, { valor: v, forma }); setPagando(false); setValorPago(""); }
+    catch (e) { acoes.notify("Não salvou o pagamento: " + (e.message || e), "error"); }
+    finally { setBusy(null); }
+  };
   const respostaPago = (sim) => {
     vibrar(6); setPerguntaPago(false); PERGUNTA_PAGOU.limpar(String(a.id));
     if (ehReceber) {
@@ -7013,7 +7073,7 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
   return <div className="card-acoes">
     {doCard.length > 0 && <div className="recados-do-card">{doCard.map((r) => <RecadoEnviado key={r.id} r={r} acoes={acoes} />)}</div>}
     <div className="card-acoes-botoes linha">
-      <button type="button" className="primary" onClick={() => (contaAberta ? (vibrar(6), setPerguntaPago(true)) : enviar("feito"))} disabled={!!busy || perguntaPago || recebendo}>{busy === "feito" ? "…" : "✅ Feito"}</button>
+      <button type="button" className="primary" onClick={() => (contaAberta ? (vibrar(6), setPerguntaPago(true)) : compra ? (vibrar(6), setPagando(true)) : enviar("feito"))} disabled={!!busy || perguntaPago || recebendo || pagando}>{busy === "feito" ? "…" : "✅ Feito"}</button>
       <button type="button" className={`secondary${modo === "remarcar" ? " ativo" : ""}`} onClick={() => abrir("remarcar")} disabled={!!busy}>🔁 Remarcar</button>
       <button type="button" className={`ghost perigo${modo === "cancelar" ? " ativo" : ""}`} onClick={() => abrir("cancelar")} disabled={!!busy}>✖ Cancelar</button>
       <button type="button" className={`ghost${modo === "recado" ? " ativo" : ""}`} onClick={() => abrir("recado")} disabled={!!busy} aria-label="Só recado">💬</button>
@@ -7035,6 +7095,19 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
         {FORMAS_RECEBIMENTO.map((f) => <button key={f.nome} type="button" className="secondary" disabled={!!busy} onClick={() => confirmarRecebido(f)}>{busy === "receber" ? "…" : f.nome}</button>)}
       </div>
       <button type="button" className="ghost" disabled={!!busy} onClick={() => setRecebendo(false)}>Voltar</button>
+    </div>}
+    {pagando && <div className="pergunta-pagou recebimento compra" role="group" aria-label="Quanto pagou e de onde saiu">
+      <b>Quanto pagou?</b>
+      <input className="recebimento-valor" inputMode="decimal" autoFocus placeholder="0,00" value={valorPago} onChange={(e) => setValorPago(e.target.value)} aria-label="Valor pago" />
+      <b>De onde saiu?</b>
+      <div className="pergunta-pagou-botoes formas-compra">
+        {FORMAS_PAGAMENTO_COMPRA.map((f) => <button key={f.nome} type="button" className="secondary" disabled={!!busy} onClick={() => confirmarPago(f)}>{busy === "pagar" ? "…" : f.nome}</button>)}
+      </div>
+      <small>Já entra no financeiro{ehCardPessoal(a) ? " pessoal" : ""} com a conta. No domingo o balanço só confere com o extrato.</small>
+      <div className="pergunta-pagou-botoes">
+        <button type="button" className="ghost" disabled={!!busy} onClick={() => { setPagando(false); acoes.notify("Continua a pagar. O card fica aberto.", "info"); }}>Ainda não paguei</button>
+        <button type="button" className="ghost" disabled={!!busy} onClick={() => { setPagando(false); enviar("feito"); }}>Feito sem gasto</button>
+      </div>
     </div>}
     {modo && <div className="card-recado">
       <p className="kicker" style={{ margin: 0 }}>RECADO PRO CLAUDE · {ROTULO[modo]}</p>
@@ -7386,7 +7459,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         })()}
         {avisoGPT && <p className="compromisso-material">{avisoGPT}</p>}
       </div>
-      {acoes && <AcoesDoCompromisso a={a} acoes={acoes} today={today} contextoClaude={[
+      {acoes && <AcoesDoCompromisso a={a} acoes={acoes} today={today} temMaterial={(materiais || []).length > 0} contextoClaude={[
         `Sobre o card "${tituloCard || ""}"${a.data ? ` de ${compactDate(a.data)}${a.hora ? " " + a.hora.slice(0, 5) : ""}` : ""}`,
         cli?.nome ? `Cliente: ${cli.nome}${cli.cidade ? " (" + cli.cidade + ")" : ""}${cli.telefone ? " · " + cli.telefone : ""}` : "",
         svc?.titulo ? `Serviço: ${svc.titulo}${svc.status ? " · " + (statusLabel[svc.status] || svc.status) : ""}${Number(svc.valor_orcamento) ? " · " + money(svc.valor_orcamento) : ""}` : "",
