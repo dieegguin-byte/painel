@@ -207,7 +207,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .fin-linha{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:11px 0;background:none;border:0;color:inherit;text-align:left;font:inherit}
 .fin-quem{display:flex;flex-direction:column;gap:2px;min-width:0}
 .fin-quem strong{font-size:15px;font-weight:600;overflow-wrap:anywhere}.fin-quem span{font-size:12px;color:var(--muted)}
-.fin-linha>b{flex:none;font-size:15px;white-space:nowrap}.fin-linha>b.entrada{color:#9acaaa}.fin-linha>b.saida{color:#e88477}
+.fin-linha>b{flex:none;font-size:15px;white-space:nowrap}.fin-linha>b.entrada{color:#9acaaa}.fin-linha>b.saida{color:#e88477}.fin-linha>b.neutro{color:var(--dim)}
 .fin-item.aberto .fin-quem strong{color:var(--orange2)}
 .fin-detalhe{padding:0 0 12px}.fin-detalhe .kicker{margin:0 0 4px}
 .fin-obs{margin:0 0 10px;font-size:13px;line-height:1.5;color:var(--text);overflow-wrap:anywhere}
@@ -823,6 +823,20 @@ button.sutil{opacity:.55;font-size:12px}
 .dinheiro-linha b{white-space:nowrap}
 .pergunta-pagou{display:grid;gap:6px;margin-top:10px;padding:12px;border-radius:14px;border:1px solid #6fcf9780;background:#6fcf9714}
 .pergunta-pagou b{font-size:17px}.pergunta-pagou-botoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}.pergunta-pagou-botoes button{min-height:46px;white-space:nowrap;font-size:15px}.pergunta-pagou small{color:var(--muted);font-size:12px}
+button.dinheiro-linha.prof-linha{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:10px;background:none;border:0;border-top:1px solid var(--line);color:var(--text);text-align:left;cursor:pointer;font:inherit;font-size:14px}
+.prof-linha strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prof-linha .prof-linha-num{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15}
+.prof-linha .prof-linha-num small{font-size:11px;color:var(--muted);letter-spacing:.02em}
+.prof-linha .prof-linha-num b{font-size:14px;color:var(--text)}
+.prof-linha .prof-linha-num b.saida{color:var(--red,#df6a5d)}
+.prof-linha i{font-style:normal;font-size:12px;color:var(--orange2);white-space:nowrap}
+.prof-detalhe{display:grid;gap:14px;padding-bottom:80px}
+.prof-bloco{display:grid;gap:8px;padding:12px;border:1px solid var(--line2);border-radius:14px}
+.prof-item{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding-top:8px;border-top:1px solid var(--line)}
+.prof-item div{min-width:0}.prof-item strong{display:block;font-size:15px}.prof-item span{display:block;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.prof-item b{font-size:16px;white-space:nowrap}.prof-item b.saida{color:var(--red,#df6a5d)}
+.prof-saldo{display:grid;gap:4px;padding:12px;border-radius:14px;background:#df6a5d14;border:1px solid #df6a5d55}
+.prof-saldo span{font-size:13px;color:var(--muted)}.prof-saldo b{font-size:18px}
 .mat-loja{border-left:3px solid #ed9057}
 .mat-loja-head b{font-size:12px;font-weight:800;padding:2px 9px;border-radius:999px;background:#d86d3626;border:1px solid #d86d3666;color:#ffcfac}
 .mat-item{align-items:center}
@@ -1454,6 +1468,45 @@ function usarArrastePraDireita(ao) {
 // `semGestos` (Diego, 15/10/2026, 20h51, sobre o card em foco: "o arrastar pro lado, pra cima e pra baixo no card do
 // cliente não ficou bom"): a lista abre sem os gestos de fechar por arrasto; o conteúdo só rola. Fecha pelo Voltar
 // do topo, pelo voltar do Android ou tocando fora.
+// CONTA DE UM PROFISSIONAL (Diego, 18/10/2026: "vale do Marcão apagado, não sei facilmente do que se trata, deveria
+// abrir outra aba como nos outros lugares"). Só leitura: o que falta pagar serviço por serviço, os vales que ele pegou
+// e o saldo. Mexer (amarrar vale, acertar) continua na aba Profissionais.
+function DetalheProfissional({ conta, onFechar, onVerProfissionais }) {
+  const abertos = conta.servicos.filter((l) => l.situacao === "aberto");
+  const semValor = conta.servicos.filter((l) => l.visivel && l.situacao === "sem_valor");
+  const clienteDe = (s) => s.clientes?.nome || s.titulo || "Serviço";
+  return <ListaLateral kicker="PROFISSIONAL" titulo={conta.nome} onFechar={onFechar} semGestos>
+    <div className="prof-detalhe">
+      <section className="prof-bloco">
+        <p className="kicker">FALTA PAGAR A ELE</p>
+        {!abertos.length && !conta.avulsos.length && <p className="ficha-note">Nenhum serviço em aberto.</p>}
+        {abertos.map((l) => <div className="prof-item" key={l.servico.id}>
+          <div><strong>{clienteDe(l.servico)}</strong><span>{l.servico.prazo ? `prazo ${compactDate(l.servico.prazo)} · ` : ""}combinado {money(l.combinado)}{l.pago ? ` · já pago ${money(l.pago)}` : ""}{l.vale ? ` · vale deste serviço ${money(l.vale)}` : ""}</span></div>
+          <b>{money(l.saldo)}</b>
+        </div>)}
+        {conta.avulsos.map((f) => <div className="prof-item" key={f.id}>
+          <div><strong>{descricaoFinanceiraVisivel(f.descricao) || "Trabalho avulso"}</strong><span>{compactDate(f.data)} · trabalho avulso</span></div>
+          <b>{money(f.valor)}</b>
+        </div>)}
+        {semValor.length > 0 && <p className="ficha-note">{semValor.length} serviço(s) ainda sem valor de mão de obra anotado ({semValor.map((l) => clienteDe(l.servico)).join(", ")}). Não entram na conta.</p>}
+      </section>
+      <section className="prof-bloco">
+        <p className="kicker">VALES QUE ELE JÁ PEGOU</p>
+        {!conta.valesSoltos.length && <p className="ficha-note">Nenhum vale solto.</p>}
+        {conta.valesSoltos.map((f) => <div className="prof-item" key={f.id}>
+          <div><strong>{compactDate(f.data)}</strong><span>{descricaoFinanceiraVisivel(f.descricao) || "Vale"}</span></div>
+          <b className="saida">− {money(f.valor)}</b>
+        </div>)}
+      </section>
+      <div className="prof-saldo">
+        <span>{money(conta.faltaServicos + conta.somaAvulsos)} a pagar − {money(conta.somaVales)} de vales =</span>
+        <b>{conta.total >= 0 ? `${money(conta.total)} a pagar a ele` : `${money(-conta.total)} que ele te deve (adiantado)`}</b>
+      </div>
+      {onVerProfissionais && <button type="button" className="ghost" style={{ width: "100%" }} onClick={() => { onFechar(); onVerProfissionais(); }}>Mexer em Profissionais</button>}
+    </div>
+    <div className="foco-nav"><button type="button" className="foco-voltar" onClick={onFechar}>Voltar</button></div>
+  </ListaLateral>;
+}
 function ListaLateral({ kicker, titulo, cabecalho = null, onFechar, semGestos = false, children }) {
   const painel = React.useRef(null);
   const toque = React.useRef(null);
@@ -9340,6 +9393,7 @@ function RegrasAprendidasCard({ duvidas, db, demo, notify, onChanged }) {
   </CardRecolhivel>;
 }
 function Dashboard({ anotarInicial = false, inbox, services, appointments, agendaPlanejada = appointments, agendaHistorico, avisos, atividadeAgente = [], duvidasAgente = [], propostas = [], finances, rotinas, customers, fornecedores, pessoais, estoque, db, demo, notify, onRotinaChanged, onServicoChanged, onConcluir, onReschedule, onSemProximaAcao, onVerRetornosVencidos, onVerCompras, onVerAPagar, onAbrirCaixa, onVerFinanceiro, onVerProfissionais, onVerLeads, onVerOrcamentos, onVerAgenda, onVerEstoque, onVerClientes, onVerFornecedores, cadastroProfissionais, onOpenFicha, composer, setComposer, files, setFiles, addInbox, busyInbox }) {
+  const [profAberto, setProfAberto] = useState(null); // Dinheiro › Profissionais: a conta de um profissional aberta por cima
   const [filtroTipo, setFiltroTipo] = useState("todos");
   // Gaveta do botão flutuante "Anotar" (Painel único, etapa 2, 11/10/2026).
   const [anotarAberto, setAnotarAberto] = useState(!!anotarInicial);
@@ -9875,7 +9929,13 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
         const vales = contas.reduce((soma, c) => soma + c.somaVales, 0);
         return <CardRecolhivel seloTexto={money(falta)} tom="laranja" icone="✎"
           cabecalho={<><p className="kicker">PROFISSIONAIS</p><h3>Falta pagar {money(falta)}{vales > 0 ? ` · vales soltos ${money(vales)}` : ""}</h3><span className="ficha-note" style={{ margin: 0 }}>{contas.map((c) => c.nome).join(", ")}</span></>}>
-          {contas.map((c) => <span className="dinheiro-linha" key={c.chave}><strong>{c.nome}</strong><b>{money(c.faltaServicos + c.somaAvulsos)}</b>{c.somaVales > 0 && <em>vales {money(c.somaVales)}</em>}</span>)}
+          {contas.map((c) => <button type="button" className="dinheiro-linha prof-linha" key={c.chave} onClick={() => setProfAberto(c.chave)}>
+            <strong>{c.nome}</strong>
+            <span className="prof-linha-num"><small>falta pagar</small><b>{money(c.faltaServicos + c.somaAvulsos)}</b></span>
+            {c.somaVales > 0 && <span className="prof-linha-num"><small>vales</small><b className="saida">− {money(c.somaVales)}</b></span>}
+            <i>ver ›</i>
+          </button>)}
+          {(() => { const c = contas.find((x) => x.chave === profAberto); return c && ReactDOM.createPortal(<DetalheProfissional conta={c} onFechar={() => setProfAberto(null)} onVerProfissionais={onVerProfissionais} />, document.body); })()}
           {onVerProfissionais && <button type="button" className="ghost" style={{ width: "100%", marginTop: 10 }} onClick={onVerProfissionais}>Ver tudo em Profissionais</button>}
         </CardRecolhivel>;
       })()}
@@ -10693,6 +10753,31 @@ const CONTAS_BANCARIAS = [
   { id: "dinheiro_pj", nome: "Dinheiro PJ" },
   { id: "dinheiro_pessoal", nome: "Dinheiro pessoal" },
 ];
+// EM CAIXA = SALDO DAS CONTAS (Diego, 19/10/2026: "por que meu caixa está constando esse dinheiro?"). O card somava
+// todo lançamento da empresa desde o começo e dava R$ 2.752,57, enquanto as contas PJ somavam R$ 1,11 no extrato.
+// Caixa agora é o mesmo número do "Saldo por conta", só das contas da empresa. A conta pessoal só aparece na aba Pessoal.
+const CONTAS_DA_EMPRESA = ["nubank_pj", "infinitepay", "dinheiro_pj"];
+const CONTAS_PESSOAIS = ["nubank_pf", "dinheiro_pessoal"];
+// Dinheiro que só muda de lugar não é entrada nem saída: transferência entre contas, empréstimo que caiu na conta e
+// saldo inicial. Continuam na lista (e no saldo de cada conta), mas fora de Entradas, Saídas e Resultado.
+function lancamentoNeutro(f) {
+  const c = String((f && f.categoria) || "").trim();
+  return /^transfer[eê]ncia interna$/i.test(c) || /^saldo inicial$/i.test(c) || (f.tipo === "entrada" && /^empr[eé]stimo( recebido)?$/i.test(c));
+}
+function useContasSaldo(db, demo) {
+  const [contas, setContas] = useState([]);
+  const [erro, setErro] = useState("");
+  const carregar = async () => {
+    if (demo || !db) return;
+    try {
+      const { data, error } = await db.from("contas_saldo").select("*");
+      if (error) throw error;
+      setContas(data || []); setErro("");
+    } catch (e) { setErro(String(e.message || e)); }
+  };
+  useEffect(() => { carregar(); }, [db, demo]);
+  return { contas, erro, carregar };
+}
 async function definirContaDoLancamento(db, demo, item, conta, notify, onChanged) {
   try {
     if (!demo) {
@@ -10712,21 +10797,11 @@ function calcularSaldosPorConta(contas, finances) {
     return { ...c, movs: movs.length, saldo: inicial == null ? null : Number((inicial + delta).toFixed(2)) };
   });
 }
-function SaldoContasCard({ finances, db, demo, notify }) {
-  const [contas, setContas] = useState([]);
-  const [erro, setErro] = useState("");
-  const carregar = async () => {
-    if (demo) return;
-    try {
-      const { data, error } = await db.from("contas_saldo").select("*");
-      if (error) throw error;
-      setContas(data || []); setErro("");
-    } catch (e) { setErro(String(e.message || e)); }
-  };
-  useEffect(() => { carregar(); }, []);
+function SaldoContasCard({ finances, db, demo, notify, contas: todasContas, erro, carregar, somente }) {
+  const contas = somente ? (todasContas || []).filter((c) => somente.includes(c.conta)) : (todasContas || []);
   const saldos = calcularSaldosPorConta(contas, finances);
   const desde = contas.reduce((m, c) => (c.data_inicial && (!m || c.data_inicial < m) ? c.data_inicial : m), "");
-  const semConta = desde ? (finances || []).filter((f) => (!f.status || f.status === "pago") && !f.conta && String(f.data || "") >= desde).length : 0;
+  const semConta = desde ? (finances || []).filter((f) => (!f.status || f.status === "pago") && !f.conta && String(f.data || "") >= desde && (!somente || (somente === CONTAS_PESSOAIS) === ((f.escopo || "empresa") === "pessoal"))).length : 0;
   const ajustar = async (c) => {
     const resp = window.prompt("Saldo inicial de " + c.nome + " (R$):", c.saldo_inicial == null ? "" : String(c.saldo_inicial).replace(".", ","));
     if (resp == null) return;
@@ -10784,15 +10859,31 @@ function FinanceView({ finances, dividas, services, db, demo, mode, notify, onCh
   // dinheiro pessoal e com o escopo legado `pro_labore` — o Classic mediu R$ 390,24 na tela contra R$ 595,63 de
   // caixa conciliado. Caixa é uma coisa só, o dinheiro da Tapeçaria, e não pode mudar de valor porque ele
   // trocou de aba. Entradas, Saídas e Resultado continuam obedecendo a aba: esses sim são recortes.
-  const caixaEmpresa = realizados.filter((i) => (i.escopo || "empresa") === "empresa").reduce((soma, i) => soma + (i.tipo === "entrada" ? Number(i.valor) : -Number(i.valor)), 0);
+  // 19/10/2026: o caixa vem do saldo das contas (ver CONTAS_DA_EMPRESA). Na aba Pessoal ele mostra a conta pessoal.
+  // Sem contas_saldo (demonstração, ou a tabela não carregou) volta pra soma antiga dos lançamentos.
+  const ehPessoal = aba === "pessoal";
+  const contasSaldo = useContasSaldo(db, demo);
+  const contasDoCaixa = ehPessoal ? CONTAS_PESSOAIS : CONTAS_DA_EMPRESA;
+  const saldosDoCaixa = calcularSaldosPorConta(contasSaldo.contas.filter((c) => contasDoCaixa.includes(c.conta)), finances).filter((c) => c.saldo != null);
+  const caixaEmpresa = saldosDoCaixa.length
+    ? Number(saldosDoCaixa.reduce((soma, c) => soma + c.saldo, 0).toFixed(2))
+    : realizados.filter((i) => (i.escopo || "empresa") === (ehPessoal ? "pessoal" : "empresa")).reduce((soma, i) => soma + (i.tipo === "entrada" ? Number(i.valor) : -Number(i.valor)), 0);
   // Só a parte sem data: a parcela já agendada entra na linha de cima, junto das outras contas.
   const dividasAbertas = dividasSemData(dividas, finances);
   const totalDividas = dividasAbertas.reduce((s, x) => s + x.semData, 0);
   // O alerta de vencimento mora no Painel (é lá que ele olha todo dia). Aqui fica só uma linha de resumo,
   // pra tela não virar uma parede de cards.
   const hoje = hojeISO();
-  const resumo = resumoContas(finances, services, hoje);
-  const paidIn = visiveis.filter((item) => item.tipo === "entrada" && (!item.status || item.status === "pago")).reduce((sum, item) => sum + Number(item.valor), 0); const paidOut = visiveis.filter((item) => item.tipo === "saida" && (!item.status || item.status === "pago")).reduce((sum, item) => sum + Number(item.valor), 0);
+  // A PAGAR DA ABA E DOS PRÓXIMOS 30 DIAS (19/10/2026). Somava as 48 contas de todo mundo, aluguel de casa e parcelas até
+  // 2027 juntos, e dava R$ 26 mil sem dizer o que vence agora. O número grande é o que vence até daqui 30 dias
+  // (vencidas incluídas); o total com as parcelas futuras fica na linha de baixo.
+  const resumo = resumoContas(aba === "todos" ? finances : finances.filter((f) => (f.escopo || "empresa") === aba), services, hoje);
+  const ate30 = somarDias(hoje, 30);
+  const aPagar30 = resumo.aPagar.filter((f) => (f.data || "") <= ate30);
+  const totalAPagar30 = aPagar30.reduce((s, f) => s + Number(f.valor), 0);
+  const ultimaParcela = resumo.aPagar.reduce((m, f) => ((f.data || "") > m ? f.data : m), "");
+  const realizadoQueConta = (item) => (!item.status || item.status === "pago") && !lancamentoNeutro(item);
+  const paidIn = visiveis.filter((item) => item.tipo === "entrada" && realizadoQueConta(item)).reduce((sum, item) => sum + Number(item.valor), 0); const paidOut = visiveis.filter((item) => item.tipo === "saida" && realizadoQueConta(item)).reduce((sum, item) => sum + Number(item.valor), 0);
   const totalAReceber = resumo.aReceber.reduce((s, f) => s + Number(f.valor), 0);
   // A lista de baixo obedece o card selecionado. Só o "A receber" troca o componente inteiro (tem botão de
   // dar baixa); entrada/saída são o mesmo formato de linha, só filtrado.
@@ -10804,7 +10895,7 @@ function FinanceView({ finances, dividas, services, db, demo, mode, notify, onCh
   // de outra aba, cai pra lista normal aqui, senão a lista de baixo mostraria o que o card de cima não mostra.
   const ehProLabore = aba === "pro_labore";
   const focoAtivo = ehProLabore && (foco === "saida" || foco === "receber") ? "todos" : foco;
-  let noFoco = focoAtivo === "entrada" ? visiveis.filter((i) => i.tipo === "entrada") : focoAtivo === "saida" ? visiveis.filter((i) => i.tipo === "saida") : visiveis;
+  let noFoco = focoAtivo === "entrada" ? visiveis.filter((i) => i.tipo === "entrada" && !lancamentoNeutro(i)) : focoAtivo === "saida" ? visiveis.filter((i) => i.tipo === "saida" && !lancamentoNeutro(i)) : visiveis;
   // Mais novo em cima (15/10/2026): é o de hoje que ele confere.
   noFoco = [...noFoco]; noFoco.sort((x, y) => String(y.data || "").localeCompare(String(x.data || "")) || String(y.criado_em || "").localeCompare(String(x.criado_em || "")));
   // FINANCEIRO LIMPO (Diego, 15/10/2026, 20h39: "muita informação, não estou entendendo nada", "poderia ter
@@ -10826,14 +10917,14 @@ function FinanceView({ finances, dividas, services, db, demo, mode, notify, onCh
     {ehProLabore ? <section className="metric-grid finance-metrics">
       <Metric label={mesSel ? "Pró-labore do mês" : "Pró-labore — todo o histórico"} value={money(paidIn)} detail={`${visiveis.length} retirada(s) · gastos pessoais e dízimo ficam na aba Pessoal`} tone="green" />
     </section> : <>
-      <p className="fin-dica">O que a empresa tem, o que deve e o que ainda vai receber.</p>
+      <p className="fin-dica">{ehPessoal ? "O que você tem na conta pessoal e o que tem pra pagar." : "O que a empresa tem, o que deve e o que ainda vai receber."}</p>
       <section className="fin-topo">
         <button type="button" className={`fin-grande caixa${focoAtivo === "todos" ? " ativo" : ""}`} onClick={() => setFoco("todos")}>
-          <span>Em caixa</span><b><NumeroAnimado valor={money(caixaEmpresa)} /></b><small>dinheiro da empresa hoje</small>
+          <span>Em caixa</span><b><NumeroAnimado valor={money(caixaEmpresa)} /></b><small>{saldosDoCaixa.length ? `${ehPessoal ? "conta pessoal" : "soma das contas da empresa"} hoje: ${saldosDoCaixa.map((c) => `${c.nome} ${money(c.saldo)}`).join(" · ")}` : ehPessoal ? "dinheiro pessoal hoje" : "dinheiro da empresa hoje"}</small>
         </button>
         <button type="button" className="fin-grande pagar" onClick={onVerAPagar || undefined}>
-          <span>A pagar</span><b><NumeroAnimado valor={money(resumo.totalAPagar)} /></b>
-          <small>{resumo.aPagar.length ? `${resumo.aPagar.length} conta(s)${resumo.vencidas.length ? ` · ${resumo.vencidas.length} vencida(s)` : ""}` : "nada por vencer"}{dividasAbertas.length ? ` · ${money(totalDividas)} sem data` : ""}</small>
+          <span>A pagar em 30 dias</span><b><NumeroAnimado valor={money(totalAPagar30)} /></b>
+          <small>{aPagar30.length ? `${aPagar30.length} conta(s)${resumo.vencidas.length ? ` · ${resumo.vencidas.length} vencida(s)` : ""}` : "nada vence em 30 dias"}{resumo.aPagar.length > aPagar30.length ? ` · ${money(resumo.totalAPagar)} com as parcelas até ${compactDate(ultimaParcela)}` : ""}{dividasAbertas.length && !ehPessoal ? ` · ${money(totalDividas)} sem data` : ""}</small>
         </button>
         <button type="button" className={`fin-grande receber${focoAtivo === "receber" ? " ativo" : ""}`} onClick={() => setFoco(foco === "receber" ? "todos" : "receber")}>
           <span>A receber</span><b><NumeroAnimado valor={money(totalAReceber)} /></b><small>{resumo.aReceber.length} saldo(s) de cliente</small>
@@ -10846,18 +10937,19 @@ function FinanceView({ finances, dividas, services, db, demo, mode, notify, onCh
         <span>{mesSel ? "Resultado do mês" : "Resultado"} <b className={paidIn - paidOut < 0 ? "saida" : "entrada"}>{money(paidIn - paidOut)}</b></span>
       </div>
     </>}
-    {!ehProLabore && <SaldoContasCard finances={finances} db={db} demo={demo} notify={notify} />}
+    {!ehProLabore && <SaldoContasCard finances={finances} db={db} demo={demo} notify={notify} contas={contasSaldo.contas} erro={contasSaldo.erro} carregar={contasSaldo.carregar} somente={aba === "empresa" ? CONTAS_DA_EMPRESA : ehPessoal ? CONTAS_PESSOAIS : null} />}
     {focoAtivo === "receber"
       ? <AReceberBloco finances={finances} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={onChanged} />
       : <section className="content-card fin-lista"><div className="card-head"><div><h3>{tituloLista}</h3><p className="fin-dica">Tudo que a Manu lançou, do mais novo pro mais antigo. Toque numa linha pra ver a observação.</p></div></div>
         {noFoco.map((item) => {
           const aberto = abertoId === item.id;
           const texto = descricaoFinanceiraVisivel(item.descricao);
-          const extras = [compactDate(item.data), item.categoria, item.conta ? contaNome(item.conta) : null, item.status && item.status !== "pago" ? item.status : null].filter(Boolean).join(" · ");
+          const neutro = lancamentoNeutro(item);
+          const extras = [compactDate(item.data), item.categoria, item.conta ? contaNome(item.conta) : null, item.status && item.status !== "pago" ? item.status : null, neutro ? "não conta em entradas/saídas" : null].filter(Boolean).join(" · ");
           return <div className={`fin-item${aberto ? " aberto" : ""}`} key={item.id}>
             <button type="button" className="fin-linha" aria-expanded={aberto} onClick={() => setAbertoId(aberto ? null : item.id)}>
               <span className="fin-quem"><strong>{tituloCurtoFinanceiro(texto) || item.categoria || "Lançamento"}</strong><span>{extras}</span></span>
-              <b className={item.tipo}>{item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b>
+              <b className={neutro ? "neutro" : item.tipo}>{neutro ? "↔" : item.tipo === "saida" ? "−" : "+"} {money(item.valor)}</b>
             </button>
             {aberto && <div className="fin-detalhe">
               <p className="kicker">Observação</p>
