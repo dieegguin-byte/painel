@@ -822,7 +822,7 @@ button.sutil{opacity:.55;font-size:12px}
 .dinheiro-linha strong{flex:1 1 120px;min-width:0;font-weight:600;overflow-wrap:anywhere}
 .dinheiro-linha b{white-space:nowrap}
 .pergunta-pagou{display:grid;gap:6px;margin-top:10px;padding:12px;border-radius:14px;border:1px solid #6fcf9780;background:#6fcf9714}
-.pergunta-pagou b{font-size:17px}.pergunta-pagou-botoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}.pergunta-pagou-botoes button{min-height:46px;white-space:nowrap;font-size:15px}.pergunta-pagou small{color:var(--muted);font-size:12px}
+.pergunta-pagou b{font-size:17px}.pergunta-pagou-botoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}.pergunta-pagou-botoes button{min-height:46px;white-space:nowrap;font-size:15px}.pergunta-pagou small{color:var(--muted);font-size:12px}.recebimento-valor{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line2);background:#0f0d0c;color:var(--text);font-size:20px;font-weight:700}.pergunta-pagou.recebimento>.ghost{margin-top:4px}
 button.dinheiro-linha.prof-linha{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:10px;background:none;border:0;border-top:1px solid var(--line);color:var(--text);text-align:left;cursor:pointer;font:inherit;font-size:14px}
 .prof-linha strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prof-linha .prof-linha-num{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15}
@@ -6730,7 +6730,42 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     return true;
   }, [db, demo, notify, onChanged, setAppointments]);
 
-  return useMemo(() => ({ recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify, comManu, pedirManu }), [recados, enviar, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify, comManu, pedirManu]);
+  // RECEBEU PELO CARD DE COBRAR (Diego, 19/10/2026: "Cobrei não quer dizer que recebi. Recebido tem que estar no
+  // financeiro, ou no dinheiro ou no cartão"). O Feito do card "Cobrar ..." dava o a receber como pago sozinho, sem
+  // conta e sem forma (Wedson, R$ 350, 17/10). Agora o banco não baixa mais a receber pelo Feito (agenda_baixa_financeiro
+  // só cuida de a_pagar) e o recebimento passa por aqui: valor + por onde entrou. Valor cheio: a própria linha vira paga
+  // com a conta, e o banco fecha o card (financeiro_fecha_card). Valor menor: nasce uma entrada paga com o que entrou, a
+  // linha a receber fica com o resto e o card fecha com recado dizendo quanto falta.
+  const receber = useCallback(async (a, { valor, conta, forma }) => {
+    const f = a.conta;
+    if (!f || f.status !== "a_receber") throw new Error("esse card não tem valor a receber ligado");
+    const saldo = Number(f.valor), v = Number(Number(valor).toFixed(2));
+    if (!(v > 0)) throw new Error("escreva quanto entrou");
+    if (v > saldo + 0.004) throw new Error(`passa do que falta receber (${money(saldo)})`);
+    const total = v >= saldo - 0.004;
+    const resto = Number((saldo - v).toFixed(2));
+    if (demo) { setAppointments((prev) => prev.filter((x) => x.id !== a.id)); notify(total ? `Recebido ${money(v)} (${forma}) (demo).` : `Recebido ${money(v)}, falta ${money(resto)} (demo).`, "ok"); return true; }
+    const hoje = hojeISO();
+    const nota = `Recebido pelo card em ${compactDate(hoje)} · ${forma}`;
+    if (total) {
+      const { data, error } = await db.from("financeiro").update({ status: "pago", conta, data: hoje, descricao: [f.descricao, nota].filter(Boolean).join(" · ") }).eq("id", f.id).eq("status", "a_receber").select("id").maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("essa conta já não está mais a receber, recarregue o app");
+    } else {
+      const { data: novo, error: e1 } = await db.from("financeiro").insert({ tipo: "entrada", escopo: f.escopo || "empresa", categoria: f.categoria || "recebimento_cliente", valor: v, status: "pago", conta, data: hoje, servico_id: f.servico_id || null, descricao: `${nota} · parte de ${money(saldo)}, falta ${money(resto)}${f.descricao ? " · " + f.descricao : ""}` }).select("id").single();
+      if (e1) throw e1;
+      const { data: upd, error: e2 } = await db.from("financeiro").update({ valor: resto }).eq("id", f.id).eq("status", "a_receber").select("id").maybeSingle();
+      if (e2 || !upd) { await db.from("financeiro").delete().eq("id", novo.id); throw e2 || new Error("essa conta já não está mais a receber, recarregue o app"); }
+      await enviar(a, { acao: "feito", texto: `Recebeu ${money(v)} (${forma}). Falta ${money(resto)}, continua a receber.` });
+    }
+    try { await db.from("historico").insert({ o_que: `Recebido pelo card: ${a.titulo}`, por: "diego", detalhe: `${money(v)} · ${forma}${total ? "" : ` · falta ${money(resto)}`}` }); } catch (e) { /* segue */ }
+    setAppointments((prev) => prev.filter((x) => x.id !== a.id));
+    notify(total ? `Recebido ${money(v)} (${forma}). Entrou no financeiro.` : `Recebido ${money(v)} (${forma}). Falta ${money(resto)}, continua a receber.`, "ok");
+    if (onChanged) onChanged();
+    return true;
+  }, [db, demo, notify, onChanged, setAppointments, enviar]);
+
+  return useMemo(() => ({ recados, enviar, receber, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify, comManu, pedirManu }), [recados, enviar, receber, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, notify, comManu, pedirManu]);
 }
 
 // Selo SEMPRE visível (fora do corpo recolhido): remarcação do Claude esperando conferência e recados que a
@@ -6894,6 +6929,13 @@ function useLinkDoTopico(db, demo, chave, padrao) {
   }, [db, demo, chave]);
   return url;
 }
+// Por onde o dinheiro de cliente entra. Cartão passa na maquininha da InfinitePay e cai na mesma conta do Pix de lá.
+const FORMAS_RECEBIMENTO = [
+  { nome: "Pix InfinitePay", conta: "infinitepay" },
+  { nome: "Cartão", conta: "infinitepay" },
+  { nome: "Pix Nubank PJ", conta: "nubank_pj" },
+  { nome: "Dinheiro", conta: "dinheiro_pj" },
+];
 function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
   const [texto, setTexto] = useState("");
   const [audio, setAudio] = useState(null);
@@ -6908,10 +6950,35 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
     const f = () => { if (contaAberta && PERGUNTA_PAGOU.id === String(a.id)) setPerguntaPago(true); };
     PERGUNTA_PAGOU.ouvintes.add(f); return () => PERGUNTA_PAGOU.ouvintes.delete(f);
   }, [a.id, contaAberta]);
+  // Card de cobrar: o Sim abre "quanto e por onde entrou" (ver `receber`), e o Ainda não fecha o card como "cobrei"
+  // com o valor continuando a receber. Card de pagar segue como antes: Sim dá Feito, Ainda não deixa o card aberto.
+  const [recebendo, setRecebendo] = useState(false);
+  const [valorRecebido, setValorRecebido] = useState("");
   const respostaPago = (sim) => {
     vibrar(6); setPerguntaPago(false); PERGUNTA_PAGOU.limpar(String(a.id));
+    if (ehReceber) {
+      if (sim) { setValorRecebido(String(Number(a.conta.valor || 0).toFixed(2)).replace(".", ",")); setRecebendo(true); }
+      else enviarTexto("feito", "Cobrei. Ainda não recebeu, continua a receber.");
+      return;
+    }
     if (sim) enviar("feito");
-    else acoes.notify(ehReceber ? "Continua a receber. O card fica aberto." : "Continua a pagar. O card fica aberto.", "info");
+    else acoes.notify("Continua a pagar. O card fica aberto.", "info");
+  };
+  const enviarTexto = async (acao, t) => {
+    if (busy) return;
+    setBusy(acao);
+    try { await acoes.enviar(a, { acao, texto: t }); acoes.notify("Cobrança anotada. O valor continua a receber.", "ok"); }
+    catch (e) { acoes.notify("Não salvou: " + (e.message || e), "error"); }
+    finally { setBusy(null); }
+  };
+  const confirmarRecebido = async (forma) => {
+    if (busy) return;
+    const v = parseMoedaBR(valorRecebido);
+    if (!Number.isFinite(v) || v <= 0) { acoes.notify("Escreva quanto entrou.", "error"); return; }
+    setBusy("receber");
+    try { await acoes.receber(a, { valor: v, conta: forma.conta, forma: forma.nome }); setRecebendo(false); }
+    catch (e) { acoes.notify("Não salvou o recebimento: " + (e.message || e), "error"); }
+    finally { setBusy(null); }
   };
   const pedidoManu = [...(acoes.comManu || [])].reverse().find((r) => (r.conversa || []).some((m) => m?.meta?.agenda_id === a.id));
   const respostaManu = pedidoManu ? (pedidoManu.conversa || []).filter((m) => m && m.de !== "diego" && m.tipo !== "sistema" && m.texto).slice(-1)[0] : null;
@@ -6946,18 +7013,28 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "" }) {
   return <div className="card-acoes">
     {doCard.length > 0 && <div className="recados-do-card">{doCard.map((r) => <RecadoEnviado key={r.id} r={r} acoes={acoes} />)}</div>}
     <div className="card-acoes-botoes linha">
-      <button type="button" className="primary" onClick={() => (contaAberta ? (vibrar(6), setPerguntaPago(true)) : enviar("feito"))} disabled={!!busy || perguntaPago}>{busy === "feito" ? "…" : "✅ Feito"}</button>
+      <button type="button" className="primary" onClick={() => (contaAberta ? (vibrar(6), setPerguntaPago(true)) : enviar("feito"))} disabled={!!busy || perguntaPago || recebendo}>{busy === "feito" ? "…" : "✅ Feito"}</button>
       <button type="button" className={`secondary${modo === "remarcar" ? " ativo" : ""}`} onClick={() => abrir("remarcar")} disabled={!!busy}>🔁 Remarcar</button>
       <button type="button" className={`ghost perigo${modo === "cancelar" ? " ativo" : ""}`} onClick={() => abrir("cancelar")} disabled={!!busy}>✖ Cancelar</button>
       <button type="button" className={`ghost${modo === "recado" ? " ativo" : ""}`} onClick={() => abrir("recado")} disabled={!!busy} aria-label="Só recado">💬</button>
     </div>
     {perguntaPago && <div className="pergunta-pagou" role="group" aria-label={ehReceber ? "Recebeu?" : "Pagou?"}>
       <b>{ehReceber ? "Recebeu" : "Pagou"}{a.conta && Number(a.conta.valor) > 0 ? ` ${money(a.conta.valor)}` : ""}?</b>
-      <small>{ehReceber ? "Só o Sim dá a conta como recebida." : "Só o Sim dá a conta como paga."}</small>
+      <small>{ehReceber ? "Ainda não: o card fecha como cobrado e o valor continua a receber." : "Só o Sim dá a conta como paga."}</small>
       <div className="pergunta-pagou-botoes">
         <button type="button" className="primary" onClick={() => respostaPago(true)}>{ehReceber ? "Sim, recebi" : "Sim, paguei"}</button>
         <button type="button" className="ghost" onClick={() => respostaPago(false)}>Ainda não</button>
       </div>
+    </div>}
+    {recebendo && <div className="pergunta-pagou recebimento" role="group" aria-label="Quanto e por onde entrou">
+      <b>Quanto entrou?</b>
+      <input className="recebimento-valor" inputMode="decimal" value={valorRecebido} onChange={(e) => setValorRecebido(e.target.value)} aria-label="Valor recebido" />
+      <small>Se entrou menos que {money(a.conta.valor)}, o resto continua a receber.</small>
+      <b>Por onde entrou?</b>
+      <div className="pergunta-pagou-botoes">
+        {FORMAS_RECEBIMENTO.map((f) => <button key={f.nome} type="button" className="secondary" disabled={!!busy} onClick={() => confirmarRecebido(f)}>{busy === "receber" ? "…" : f.nome}</button>)}
+      </div>
+      <button type="button" className="ghost" disabled={!!busy} onClick={() => setRecebendo(false)}>Voltar</button>
     </div>}
     {modo && <div className="card-recado">
       <p className="kicker" style={{ margin: 0 }}>RECADO PRO CLAUDE · {ROTULO[modo]}</p>
