@@ -6705,7 +6705,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     if (patch) setAppointments((prev) => prev.filter((x) => x.id !== a.id));
     notify(acao === "feito" ? "Feito. Saiu da agenda." + avisoPessoal
       : acao === "cancelar" ? "Cancelado. Saiu da agenda." + avisoPessoal
-      : acao === "remarcar" ? `Anotado. O card sai da tela e volta na data nova que o Claude escolher (${HORARIOS_ROTINA_RECADOS}).`
+      : acao === "remarcar" ? `Remarcar anotado. O card sai da tela e volta no dia que a Manu escolher. Desfazer fica na seção da Manu.`
       : `Recado guardado. O Claude lê na próxima rodada (${HORARIOS_ROTINA_RECADOS}).`, avisoPessoal ? "error" : "ok");
     if (onChanged) onChanged();
     return true;
@@ -7003,7 +7003,7 @@ function DesfazerRecados() {
   if (!abertos.length) return null;
   const icone = { feito: "✅", cancelar: "✖", remarcar: "🔁", recado: "💬" };
   return <CardRecolhivel className="content-card desfazer-faixa" selo={abertos.length} tom="azul" icone="↶"
-    cabecalho={<><p className="kicker">ENVIADO AO CLAUDE</p><h3>{abertos.length} aguardando o Claude · dá pra desfazer</h3></>}>
+    cabecalho={<><p className="kicker">TOQUES NOS CARDS · COM A MANU</p><h3>{abertos.length} esperando a Manu · dá pra desfazer</h3></>}>
     {abertos.slice(0, 6).map((r) => <div key={r.id} className="desfazer-linha">
       <span>{icone[r.acao] || "•"} <b>{ACAO_RECADO_ROTULO[r.acao] || r.acao}</b> · {r.agenda?.titulo || "compromisso"}{r.texto && <small className="desfazer-texto">“{r.texto}”</small>}<small>{new Date(r.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small></span>
       {/* CONFIRMA ANTES (Diego, 14/10/2026: desfez 6 itens sem querer só pra ler o que tinha escrito). O texto do recado
@@ -7182,7 +7182,10 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "", temMaterial 
     {doCard.length > 0 && <div className="recados-do-card">{doCard.map((r) => <RecadoEnviado key={r.id} r={r} acoes={acoes} />)}</div>}
     <div className="card-acoes-botoes linha">
       <button type="button" className="primary" onClick={() => (contaAberta ? (vibrar(6), setPerguntaPago(true)) : compra ? (vibrar(6), setPagando(true)) : enviar("feito"))} disabled={!!busy || perguntaPago || recebendo || pagando}>{busy === "feito" ? "…" : "✅ Feito"}</button>
-      <button type="button" className={`secondary${modo === "remarcar" ? " ativo" : ""}`} onClick={() => abrir("remarcar")} disabled={!!busy}>🔁 Remarcar</button>
+      {/* REMARCAR COM UM TOQUE (Diego, 20/10/2026: "só clicar nele e ele sumir da minha vista e a Manu decidir qual
+          dia que remarca. Se eu precisar escrever, vou lá no recado. Se clicar sem querer, vou lá na Manu e desmarco").
+          Sem caixa de texto: o card some na hora e o ↶ Desfazer fica na seção da Manu. */}
+      <button type="button" className="secondary" onClick={() => { vibrar(6); setModo(null); enviar("remarcar"); }} disabled={!!busy}>{busy === "remarcar" ? "…" : "🔁 Remarcar"}</button>
       <button type="button" className={`ghost perigo${modo === "cancelar" ? " ativo" : ""}`} onClick={() => abrir("cancelar")} disabled={!!busy}>✖ Cancelar</button>
       <button type="button" className={`ghost${modo === "recado" ? " ativo" : ""}`} onClick={() => abrir("recado")} disabled={!!busy} aria-label="Só recado">💬</button>
     </div>
@@ -9755,7 +9758,9 @@ function ManuCard({ duvidas, inbox = [], atividadeAgente = [], today, db, demo, 
   const abertas = (duvidas || []).filter((d) => d.status === "aberta").length + (inbox || []).filter((it) => it && it.status === "aguardando_voce" && !it.processado).length;
   const respondidas = (duvidas || []).filter((d) => d.status === "respondida").length + (inbox || []).filter((it) => it && it.status === "respondido" && !it.processado).length;
   const ultima = (atividadeAgente || []).filter((h) => h && h.quando).map(separarFonteAgente).filter((h) => h && h.fonte === "agente").sort((a, b) => String(b.quando).localeCompare(String(a.quando)))[0];
-  const resumo = abertas ? `${abertas} pergunta${abertas === 1 ? "" : "s"} pra você` : respondidas ? `${respondidas} resposta${respondidas === 1 ? "" : "s"} esperando ela` : ultima ? `última rodada ${idadeDoDado(new Date(ultima.quando).getTime())}` : "ainda não rodou";
+  const acoesAgenda = React.useContext(AcoesAgendaCtx);
+  const enviados = acoesAgenda ? acoesAgenda.recados.filter((r) => !r.processado_em).length : 0;
+  const resumo = abertas ? `${abertas} pergunta${abertas === 1 ? "" : "s"} pra você` : respondidas ? `${respondidas} resposta${respondidas === 1 ? "" : "s"} esperando ela` : enviados ? `${enviados} toque${enviados === 1 ? "" : "s"} nos cards esperando · dá pra desfazer` : ultima ? `última rodada ${idadeDoDado(new Date(ultima.quando).getTime())}` : "ainda não rodou";
   // BARREIRA PRÓPRIA (14/10/2026): um dado fora do padrão vindo da Manu (histórico, pergunta ou regra) não pode
   // derrubar o Painel inteiro — se algo quebrar aqui dentro, só este card avisa, e Atrasados/Hoje seguem na tela.
   return <GrupoRecolhivel id="grupo-manu" titulo="Manu" className={`grupo-agente grupo-manu${abertas ? " com-perguntas" : ""}`} semContador resumo={resumo} abertoInicial={abertas > 0}>
@@ -9763,6 +9768,9 @@ function ManuCard({ duvidas, inbox = [], atividadeAgente = [], today, db, demo, 
       <RecadoPraManu db={db} demo={demo} notify={notify} />
       <DuvidasAgenteCard duvidas={duvidas} inbox={inbox} today={today} db={db} demo={demo} notify={notify} customers={customers} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />
       <RespondidasAoClaude duvidas={duvidas} inbox={inbox} db={db} demo={demo} notify={notify} onChanged={onChanged} />
+      {/* O DESFAZER MORA NA MANU (Diego, 20/10/2026: "se eu clicar sem querer, eu vou lá na Manu e desmarco").
+          Feito, Remarcar e Cancelar tocados nos cards ficam aqui até a rodada aplicar, cada um com ↶ Desfazer. */}
+      <DesfazerRecados />
       <AgenteCard itens={atividadeAgente} today={today} services={services} appointments={appointments} customers={customers} finances={finances} onOpenFicha={onOpenFicha} />
       <RegrasAprendidasCard duvidas={duvidas} db={db} demo={demo} notify={notify} onChanged={onChanged} />
     </BarreiraDaAba>
@@ -10203,7 +10211,6 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
       {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} ligado={ligacoesFuturos.get(a.id) || null} />)}</CardRecolhivel>}
     {/* ENVIADO AO CLAUDE vem DEPOIS de Atrasados, Hoje e Próximos (Diego, 12/10: "os compromissos de hoje,
         atrasados precisam ser os primeiros, não o recado que vai pro Claude"). Fica recolhido, só com o selo. */}
-    <DesfazerRecados />
     {/* PAINEL ORGANIZADO (11/10/2026, Diego: "Está muito carregado"). Os blocos viraram grupos: Pendências,
         Contas, Produção, Próximos, Anotar, Pessoais. Nada foi apagado — cada card de antes continua inteiro,
         só que como uma linha dentro do grupo (ver CSS `.grupo-card`). Os dois quadrados de número saíram
