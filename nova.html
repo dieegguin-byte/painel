@@ -821,7 +821,7 @@ button.sutil{opacity:.55;font-size:12px}
 .dinheiro-linha em{font-style:normal;font-size:11px;color:var(--dim);white-space:nowrap}
 .dinheiro-linha strong{flex:1 1 120px;min-width:0;font-weight:600;overflow-wrap:anywhere}
 .dinheiro-linha b{white-space:nowrap}
-.pergunta-pagou{display:grid;gap:6px;margin-top:10px;padding:12px;border-radius:14px;border:1px solid #6fcf9780;background:#6fcf9714}
+.duvida-aviso-numero{margin:6px 0 0;font-size:13px;font-weight:700;color:#ffb36b}.pergunta-pagou{display:grid;gap:6px;margin-top:10px;padding:12px;border-radius:14px;border:1px solid #6fcf9780;background:#6fcf9714}
 .pergunta-pagou b{font-size:17px}.pergunta-pagou-botoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}.pergunta-pagou-botoes button{min-height:46px;white-space:nowrap;font-size:15px}.pergunta-pagou small{color:var(--muted);font-size:12px}.recebimento-valor{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line2);background:#0f0d0c;color:var(--text);font-size:20px;font-weight:700}.pergunta-pagou.recebimento>.ghost{margin-top:4px}.pergunta-pagou.compra{grid-template-columns:minmax(0,1fr)}.pergunta-pagou.compra .recebimento-valor{box-sizing:border-box;min-width:0}.pergunta-pagou.compra .pergunta-pagou-botoes{grid-template-columns:repeat(2,minmax(0,1fr))}.pergunta-pagou.compra .formas-compra{grid-template-columns:repeat(3,minmax(0,1fr))}.pergunta-pagou.compra button{min-width:0;padding:0 6px;font-size:14px}
 button.dinheiro-linha.prof-linha{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:10px;background:none;border:0;border-top:1px solid var(--line);color:var(--text);text-align:left;cursor:pointer;font:inherit;font-size:14px}
 .prof-linha strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1936,6 +1936,9 @@ const demoDuvidas = [
   { id: "dv1", status: "aberta", origem: "agente", pergunta: "A Ana Paula pediu pra buscar o sofá sábado de manhã. Marco sábado 9h ou prefere outro horário?", contexto: "Ela disse no WhatsApp: \"sábado de manhã tá bom pra mim\". Sábado 9h está livre na agenda.", opcoes: ["Sábado 9h", "Outro horário", "Não marcar"], cliente_id: "c3", referencia: "servico s3", resposta: null, vale_sempre: false, regra: null, criado_em: new Date(Date.now() - 2 * 3600000).toISOString(), respondido_em: null, aplicado_em: null },
   { id: "dv2", status: "aplicada", pergunta: "Cliente de Valparaíso pediu retirada depois das 18h. Posso marcar à noite?", contexto: null, opcoes: ["Sim", "Não"], cliente_id: null, referencia: null, resposta: "Sim, até 20h, menos segunda, quarta e sexta.", vale_sempre: true, regra: "Retirada ou entrega à noite pode até 20h; nunca às segundas, quartas e sextas (igreja).", criado_em: new Date(Date.now() - 3 * 86400000).toISOString(), respondido_em: new Date(Date.now() - 2 * 86400000).toISOString(), aplicado_em: new Date(Date.now() - 2 * 86400000).toISOString() },
 ];
+demoDuvidas.push(
+  { id: "dv4", status: "aberta", origem: "agente", pergunta: "Pedir ao fornecedor o valor da nota do tecido?", contexto: "Texto: Opa, tudo bem? Me passa o valor da nota do tecido? Fornecedor +55 61 99999-0001 https://wa.me/5561999990001. Vai hoje 13h40 pela Zapia.", opcoes: ["Manda", "Mudar", "Não manda"], cliente_id: null, criado_em: new Date().toISOString() },
+  { id: "dv5", status: "aberta", origem: "agente", pergunta: "Mandar o follow-up pra Mariana? (vai escrito)", contexto: "Vai ESCRITO: Olá Mariana, tudo bem? — Mariana +55 61 99999-0002 https://wa.me/5561999990002. Quando: 21/10 10h00.", opcoes: ["Manda", "Mudar", "Não manda"], cliente_id: "c1", criado_em: new Date().toISOString() });
 demoDuvidas.push({ id: "dv3", status: "respondida", origem: "auditoria", pergunta: "O card Visita — Mariana de ontem 15h foi feito?", contexto: null, opcoes: ["Feito", "Não foi feito"], cliente_id: null, referencia: "agenda a1", resposta: "Feito", vale_sempre: false, regra: null, criado_em: new Date(Date.now() - 5 * 3600000).toISOString(), respondido_em: new Date(Date.now() - 20 * 60000).toISOString(), aplicado_em: null });
 const demoAvisos = [
   { id: "av1", dominio: "agenda", prioridade: "alta", ativo: true, expira_em: null, referencia_id: "a6",
@@ -9520,6 +9523,7 @@ function DuvidasAgenteCard({ duvidas, inbox = [], today, db, demo, notify, custo
     {caixa.map((it) => <DuvidaItem key={"cx-" + it.id} d={{ id: it.id, origem: "caixa", pergunta: perguntaDaCaixa(it), contexto: null, opcoes: /lan[cç]o assim/i.test(perguntaDaCaixa(it)) ? ["Sim, lança assim", "Não"] : [], criado_em: it.criado_em, cliente_id: null }} caixaItem={it} today={today} db={db} demo={demo} notify={notify} nome={null} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />)}
   </section>;
 }
+const RE_WAME_NO_CARTAO = /wa\.me\/\+?(\d{10,13})\b/i;
 function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, telefone = null, onOpenFicha, onAbrirCaixa, onChanged }) {
   const [texto, setTexto] = useState("");
   const [opcao, setOpcao] = useState(null);
@@ -9554,6 +9558,15 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, telefo
     } catch (e) { notify("Erro ao responder: " + e.message, "error"); } finally { setBusy(false); }
   };
   const contatoZapia = ehContatoZapia(d.pergunta);
+  // O NÚMERO QUE VAI, PRA CONFERIR (Diego, 20/10/2026: "sempre com o botão do WhatsApp, né, do cliente... para me conferir
+  // se bate"). A Manu escreve no cartão de envio o número pra onde a Zapia manda ("— Nome +55 61 9… https://wa.me/…").
+  // O botão abre ESSE número e mostra os dígitos; sem link no texto, vale o da ficha. Profissional e fornecedor não têm
+  // ficha de cliente, então só o link do texto dá o botão. Se o texto e a ficha discordam, os dois aparecem com aviso.
+  const telTexto = telefoneWhatsapp((RE_WAME_NO_CARTAO.exec(`${d.contexto || ""} ${d.pergunta || ""}`) || [])[1]);
+  const telFicha = telefoneWhatsapp(telefone);
+  const digitos = (t) => (corrigirTelefone(t) || t).replace(/^\+55\s*/, "");
+  const telVai = telTexto || telFicha;
+  const discordam = telTexto && telFicha && telTexto !== telFicha;
   return <div className={`duvida${contatoZapia ? " contato-zapia" : ""}`}>
     <span className={`duvida-origem ${origem}`}>{rotuloOrigem(origem)}</span>{contatoZapia && <i className="selo-followup zapia" style={{ marginLeft: 7 }}>↻ Contato · Zapia envia</i>}
     <strong>{d.pergunta}</strong>
@@ -9563,8 +9576,10 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, telefo
     {d.cliente_id && onOpenFicha && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onOpenFicha(d.cliente_id); }}>Abrir ficha{nome ? ` de ${nome.split(" ")[0]}` : ""} ›</button>}
     {/* CONFERIR A CONVERSA ANTES (Diego, 17/10/2026: "no card botão com WhatsApp do cliente para eu conferir se falo
         com ele ou não"). Mesmo transporte dos outros botões: Business, ou o WhatsApp comum pra quem é exceção. */}
-    {telefoneWhatsapp(telefone) && <a className="btn-wpp duvida-wpp" href={urlWhatsapp(telefoneWhatsapp(telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => vibrar(6)}>WhatsApp{nome ? ` · ${nome.split(" ")[0]}` : ""}</a>}
+    {telVai && <a className="btn-wpp duvida-wpp" href={urlWhatsapp(telVai, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => vibrar(6)}>WhatsApp{nome ? ` · ${nome.split(" ")[0]}` : ""} · {digitos(telVai)}</a>}
+    {discordam && <a className="btn-wpp duvida-wpp" href={urlWhatsapp(telFicha, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => vibrar(6)}>Ficha · {digitos(telFicha)}</a>}
     </div>
+    {discordam && <p className="duvida-aviso-numero">⚠ O texto vai pro {digitos(telTexto)}, mas a ficha tem {digitos(telFicha)}. Confira antes de mandar.</p>}
     {caixaItem && onAbrirCaixa && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onAbrirCaixa(); }}>Ver na Caixa ›</button>}
     {opcoes.length > 0 && <div className="duvida-opcoes">{opcoes.map((o) => <button type="button" key={o} className={opcao === o ? "ativo" : ""} onClick={() => { vibrar(6); setOpcao(opcao === o ? null : o); }}>{o}</button>)}</div>}
     <textarea value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy && resposta) gravar("respondida"); })} placeholder={opcoes.length ? "Quer explicar mais? (opcional)" : "Sua resposta pra Manu"} />
