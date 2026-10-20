@@ -983,7 +983,7 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .proposta-selo{font-style:normal;font-size:10px;font-weight:800;margin-left:6px;padding:2px 7px;border-radius:999px;white-space:nowrap}.proposta-selo.verde{background:#1f9d55;color:#fff}.proposta-selo.laranja{background:var(--orange);color:#fff}.proposta-selo.cinza{background:var(--line);color:inherit}.proposta-versao{font-style:normal;font-size:10px;font-weight:800;margin-left:6px;padding:2px 7px;border-radius:999px;background:var(--orange);color:#fff}
 .proposta-aberta .proposta-texto{white-space:pre-wrap;font-size:15px;line-height:1.5;color:var(--cream);margin:6px 0 10px}
 .proposta-detalhe{margin:12px 0}.proposta-detalhe summary{cursor:pointer;color:var(--orange2);font-size:13px}.proposta-detalhe pre{white-space:pre-wrap;font:13px/1.5 Inter,system-ui,sans-serif;color:var(--muted);margin:8px 0 0}
-.proposta-acoes{margin-top:14px}.proposta-acoes .primary{flex:1 1 100%;min-height:46px;font-size:15px}
+.proposta-acoes{margin-top:14px}.proposta-acoes .primary{flex:1 1 100%;min-height:46px;font-size:15px}.proposta-acoes .proposta-ja-mandei{flex:1 1 100%;min-height:44px;font-size:15px}
 .proposta-confirma{margin-top:14px;padding:12px;border-radius:12px;background:#d86d3618;border:1px solid #d86d3655}.proposta-confirma p{margin:0 0 10px;font-size:14px;color:var(--cream)}
 .proposta-confirma textarea{width:100%;box-sizing:border-box;margin-bottom:8px}
 .pessoal-item{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;background:linear-gradient(150deg,#ffffff0c,#ffffff02 50%),var(--surface);border:1px solid var(--line);border-left:3px solid #8fb8dc;border-radius:14px;padding:11px 12px;box-shadow:inset 0 1px 0 #ffffff10,0 1px 2px #0000004d}
@@ -7859,7 +7859,7 @@ function dataHoraCurta(iso) {
   return `${p2(d.getDate())}/${p2(d.getMonth() + 1)} ${p2(d.getHours())}h${d.getMinutes() ? p2(d.getMinutes()) : ""}`;
 }
 function seloProposta(p) {
-  if (p.status === "enviada") return { tom: "verde", texto: `✓ Enviada ao cliente${p.enviado_em ? " " + dataHoraCurta(p.enviado_em) : ""}` };
+  if (p.status === "enviada") return { tom: "verde", texto: `✓ ${propostaMandadaPeloDiego(p) ? "Você mandou" : "Enviada ao cliente"}${p.enviado_em ? " " + dataHoraCurta(p.enviado_em) : ""}` };
   if (p.status === "aguardando") return { tom: "laranja", texto: "Esperando você" };
   if (p.status === "aprovada") return { tom: "cinza", texto: "Aprovada · ainda não enviada" };
   if (p.status === "recado") return { tom: "cinza", texto: "Seu recado · refazendo" };
@@ -7874,6 +7874,13 @@ const PROPOSTA_STATUS = { aguardando: "esperando você", aprovada: "aprovada · 
 // reabre o card "Aprovar a proposta / Mandar orçamento" que o Aprovar tinha fechado (gatilho propostas_fecha_card).
 const propostaJaFoi = (p) => p.status === "enviada" || !!p.enviado_em;
 const propostaDesfazivel = (p) => p.status === "aprovada" && !p.enviado_em;
+// "JÁ MANDEI" (Diego, 19/10/2026: "Você já colocou os orçamentos como enviado? Que eu nem vi ali como marcar no app").
+// Ele manda pelo WhatsApp dele: a proposta vai direto pra enviada, sem Zapia, e a Caixa avisa a Manu pra salvar o valor
+// no serviço e contar as 24h do follow-up, como depois de um "manda". O banco fecha o card "Mandar orçamento" do serviço
+// (gatilho propostas_fecha_card) e reabre se ele desfizer. O Desfazer vale até o follow-up (24h).
+const PROPOSTA_MANDADA_PELO_DIEGO = "Enviada pelo Diego no WhatsApp dele";
+const propostaMandadaPeloDiego = (p) => p.status === "enviada" && String(p.resultado || "").startsWith(PROPOSTA_MANDADA_PELO_DIEGO);
+const mandadaDesfazivel = (p) => propostaMandadaPeloDiego(p) && !!p.enviado_em && Date.now() - new Date(p.enviado_em).getTime() < 24 * 3600 * 1000;
 const horaCurta = (iso) => { try { return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); } catch (e) { return ""; } };
 function PropostasCard({ propostas, customers = [], services = [], db, demo, notify, onChanged }) {
   const [abertaId, setAbertaId] = useState(() => { if (IR_INICIAL !== "proposta" || !IR_ID) return null; consumirIrInicial(); return IR_ID; });
@@ -7884,8 +7891,8 @@ function PropostasCard({ propostas, customers = [], services = [], db, demo, not
   // id → {de, para}: o que este aparelho acabou de gravar (a lista não espera o reload). Só vale enquanto o banco
   // ainda mostra o status de antes — quando a lista nova chega com outro status, quem manda é o banco.
   const [feitas, setFeitas] = useState({});
-  const marcar = (p, para) => setFeitas((f) => ({ ...f, [p.id]: { de: p.status, para } }));
-  const lista = (propostas || []).map((p) => feitas[p.id] && feitas[p.id].de === p.status ? { ...p, status: feitas[p.id].para } : p);
+  const marcar = (p, para, extra = {}) => setFeitas((f) => ({ ...f, [p.id]: { de: p.status, para, extra } }));
+  const lista = (propostas || []).map((p) => feitas[p.id] && feitas[p.id].de === p.status ? { ...p, ...(feitas[p.id].extra || {}), status: feitas[p.id].para } : p);
   const esperando = lista.filter((p) => p.status === "aguardando");
   // CARD RECOLHIDO "Propostas de orçamento" (Diego, 16/10/2026: "um card recolhido pra eu abrir e saber se foi
   // enviado, se não foi"; "pode estar enviada, cancelada, descartada, aprovada"). Fechado mostra só o nome e as
@@ -7960,6 +7967,57 @@ function PropostasCard({ propostas, customers = [], services = [], db, demo, not
       if (onChanged && !demo) onChanged();
     } catch (e) { notify("Não desfez: " + (e.message || e), "error"); } finally { setBusy(false); }
   };
+  const jaMandei = async (p) => {
+    if (busy) return;
+    setBusy(true);
+    const agora = new Date().toISOString();
+    const nome = `${p.cliente_nome}${p.titulo ? " — " + p.titulo : ""}`;
+    const extra = { decidido_em: agora, enviado_em: agora, resultado: `${PROPOSTA_MANDADA_PELO_DIEGO} (marcou Já mandei no app ${dataHoraCurta(agora)})` };
+    try {
+      if (!demo) {
+        const { data, error } = await db.from("propostas").update({ status: "enviada", ...extra }).eq("id", p.id).eq("status", "aguardando").select("id").maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error("essa proposta já foi decidida ou substituída — recarregue o app");
+        const { error: cxErr } = await db.from("caixa_entrada").insert({ texto: `PROPOSTA ENVIADA PELO DIEGO — ${nome} (propostas.id ${p.id}, v${p.versao || 1}). Ele mandou pelo WhatsApp dele e marcou "Já mandei" no app em ${dataHoraCurta(agora)}: NÃO passar pra Zapia. Salvar o valor no serviço como depois de um "manda" e contar as 24h do follow-up a partir de agora.`, status: "novo", conversa: [], processado: false });
+        if (cxErr) notify("Marcada como enviada, mas o aviso pra Manu NÃO foi (" + cxErr.message + ") — avise ela.", "error");
+        try { await db.from("historico").insert({ o_que: `Mandou a proposta: ${nome}`, por: "diego", detalhe: "Pelo WhatsApp dele; marcou Já mandei no app." }); } catch (e) { /* segue */ }
+      }
+      marcar(p, "enviada", extra);
+      notify("Marcada como enviada. A Manu salva o valor e conta as 24h do follow-up.", "ok");
+      fechar();
+      if (onChanged && !demo) onChanged();
+    } catch (e) { notify("Não salvou: " + (e.message || e), "error"); } finally { setBusy(false); }
+  };
+  const desfazerMandei = async (p) => {
+    if (busy) return;
+    if (!window.confirm(`Desfazer o "Já mandei" da proposta de ${p.cliente_nome}? Ela volta a esperar você.`)) return;
+    setBusy(true);
+    try {
+      let aviso = "";
+      if (!demo) {
+        const { data, error } = await db.from("propostas").update({ status: "aguardando", decidido_em: null, enviado_em: null, resultado: null }).eq("id", p.id).eq("status", "enviada").like("resultado", PROPOSTA_MANDADA_PELO_DIEGO + "%").select("id").maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error("essa proposta mudou — recarregue o app");
+        // A linha que a Manu ainda não leu sai; e sempre vai o aviso de desfeito (ela pode estar no meio da rodada).
+        try {
+          const { data: linhas, error: lerErr } = await db.from("caixa_entrada").select("id,processado").like("texto", `PROPOSTA ENVIADA PELO DIEGO — %(propostas.id ${p.id},%`);
+          if (lerErr) throw lerErr;
+          const naoLidas = (linhas || []).filter((l) => !l.processado);
+          if (naoLidas.length) {
+            const { error: cxErr } = await db.from("caixa_entrada").update({ status: "descartado", processado: true, processado_em: new Date().toISOString() }).in("id", naoLidas.map((l) => l.id));
+            if (cxErr) throw cxErr;
+          }
+        } catch (e) { aviso = " A linha antiga da Caixa não saiu (" + (e.message || e) + "), mas a Manu recebe o aviso."; }
+        const { error: insErr } = await db.from("caixa_entrada").insert({ texto: `PROPOSTA ENVIADA DESFEITA — ${p.cliente_nome}${p.titulo ? " — " + p.titulo : ""} (propostas.id ${p.id}, v${p.versao || 1}). O Diego desfez o "Já mandei" no app: a proposta voltou a esperar ele (aguardando). Se já salvou o valor no serviço ou agendou o follow-up por causa da linha PROPOSTA ENVIADA PELO DIEGO, desfazer.`, status: "novo", conversa: [], processado: false });
+        if (insErr) aviso = " Mas o aviso pra Manu NÃO foi (" + insErr.message + ") — avise ela.";
+        try { await db.from("historico").insert({ o_que: `Desfez o Já mandei da proposta: ${p.cliente_nome}${p.titulo ? " — " + p.titulo : ""}`, por: "diego", detalhe: "Pelo card do app." }); } catch (e) { /* segue */ }
+      }
+      marcar(p, "aguardando", { enviado_em: null, decidido_em: null, resultado: null });
+      notify("Desfeito. A proposta voltou a esperar você." + aviso, aviso ? "error" : "ok");
+      fechar();
+      if (onChanged && !demo) onChanged();
+    } catch (e) { notify("Não desfez: " + (e.message || e), "error"); } finally { setBusy(false); }
+  };
   // WHATSAPP DO CLIENTE NA PROPOSTA (Diego, 16/10/2026: "na proposta quero botão do WhatsApp do cliente"). O número
   // vem da ficha do cliente; sem cliente_id, do cliente do serviço da proposta.
   const telDe = (p) => telefoneWhatsapp((customers || []).find((c) => c.id === p.cliente_id)?.telefone) || telefoneWhatsapp((services || []).find((s) => s.id === p.servico_id)?.clientes?.telefone);
@@ -7968,11 +8026,12 @@ function PropostasCard({ propostas, customers = [], services = [], db, demo, not
     <div className="proposta-txt">
       <strong>{p.cliente_nome}{p.versao > 1 ? <i className="proposta-versao">v{p.versao}</i> : null}{seloProposta(p) && <i className={`proposta-selo ${seloProposta(p).tom}`}>{seloProposta(p).texto}</i>}</strong>
       <span>{p.titulo || "proposta"}{valor(p) ? " · " + valor(p) : ""}</span>
-      {!decidida ? <em>toque pra ler e aprovar ›</em>
+      {!decidida ? <em>toque pra aprovar ou marcar que já mandou ›</em>
+        : propostaMandadaPeloDiego(p) ? <em>você mandou no seu WhatsApp{p.enviado_em ? " " + horaCurta(p.enviado_em) : ""}</em>
         : propostaJaFoi(p) ? <em>já foi pra Zapia{p.enviado_em ? " " + horaCurta(p.enviado_em) : ""} · não dá mais pra desfazer</em>
         : <em>{PROPOSTA_STATUS[p.status] || p.status}</em>}
     </div>
-    {decidida && propostaDesfazivel(p) && <button type="button" className="ghost proposta-desfazer" disabled={busy} onClick={(e) => { e.stopPropagation(); desfazer(p); }}>{busy ? "…" : "↶ Desfazer"}</button>}
+    {decidida && (propostaDesfazivel(p) || mandadaDesfazivel(p)) && <button type="button" className="ghost proposta-desfazer" disabled={busy} onClick={(e) => { e.stopPropagation(); (mandadaDesfazivel(p) ? desfazerMandei : desfazer)(p); }}>{busy ? "…" : "↶ Desfazer"}</button>}
   </article>;
   return <>
     <CardRecolhivel id="card-propostas" className="content-card propostas-card" selo={esperando.length || null} tom="laranja" icone="📄"
@@ -7995,13 +8054,16 @@ function PropostasCard({ propostas, customers = [], services = [], db, demo, not
         {aberta.detalhamento && <details className="proposta-detalhe" open><summary>Como chegou nesse valor</summary><pre>{aberta.detalhamento}</pre></details>}
         {aberta.recado && <p className="compromisso-material">✍️ Seu recado anterior: {aberta.recado}</p>}
         {aberta.status !== "aguardando" && <div className="proposta-feita">
-          {propostaJaFoi(aberta) ? <>✓ Já foi pra Zapia{aberta.enviado_em ? " em " + horaCurta(aberta.enviado_em) : ""}. Não dá mais pra desfazer por aqui.</>
+          {propostaMandadaPeloDiego(aberta) ? <>✓ Você mandou no seu WhatsApp{aberta.enviado_em ? " em " + horaCurta(aberta.enviado_em) : ""}. A Manu salva o valor e conta as 24h do follow-up.
+              {mandadaDesfazivel(aberta) && <div className="ficha-actions"><button type="button" className="ghost" disabled={busy} onClick={() => desfazerMandei(aberta)}>{busy ? "…" : "↶ Desfazer"}</button></div>}</>
+            : propostaJaFoi(aberta) ? <>✓ Já foi pra Zapia{aberta.enviado_em ? " em " + horaCurta(aberta.enviado_em) : ""}. Não dá mais pra desfazer por aqui.</>
             : aberta.status === "aprovada" ? <>✅ Você aprovou{aberta.decidido_em ? " em " + horaCurta(aberta.decidido_em) : ""}. A Manu ainda não passou pra Zapia, então dá pra desfazer.
               <div className="ficha-actions"><button type="button" className="ghost" disabled={busy} onClick={() => desfazer(aberta)}>{busy ? "…" : "↶ Desfazer"}</button></div></>
             : <>{PROPOSTA_STATUS[aberta.status] || aberta.status}</>}
         </div>}
         {aberta.status === "aguardando" && !confirmando && !recadoAberto && <div className="ficha-actions proposta-acoes">
           <button type="button" className="primary" disabled={busy} onClick={() => setConfirmando(true)}>✅ Aprovar e mandar</button>
+          <button type="button" className="secondary proposta-ja-mandei" disabled={busy} onClick={() => jaMandei(aberta)}>{busy ? "…" : "📲 Já mandei"}</button>
           <button type="button" className="ghost" disabled={busy} onClick={() => setRecadoAberto(true)}>✍️ Recado pra mudar</button>
           <button type="button" className="ghost" disabled={busy} onClick={() => descartar(aberta)}>🗑 Descartar</button>
         </div>}
