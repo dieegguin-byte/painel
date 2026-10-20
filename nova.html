@@ -2203,6 +2203,44 @@ function parseInbox(raw = "") {
   const temImagem = images.length > 0;
   return { text: temImagem ? (note?.[1] || "").trim() : raw.trim(), images, imageUrl: images[0]?.url || "", fileName: images[0]?.fileName || "print" };
 }
+// EXCLUIR APAGA OS ARQUIVOS (19/10/2026: o Diego excluiu uma conversa exportada com 23 áudios e 6 fotos e os 30
+// arquivos ficaram no armazenamento, que nenhuma sessão do Claude consegue apagar). Só o Excluir apaga; o Descartar
+// guarda o item e os arquivos. Arquivo que outro item da Caixa também usa fica. Devolve quantos não saíram.
+async function apagarArquivosDaCaixa(db, item) {
+  const caminhos = parseInbox(item.texto || "").images
+    .map((img) => { const m = /\/fotos-servicos\/(caixa-entrada\/[^?#]+)/.exec(img.url || ""); return m ? decodeURIComponent(m[1]) : null; })
+    .filter(Boolean);
+  if (!caminhos.length) return 0;
+  const usados = new Set();
+  for (const c of caminhos) {
+    const { data } = await db.from("caixa_entrada").select("id").neq("id", item.id).like("texto", `%${c}%`).limit(1);
+    if (data && data.length) usados.add(c);
+  }
+  const apagar = caminhos.filter((c) => !usados.has(c));
+  if (!apagar.length) return 0;
+  const { data, error } = await db.storage.from("fotos-servicos").remove(apagar);
+  if (error) return apagar.length;
+  return Math.max(0, apagar.length - (data || []).length);
+}
+// SOBRA DA CONVERSA EXCLUÍDA EM 19/10 (Chiara, 21h19: 23 áudios, 6 fotos e o texto, prefixo 1792455524588_). A linha da
+// Caixa já foi apagada, mas os 30 arquivos ficaram, e só o app logado pode apagar no armazenamento. Roda uma vez ao
+// abrir o app e só apaga se nenhuma linha da Caixa ainda usar esse prefixo.
+const SOBRAS_DA_CAIXA = ["1792455524588_"];
+let sobrasJaRodou = false;
+async function limparSobrasDaCaixa(db) {
+  if (sobrasJaRodou || !db) return;
+  sobrasJaRodou = true;
+  for (const prefixo of SOBRAS_DA_CAIXA) {
+    try {
+      const { data: usados } = await db.from("caixa_entrada").select("id").like("texto", `%caixa-entrada/${prefixo}%`).limit(1);
+      if (!usados || usados.length) continue;
+      const { data: arquivos, error } = await db.storage.from("fotos-servicos").list("caixa-entrada", { search: prefixo, limit: 100 });
+      if (error || !arquivos || !arquivos.length) continue;
+      const caminhos = arquivos.filter((f) => f.name.startsWith(prefixo)).map((f) => `caixa-entrada/${f.name}`);
+      if (caminhos.length) await db.storage.from("fotos-servicos").remove(caminhos);
+    } catch (e) { console.warn("sobras da caixa", e); }
+  }
+}
 function buildInboxPayload(images, texto) {
   if (!images.length) return texto;
   return images.map((img) => `[[TB_INBOX_IMG]]${img.url}\n[[TB_INBOX_FILE]]${img.fileName}`).join("\n") + `\n[[TB_INBOX_NOTE]]${texto}`;
@@ -4605,6 +4643,7 @@ function Home() {
 
   useEffect(() => { if (demo || session) loadAll(); }, [demo, session, loadAll]);
   useEffect(() => { if (!demo && session && db) transcreverAudiosAtrasados(db, notify); }, [demo, session, db, notify]);
+  useEffect(() => { if (!demo && session && db) limparSobrasDaCaixa(db); }, [demo, session, db]);
 
   // O APP EM TEMPO REAL (recado de 04/09: "compromisso gravado na fonte oficial e ainda assim não
   // aparece"). O Classic grava direto no Supabase; até aqui o app só via isso se o Diego lembrasse de
@@ -4977,7 +5016,11 @@ function Home() {
     try { recusaSeForPendenciaAberta(item); } catch (e) { notify(e.message, "error"); return; }
     if (demo) { setInbox((items) => items.filter((entry) => entry.id !== item.id)); setSelectedId(null); notify("Na demonstração não salva.", "info"); return; }
     const { error } = await db.from("caixa_entrada").delete().eq("id", item.id);
-    if (error) notify("Erro: " + error.message, "error"); else { setSelectedId(null); await loadAll(); notify("Item excluído.", "ok"); }
+    if (error) { notify("Erro: " + error.message, "error"); return; }
+    setSelectedId(null);
+    const sobrou = await apagarArquivosDaCaixa(db, item);
+    await loadAll();
+    notify(sobrou ? `Item excluído. ${sobrou} arquivo(s) não saíram do armazenamento.` : "Item excluído, com os arquivos.", sobrou ? "error" : "ok");
   }
 
   async function answer(item) {
