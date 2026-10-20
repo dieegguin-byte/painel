@@ -2376,13 +2376,27 @@ async function gravarTranscricao(db, itemId, arquivo, texto) {
 }
 // Fila única: um áudio por vez, na ordem em que chegaram. `fontes` = [{ nome, blob }] ou [{ nome, url }].
 let filaTranscricao = Promise.resolve();
+// ITEM EXCLUÍDO OU DESCARTADO PARA A FILA (Diego, 19/10/2026: "Exportei uma conversa com áudio. Eu excluí, mas ainda
+// está continuando baixando os áudios"). A fila seguia baixando e transcrevendo cada áudio do item apagado. Agora o
+// Excluir e o Descartar avisam a fila, e antes de cada áudio ela confere no banco se o item ainda existe e não foi
+// descartado; se não, pula o resto dele.
+const itensForaDaFila = new Set();
+function tirarDaFilaDeAudio(itemId) { if (itemId) itensForaDaFila.add(String(itemId)); }
+async function itemSaiuDaFila(db, itemId) {
+  if (itensForaDaFila.has(String(itemId))) return true;
+  const { data, error } = await db.from("caixa_entrada").select("id,status").eq("id", itemId).maybeSingle();
+  if (error) return false;
+  if (!data || data.status === "descartado") { tirarDaFilaDeAudio(itemId); return true; }
+  return false;
+}
 function transcreverAudiosDaCaixa({ db, itemId, fontes, notify, onFeito }) {
   const lista = (fontes || []).filter((f) => f && ehAudioDaCaixa(f.nome));
   if (!db || !itemId || !lista.length) return Promise.resolve(0);
   filaTranscricao = filaTranscricao.then(async () => {
-    let feitos = 0, falhas = 0;
+    let feitos = 0, falhas = 0, pulados = 0;
     for (let i = 0; i < lista.length; i++) {
       const f = lista[i];
+      if (await itemSaiuDaFila(db, itemId)) { pulados = lista.length - i; break; }
       TRANSCRICAO.mudar({ atual: i + 1, total: lista.length, arquivo: f.nome, baixando: TRANSCRICAO.estado?.baixando ?? null });
       try {
         const anterior = await db.from("caixa_entrada").select("conversa").contains("conversa", [{ meta: { tipo_operacional: "transcricao_audio", arquivo: f.nome } }]).limit(1);
@@ -2396,6 +2410,7 @@ function transcreverAudiosDaCaixa({ db, itemId, fontes, notify, onFeito }) {
       } catch (e) { falhas++; console.warn("transcrição", f.nome, e); }
     }
     TRANSCRICAO.mudar(null);
+    if (pulados && !feitos && !falhas) { if (onFeito) onFeito(); return 0; }
     if (notify) notify(falhas ? `Transcrevi ${feitos} áudio(s); ${falhas} não deu (o arquivo fica na Caixa pra ouvir).` : `${feitos} áudio(s) da Caixa viraram texto.`, falhas ? "error" : "ok");
     if (onFeito) onFeito();
     return feitos;
@@ -2406,9 +2421,9 @@ function transcreverAudiosDaCaixa({ db, itemId, fontes, notify, onFeito }) {
 const FILTRO_AUDIO_CAIXA = "texto.ilike.%.opus%,texto.ilike.%.ogg%,texto.ilike.%.m4a%,texto.ilike.%.mp3%,texto.ilike.%.aac%,texto.ilike.%.amr%,texto.ilike.%.wav%";
 async function itensComAudioRecentes(db) {
   const desde = new Date(Date.now() - 7 * 86400000).toISOString();
-  const { data, error } = await db.from("caixa_entrada").select("id,texto,conversa,criado_em,processado").gte("criado_em", desde).or(FILTRO_AUDIO_CAIXA).order("criado_em", { ascending: false });
+  const { data, error } = await db.from("caixa_entrada").select("id,texto,conversa,criado_em,processado,status").gte("criado_em", desde).or(FILTRO_AUDIO_CAIXA).order("criado_em", { ascending: false });
   if (error) throw error;
-  return (data || []).map((item) => ({ ...item, audios: parseInbox(item.texto || "").images.filter((img) => ehAudioDaCaixa(img.fileName)) })).filter((item) => item.audios.length);
+  return (data || []).filter((item) => item.status !== "descartado" && !itensForaDaFila.has(String(item.id))).map((item) => ({ ...item, audios: parseInbox(item.texto || "").images.filter((img) => ehAudioDaCaixa(img.fileName)) })).filter((item) => item.audios.length);
 }
 // Ao abrir o app: o que chegou antes do Whisper existir (ou com o app fechado no meio) vira texto também.
 let atrasadosJaRodou = false;
@@ -2425,7 +2440,9 @@ async function transcreverAudiosAtrasados(db, notify) {
     notify(`🎤 Transcrevendo ${total} áudio(s) da Caixa — deixe o app aberto.`, "info");
     let feitos = 0;
     for (const x of pendentes) feitos += await transcreverAudiosDaCaixa({ db, itemId: x.item.id, fontes: x.fontes, notify: null });
-    notify(`${feitos} de ${total} áudio(s) da Caixa viraram texto. Estão em Caixa › Áudios recentes.`, feitos === total ? "ok" : "error");
+    const restantes = pendentes.filter((x) => !itensForaDaFila.has(String(x.item.id))).reduce((n, x) => n + x.fontes.length, 0);
+    if (!restantes) return;
+    notify(`${feitos} de ${restantes} áudio(s) da Caixa viraram texto. Estão em Caixa › Áudios recentes.`, feitos >= restantes ? "ok" : "error");
   } catch (e) { console.warn("áudios atrasados", e); }
 }
 function FaixaTranscricao() {
@@ -4976,6 +4993,7 @@ function Home() {
     // Pendência de remarcação aberta nunca pode ser excluída — apagar faz o cliente desaparecer de novo.
     try { recusaSeForPendenciaAberta(item); } catch (e) { notify(e.message, "error"); return; }
     if (demo) { setInbox((items) => items.filter((entry) => entry.id !== item.id)); setSelectedId(null); notify("Na demonstração não salva.", "info"); return; }
+    tirarDaFilaDeAudio(item.id);
     const { error } = await db.from("caixa_entrada").delete().eq("id", item.id);
     if (error) notify("Erro: " + error.message, "error"); else { setSelectedId(null); await loadAll(); notify("Item excluído.", "ok"); }
   }
@@ -8582,6 +8600,7 @@ function CaixaFormBaixa({ item, modo, origem, meta, db, demo, notify, onFeito, o
     setBusy(true);
     try {
       await processarItemDaCaixa(db, item, { acao, nota, resposta, vinculos: modo === "cancelar_remarcacao" ? { remarcacao_cancelada: true } : {} });
+      if (acao === "descartado") tirarDaFilaDeAudio(item.id);
       notify(resposta ? "Resposta gravada e item concluído." : acao === "descartado" ? "Descartado. Saiu da fila." : "Resolvido. Saiu da fila.", "ok");
       onFeito();
     } catch (e) { notify("Nada foi baixado: " + e.message, "error"); }
