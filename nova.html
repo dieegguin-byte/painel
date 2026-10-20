@@ -604,11 +604,13 @@ button.sutil{opacity:.55;font-size:12px}
 @media(min-width:851px){.faixa-transcricao{left:auto;width:340px;bottom:76px}}
 .caixa-prints img{max-width:100%;max-height:360px;border-radius:10px;border:1px solid var(--line2)}
 .caixa-conversa{border-top:1px solid var(--line);padding-top:8px}
+.caixa-bloco{border:1px solid var(--line2);border-radius:12px;padding:8px 10px;min-width:0}.caixa-bloco>summary{cursor:pointer;font-weight:700;font-size:13px}.caixa-bloco[open]>summary{margin-bottom:8px}.caixa-bloco .caixa-resumo{font-weight:400;display:inline-block;max-width:calc(100% - 22px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}.caixa-recado-mais[open]{display:grid;gap:8px}
 .caixa-conversa summary{cursor:pointer;font-size:12px;color:var(--muted)}
 .caixa-conversa p{margin:6px 0 0;font-size:12px;color:var(--muted);white-space:pre-wrap;word-break:break-word}
 .caixa-conversa b{color:var(--text)}
 .caixa-acoes{display:flex;flex-wrap:wrap;gap:8px}
 .caixa-acoes button{flex:1 1 150px}
+.caixa-item .caixa-acoes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.caixa-item .caixa-acoes button{min-height:40px;padding:6px 8px;font-size:13px}
 .caixa-form{border-top:1px solid var(--line);padding-top:10px}.caixa-arquivo{font-size:11px;color:var(--muted);word-break:break-all}.caixa-recado{background:#d4a64e0f;border:1px solid #d4a64e44;border-radius:12px;padding:10px 12px}.caixa-recado .kicker{margin:0}
 /* EFEITOS VISUAIS (11/10/2026, Diego: "Sim os 6"). Só CSS, nada de biblioteca. Anima só transform e
    opacity, que o celular faz sem esforço. Quem liga "reduzir movimento" no celular fica sem nenhum. */
@@ -8602,6 +8604,7 @@ function CaixaView({ inbox, abrirId, customers, services, agenda, agendaBruta, d
   const [atualId, setAtualId] = useState(() => (IR_INICIAL === "caixa" && IR_ID ? IR_ID : abrirId || null)); // ?ir=caixa&id= abre direto no item
   useEffect(() => { if (abrirId) setAtualId(abrirId); }, [abrirId]);
   const [acao, setAcao] = useState(null);
+  const linkOrcamento = useLinkDoTopico(db, demo, "orcamento", TOPICO_ORCAMENTO_PADRAO);
   const achado = fila.findIndex((i) => i.id === atualId);
   const indice = achado >= 0 ? achado : 0;
   const item = fila[indice] || null;
@@ -8616,6 +8619,22 @@ function CaixaView({ inbox, abrirId, customers, services, agenda, agendaBruta, d
   const criado = item.criado_em ? new Date(item.criado_em) : null;
   const dias = criado ? Math.max(0, Math.floor((agora - criado.getTime()) / 86400000)) : null;
   const mensagens = comoLista(item.conversa).filter((m) => String(m?.texto || "").trim());
+  // CAIXA COMPACTA (Diego, 20/10/2026: "o card tem que ser tudo recolhível, ficar uma coisinha mais minimalista").
+  // Texto longo, imagens, áudios e conversa nascem fechados; abre só o que ele quiser.
+  const textoCurto = !p.text || (p.text.length <= 180 && p.text.split("\n").length <= 3);
+  const prints = p.images.filter((img) => !ehAudioDaCaixa(img.fileName));
+  // BOTÃO DO ORÇAMENTO ONLINE (Diego, 20/10/2026: "depois que eu gravasse, eu tivesse o botão que me levasse direto
+  // pro atendimento orçamento online, e aí eu pudesse falar sobre aquele caso específico"). Aparece quando o último
+  // recado dele diz Orçamento online; abre o tópico do orçamento com o caso copiado, pra colar e conversar.
+  const recadoOrcamento = [...comoLista(item.conversa)].reverse().find((m) => m?.meta?.tipo_operacional === "recado_caixa" && /orçamento online/i.test(String(m.texto || "")));
+  const casoCopiado = recadoOrcamento ? [
+    "Orçamento online da Caixa",
+    recadoOrcamento.meta?.cliente_nome ? "Cliente: " + recadoOrcamento.meta.cliente_nome : "",
+    String(recadoOrcamento.texto || "").replace(/\n/g, " · "),
+    p.text ? "Começo: " + p.text.slice(0, 200).replace(/\s+/g, " ") : "",
+    p.images.length ? `${p.images.length} arquivo(s)` : "",
+    "código caixa " + String(item.id).slice(0, 8),
+  ].filter(Boolean).join("\n") : "";
   const meta = tipo === "remarcacao" ? ultimaMetaRemarcacao(item) : null;
   const origem = meta?.agenda_origem_id ? (agendaBruta || []).find((a) => a.id === meta.agenda_origem_id) : null;
   const statusAntigo = item.status && item.status !== "novo" ? item.status : null;
@@ -8643,14 +8662,16 @@ function CaixaView({ inbox, abrirId, customers, services, agenda, agendaBruta, d
     </div>
     <article className="caixa-item">
       <div className="caixa-item-topo"><span className="status-pill">{info.icone} {info.rotulo}</span><time>{criado ? `${criado.toLocaleDateString("pt-BR")} · ${dias === 0 ? "hoje" : `há ${dias} dia(s)`}` : "sem data"}</time></div>
-      <p className="caixa-texto">{p.text || "(sem texto — só arquivo)"}</p>
-      {!!p.images.length && <div className="caixa-prints">{p.images.filter((img) => !ehAudioDaCaixa(img.fileName)).map((img) => <a key={img.url} href={img.url} target="_blank" rel="noreferrer"><img src={img.url} alt={img.fileName} /></a>)}</div>}
-      <AudiosDaCaixa item={item} imagens={p.images} db={db} demo={demo} notify={notify} onChanged={onChanged} />
+      {textoCurto ? <p className="caixa-texto">{p.text || "(sem texto — só arquivo)"}</p>
+        : <details className="caixa-bloco"><summary><span className="caixa-resumo">📝 {p.text.slice(0, 160)}</span></summary><p className="caixa-texto">{p.text}</p></details>}
+      {!!prints.length && <details className="caixa-bloco"><summary>🖼 {prints.length} {prints.length === 1 ? "imagem" : "imagens"}</summary><div className="caixa-prints">{prints.map((img) => <a key={img.url} href={img.url} target="_blank" rel="noreferrer"><img src={img.url} alt={img.fileName} /></a>)}</div></details>}
+      <AudiosDaCaixa item={item} imagens={p.images} db={db} demo={demo} notify={notify} onChanged={onChanged} fechado />
       {meta && <p className="ficha-note" style={{ margin: 0 }}>Compromisso original: {meta.titulo_original || "—"}{meta.data_original ? " · " + compactDate(meta.data_original) : ""}{origem ? ` · está ${origem.status}` : ""}{meta.motivo ? ` · motivo: ${meta.motivo}` : ""}</p>}
       {!!mensagens.length && <details className="caixa-conversa" open={tipo === "pergunta"}><summary>Conversa ({mensagens.length})</summary>
         {mensagens.map((m, i) => <p key={i}><b>{m.de || "?"}</b>{m.em ? " · " + new Date(m.em).toLocaleDateString("pt-BR") : ""}: {parseInbox(String(m.texto)).text || "(arquivo)"}</p>)}
       </details>}
       {statusAntigo && <p className="ficha-note" style={{ margin: 0 }}>Status antigo: {statusAntigo}</p>}
+      {recadoOrcamento && <BotaoClaude className="botao-orcamento-proposta" href={linkOrcamento} rotulo="✳ Falar com o orçamento sobre este caso" dica="o caso vai copiado, é só colar na conversa" copiar={casoCopiado} />}
       {!acao && <CaixaRecado item={item} customers={customers} db={db} demo={demo} notify={notify} onSalvo={() => { if (!demo) onChanged(); }} />}
       {!acao && <div className="caixa-acoes">{botoes}</div>}
       {acao === "compromisso" && <CaixaFormCompromisso {...comum} customers={customers} services={services} agenda={agenda} />}
@@ -8671,7 +8692,7 @@ function CaixaView({ inbox, abrirId, customers, services, agenda, agendaBruta, d
 // conversa exportada), pergunta "de quem é / o que é" e só salva no "Salvar na Caixa". É a mesma pergunta do
 // CaixaRecado, feita na hora certa: quando ele ainda lembra de que cliente é aquele comprovante.
 // Áudios do item da Caixa: tocar aqui mesmo e ler o que o Whisper escreveu. Os que ainda não têm texto ganham o botão.
-function AudiosDaCaixa({ item, imagens, db, demo, notify, onChanged }) {
+function AudiosDaCaixa({ item, imagens, db, demo, notify, onChanged, fechado = false }) {
   const audios = (imagens || []).filter((img) => ehAudioDaCaixa(img.fileName));
   const [rodando, setRodando] = useState(false);
   if (!audios.length) return null;
@@ -8682,7 +8703,7 @@ function AudiosDaCaixa({ item, imagens, db, demo, notify, onChanged }) {
     try { await transcreverAudiosDaCaixa({ db, itemId: item.id, fontes: semTexto.map((img) => ({ nome: img.fileName, url: img.url })), notify, onFeito: onChanged }); }
     finally { setRodando(false); }
   };
-  return <details className="caixa-audios" open={audios.length <= 6}>
+  return <details className="caixa-audios" open={!fechado && audios.length <= 6}>
     <summary>🎤 {audios.length} áudio(s){semTexto.length ? ` · ${semTexto.length} sem texto` : " · todos com texto"}</summary>
     {semTexto.length > 0 && <button type="button" className="secondary" disabled={rodando} onClick={transcrever}>{rodando ? "Transcrevendo…" : `🎤 Transcrever ${semTexto.length} áudio(s)`}</button>}
     {audios.map((img) => { const t = transcricaoDoArquivo(item.conversa, img.fileName); return <div key={img.url} className="caixa-audio">
@@ -8789,13 +8810,14 @@ function CaixaRecado({ item, customers, db, demo, notify, onSalvo }) {
     finally { setBusy(false); }
   };
   return <div className="caixa-form form-grid caixa-recado">
-    <p className="kicker">RECADO PRO CLAUDE · DE QUEM É / O QUE É</p>
-    <label>De quem é<select value={clienteId} onChange={(e) => setClienteId(e.target.value)}><option value="">Ainda não sei / não é de cliente</option>{clientes.map((c) => <option key={c.id} value={c.id}>{nomeDoCliente(c)}{c.telefone ? ` · ${c.telefone}` : ""}</option>)}</select></label>
-    <label>O que é</label>
+    <p className="kicker">RECADO PRO CLAUDE · O QUE É</p>
     <TiposDaCaixa valor={tipo} onChange={setTipo} />
-    <textarea value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy) salvar(); })} aria-label="Mais algum detalhe" placeholder="Mais algum detalhe? (opcional)" />
-    <GravadorAudio audio={null} onAudio={() => {}} somenteDitado rotulo="🎤 Falar o detalhe" onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={busy} />
-    <DicaEnter />
+    <details className="caixa-bloco caixa-recado-mais"><summary>{cliente ? `👤 ${nomeDoCliente(cliente)}` : "👤 De quem é"}{texto.trim() ? " · com detalhe" : ""}</summary>
+      <label>De quem é<select value={clienteId} onChange={(e) => setClienteId(e.target.value)}><option value="">Ainda não sei / não é de cliente</option>{clientes.map((c) => <option key={c.id} value={c.id}>{nomeDoCliente(c)}{c.telefone ? ` · ${c.telefone}` : ""}</option>)}</select></label>
+      <textarea value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy) salvar(); })} aria-label="Mais algum detalhe" placeholder="Mais algum detalhe? (opcional)" />
+      <GravadorAudio audio={null} onAudio={() => {}} somenteDitado rotulo="🎤 Falar o detalhe" onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={busy} />
+      <DicaEnter />
+    </details>
     <div className="ficha-actions"><button className="primary" onClick={salvar} disabled={busy}>{busy ? "Gravando…" : tipo && !texto.trim() ? `Gravar recado · ${tipo}` : "Gravar recado"}</button></div>
   </div>;
 }
