@@ -1814,6 +1814,7 @@ const demoAppointments = [
   { id: "a13", titulo: "🔥 Ligar pra Eloisa — fechar o sofá (aceitou a faixa da IA às 8h37)", data: hojeISO(), hora: "18:21", cidade: "Cidade Ocidental", local: "", tipo: "remoto", status: "planejado", servico_id: null },
       { id: "a12b", titulo: "Pagar a proteção do carro — boleto de outubro 190,70", data: hojeISO(), hora: "15:10", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", financeiro_id: "f4b" },
       { id: "a12", titulo: "Pagar Pix — Afibracom — R$ 100 (pedido 84697, 3 m Colorado Preto)", data: hojeISO(), hora: "14:27", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", servico_id: "s1" },
+  { id: "a16", titulo: "Responder a Joana — pode passar hoje pra buscar a almofada?", data: hojeISO(), hora: "08:20", cidade: "", local: null, tipo: "remoto", status: "planejado", servico_id: null, nota_claude: "Joana perguntou se pode passar hoje pra buscar a almofada. WhatsApp: https://wa.me/556199990000", nota_claude_conferida: true },
   { id: "a14", titulo: "Comprar aditivo Paraflu Ecoflu rosa", data: hojeISO(), hora: "12:30", cidade: "Luziânia", local: "", tipo: "presencial", status: "planejado", servico_id: null },
   { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", local: "Remoto / WhatsApp", tipo: "remoto", status: "planejado", servico_id: "s2" },
   // CARDS LIGADOS (14/10/2026): duas tarefas na mesma parada, 1 minuto uma da outra, título começando pela pessoa.
@@ -2097,6 +2098,15 @@ const RE_TRIAGEM_TEL = /^whatsapp:(\d{8,13})$/i;
 function ehEnvelopeDeTriagem(a) {
   if (RE_TRIAGEM_TEL.test(String((a && a.local) || "").trim())) return true;
   return /TRIAGEM TEMPOR/i.test((a && a.titulo) || "");
+}
+// LINK wa.me NA NOTA DO CARD (Diego, 20/10/2026, card "Responder a J — o rapaz pode passar hoje pra recolher a doação?":
+// "Cadê o botão do WhatsApp nesse card"). A rotina que cria o card sem ficha ligada escreve o contato na nota como
+// "WhatsApp: https://wa.me/<número>". Esse link é o contato que ela mesma escolheu, então vira o botão quando a ficha
+// não dá telefone. Só o link wa.me explícito conta: número solto no texto continua sem botão.
+const RE_WAME_NA_NOTA = /wa\.me\/\+?(\d{10,13})\b/i;
+function telefoneDaNota(a) {
+  const m = RE_WAME_NA_NOTA.exec(String((a && a.nota_claude) || ""));
+  return m ? telefoneWhatsapp(m[1]) : "";
 }
 function telefoneDaTriagem(a) {
   if (!ehEnvelopeDeTriagem(a)) return "";
@@ -7302,7 +7312,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   // e criar serviço falso pra fazer um botão nascer seria mentir no banco pra consertar tela.
   // A precedência é a mesma de sempre: quem tem serviço continua resolvendo pelo serviço.
   const cli = svc?.clientes || cliente;
-  const tel = telefoneWhatsapp(cli?.telefone) || telefoneDaTriagem(a);
+  const tel = telefoneWhatsapp(cli?.telefone) || telefoneDaTriagem(a) || telefoneDaNota(a);
   // Telefone técnico quebrado não pode sumir em silêncio: sem isso o envelope volta a parecer um card sem
   // WhatsApp, que é exatamente o defeito que estamos consertando. Erro visível vale mais que omissão.
   const triagemSemTelefone = !tel && ehEnvelopeDeTriagem(a);
