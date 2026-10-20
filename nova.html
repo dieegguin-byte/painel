@@ -604,6 +604,7 @@ button.sutil{opacity:.55;font-size:12px}
 @media(min-width:851px){.faixa-transcricao{left:auto;width:340px;bottom:76px}}
 .caixa-prints img{max-width:100%;max-height:360px;border-radius:10px;border:1px solid var(--line2)}
 .caixa-conversa{border-top:1px solid var(--line);padding-top:8px}
+.prof-contato{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}.prof-contato>span{display:grid;gap:2px;min-width:0}.prof-contato small{color:var(--muted);font-size:12px}.btn-wpp.prof-wpp{flex:0 0 auto;width:auto;min-width:0;max-width:60%;font-size:12px;padding:6px 10px;min-height:34px;white-space:nowrap}.prof-contato>span{flex:1 1 auto}.vale-fornecedor-head .prof-wpp{margin-left:auto}
 .caixa-bloco{border:1px solid var(--line2);border-radius:12px;padding:8px 10px;min-width:0}.caixa-bloco>summary{cursor:pointer;font-weight:700;font-size:13px}.caixa-bloco[open]>summary{margin-bottom:8px}.caixa-bloco .caixa-resumo{font-weight:400;display:inline-block;max-width:calc(100% - 22px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}.caixa-recado-mais[open]{display:grid;gap:8px}
 .caixa-conversa summary{cursor:pointer;font-size:12px;color:var(--muted)}
 .caixa-conversa p{margin:6px 0 0;font-size:12px;color:var(--muted);white-space:pre-wrap;word-break:break-word}
@@ -11650,7 +11651,15 @@ function ProfissionaisView({ finances, services, profissionais, db, demo, mode, 
     } catch (e) { notify("A operação ficou visível para retomada: " + e.message, "error"); } finally { setBusyId(null); }
   };
   const acertados = finances.filter((f) => f.categoria === CATEGORIA_MAO_DE_OBRA && (f.descricao || "").startsWith(MAO_DE_OBRA_ACERTADA_TAG));
+  // TELEFONE E WHATSAPP DE CADA PROFISSIONAL (20/10/2026: a Zapia confere o número por esta tela antes de mandar e
+  // bloqueou o recado do Marlom por não achar). Mesmo desenho da aba Fornecedores; número só do cadastro.
+  const contatoDe = (conta) => (profissionais || []).find((p) => (conta.id && p.id === conta.id) || chaveProfissional(p.nome || "") === chaveProfissional(conta.nome || "")) || null;
+  const botaoWpp = (p) => { const t = telefoneWhatsapp(p && p.telefone); return t ? <a className="btn-wpp prof-wpp" href={urlWhatsapp(t, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => vibrar(6)}>WhatsApp · {(corrigirTelefone(t) || t).replace(/^\+55\s*/, "")}</a> : null; };
+  const ativos = (profissionais || []).filter((p) => p && p.ativo !== false).sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
   return <div className="page-grid">
+    {ativos.length > 0 && <section className="content-card prof-contatos"><div className="card-head"><div><p className="kicker">CONTATO</p><h3>Telefone de cada profissional</h3></div></div>
+      {ativos.map((p) => <div key={p.id} className="prof-contato"><span><strong>{p.nome}</strong>{!telefoneWhatsapp(p.telefone) && <small>Sem telefone no cadastro</small>}</span>{botaoWpp(p)}</div>)}
+    </section>}
     <section className="metric-grid finance-metrics">
       <Metric label="Falta pagar de mão de obra" value={money(faltaTotal)} detail={`${qtdAbertos} em aberto${qtdSemValor ? ` · ${qtdSemValor} sem valor` : ""}`} tone={qtdSemValor ? "orange" : "yellow"} />
       <Metric label="Vales ainda soltos" value={money(valesSoltosTotal)} detail={contasComAlgo.filter((c) => c.somaVales > 0).map((c) => `${c.nome.split(" ")[0]} ${money(c.somaVales)}`).join(" · ") || `${qtdValesSoltos} vale(s) sem serviço`} tone="red" />
@@ -11697,7 +11706,7 @@ function ProfissionaisView({ finances, services, profissionais, db, demo, mode, 
         const chaveSoltos = "soltos-" + conta.chave;
         const liquidoAvulsos = Number((conta.somaAvulsos - conta.somaVales).toFixed(2));
         return <div key={conta.chave} className="vale-fornecedor">
-        <div className="vale-fornecedor-head"><strong>{conta.nome}</strong><b className={conta.total > 0 ? "saida" : ""}>{conta.total > 0 ? money(conta.total) + " a pagar" : conta.total < 0 ? money(-conta.total) + " de vale a descontar" : "quites"}</b></div>
+        <div className="vale-fornecedor-head"><strong>{conta.nome}</strong>{botaoWpp(contatoDe(conta))}<b className={conta.total > 0 ? "saida" : ""}>{conta.total > 0 ? money(conta.total) + " a pagar" : conta.total < 0 ? money(-conta.total) + " de vale a descontar" : "quites"}</b></div>
         {conta.total < 0 && <p className="ficha-note">Ele já recebeu {money(-conta.total)} adiantado{conta.servicos.some((l) => l.situacao === "sem_valor") ? " e nenhum serviço dele tem o combinado anotado — anote o R$ combinado e o vale desconta sozinho" : ""}. Nada a pagar por enquanto.</p>}
 
         {/* UMA LINHA POR SERVIÇO. Sem combinado, o campo pra anotar fica na própria linha: é um número só, e
