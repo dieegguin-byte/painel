@@ -222,9 +222,9 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .foco-nav{position:fixed;left:0;bottom:calc(12px + env(safe-area-inset-bottom));z-index:3;width:min(92vw,440px);box-sizing:border-box;display:flex;justify-content:flex-end;gap:8px;margin:0;padding:0 12px;pointer-events:none}
 .foco-nav button{pointer-events:auto;flex:0 1 auto;min-width:92px;padding:12px 10px;border-radius:12px;border:1px solid var(--line2);background:#1d1714f2;color:var(--text);font-size:13px;font-weight:600;box-shadow:0 6px 18px #0009}
 .compromisso-card.em-foco{margin-bottom:74px}
-.foco-nav button.foco-voltar{color:var(--orange2)}
+.foco-nav button.foco-voltar{color:var(--orange2)}.foco-nav.voltar-grande{position:static;width:auto;justify-content:center;margin:18px 0 calc(24px + env(safe-area-inset-bottom));padding:0;pointer-events:auto}.foco-nav.voltar-grande button.foco-voltar{flex:1 1 auto;min-height:60px;font-size:18px;font-weight:800;border-radius:16px;box-shadow:none}
 .foco-dica{display:block;margin-top:2px;font-size:11px;color:var(--muted);opacity:.8}
-.foco-deslize{min-height:calc(100% - 140px);padding-bottom:70px}
+.foco-deslize{padding-bottom:0}
 .proposta-wpp{display:block;margin-top:10px}
 .foco-nav button:disabled{opacity:.3;cursor:default}
 .compromisso-card.em-foco .compromisso-cab{cursor:default}
@@ -7641,8 +7641,10 @@ function FocoDoCard({ props, onFechar }) {
     <div className="foco-deslize" onTouchStart={gestoInicio} onTouchMove={gestoMove} onTouchEnd={gestoFim} onTouchCancel={() => { toque.current = null; }}>
       <CompromissoCard {...props} emFoco onSairFoco={onFechar} />
     </div>
-    <div className="foco-nav">
-      <button type="button" className="foco-voltar" onClick={onFechar}>Voltar</button>
+    {/* VOLTAR GRANDE (Diego, 20/10/2026, print com o lugar marcado: "coloque botão voltar aqui maior"). Saiu do canto
+        de baixo e virou um botão largo logo embaixo do card. */}
+    <div className="foco-nav voltar-grande">
+      <button type="button" className="foco-voltar" onClick={onFechar}>← Voltar</button>
     </div>
   </ListaLateral>;
 }
