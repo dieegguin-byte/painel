@@ -1133,7 +1133,7 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .checklist-entrega p{margin:8px 0 0;font-size:13px;color:#cfe6d6}
 .botao-manu{margin:0 0 10px}
 .recado-manu-secao{margin:0 0 12px}
-.botao-claude.botao-orcamento{margin-bottom:12px}.botao-claude.botao-orcamento-proposta{flex-direction:column;gap:2px;margin-top:10px;padding:10px 12px;text-align:center}.botao-claude.compacto{flex:none;align-self:flex-start;min-height:34px;padding:4px 12px;font-size:12px}
+.botao-claude.botao-orcamento{margin-bottom:12px}.botao-claude.botao-balanco{margin:0 0 4px;justify-self:start;align-self:flex-start}.botao-claude.botao-app{width:100%;justify-content:center;margin:0 0 10px}.botao-claude.botao-presencial{margin-top:6px}.botao-claude.botao-orcamento-proposta{flex-direction:column;gap:2px;margin-top:10px;padding:10px 12px;text-align:center}.botao-claude.compacto{flex:none;align-self:flex-start;min-height:34px;padding:4px 12px;font-size:12px}
 .card-acoes-botoes.linha button{padding:0 4px;font-size:11px;letter-spacing:0;white-space:nowrap;min-width:0;overflow:hidden}
 .card-acoes-botoes button.ativo{border-color:var(--orange);color:var(--orange2)}
 .card-recado{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:#ffffff06;border:1px dashed var(--line2)}
@@ -4831,6 +4831,7 @@ function Home() {
   // compromisso com pendência de remarcação aberta; Agenda, rota, Compras e o seletor de horário do
   // "+ Adicionar" continuavam mostrando/permitindo agendar em cima de um compromisso fantasma.
   const acoesAgenda = useRecadosAgenda({ db, demo, session, notify, onChanged: loadAll, setAppointments, recarga: recargaN });
+  const linkApp = useLinkDoTopico(db, demo, "app", TOPICO_APP_PADRAO); // também carrega os links de todos os botões de tópico
   // REMARCAR SOME DA TELA (Diego, 11/10: "no remarcar também pode sumir... só não pode sumir das suas vistas").
   // O card continua planejado no banco e o recado aberto em agenda_recados: a rotina do Claude acha os dois e
   // move. Até lá ele sai de toda tela, como a pendência da Regra Nº 12 — por isso o filtro é aqui, na coleção
@@ -5482,6 +5483,7 @@ function Home() {
     {maisAberto && <div className="modal-overlay mais-overlay" onClick={() => setMaisAberto(false)}><div className="modal-card mais-card" onClick={(e) => e.stopPropagation()}>
       <p className="kicker">MAIS TELAS</p>
       <button type="button" className="ghost wide calc-atalho" onClick={() => { setMaisAberto(false); setCalcAberta(true); }}>🧮 Calculadora rápida de orçamento</button>
+      <BotaoClaude className="botao-app" href={linkApp} rotulo="🛠 Ajuste no app" />
       <div className="mais-grade">{nav.filter((item) => !NAV_BARRA.includes(item.id)).map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => { setMaisAberto(false); irParaAba(item); }}><i>{item.icon}</i><span>{item.label}</span>{item.count ? <b>{item.count}</b> : null}</button>)}</div>
     </div></div>}
     {/* AGENDA POR CIMA DO PAINEL (arrastar pra direita). Fica ANTES das fichas/modais no DOM: assim o voltar fecha
@@ -7031,18 +7033,32 @@ function BotaoClaude({ copiar = "", className = "", href = LINK_CLAUDE, rotulo =
 // novo, a sessão que assumir troca com um UPDATE no banco e o botão já abre o tópico novo, sem publicar o app. O valor
 // fixo aqui é só a reserva pra quando o banco não responde.
 const TOPICO_ORCAMENTO_PADRAO = "https://claude.ai/code/project/chan_01SdFSA5KsWwgW6FGEucUZeN?thread=cmsg_01SdFSA5KsWwgW6FGEucUZeN9GQSBQ7dSbFXEq8fssKRaQ";
-function useLinkDoTopico(db, demo, chave, padrao) {
-  const [url, setUrl] = useState(padrao);
-  useEffect(() => {
-    if (demo || !db) return;
-    let vivo = true;
+// BOTÕES PARA OS TÓPICOS (Diego, 20/10/2026: "um botão que leve aos threads", escolheu os 5 no cartão). Cada
+// tópico tem a sua chave em config.ajustes.links; o banco é lido uma vez só e todos os botões ouvem a mesma leitura.
+const PROJETO_TOPICO = "https://claude.ai/code/project/chan_01SdFSA5KsWwgW6FGEucUZeN?thread=";
+const TOPICO_MANU_PADRAO = PROJETO_TOPICO + "cmsg_01SdFSA5KsWwgW6FGEucUZeNVoZDxdBWYe7tmvLGV4ap7a";
+const TOPICO_PRESENCIAL_PADRAO = PROJETO_TOPICO + "cmsg_01SdFSA5KsWwgW6FGEucUZeNRCGSftWGQCQsV8xFbTdXTV";
+const TOPICO_BALANCO_PADRAO = PROJETO_TOPICO + "cmsg_01SdFSA5KsWwgW6FGEucUZeNWWxVz2p1SP2x67bHWqr4ja";
+const TOPICO_APP_PADRAO = PROJETO_TOPICO + "cmsg_01SdFSA5KsWwgW6FGEucUZeNLq6m2op4pasBQmWHpBarff";
+const LINKS_TOPICO = { dados: {}, lido: false, ouvintes: new Set(),
+  carregar(db) {
+    if (this.lido || !db) return;
+    this.lido = true;
     db.from("config").select("ajustes").eq("id", 1).maybeSingle().then(({ data }) => {
-      const u = data && data.ajustes && data.ajustes.links && data.ajustes.links[chave] && data.ajustes.links[chave].url;
-      if (vivo && /^https:\/\/claude\.ai\//.test(u || "")) setUrl(u);
-    }, () => {});
-    return () => { vivo = false; };
-  }, [db, demo, chave]);
-  return url;
+      this.dados = (data && data.ajustes && data.ajustes.links) || {};
+      this.ouvintes.forEach((f) => f());
+    }, () => { this.lido = false; });
+  } };
+function useLinkDoTopico(db, demo, chave, padrao) {
+  const [, setN] = useState(0);
+  useEffect(() => {
+    const f = () => setN((n) => n + 1);
+    LINKS_TOPICO.ouvintes.add(f);
+    if (!demo) LINKS_TOPICO.carregar(db);
+    return () => { LINKS_TOPICO.ouvintes.delete(f); };
+  }, [db, demo]);
+  const u = !demo && LINKS_TOPICO.dados[chave] && LINKS_TOPICO.dados[chave].url;
+  return /^https:\/\/claude\.ai\//.test(u || "") ? u : padrao;
 }
 // Por onde o dinheiro de cliente entra. Cartão passa na maquininha da InfinitePay e cai na mesma conta do Pix de lá.
 const FORMAS_RECEBIMENTO = [
@@ -7068,7 +7084,11 @@ const FORMAS_PAGAMENTO_COMPRA = [
   { nome: "Dinheiro", conta: (pessoal) => (pessoal ? "dinheiro_pessoal" : "dinheiro_pj") },
   { nome: "Cartão", conta: "cartao_credito" },
 ];
+// Visita na casa do cliente pra ver, medir ou orçar: o botão leva ao tópico do Orçamento presencial.
+const RE_VISITA_ORCAMENTO = /visita|or[çc]amento|medir|medida|avaliar|ver o (sof|estofad|banco|cadeir|poltron)/i;
+function ehVisitaDeOrcamento(a) { return a && a.tipo === "presencial" && RE_VISITA_ORCAMENTO.test(String(a.titulo_visivel || a.titulo || "")); }
 function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "", temMaterial = false }) {
+  const linkPresencial = useLinkDoTopico(null, false, "presencial", TOPICO_PRESENCIAL_PADRAO);
   const [texto, setTexto] = useState("");
   const [audio, setAudio] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -7208,6 +7228,7 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "", temMaterial 
     {/* O CONTEXTO DO CARD VAI JUNTO (Diego, 17/10/2026: "se conseguisse carregar o contexto do card seria bem melhor"):
         título, data, cliente, serviço, o que fazer e o id curto vão copiados; ele só cola na conversa. */}
     {!modo && <BotaoClaude copiar={contextoClaude || `Sobre o card "${a.titulo_visivel || a.titulo || ""}"\n\n`} />}
+    {!modo && ehVisitaDeOrcamento(a) && <BotaoClaude className="botao-presencial" href={linkPresencial} rotulo="✳ Orçamento presencial" copiar={contextoClaude || `Sobre a visita "${a.titulo_visivel || a.titulo || ""}"\n\n`} />}
     {!modo && !a.pessoal && acoes.pedirManu && (pedidoManu
       ? <div className={`com-manu${pedidoManu.processado ? " visto" : ""}`}><b>🤖 Com a Manu</b>
         <span>{respostaManu ? `Manu: ${String(respostaManu.texto).slice(0, 240)}` : pedidoManu.processado ? "✓ Manu viu." : "Ela te mostra nos Cartões pra você como vai falar, e você confirma, muda ou cancela."}</span></div>
@@ -9551,12 +9572,13 @@ function DuvidasAgenteCard({ duvidas, inbox = [], today, db, demo, notify, custo
   const abertas = (duvidas || []).filter((d) => d.status === "aberta").sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em)));
   const caixa = (inbox || []).filter((it) => it && it.status === "aguardando_voce" && !it.processado).sort((a, b) => String(a.criado_em).localeCompare(String(b.criado_em)));
   const total = abertas.length + caixa.length;
+  const linkManu = useLinkDoTopico(db, demo, "manu", TOPICO_MANU_PADRAO);
   if (!total) return null;
   const nomeDe = (id) => { const c = (customers || []).find((x) => x.id === id); return c ? nomeDoCliente(c) : null; };
   return <section className="content-card resumo-card duvidas-card">
     <div className="resumo-topo"><div><p className="kicker">CARTÕES PRA VOCÊ</p>
       <h3>{total} pergunta{total === 1 ? "" : "s"} pra você</h3>
-      <small>Toque numa opção ou fale no 🎤. Respondeu, some daqui e a Manu aplica na próxima rodada.</small></div><BotaoClaude className="compacto" /></div>
+      <small>Toque numa opção ou fale no 🎤. Respondeu, some daqui e a Manu aplica na próxima rodada.</small></div><BotaoClaude className="compacto" href={linkManu} rotulo="✳ Manu" /></div>
     {abertas.map((d) => <DuvidaItem key={d.id} d={d} today={today} db={db} demo={demo} notify={notify} nome={d.cliente_id ? nomeDe(d.cliente_id) : null} telefone={d.cliente_id ? ((customers || []).find((x) => x.id === d.cliente_id) || {}).telefone : null} onOpenFicha={onOpenFicha} onChanged={onChanged} />)}
     {caixa.map((it) => <DuvidaItem key={"cx-" + it.id} d={{ id: it.id, origem: "caixa", pergunta: perguntaDaCaixa(it), contexto: null, opcoes: /lan[cç]o assim/i.test(perguntaDaCaixa(it)) ? ["Sim, lança assim", "Não"] : [], criado_em: it.criado_em, cliente_id: null }} caixaItem={it} today={today} db={db} demo={demo} notify={notify} nome={null} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />)}
   </section>;
@@ -9567,6 +9589,7 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, telefo
   const [opcao, setOpcao] = useState(null);
   const [sempre, setSempre] = useState(false);
   const [busy, setBusy] = useState(false);
+  const linkManu = useLinkDoTopico(db, demo, "manu", TOPICO_MANU_PADRAO);
   const opcoes = Array.isArray(d.opcoes) ? d.opcoes.map((o) => String(o)).filter(Boolean) : [];
   const resposta = [opcao, texto.trim()].filter(Boolean).join(" — ");
   const origem = String(d.origem || "agente").toLowerCase();
@@ -9616,6 +9639,7 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, telefo
         com ele ou não"). Mesmo transporte dos outros botões: Business, ou o WhatsApp comum pra quem é exceção. */}
     {telVai && <a className="btn-wpp duvida-wpp" href={urlWhatsapp(telVai, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => vibrar(6)}>WhatsApp{nome ? ` · ${nome.split(" ")[0]}` : ""} · {digitos(telVai)}</a>}
     {discordam && <a className="btn-wpp duvida-wpp" href={urlWhatsapp(telFicha, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => vibrar(6)}>Ficha · {digitos(telFicha)}</a>}
+    <BotaoClaude className="compacto" href={linkManu} rotulo="✳ Falar com a Manu" dica="" copiar={`Sobre o cartão da Manu: "${d.pergunta}"${nome ? " · " + nome : ""} · código ${String(d.id).slice(0, 8)}\n\n`} />
     </div>
     {discordam && <p className="duvida-aviso-numero">⚠ O texto vai pro {digitos(telTexto)}, mas a ficha tem {digitos(telFicha)}. Confira antes de mandar.</p>}
     {caixaItem && onAbrirCaixa && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onAbrirCaixa(); }}>Ver na Caixa ›</button>}
@@ -11282,6 +11306,7 @@ function FinanceView({ finances, dividas, services, db, demo, mode, notify, onCh
   // linha curta (quem · valor · data). A observação inteira e o seletor de conta ficam ATRÁS de um toque — o
   // seletor exposto em toda linha era onde ele clicava errado sem querer.
   const [abertoId, setAbertoId] = useState(null);
+  const linkBalanco = useLinkDoTopico(db, demo, "balanco", TOPICO_BALANCO_PADRAO);
   const [trocandoConta, setTrocandoConta] = useState(null); // o seletor só aparece depois de tocar em "trocar"
   const contaNome = (id) => (CONTAS_BANCARIAS.find((c) => c.id === id) || {}).nome || "";
   const tituloLista = ehProLabore ? "Retiradas de pró-labore" : focoAtivo === "entrada" ? "Entradas confirmadas" : focoAtivo === "saida" ? "Saídas confirmadas" : "Lançamentos";
@@ -11292,6 +11317,7 @@ function FinanceView({ finances, dividas, services, db, demo, mode, notify, onCh
       <button type="button" className="ghost" onClick={() => andarMes(1)} disabled={!mesSel} title="Próximo mês">›</button>
       <button type="button" className={`ghost${mesSel ? "" : " active"}`} onClick={() => setMesSel(mesSel ? "" : mesISO(hojeISO()))}>{mesSel ? "Ver tudo" : "Voltar pro mês"}</button>
     </div>
+    <BotaoClaude className="compacto botao-balanco" href={linkBalanco} rotulo="✳ Falar com o balanço" />
     {ehProLabore ? <section className="metric-grid finance-metrics">
       <Metric label={mesSel ? "Pró-labore do mês" : "Pró-labore — todo o histórico"} value={money(paidIn)} detail={`${visiveis.length} retirada(s) · gastos pessoais e dízimo ficam na aba Pessoal`} tone="green" />
     </section> : <>
