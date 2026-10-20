@@ -1174,6 +1174,7 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .duvida-quando{display:block;font-size:11px;color:var(--dim);margin-top:4px}
 .duvida-opcoes{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
 .duvida-opcoes button{border:1px solid var(--line2);background:var(--surface2);color:var(--cream);border-radius:999px;padding:8px 13px;font-size:13px;min-height:38px}
+.caixa-tipos{margin-top:0}
 .duvida-opcoes button.ativo{background:#c95f2e;color:#fff;border-color:#db7542}
 .duvida textarea{display:block;width:100%;margin-top:9px;min-height:64px;resize:vertical;background:#0f0d0c;border:1px solid var(--line2);color:var(--text);border-radius:10px;padding:10px 11px;outline:0;font-size:14px;line-height:1.45}
 .duvida textarea:focus{border-color:#d37742;box-shadow:0 0 0 3px #d86d3619}
@@ -8715,16 +8716,25 @@ function AudiosRecentesDaCaixa({ db, demo, notify }) {
     </div>)}
   </section>;
 }
+// O QUE É COM UM TOQUE (Diego, 20/10/2026: "Por que não deixa eu gravar sem escrever nada" / "Quase sempre que eu
+// vou mandar para a caixa é orçamento online" / "Na hora"). "Orçamento online" já vem marcado, no compartilhar e no
+// recado do item: um toque em Salvar e pronto. Tocar de novo desmarca; o texto, se ele escrever, vai junto.
+const TIPOS_DA_CAIXA = ["Orçamento online", "Comprovante", "Conversa de cliente", "Material / compra"];
+function TiposDaCaixa({ valor, onChange }) {
+  return <div className="duvida-opcoes caixa-tipos">{TIPOS_DA_CAIXA.map((t) => <button key={t} type="button" className={valor === t ? "ativo" : ""} onClick={() => onChange(valor === t ? "" : t)}>{t}</button>)}</div>;
+}
+function oQueEDaCaixa(tipo, texto) { return [tipo, String(texto || "").trim()].filter(Boolean).join(" · "); }
 function ConfirmarCompartilhamento({ pendente, customers, onSalvar, onFechar, notify }) {
   const [clienteId, setClienteId] = useState("");
   const [texto, setTexto] = useState("");
+  const [tipo, setTipo] = useState(TIPOS_DA_CAIXA[0]);
   const [busy, setBusy] = useState(false);
   const clientes = useMemo(() => [...(customers || [])].sort((a, b) => nomeDoCliente(a).localeCompare(nomeDoCliente(b), "pt-BR")), [customers]);
   const textoCompartilhado = String(pendente.carga?.texto || "").trim();
   const conversaExportada = String(pendente.textoDeArquivos || "").trim();
   const salvar = async () => {
     setBusy(true);
-    try { await onSalvar({ clienteId, texto }); }
+    try { await onSalvar({ clienteId, texto: oQueEDaCaixa(tipo, texto) }); }
     catch (e) { notify("Não consegui salvar na Caixa: " + e.message + " — a carga continua guardada no aparelho.", "error"); }
     finally { setBusy(false); }
   };
@@ -8738,9 +8748,11 @@ function ConfirmarCompartilhamento({ pendente, customers, onSalvar, onFechar, no
         {!!textoCompartilhado && <p className="caixa-texto">{textoCompartilhado.slice(0, 600)}{textoCompartilhado.length > 600 ? "…" : ""}</p>}
         {!!conversaExportada && <p className="ficha-note" style={{ margin: 0 }}>Conversa exportada: {conversaExportada.length.toLocaleString("pt-BR")} caracteres lidos do arquivo.</p>}
         <label>De quem é<select value={clienteId} onChange={(e) => setClienteId(e.target.value)}><option value="">Ainda não sei / não é de cliente</option>{clientes.map((c) => <option key={c.id} value={c.id}>{nomeDoCliente(c)}{c.telefone ? ` · ${c.telefone}` : ""}</option>)}</select></label>
-        <label>O que é<textarea value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Ex.: comprovante do Pix da entrada do sofá; conversa inteira do orçamento; print do endereço" /></label>
+        <label>O que é</label>
+        <TiposDaCaixa valor={tipo} onChange={setTipo} />
+        <textarea value={texto} onChange={(e) => setTexto(e.target.value)} aria-label="Mais algum detalhe" placeholder="Mais algum detalhe? (opcional)" />
         <div className="ficha-actions">
-          <button className="primary" onClick={salvar} disabled={busy}>{busy ? "Salvando…" : (texto.trim() || clienteId) ? "Salvar na Caixa com o recado" : "Salvar na Caixa sem anotar"}</button>
+          <button className="primary" onClick={salvar} disabled={busy}>{busy ? "Salvando…" : (oQueEDaCaixa(tipo, texto) || clienteId) ? `Salvar na Caixa${tipo ? " · " + tipo : " com o recado"}` : "Salvar na Caixa sem anotar"}</button>
         </div>
         <p className="ficha-note" style={{ margin: 0 }}>Nada é lançado sozinho: fica na Caixa até o Claude processar com o seu recado.</p>
       </div>
@@ -8752,19 +8764,21 @@ function CaixaRecado({ item, customers, db, demo, notify, onSalvo }) {
   const ultimo = [...comoLista(item.conversa)].reverse().find((m) => m?.meta?.tipo_operacional === "recado_caixa");
   const [clienteId, setClienteId] = useState(ultimo?.meta?.cliente_id || "");
   const [texto, setTexto] = useState("");
+  const [tipo, setTipo] = useState(TIPOS_DA_CAIXA[0]);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { setClienteId(ultimo?.meta?.cliente_id || ""); setTexto(""); }, [item.id]);
+  useEffect(() => { setClienteId(ultimo?.meta?.cliente_id || ""); setTexto(""); setTipo(TIPOS_DA_CAIXA[0]); }, [item.id]);
   const clientes = useMemo(() => [...(customers || [])].sort((a, b) => nomeDoCliente(a).localeCompare(nomeDoCliente(b), "pt-BR")), [customers]);
   const cliente = clientes.find((c) => c.id === clienteId) || null;
   const salvar = async () => {
-    if (!texto.trim() && !clienteId) { notify("Escolha o cliente ou escreva o que é.", "error"); return; }
+    const oQueE = oQueEDaCaixa(tipo, texto);
+    if (!oQueE && !clienteId) { notify("Toque em Orçamento online (ou outro) ou escolha o cliente.", "error"); return; }
     if (demo) { notify("Na demonstração não salva.", "info"); return; }
     setBusy(true);
     try {
       // Relê antes de gravar: o Claude ou outra tela pode ter escrito em conversa[] enquanto isto ficou aberto.
       const { data: atual, error: leituraErr } = await db.from("caixa_entrada").select("conversa").eq("id", item.id).single();
       if (leituraErr) throw leituraErr;
-      const partes = [cliente ? `De quem é: ${nomeDoCliente(cliente)}${cliente.telefone ? " · " + cliente.telefone : ""}` : "", texto.trim() ? `O que é: ${texto.trim()}` : ""].filter(Boolean);
+      const partes = [cliente ? `De quem é: ${nomeDoCliente(cliente)}${cliente.telefone ? " · " + cliente.telefone : ""}` : "", oQueE ? `O que é: ${oQueE}` : ""].filter(Boolean);
       const mensagem = { de: "diego", texto: partes.join("\n"), em: new Date().toISOString(), meta: { tipo_operacional: "recado_caixa", cliente_id: clienteId || null, cliente_nome: cliente ? nomeDoCliente(cliente) : null } };
       const { error } = await db.from("caixa_entrada").update({ conversa: [...comoLista(atual?.conversa), mensagem] }).eq("id", item.id);
       if (error) throw error;
@@ -8777,10 +8791,12 @@ function CaixaRecado({ item, customers, db, demo, notify, onSalvo }) {
   return <div className="caixa-form form-grid caixa-recado">
     <p className="kicker">RECADO PRO CLAUDE · DE QUEM É / O QUE É</p>
     <label>De quem é<select value={clienteId} onChange={(e) => setClienteId(e.target.value)}><option value="">Ainda não sei / não é de cliente</option>{clientes.map((c) => <option key={c.id} value={c.id}>{nomeDoCliente(c)}{c.telefone ? ` · ${c.telefone}` : ""}</option>)}</select></label>
-    <label>O que é<textarea value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy) salvar(); })} placeholder="Ex.: comprovante do Pix da entrada do sofá; conversa inteira do orçamento; print do endereço" /></label>
-    <GravadorAudio audio={null} onAudio={() => {}} somenteDitado rotulo="🎤 Gravar" onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={busy} />
+    <label>O que é</label>
+    <TiposDaCaixa valor={tipo} onChange={setTipo} />
+    <textarea value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy) salvar(); })} aria-label="Mais algum detalhe" placeholder="Mais algum detalhe? (opcional)" />
+    <GravadorAudio audio={null} onAudio={() => {}} somenteDitado rotulo="🎤 Falar o detalhe" onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={busy} />
     <DicaEnter />
-    <div className="ficha-actions"><button className="primary" onClick={salvar} disabled={busy}>{busy ? "Gravando…" : "Gravar recado"}</button></div>
+    <div className="ficha-actions"><button className="primary" onClick={salvar} disabled={busy}>{busy ? "Gravando…" : tipo && !texto.trim() ? `Gravar recado · ${tipo}` : "Gravar recado"}</button></div>
   </div>;
 }
 
