@@ -604,6 +604,7 @@ button.sutil{opacity:.55;font-size:12px}
 @media(min-width:851px){.faixa-transcricao{left:auto;width:340px;bottom:76px}}
 .caixa-prints img{max-width:100%;max-height:360px;border-radius:10px;border:1px solid var(--line2)}
 .caixa-conversa{border-top:1px solid var(--line);padding-top:8px}
+.resposta-diego .resposta-quando{margin:0;font-weight:700;color:#9fd9b4}
 .prof-contato{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}.prof-contato>span{display:grid;gap:2px;min-width:0}.prof-contato small{color:var(--muted);font-size:12px}.btn-wpp.prof-wpp{flex:0 0 auto;width:auto;min-width:0;max-width:60%;font-size:12px;padding:6px 10px;min-height:34px;white-space:nowrap}.prof-contato>span{flex:1 1 auto}.vale-fornecedor-head .prof-wpp{margin-left:auto}
 .caixa-bloco{border:1px solid var(--line2);border-radius:12px;padding:8px 10px;min-width:0}.caixa-bloco>summary{cursor:pointer;font-weight:700;font-size:13px}.caixa-bloco[open]>summary{margin-bottom:8px}.caixa-bloco .caixa-resumo{font-weight:400;display:inline-block;max-width:calc(100% - 22px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}.caixa-recado-mais[open]{display:grid;gap:8px}
 .caixa-conversa summary{cursor:pointer;font-size:12px;color:var(--muted)}
@@ -4416,6 +4417,7 @@ function Home() {
   // a aba "Conferência" no `nav`, o resumo do Painel, a renderização da aba e o `onConferir` da ficha.
   const [notice, setNotice] = useState(null);
   const [maisAberto, setMaisAberto] = useState(false); // menu "Mais" da barra de baixo (Painel único, 11/10/2026)
+  const [respostaId, setRespostaId] = useState(() => { if (IR_INICIAL !== "resposta" || !IR_ID) return null; consumirIrInicial(); return IR_ID; });
   const [calcAberta, setCalcAberta] = useState(() => IR_INICIAL === "calculadora"); // Calculadora rápida (Diego, 16/10/2026); atalho do ícone abre direto nela
   const [listaLateral, setListaLateral] = useState(false); // Agenda por cima do Painel, aberta arrastando pra direita (15/10/2026)
   const [search, setSearch] = useState("");
@@ -5491,6 +5493,7 @@ function Home() {
         primeiro o que foi aberto de dentro dela (reagendar, concluir, adicionar) e só depois a própria lista. */}
     {listaLateral && <ListaLateral kicker="ARRASTOU PARA A DIREITA" titulo="Agenda" onFechar={() => setListaLateral(false)}><BarreiraDaAba nome="A agenda" onFechar={() => setListaLateral(false)}><AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} db={db} demo={demo} notify={notify} onChanged={loadAll} /></BarreiraDaAba></ListaLateral>}
     {/* As janelas por cima também têm barreira própria: ficha com dado ruim fecha sozinha, não o app. */}
+    {respostaId && <RespostaDoDiego db={db} demo={demo} id={respostaId} onFechar={() => setRespostaId(null)} />}
     {calcAberta && <BarreiraDaAba nome="A calculadora" onFechar={() => setCalcAberta(false)}><CalculadoraRapida onFechar={() => setCalcAberta(false)} notify={notify} /></BarreiraDaAba>}
     {showGuia && <BarreiraDaAba nome="O guia da IA" onFechar={() => setShowGuia(false)}><GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} /></BarreiraDaAba>}
     {compartilhamentoPendente && <ConfirmarCompartilhamento pendente={compartilhamentoPendente} customers={customers} onSalvar={salvarCompartilhamento} onFechar={fecharCompartilhamento} notify={notify} />}
@@ -7778,6 +7781,7 @@ const IR_SECAO = { atrasados: "secao-vencendo", hoje: "secao-hoje", propostas: "
 //   ?ir=proposta&id=<propostas.id>  a proposta aberta · ?ir=propostas  o card das propostas
 //   ?ir=manu                        a seção da Manu (Cartões pra você, recado)
 //   ?ir=caixa&id=<caixa_entrada.id> o item da Caixa · ?ir=ficha&id=<clientes.id>  a ficha
+//   ?ir=resposta&id=<duvidas_agente.id>  o cartão de envio respondido: opção tocada, dia e hora (RespostaDoDiego)
 const IR_ID = (() => { try { return new URL(location.href).searchParams.get("id"); } catch (e) { return null; } })();
 const IR_GRUPO = { manu: "grupo-manu" };
 function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null }) {
@@ -10461,6 +10465,37 @@ function calcularOrcamento({ mo, material, divisor, frete, ajudante, viagem }) {
   const pix = Math.round(total / 50) * 50;
   const parcela = Math.round(pix / CALC_TAXA_CARTAO / 6);
   return { custo, base, extraAjudante, total, pix, parcela, cartao: parcela * 6 };
+}
+// RESPOSTA DO DIEGO POR LINK (20/10/2026: a Zapia só manda recado com o toque dele visível no app, com dia e hora).
+// ?ir=resposta&id=<duvidas_agente.id> abre o cartão de envio já respondido: o que foi perguntado, o texto que vai,
+// a opção que ele tocou e quando. Lê a linha direto do banco, em qualquer status (respondida, aplicada, descartada).
+const STATUS_RESPOSTA = { aberta: "Ainda sem resposta", respondida: "Respondida, esperando a Manu", aplicada: "Respondida e já aplicada pela Manu", descartada: "Pulada (não manda)" };
+function RespostaDoDiego({ db, demo, id, onFechar }) {
+  const [d, setD] = useState(undefined);
+  useEffect(() => {
+    if (demo) { setD((demoDuvidas || []).find((x) => String(x.id) === String(id)) || null); return; }
+    if (!db) return;
+    db.from("duvidas_agente").select("id,pergunta,contexto,opcoes,resposta,status,respondido_em,aplicado_em,criado_em").eq("id", id).maybeSingle()
+      .then(({ data }) => setD(data || null), () => setD(null));
+  }, [db, demo, id]);
+  const quando = (v) => v ? new Date(v).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+  const opcoes = d && Array.isArray(d.opcoes) ? d.opcoes.map(String) : [];
+  const resposta = d ? String(d.resposta || "") : "";
+  const tocada = opcoes.find((o) => resposta === o || resposta.startsWith(o + " — ")) || null;
+  const extra = tocada ? resposta.slice(tocada.length).replace(/^ — /, "") : resposta;
+  return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onFechar(); }}>
+    <div className="modal-card small resposta-diego">
+      <div className="modal-head"><div><p className="kicker">CARTÃO DE ENVIO · RESPOSTA DO DIEGO</p><h2>{d === undefined ? "Abrindo…" : d ? (tocada || (resposta ? "Respondeu" : "Sem resposta")) : "Não achei"}</h2></div><button className="ghost" onClick={onFechar}>Fechar</button></div>
+      {d === null && <p className="ficha-note">Esse cartão não existe ou você não está logado.</p>}
+      {d && <div className="form-grid">
+        <p className="resposta-quando">{d.respondido_em ? `Tocou em ${quando(d.respondido_em)}` : "Ainda não respondeu"} · {STATUS_RESPOSTA[d.status] || d.status}</p>
+        {extra && <p className="caixa-texto"><b>O que ele escreveu:</b> {extra}</p>}
+        <p className="caixa-texto"><b>Pergunta:</b> {d.pergunta}</p>
+        {d.contexto && <p className="caixa-texto"><b>O que vai:</b> {d.contexto}</p>}
+        <small className="ficha-note">Criado em {quando(d.criado_em)}{d.aplicado_em ? ` · aplicado em ${quando(d.aplicado_em)}` : ""} · código {String(d.id).slice(0, 8)}</small>
+      </div>}
+    </div>
+  </div>;
 }
 function CalculadoraRapida({ onFechar, notify }) {
   // QUIZ RÁPIDO (Diego, 16/10/2026, 21h57: "tipo eu falando contigo... tipo um quiz rápido"; 22h19: "quantos metros
