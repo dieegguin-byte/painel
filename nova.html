@@ -164,7 +164,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 .compromisso-cliente{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .compromisso-idc>span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .selo-followup{display:inline-block;font-style:normal;font-size:11px;font-weight:700;color:#8fc3e6;background:#4a90c41f;border:1px solid #4a90c459;border-radius:999px;padding:1px 8px;margin-right:7px;vertical-align:1px}
-.selo-followup.zapia{color:#9fd4ae;background:#75a9872b;border-color:#75a98780}
+.selo-followup.zapia{color:#9fd4ae;background:#75a9872b;border-color:#75a98780}.selo-followup.selo-audio{font-weight:800}.compromisso-audio-rotulo{margin:10px 0 -4px;color:#9fd4ae}
 .selo-followup.compras{color:#f1a06d;background:#d86d361f;border-color:#d86d3666}.selo-followup.pagamento{color:#e4bd72;background:#d4a64e1f;border-color:#d4a64e66}.selo-followup.entrega{color:#c9a7e8;background:#9a6fc41f;border-color:#9a6fc466}.selo-followup.visita{color:#e8b0c4;background:#c46f8f1f;border-color:#c46f8f66}.selo-followup.orcamento{color:#d9cfc4;background:#8a7a6a26;border-color:#8a7a6a66}.selo-followup.servico{color:#8fd0c9;background:#4aa49a1f;border-color:#4aa49a66}.selo-followup.pessoal{color:#b8b0a8;background:#5a524a33;border-color:#6a625a66}
 .compromisso-card.followup-zapia{background:linear-gradient(150deg,#16241b,#121a14);border-color:#75a98766}
 /* CARTÃO "Agendar contato com …" (Diego, 15/10/2026): a Manu pergunta se agenda um contato pela Zapia; mesma cor do Follow-up 1. */
@@ -1759,7 +1759,7 @@ const demoCustomers = [
 const demoServices = [
   { id: "s1", cliente_id: "c1", titulo: "Reforma de sofá retrátil", status: "orcamento", prioridade: "alta", proxima_acao: "Confirmar visita", prazo: "2026-07-10", valor_orcamento: 2400, clientes: demoCustomers[0] },
   { id: "s2", cliente_id: "c2", titulo: "6 cadeiras de jantar", status: "agendado", prioridade: "media", profissional_id: "p2", proxima_acao: "Buscar cadeiras", prazo: "2026-07-11", valor_orcamento: 1350, clientes: demoCustomers[1], loja_material: "Ellis Tecidos", materiais_necessarios: [{ item: "Tecido para 6 assentos", comprado: false }, { item: "Espuma D33", comprado: true }] },
-  { id: "s3", cliente_id: "c3", titulo: "Cabeceira sob medida", status: "pronto", prioridade: "baixa", proxima_acao: "Pedir medidas", prazo: "2026-07-12", clientes: demoCustomers[2] },
+  { id: "s3", cliente_id: "c3", titulo: "Cabeceira sob medida", status: "pronto", prioridade: "baixa", proxima_acao: "Pedir medidas", prazo: "2026-07-12", clientes: demoCustomers[2], sugestao_resposta: "[Seu áudio] Oi, tudo bem? Aqui é o Diego, da Tapeçaria Bahia. Passando pra saber se ficou alguma dúvida no orçamento da cabeceira." },
   // s4 existe pra demo exercitar o aviso de compra repetida: mesma loja que o s2. Sem dois
   // serviços na mesma loja, o bloco de material nunca mostra a dica de juntar o frete.
   { id: "s4", cliente_id: "c3", titulo: "Poltrona reclinável", status: "pronto", prioridade: "media", proxima_acao: "Comprar tecido", prazo: "2026-07-20", valor_orcamento: 780, clientes: demoCustomers[2], loja_material: "Ellis Tecidos", materiais_necessarios: [{ item: "Veludo grafite", comprado: false, pedido: true }] },
@@ -1814,6 +1814,7 @@ const demoAppointments = [
   { id: "a13", titulo: "🔥 Ligar pra Eloisa — fechar o sofá (aceitou a faixa da IA às 8h37)", data: hojeISO(), hora: "18:21", cidade: "Cidade Ocidental", local: "", tipo: "remoto", status: "planejado", servico_id: null },
       { id: "a12b", titulo: "Pagar a proteção do carro — boleto de outubro 190,70", data: hojeISO(), hora: "15:10", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", financeiro_id: "f4b" },
       { id: "a12", titulo: "Pagar Pix — Afibracom — R$ 100 (pedido 84697, 3 m Colorado Preto)", data: hojeISO(), hora: "14:27", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", servico_id: "s1" },
+  { id: "a15", titulo: "Follow-up 1 — Cabeceira", data: hojeISO(), hora: "10:15", cidade: "Luziânia", local: "", tipo: "remoto", status: "planejado", servico_id: "s3" },
   { id: "a14", titulo: "Comprar aditivo Paraflu Ecoflu rosa", data: hojeISO(), hora: "12:30", cidade: "Luziânia", local: "", tipo: "presencial", status: "planejado", servico_id: null },
   { id: "a2", titulo: "Carlos — confirmar tecido no WhatsApp", data: hojeISO(), hora: "17:00", cidade: "Luziânia", local: "Remoto / WhatsApp", tipo: "remoto", status: "planejado", servico_id: "s2" },
   // CARDS LIGADOS (14/10/2026): duas tarefas na mesma parada, 1 minuto uma da outra, título começando pela pessoa.
@@ -2734,6 +2735,12 @@ function ehFollowUpZapia(a) { return /^\s*(follow[\s-]?up\s*1|contato\s+zapia)\s
 // CARTÃO DE CONTATO PELA ZAPIA (Diego, 15/10/2026, caso Gina: "me perguntar se agenda para entrar em contato com ela...
 // na mesma cor que o Follow-up 1"). A Manu cria a dúvida com a pergunta começando por "Agendar contato com "; o cartão
 // fica verde como o Follow-up 1, porque o "Sim, agenda" vai pra Zapia mandar.
+// FOLLOW-UP COM O ÁUDIO DO DIEGO (Diego, 19/10/2026: "Follow up verde saber que está indo meu audio"). Quando a Manu
+// começa o sugestao_resposta do serviço com "[Seu áudio]", a Zapia manda o áudio gravado por ele, não um texto. O título
+// não muda (o verde depende de "Follow-up 1 — Nome"); o card ganha o selo 🎤 e mostra o que ele fala no áudio.
+const RE_SEU_AUDIO = /^\s*\[\s*seu\s+[áa]udio\s*\]\s*/i;
+function vaiSeuAudio(texto) { return RE_SEU_AUDIO.test(String(texto || "")); }
+function semMarcaDeAudio(texto) { return String(texto || "").replace(RE_SEU_AUDIO, ""); }
 function ehContatoZapia(pergunta) { return /^\s*agendar contato com\s/i.test(String(pergunta || "")); }
 // SELO DO TIPO DE COMPROMISSO (Diego, 11/10/2026: "coloque compras e veja outras que identifiquem rápido").
 // Sai do título, na ordem abaixo: a primeira regra que casar vence ("Acertar com Marlom (na entrega)" é
@@ -7291,7 +7298,8 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   // sairia adivinhando pelo título ("Retirada" vira "posso buscar a peça hoje?") e isso vai pro WhatsApp da
   // cliente. O botão abre vazio: o vínculo prova COM QUEM ele fala, não O QUE foi combinado.
   const semServico = !svc;
-  const sugestao = svc?.sugestao_resposta || (quem.destino === "cliente" && !semServico && !ehEnvelopeDeTriagem(a) ? mensagemPadraoCompromisso(a, svc, today) : "");
+  const vaiAudio = vaiSeuAudio(svc?.sugestao_resposta);
+  const sugestao = semMarcaDeAudio(svc?.sugestao_resposta) || (quem.destino === "cliente" && !semServico && !ehEnvelopeDeTriagem(a) ? mensagemPadraoCompromisso(a, svc, today) : "");
   // UMA variável de telefone, um caminho de renderização só. A ficha do cliente continua sendo a primeira
   // fonte; o telefone técnico do envelope de triagem só entra quando ela não existe, e alimenta ESTA mesma
   // variável — o botão de WhatsApp abaixo é o mesmo, sem componente, estilo ou fluxo paralelo.
@@ -7419,7 +7427,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
             e ele achou que era duplicado). O título já diz quem + o quê; o nome da cliente vira a linha de baixo. */}
         <strong>{tituloCard || nomeCliente}</strong>
         {cli?.nome && tituloCard && !tituloCard.toLowerCase().includes(cli.nome.split(" ")[0].toLowerCase()) && <small className="compromisso-cliente">{cli.nome}</small>}
-        <span>{ligado && ligado.cor && <i className="selo-ligado" title="Mesma saída: cards separados, mas é uma viagem só">⛓ {ligado.indice}/{ligado.n}</i>}{ehQuente(a) && <i className="selo-quente">🔥 Quente</i>}{seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
+        <span>{ligado && ligado.cor && <i className="selo-ligado" title="Mesma saída: cards separados, mas é uma viagem só">⛓ {ligado.indice}/{ligado.n}</i>}{ehQuente(a) && <i className="selo-quente">🔥 Quente</i>}{vaiAudio ? <i className="selo-followup zapia selo-audio">🎤 Vai o seu áudio</i> : seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
       </span>
       <span className="compromisso-seta">{emFoco ? "" : "›"}</span>
     </button>
@@ -7473,6 +7481,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         </div>; })()}
         {/* SUGESTÃO SÓ PRA LER/COPIAR (Diego, 12/10/2026): o WhatsApp abre LIMPO, sem texto pré-preenchido — ele decide
             se manda áudio ou texto. A sugestão fica aqui como instrução, com um botão de copiar. */}
+        {sugestao && vaiAudio && <p className="kicker compromisso-audio-rotulo">🎤 VAI O SEU ÁUDIO · O QUE VOCÊ FALA NELE</p>}
         {sugestao && <q className="compromisso-msg">{sugestao}<button type="button" className="copiar-sugestao" title="Copiar sugestão" onClick={async (e) => { e.preventDefault(); try { await navigator.clipboard.writeText(sugestao); vibrar(6); } catch (err) { /* segure no texto pra copiar */ } }}>📋 Copiar</button></q>}
         {/* SEM AVISO DO APP NO CARD (Diego, 16/10/2026, print das 06h53: "Este compromisso envolve Afibracom e o cliente —
             escreva você; o app não tem como saber o texto certo"). Regra do projeto: dúvida ou aviso do sistema não
