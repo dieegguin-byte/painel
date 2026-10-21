@@ -4841,7 +4841,7 @@ function Home() {
   // move. Até lá ele sai de toda tela, como a pendência da Regra Nº 12 — por isso o filtro é aqui, na coleção
   // central, e não no card: contador, rota e seletores de horário também deixam de contar com ele.
   const remarcarAbertos = useMemo(() => new Set(acoesAgenda.recados.filter((r) => !r.processado_em && ACOES_QUE_ESCONDEM_O_CARD.includes(r.acao)).map((r) => r.agenda_id)), [acoesAgenda.recados]);
-  const agendaVisivel = useMemo(() => compromissosOperacionais(appointments, inbox).filter((a) => !remarcarAbertos.has(a.id)), [appointments, inbox, remarcarAbertos]);
+  const agendaVisivel = useMemo(() => compromissosOperacionais(appointments, inbox).filter((a) => !(remarcarAbertos.has(a.id) && someComToque(a))), [appointments, inbox, remarcarAbertos]);
   const claudeQueue = useMemo(() => inbox.filter((item) => ["respondido", "novo"].includes(statusDaCaixa(item))).sort((a, b) => {
     const priority = (value) => value === "respondido" ? 0 : 1;
     return priority(a.status) - priority(b.status) || new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
@@ -6634,6 +6634,10 @@ const ACAO_RECADO_ROTULO = { recado: "Recado", feito: "Feito", remarcar: "Remarc
 // Se for algo pra mudar, eu peço, já tá lá o recado"). Igual ao Remarcar: o card sai de toda tela até a Manu
 // processar, e o ↶ Desfazer (com o texto do recado) fica na seção da Manu.
 const ACOES_QUE_ESCONDEM_O_CARD = ["remarcar", "recado"];
+// VISITA NÃO SOME (21/10/2026, Debora: tocou Remarcar às 13h11 na visita das 14h e, na hora de sair pra atender, "essa
+// cliente sumiu"). Card presencial com toque pendente continua na tela, no horário dele, com o selo de remarcar
+// pendente, até a Manu dar a data nova. Os outros cards continuam sumindo como ele pediu em 20/10.
+const someComToque = (a) => !!a && a.tipo !== "presencial";
 
 function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointments, recarga = 0 }) {
   const [recados, setRecados] = useState([]);
@@ -6714,7 +6718,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     if (patch) setAppointments((prev) => prev.filter((x) => x.id !== a.id));
     notify(acao === "feito" ? "Feito. Saiu da agenda." + avisoPessoal
       : acao === "cancelar" ? "Cancelado. Saiu da agenda." + avisoPessoal
-      : acao === "remarcar" ? `Remarcar anotado. O card sai da tela e volta no dia que a Manu escolher. Desfazer fica na seção da Manu.`
+      : acao === "remarcar" ? (someComToque(a) ? `Remarcar anotado. O card sai da tela e volta no dia que a Manu escolher. Desfazer fica na seção da Manu.` : `Remarcar anotado. A visita fica na tela no horário de agora até a Manu dar o dia novo. Desfazer fica na seção da Manu.`)
       : `Recado com a Manu. O card sai da tela e ela faz o que você pediu. Desfazer fica na seção da Manu.`, avisoPessoal ? "error" : "ok");
     if (onChanged) onChanged();
     return true;
@@ -6911,7 +6915,7 @@ function SelosClaudeDoCard({ a, acoes, onMudar }) {
         <button type="button" className="ghost" onClick={onMudar}>Mudar</button>
       </div>
     </div>}
-    {abertos.length > 0 && <p className="selo-recado">⏳ {abertos.map((r) => ACAO_RECADO_ROTULO[r.acao] || r.acao).join(" · ")} enviado. O Claude lê na próxima rodada ({HORARIOS_ROTINA_RECADOS}).</p>}
+    {abertos.length > 0 && <p className="selo-recado">{abertos.some((r) => r.acao === "remarcar") ? "🔁 Remarcar pendente: a Manu escolhe o dia novo. Até lá a visita fica aqui no horário dela." : `⏳ ${abertos.map((r) => ACAO_RECADO_ROTULO[r.acao] || r.acao).join(" · ")} enviado. A Manu lê na próxima rodada (${HORARIOS_ROTINA_RECADOS}).`}</p>}
   </>;
 }
 
@@ -9892,7 +9896,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
   // volta quando a Manu o mover (o recado processado deixa de esconder) ou se ela não conseguir.
   const acoesCtxPainel = React.useContext(AcoesAgendaCtx);
   const idsRemarcando = useMemo(() => new Set((acoesCtxPainel?.recados || []).filter((r) => ACOES_QUE_ESCONDEM_O_CARD.includes(r.acao) && !r.processado_em).map((r) => r.agenda_id)), [acoesCtxPainel]);
-  const semRemarcando = (lista) => idsRemarcando.size ? lista.filter((entry) => !idsRemarcando.has(entry.id)) : lista;
+  const semRemarcando = (lista) => idsRemarcando.size ? lista.filter((entry) => !(idsRemarcando.has(entry.id) && someComToque(entry))) : lista;
   const pessoaisEsperandoData = acoesCtxPainel?.pessoaisRemarcando;
   const rotaAll = [...semRemarcando(appointments).filter((entry) => !idsCobranca.has(entry.id)), ...pessoaisNaFila(pessoais, appointments).filter((entry) => !(pessoaisEsperandoData && pessoaisEsperandoData.has(entry.pessoal_id)))];
   // HISTÓRICO DESTA DIVISÃO, porque ela já mudou duas vezes e o motivo importa:
