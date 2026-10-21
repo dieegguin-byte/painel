@@ -4068,7 +4068,8 @@ const WHATSAPP_PACOTE = "com.whatsapp.w4b";
 // (+55 61 99184-4530), 08/10/2026 — chegou pelo WhatsApp comum (o número do Google Meu Negócio).
 // Quarta: Carol (+55 61 98127-6678), 13/10/2026 — chegou pelo WhatsApp comum, não pelo Business.
 // Quinta: Caio, Ceilândia (+55 61 99105-2108), 21/10/2026 — Diego: "Caio abrir no WhatsApp normal".
-const WHATSAPP_COMUM_POR_NUMERO = new Set(["61996031000", "61991378814", "61991844530", "61981276678", "61991052108"]);
+// Sexta: Larissa Andrade (+55 61 99406-1941), 21/10/2026 — recado no card: "WhatsApp dela tem que abrir no WhatsApp normal".
+const WHATSAPP_COMUM_POR_NUMERO = new Set(["61996031000", "61991378814", "61991844530", "61981276678", "61991052108", "61994061941"]);
 function pacoteWhatsapp(tel) {
   const d = String(tel || "").replace(/\D/g, "");
   const semPais = d.length > 11 && d.startsWith("55") ? d.slice(2) : d;
