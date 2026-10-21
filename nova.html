@@ -4628,8 +4628,20 @@ function Home() {
   const ignorarPop = React.useRef(false);
   const voltando = React.useRef(null);
   const sincronizarRef = React.useRef(null);
+  // FICHA FECHAVA O APP (Diego, 21/10/2026: "eu tô na ficha, se eu clicar o botão voltar, ele tá saindo do aplicativo").
+  // Duas causas, dois ajustes:
+  // 1) O Chrome do Android PULA no voltar a entrada que a página deixou sem o usuário ter tocado nela ainda (intervenção
+  //    contra sites que prendem o voltar). Quando o app abre por link já com a ficha aberta, a guarda nasce antes de
+  //    qualquer toque e o voltar saía direto. Agora, guarda posta sem toque é refeita no primeiro toque.
+  // 2) O voltar fechava o pano de fundo que estava por último no HTML, não o último aberto: as listas por cima e o card
+  //    em foco são desenhados no fim da página, então com a ficha aberta por cima deles o voltar fechava a coisa errada.
+  //    Agora cada pano ganha um número de ordem quando aparece e o voltar fecha o de número maior.
   useEffect(() => {
     const GUARDA = { tbGuarda: true };
+    let ordemPano = 0;
+    let guardaSemToque = false;
+    const jaTocou = () => { try { return !navigator.userActivation || navigator.userActivation.hasBeenActive; } catch (e) { return true; } };
+    const numerarPanos = () => document.querySelectorAll(".modal-overlay:not([data-tb-ordem]), .menu-topo-fundo:not([data-tb-ordem])").forEach((el) => { el.dataset.tbOrdem = String(++ordemPano); });
     const armado = () => { try { return !!(window.history.state && window.history.state.tbGuarda); } catch (e) { return false; } };
     const abertoPorCima = () => document.querySelector(".modal-overlay, .menu-topo-fundo");
     const expandidos = () => Array.from(document.querySelectorAll('[aria-expanded="true"]:not(.menu-topo-botao), details[open]'));
@@ -4638,7 +4650,7 @@ function Home() {
       if (voltando.current) return; // já pedimos um back(); esperar o popstate antes de decidir de novo
       const precisa = precisaGuarda();
       try {
-        if (precisa && !armado()) window.history.pushState(GUARDA, "");
+        if (precisa && !armado()) { guardaSemToque = !jaTocou(); window.history.pushState(GUARDA, ""); }
         else if (!precisa && armado()) {
           ignorarPop.current = true;
           // Se o popstate não vier (navegador que ignorou o back), destrava em 1s pra não ficar surdo pra sempre.
@@ -4651,7 +4663,8 @@ function Home() {
     const onPop = () => {
       if (voltando.current) { clearTimeout(voltando.current); voltando.current = null; }
       if (ignorarPop.current) { ignorarPop.current = false; setTimeout(sincronizar, 50); return; }
-      const topo = (() => { const todos = document.querySelectorAll(".modal-overlay, .menu-topo-fundo"); return todos[todos.length - 1]; })();
+      numerarPanos();
+      const topo = Array.from(document.querySelectorAll(".modal-overlay, .menu-topo-fundo")).reduce((maior, el) => (!maior || Number(el.dataset.tbOrdem || 0) >= Number(maior.dataset.tbOrdem || 0) ? el : maior), null);
       if (topo) {
         // Mesmo gesto de "tocar fora": os modais ouvem mousedown ou click no próprio pano de fundo.
         topo.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
@@ -4671,14 +4684,23 @@ function Home() {
       // Painel limpo e sem guarda: nada a fazer; o Android fecha o app no próximo voltar.
     };
     let agendado = null;
-    const obs = new MutationObserver(() => { if (agendado) return; agendado = requestAnimationFrame(() => { agendado = null; sincronizar(); }); });
+    const obs = new MutationObserver(() => { numerarPanos(); if (agendado) return; agendado = requestAnimationFrame(() => { agendado = null; sincronizar(); }); });
+    // Primeiro toque depois de uma guarda posta sem toque: troca por uma guarda nova, agora com toque, pra o Chrome
+    // não pular a entrada no voltar.
+    const aoTocar = () => {
+      if (!guardaSemToque) return;
+      guardaSemToque = false;
+      try { if (armado() && !voltando.current) { window.history.replaceState(null, ""); window.history.pushState(GUARDA, ""); } } catch (e) { /* segue */ }
+    };
+    window.addEventListener("pointerup", aoTocar, true);
+    window.addEventListener("keydown", aoTocar, true);
     obs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-expanded", "open"] });
     window.addEventListener("popstate", onPop);
     // Guarda herdada de um carregamento anterior (F5, reabrir a aba): a entrada de trás pode ser outro site.
     // Trocar o estado é seguro; "voltar" dela não.
     try { if (armado()) window.history.replaceState(null, ""); } catch (e) { /* segue */ }
     sincronizar();
-    return () => { obs.disconnect(); window.removeEventListener("popstate", onPop); if (agendado) cancelAnimationFrame(agendado); if (voltando.current) clearTimeout(voltando.current); sincronizarRef.current = null; };
+    return () => { obs.disconnect(); window.removeEventListener("popstate", onPop); window.removeEventListener("pointerup", aoTocar, true); window.removeEventListener("keydown", aoTocar, true); if (agendado) cancelAnimationFrame(agendado); if (voltando.current) clearTimeout(voltando.current); sincronizarRef.current = null; };
   }, []);
   useEffect(() => {
     // Mudou de aba: arma (saiu do Painel) ou desarma (voltou pro Painel limpo). Mesma função do observador,
