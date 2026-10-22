@@ -6709,6 +6709,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     if (demo) {
       setRecados((prev) => [...prev, { id: "demo-" + Date.now(), agenda_id: a.id, agenda: { titulo: a.titulo, data: a.data, hora: a.hora }, acao, texto: limpo, audio_path: audio ? "demo" : null, criado_em: new Date().toISOString(), processado_em: null }]);
       if (acao === "feito" || acao === "cancelar") setAppointments((prev) => prev.filter((x) => x.id !== a.id));
+      if (acao === "remarcar" && a.urgente) setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, urgente: false, urgente_em: null } : x));
       notify("Anotado (demo).", "ok");
       return true;
     }
@@ -6731,9 +6732,13 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     // vira hoje — é o que o próprio banco manda fazer, e o mesmo que o Concluir antigo fazia.
     const patch = acao === "feito" ? (antecipado ? { status: "feito", data: hojeISO() } : { status: "feito" }) : acao === "cancelar" ? { status: "cancelado" } : null;
     const conferir = a.nota_claude && a.nota_claude_conferida === false ? { nota_claude_conferida: true } : null;
-    if (patch || conferir) {
-      const { error: agErr } = await db.from("agenda").update({ ...(patch || {}), ...(conferir || {}) }).eq("id", a.id).eq("status", "planejado");
+    // REMARCAR DESAFIXA (Diego, 22/10/2026: "apertei remarcar o Francisco, que estava em urgente, e não sumiu do topo"):
+    // remarcou é porque não vai resolver agora, então o card sai da Prioridade do momento e volta pro lugar dele.
+    const desafixar = acao === "remarcar" && a.urgente ? { urgente: false, urgente_em: null } : null;
+    if (patch || conferir || desafixar) {
+      const { error: agErr } = await db.from("agenda").update({ ...(patch || {}), ...(conferir || {}), ...(desafixar || {}) }).eq("id", a.id).eq("status", "planejado");
       if (agErr) { await db.from("agenda_recados").delete().eq("id", rec.id); throw agErr; }
+      if (desafixar) setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, ...desafixar } : x));
     }
     // CARD PESSOAL COM BLOQUEIO (Diego, 13/10/2026: "não tem como eu marcar feito naquele compromisso do carro").
     // A linha da agenda com pessoal_id é só a indisponibilidade; o fato mora em `pessoais`. Feito/Cancelar aqui
@@ -10214,7 +10219,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
   // PRIORIDADE DO MOMENTO NO TOPO (Diego, 22/10/2026, depois de marcar dois e nada subir: "eu já sei que esse negócio eu
   // vou resolver agora"). Sobe NA HORA em que ele marca, sem esperar o horário do card, todos os marcados, o mais antigo
   // primeiro. Ignora os filtros (prioridade não pode sumir por filtro esquecido). É o card de sempre, com os botões dele.
-  const prioridades = (agendaPlanejada || []).filter((a) => fixadoHoje(a) && a.status === "planejado")
+  const prioridades = (agendaPlanejada || []).filter((a) => fixadoHoje(a) && a.status === "planejado" && !idsRemarcando.has(a.id))
     .sort((x, y) => `${x.data} ${x.hora || ""}`.localeCompare(`${y.data} ${y.hora || ""}`));
   const cardAtrasado = (a) => <CompromissoCard key={a.id} a={a} svc={svcDe(a)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} revisaoData={idsRemarcacao.has(a.id)} sucessor={sucessorMaisNovoNoServico(a, agendaPlanejada)} passouDaHora={idsPassouDaHora.has(a.id)} ligado={ligacoesAtrasados.get(a.id) || null} />;
   // QUEM ESPERA HÁ MAIS TEMPO, NO CABEÇALHO FECHADO (19/09/2026, caso Cacau). O bloco "PRECISA
