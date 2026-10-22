@@ -2748,7 +2748,9 @@ function ehFollowUp(a) { return /follow[\s-]?up/i.test(String((a && a.titulo) ||
 // é mandado pela Zapia ao cliente; os outros follow-ups ele faz na mão. Verde = não precisa mandar, a Zapia manda.
 // "Contato Zapia — <cliente> — <assunto>" (15/10/2026): o card que nasce quando o Diego responde "Sim, agenda" ao cartão
 // "Agendar contato com …". A Zapia manda, então é verde como o Follow-up 1.
-function ehFollowUpZapia(a) { return /^\s*(follow[\s-]?up\s*1|contato\s+zapia)\s*[—–-]/i.test(String((a && a.titulo) || "")); }
+// FOLLOW-UP 2, 3... TAMBÉM (Diego, 22/10/2026: "Sim fale follow up 2 mas verde"): qualquer "Follow-up N — Nome" que a
+// Zapia agendou fica verde, não só o 1.
+function ehFollowUpZapia(a) { return /^\s*(follow[\s-]?up\s*\d+|contato\s+zapia)\s*[—–-]/i.test(String((a && a.titulo) || "")); }
 // CARTÃO DE CONTATO PELA ZAPIA (Diego, 15/10/2026, caso Gina: "me perguntar se agenda para entrar em contato com ela...
 // na mesma cor que o Follow-up 1"). A Manu cria a dúvida com a pergunta começando por "Agendar contato com "; o cartão
 // fica verde como o Follow-up 1, porque o "Sim, agenda" vai pra Zapia mandar.
