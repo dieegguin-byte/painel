@@ -236,7 +236,7 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
 /* CLIENTE QUENTE (Diego, 16/10/2026): só a etiqueta, âmbar, piscando de leve; card normal, nada de vermelho (vermelho é urgente). */
 .selo-quente{display:inline-block;font-style:normal;font-size:11px;font-weight:800;color:#ffb454;background:#f0921f24;border:1px solid #f0921f80;border-radius:999px;padding:1px 8px;margin-right:7px;vertical-align:1px;animation:remotoPisca 1.6s ease-in-out infinite}
 .compromisso-card.quente{border-left-color:#f0921f}
-@media(prefers-reduced-motion:reduce){.selo-quente{animation:none}}
+@media(prefers-reduced-motion:reduce){.selo-quente{animation:none}}.contador-agua{display:flex;align-items:center;gap:12px;margin:0 0 14px;padding:12px 14px;border-radius:14px;border:1px solid #3b82f666;background:linear-gradient(150deg,#0f1a2b,#0b1220)}.contador-agua .agua-txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}.contador-agua .agua-txt b{font-size:16px;color:#9cc7ff}.contador-agua .agua-txt small{font-size:12px;color:var(--muted)}.contador-agua button{flex:none;min-height:44px;padding:8px 16px;border-radius:12px;border:1px solid #3b82f6;background:#1d4ed8;color:#fff;font-weight:800;font-size:15px}.contador-agua.amarelo{border-color:#f0b42999;background:linear-gradient(150deg,#2a2210,#17130a)}.contador-agua.amarelo .agua-txt b{color:#f5c95c}.contador-agua.vermelho{border-color:#e5484d;background:linear-gradient(150deg,#2e1213,#170a0b)}.contador-agua.vermelho .agua-txt b{color:#ff8b8e}
 body[data-filtro-tipo="todos"] .compromisso-card.remoto-pendente .selo-remoto{animation:remotoPisca 1.8s ease-in-out infinite}
 @keyframes remotoPisca{0%,100%{opacity:1}50%{opacity:.35}}
 /* CARDS LIGADOS (Diego, 14/10/2026: "são cards separados, mas é um ligado no outro, com cores iguais"; 16/10: a saída
@@ -7984,6 +7984,49 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = fal
   </CardRecolhivel>;
 }
 
+// CONTADOR DE ÁGUA (Diego, 22/10/2026: "tenho dificuldade de beber água... não pode adiar não, tem que ficar o tempo
+// todo. Só tem que falar quantos minutos, quantas horas eu tô sem beber água, pra ficar mais consciente"). Fica sempre
+// no topo do Painel, sem Adiar: "Sem beber água há 2h35" e o botão Bebi, que grava uma linha em `agua` e zera. Conta
+// sempre do último Bebi, a qualquer hora, de dia ou de madrugada ("tem dia que eu tô rodado até 2, 3 horas da manhã"):
+// bebeu atrasado, as próximas 3h começam dali. Depois do Bebi a linha some e volta com 2h30, amarela; vermelha de 3h.
+const AGUA_APARECE_MIN = 150, AGUA_VERMELHO_MIN = 180;
+function tempoSemAgua(min) { const h = Math.floor(min / 60), m = min % 60; return h ? `${h}h${String(m).padStart(2, "0")}` : `${m} min`; }
+function ContadorAgua({ db, demo, notify }) {
+  const [ultima, setUltima] = useState(() => demo ? Date.now() - 155 * 60000 : null);
+  const [carregou, setCarregou] = useState(demo);
+  const [gravando, setGravando] = useState(false);
+  const [, setTique] = useState(0);
+  useEffect(() => { const t = window.setInterval(() => setTique((n) => n + 1), 30000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    if (demo || !db) return;
+    let vivo = true;
+    db.from("agua").select("bebi_em").order("bebi_em", { ascending: false }).limit(1).then(({ data }) => {
+      if (!vivo) return; setUltima(data && data[0] ? new Date(data[0].bebi_em).getTime() : null); setCarregou(true);
+    });
+    return () => { vivo = false; };
+  }, [db, demo]);
+  const bebi = async () => {
+    setGravando(true);
+    const antes = ultima;
+    setUltima(Date.now()); vibrar(10);
+    try {
+      if (!demo) { const { error } = await db.from("agua").insert({}); if (error) throw error; }
+      notify("💧 Boa! Contador zerado.", "ok");
+    } catch (e) { setUltima(antes); notify("Erro: " + e.message, "error"); } finally { setGravando(false); }
+  };
+  if (!carregou) return null;
+  const min = ultima ? Math.max(0, Math.floor((Date.now() - ultima) / 60000)) : null;
+  if (min !== null && min < AGUA_APARECE_MIN) return null;
+  const cor = min === null || min >= AGUA_VERMELHO_MIN ? "vermelho" : "amarelo";
+  return <section className={`contador-agua${cor ? " " + cor : ""}`}>
+    <div className="agua-txt">
+      <b>💧 {min === null ? "Sem registro de água ainda" : `Sem beber água há ${tempoSemAgua(min)}`}</b>
+      <small>{min === null ? "Toque em Bebi quando beber" : `Último copo às ${new Date(ultima).toTimeString().slice(0, 5)} · meta: a cada 3h`}</small>
+    </div>
+    <button type="button" disabled={gravando} onClick={bebi}>{gravando ? "…" : "Bebi"}</button>
+  </section>;
+}
+
 // ===== DOMÍNIO PESSOAIS (item APP-PESSOAIS-CARD-20260824-2145 + adendo CROSSDOMAIN-20260824-2150) =====
 //
 // REGRA-MÃE: NOTIFICAÇÃO/VENCIMENTO NÃO É CONCLUSÃO. O problema que este card existe pra resolver é o
@@ -10298,6 +10341,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     {filtroAtivo && <p className="filtro-aviso">{rotuloFiltro}{escondidosPorFiltro > 0 ? ` · ${escondidosPorFiltro} escondido(s)` : ""} · <button type="button" onClick={() => { setFiltroTipo("todos"); setFiltroSelo(null); }}>Mostrar todos</button></p>}
     {/* TOPO DO PAINEL (Diego, 11/10/2026: "compromisso atrasado, Hoje e próximos compromissos são os mais
         importantes"): os três ficam no alto, como cards grandes, fora do grupo Pendências. */}
+    <ContadorAgua db={db} demo={demo} notify={notify} />
     {prioridades.length > 0 && <section className="content-card prioridade-topo topo-card">
       <p className="kicker">📌 PRIORIDADE DO MOMENTO</p>
       {prioridades.map((a) => <React.Fragment key={a.id}>
