@@ -1,4 +1,5 @@
 dados_atendimento.json
-.claude/
+.claude/*
+!.claude/skills/
 node_modules/
 supabase/.temp/
