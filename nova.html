@@ -5533,7 +5533,7 @@ function Home() {
         primeiro o que foi aberto de dentro dela (reagendar, concluir, adicionar) e só depois a própria lista. */}
     {listaLateral && <ListaLateral kicker="ARRASTOU PARA A DIREITA" titulo="Agenda" onFechar={() => setListaLateral(false)}><BarreiraDaAba nome="A agenda" onFechar={() => setListaLateral(false)}><AgendaView appointments={agendaVisivel} services={services} customers={customers} finances={finances} fornecedores={fornecedores} onReschedule={abrirReagendar} onConcluir={setConcluirAppt} onAdd={() => setAddAgendaOpen(true)} db={db} demo={demo} notify={notify} onChanged={loadAll} /></BarreiraDaAba></ListaLateral>}
     {/* As janelas por cima também têm barreira própria: ficha com dado ruim fecha sozinha, não o app. */}
-    {respostaId && <RespostaDoDiego db={db} demo={demo} id={respostaId} onFechar={() => setRespostaId(null)} />}
+    {respostaId && <RespostaDoDiego db={db} demo={demo} id={respostaId} onFechar={() => setRespostaId(null)} notify={notify} customers={customers} onOpenFicha={setFichaId} onChanged={loadAll} />}
     {calcAberta && <BarreiraDaAba nome="A calculadora" onFechar={() => setCalcAberta(false)}><CalculadoraRapida onFechar={() => setCalcAberta(false)} notify={notify} /></BarreiraDaAba>}
     {showGuia && <BarreiraDaAba nome="O guia da IA" onFechar={() => setShowGuia(false)}><GuiaModal db={db} demo={demo} notify={notify} onClose={() => setShowGuia(false)} /></BarreiraDaAba>}
     {compartilhamentoPendente && <ConfirmarCompartilhamento pendente={compartilhamentoPendente} customers={customers} onSalvar={salvarCompartilhamento} onFechar={fecharCompartilhamento} notify={notify} />}
@@ -10706,14 +10706,19 @@ function calcularOrcamento({ mo, material, divisor, frete, ajudante, viagem }) {
 // ?ir=resposta&id=<duvidas_agente.id> abre o cartão de envio já respondido: o que foi perguntado, o texto que vai,
 // a opção que ele tocou e quando. Lê a linha direto do banco, em qualquer status (respondida, aplicada, descartada).
 const STATUS_RESPOSTA = { aberta: "Ainda sem resposta", respondida: "Respondida, esperando a Manu", aplicada: "Respondida e já aplicada pela Manu", descartada: "Pulada (não manda)" };
-function RespostaDoDiego({ db, demo, id, onFechar }) {
+// AINDA SEM RESPOSTA = OS BOTÕES (Diego, 23/10/2026, print do cartão da Suzany: "tem que ter o botão lá só para me
+// confirmar, ver o que está sendo enviado, confirmar"). Cartão aberto chega pelo link com o texto que vai e as mesmas
+// opções dos Cartões pra você (DuvidaItem). Tocou, o cartão relê e mostra a resposta com dia e hora, como antes.
+function RespostaDoDiego({ db, demo, id, onFechar, notify, customers = [], onOpenFicha, onChanged }) {
   const [d, setD] = useState(undefined);
+  const [releitura, setReleitura] = useState(0);
   useEffect(() => {
     if (demo) { setD((demoDuvidas || []).find((x) => String(x.id) === String(id)) || null); return; }
     if (!db) return;
-    db.from("duvidas_agente").select("id,pergunta,contexto,opcoes,resposta,status,respondido_em,aplicado_em,criado_em").eq("id", id).maybeSingle()
+    db.from("duvidas_agente").select("id,pergunta,contexto,opcoes,resposta,status,respondido_em,aplicado_em,criado_em,origem,cliente_id").eq("id", id).maybeSingle()
       .then(({ data }) => setD(data || null), () => setD(null));
-  }, [db, demo, id]);
+  }, [db, demo, id, releitura]);
+  const cliente = d && d.cliente_id ? (customers || []).find((c) => c.id === d.cliente_id) : null;
   const quando = (v) => v ? new Date(v).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
   const opcoes = d && Array.isArray(d.opcoes) ? d.opcoes.map(String) : [];
   const resposta = d ? String(d.resposta || "") : "";
@@ -10721,9 +10726,13 @@ function RespostaDoDiego({ db, demo, id, onFechar }) {
   const extra = tocada ? resposta.slice(tocada.length).replace(/^ — /, "") : resposta;
   return <div className="modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onFechar(); }}>
     <div className="modal-card small resposta-diego">
-      <div className="modal-head"><div><p className="kicker">CARTÃO DE ENVIO · RESPOSTA DO DIEGO</p><h2>{d === undefined ? "Abrindo…" : d ? (tocada || (resposta ? "Respondeu" : "Sem resposta")) : "Não achei"}</h2></div><button className="ghost" onClick={onFechar}>Fechar</button></div>
+      <div className="modal-head"><div><p className="kicker">CARTÃO DE ENVIO · RESPOSTA DO DIEGO</p><h2>{d === undefined ? "Abrindo…" : d ? (d.status === "aberta" ? "Confira e responda" : (tocada || (resposta ? "Respondeu" : "Sem resposta"))) : "Não achei"}</h2></div><button className="ghost" onClick={onFechar}>Fechar</button></div>
       {d === null && <p className="ficha-note">Esse cartão não existe ou você não está logado.</p>}
-      {d && <div className="form-grid">
+      {d && d.status === "aberta" && <DuvidaItem d={d} today={hojeISO()} db={db} demo={demo} notify={notify}
+        nome={cliente ? nomeDoCliente(cliente) : null} telefone={cliente ? cliente.telefone : null}
+        onOpenFicha={onOpenFicha ? (cid) => { onFechar(); onOpenFicha(cid); } : undefined}
+        onChanged={() => { setReleitura((n) => n + 1); if (onChanged) onChanged(); }} />}
+      {d && d.status !== "aberta" && <div className="form-grid">
         <p className="resposta-quando">{d.respondido_em ? `Tocou em ${quando(d.respondido_em)}` : "Ainda não respondeu"} · {STATUS_RESPOSTA[d.status] || d.status}</p>
         {extra && <p className="caixa-texto"><b>O que ele escreveu:</b> {extra}</p>}
         <p className="caixa-texto"><b>Pergunta:</b> {d.pergunta}</p>
