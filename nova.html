@@ -2201,10 +2201,19 @@ function comTituloVisivel(appointments, pessoais) {
 // A correção é de LEITURA, não de escrita: o item é projetado na fila a partir de `pessoais`, sem criar
 // nada no banco e sem exigir hora. Quem JÁ tem bloqueio planejado na agenda não entra aqui — senão o mesmo
 // compromisso apareceria duas vezes, que é justo o contador que faz ele parar de confiar na conta.
+// SOME SOZINHO NA HORA (Diego, 23/10/2026: "buscar minha esposa e filho na escola, ela durar só até 18 horas e
+// remover sozinha"). `pessoais.some_as` é a hora em que o item deixa de valer no próprio dia: passou dela, sai da
+// fila e do card Pessoais sem virar "atrasado". O banco fecha a linha logo depois (cron pessoal-some-sozinho);
+// o app esconde já na hora, sem esperar o cron.
+function pessoalExpirou(p, agora = new Date()) {
+  if (!p || !p.some_as || !p.data_alvo) return false;
+  const fim = new Date(`${p.data_alvo}T${String(p.some_as).slice(0, 5)}:00`);
+  return !isNaN(fim.getTime()) && agora >= fim;
+}
 function pessoaisNaFila(pessoais, appointments) {
   const comBloqueio = new Set((appointments || []).filter((a) => a.pessoal_id && a.status === "planejado").map((a) => a.pessoal_id));
   return (pessoais || [])
-    .filter((p) => p.status === "PENDENTE" && p.data_alvo && !comBloqueio.has(p.id))
+    .filter((p) => p.status === "PENDENTE" && p.data_alvo && !comBloqueio.has(p.id) && !pessoalExpirou(p))
     .map((p) => ({
       id: "pessoal:" + p.id, pessoal_virtual: true, pessoal_id: p.id,
       titulo: p.titulo, data: p.data_alvo, hora: p.hora ? String(p.hora).slice(0, 5) : null,
@@ -8296,7 +8305,7 @@ function PessoaisCard({ pessoais, bloqueios = [], hoje, db, demo, notify, onChan
   const bloqueioDe = (p) => (bloqueios || []).filter((a) => a.pessoal_id === p.id && a.status === "planejado").sort((a, b) => String(a.data).localeCompare(String(b.data)))[0] || null;
   const efetivo = (p) => { const b = bloqueioDe(p); return b ? { ...p, data_alvo: b.data, hora: b.hora, cidade: b.cidade || p.cidade } : p; };
   const esperandoData = acoes?.pessoaisRemarcando;
-  const ativos = (pessoais || []).filter((p) => p.status === "PENDENTE" && !(esperandoData && esperandoData.has(p.id))).map(efetivo);
+  const ativos = (pessoais || []).filter((p) => p.status === "PENDENTE" && !pessoalExpirou(p) && !(esperandoData && esperandoData.has(p.id))).map(efetivo);
   const encerrados = (pessoais || []).filter((p) => p.status !== "PENDENTE");
   const atrasados = ativos.filter((p) => pessoalAtrasado(p, hoje));
   const proximo = ativos.filter((p) => !pessoalAtrasado(p, hoje)).sort((a, b) => String(a.data_alvo || "9999").localeCompare(String(b.data_alvo || "9999")))[0];

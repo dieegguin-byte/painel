@@ -388,6 +388,60 @@ function avisosNaHora(lista: any[]): Envio[] {
   });
 }
 
+// ---------------------------------------------------------------- rotina fixada NA HORA, e a água
+//
+// DIEGO, 23/10/2026 (print das notificações do Feito/Adiar 1h): "quero que a notificação da rotina de água e comprar
+// pão apareça aqui". Rotina fixada no topo (rotinas.fixar_topo) que vence hoje e cuja hora chegou ganha o mesmo aviso
+// dos compromissos: Feito (ultima_execucao = hoje, igual ao ✓ Feito do app) e Adiar 1h (adiada_ate, igual ao ⏰ do app).
+// Um aviso por dia e por hora: a chave leva a data e o adiada_ate, então o Adiar 1h avisa de novo quando a hora vence.
+// Mesma janela de dia dos compromissos na hora.
+const botoesDaRotina = (r: any): Botao[] => [
+  { action: "a0", title: "Feito", plano: { tabela: "rotinas", id: String(r.id), resposta: "feito" } },
+  { action: "a1", title: "Adiar 1h", plano: { tabela: "rotinas", id: String(r.id), resposta: "adiar" } },
+];
+const chaveRotina = (r: any, hoje: string) => `rotina:${r.id}:${hoje}:${r.adiada_ate || r.hora || "-"}`;
+
+function avisosDasRotinas(lista: any[]): Envio[] {
+  return lista.map((r) => ({
+    chaves: [r.chave],
+    aviso: {
+      titulo: r.hora ? `Agora ${r.adiada_ate || r.hora} · ${nomeCurto(r.titulo)}` : String(r.titulo || "Rotina"),
+      corpo: [String(r.titulo || "").trim(), r.adiada_ate ? `Adiada, era ${r.hora}` : null].filter(Boolean).join("\n") || "Rotina de hoje",
+      tag: `rotina-${r.id}`,
+      url: "./nova.html",
+      acoes: botoesDaRotina(r),
+    },
+  }));
+}
+
+// A ÁGUA não é rotina com hora (Diego, 22/10/2026: "não pode adiar, tem que ficar o tempo todo, só falar quantas horas
+// eu tô sem beber água"). O contador do app fica vermelho com 3h sem Bebi; o aviso sai junto, com 3h, e repete a cada
+// hora enquanto ele não toca em Bebi (chave com o último copo e a vez). Mesma tag, então substitui na barra.
+// Janela própria, das 8h às 3h (Diego, 22/10/2026: "pode ser direto... tem dia que eu tô rodado até 2 horas e 3 horas
+// da manhã"). Só a faixa das 3h às 8h fica calada, que é quando ele dorme.
+const AGUA_AVISA_MIN = 180;
+const AGUA_REPETE_MIN = 60;
+const AGUA_HORA_INICIO = 8;
+const AGUA_HORA_FIM = 3;
+const aguaNaJanela = (hora: number) => hora >= AGUA_HORA_INICIO || hora < AGUA_HORA_FIM;
+const vezAgua = (ag: any) => Math.floor((Number(ag.minutos) - AGUA_AVISA_MIN) / AGUA_REPETE_MIN);
+const chaveAgua = (ag: any) => `agua:${ag.ultima_id}:${vezAgua(ag)}`;
+
+function avisoDaAgua(ag: any): Envio[] {
+  const min = Number(ag.minutos);
+  const tempo = `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}`;
+  return [{
+    chaves: [chaveAgua(ag)],
+    aviso: {
+      titulo: `💧 ${tempo} sem beber água`,
+      corpo: `Último copo às ${ag.ultima}. Bebe um copo agora.`,
+      tag: "agua",
+      url: "./nova.html",
+      acoes: [{ action: "a0", title: "Bebi", plano: { tabela: "agua", id: String(ag.ultima_id), resposta: "bebi" } }],
+    },
+  }];
+}
+
 // ---------------------------------------------------------------- cartões pra você
 //
 // DIEGO, 13/10/2026: "algumas coisas resolver por lá sem entrar no app, o WhatsApp mesmo responde rapidamente
@@ -644,9 +698,12 @@ Deno.serve(async (req) => {
       const duvidas = horaDeDia && CARTOES_NO_PUSH ? (pendencias.duvidas || []) : [];
       // Na hora, com botões (15/10/2026). Mesma janela de dia dos cartões: fora dela o card fica no app.
       const naHora = horaDeDia ? (pendencias.agenda_na_hora || []).filter(jaDecidido).filter(aindaInsiste) : [];
-      candidatos = leva.length + caixa.length + contas.length + duvidas.length + naHora.length;
+      const rotinas = horaDeDia ? (pendencias.rotinas_na_hora || []).map((r: any) => ({ ...r, chave: chaveRotina(r, String(pendencias.hoje)) })) : [];
+      const ag = pendencias.agua;
+      const agua = aguaNaJanela(hora) && ag && ag.ultima_id && Number(ag.minutos) >= AGUA_AVISA_MIN ? [ag] : [];
+      candidatos = leva.length + caixa.length + contas.length + duvidas.length + naHora.length + rotinas.length + agua.length;
       if (candidatos) {
-        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...naHora.map(chaveNaHora), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`)];
+        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...naHora.map(chaveNaHora), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`), ...rotinas.map((r: any) => r.chave), ...agua.map(chaveAgua)];
         const liberadas = new Set<string>(await rpc("push_reservar", { chaves }));
         envios = [
           ...avisosDaVarredura(
@@ -656,6 +713,8 @@ Deno.serve(async (req) => {
           ...avisosNaHora(naHora.filter((a: any) => liberadas.has(chaveNaHora(a)))),
           ...avisoContasD3(contas.filter((c: any) => liberadas.has(chaveConta(c)))),
           ...avisosDosCartoes(duvidas.filter((d: any) => liberadas.has(`duvida:${d.id}`))),
+          ...avisosDasRotinas(rotinas.filter((r: any) => liberadas.has(r.chave))),
+          ...agua.filter((a: any) => liberadas.has(chaveAgua(a))).flatMap(avisoDaAgua),
         ];
       }
     }
