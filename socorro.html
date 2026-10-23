@@ -149,6 +149,8 @@
       }
       if (navigator.serviceWorker) {
         const regs = await navigator.serviceWorker.getRegistrations();
+        // Fecha os avisos da barra ANTES de apagar o motor: depois, ninguém mais alcança eles (23/10/2026).
+        for (const r of regs) { try { if (r.getNotifications) (await r.getNotifications()).forEach((n) => n.close()); } catch (e) {} }
         await Promise.all(regs.map((r) => r.unregister()));
       }
     } catch (e) { /* mesmo falhando, reabrir sem cache já ajuda */ }
