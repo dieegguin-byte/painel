@@ -4607,6 +4607,7 @@ function Home() {
     const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [], duvidasAgente: da?.data || [], propostas: pr?.data || [] };
     aplicarPacote(pacote);
     fecharAvisosDeCards(new Set((pacote.appointments || []).map((a) => a.id)));
+    fecharAvisosResolvidos({ rotinas: pacote.rotinas || [] });
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
     // sinal é rotina. Só leitura: gravação offline ficaria numa fila que duplicaria compromisso e bateria
@@ -4758,7 +4759,8 @@ function Home() {
     // financeiro + agenda de uma vez vira UMA recarga, não três.
     // `agenda_recados` entrou em 14/10/2026: a faixa "Enviado ao Claude" lia só a lista do aparelho, então o que a Manu
     // processava, apagava ou recriava direto no banco não aparecia até fechar e abrir o app (faixa vazia das 10h05).
-    const TABELAS_VIVAS = ["agenda", "servicos", "financeiro", "caixa_entrada", "clientes", "pessoais", "avisos_operacionais", "duvidas_agente", "agenda_recados"];
+    // `rotinas` entrou em 23/10/2026: o Feito/Adiar 1h da notificação da rotina não aparecia no app aberto.
+    const TABELAS_VIVAS = ["agenda", "servicos", "financeiro", "caixa_entrada", "clientes", "pessoais", "avisos_operacionais", "duvidas_agente", "agenda_recados", "rotinas"];
     const canal = TABELAS_VIVAS.reduce(
       (ch, table) => ch.on("postgres_changes", { event: "*", schema: "public", table }, recarregarLogo),
       db.channel("operacao-viva")
@@ -6518,6 +6520,27 @@ async function fecharAvisosDeCards(manter, fechar) {
     }
   } catch (e) { /* sem permissão ou sem service worker: nada a fechar */ }
 }
+// ROTINA E ÁGUA TAMBÉM (Diego, 23/10/2026: "se eu confirmo que eu bebi água no aplicativo ou na notificação, eles não
+// somem um do outro. Já revisa as outras coisas assim também"). Mesma ideia dos cards: a cada carga o aviso "rotina-<id>"
+// sai da barra quando a rotina já não está pra fazer agora (Feito ou Não fiz grava o dia e a próxima fica pra frente,
+// Adiar 1h, rotina desligada), e o aviso "agua" sai quando o último copo tem menos de 3h (Bebi no app ou no PC).
+async function fecharAvisosResolvidos({ rotinas, aguaMin } = {}) {
+  try {
+    if (!("serviceWorker" in navigator)) return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg || !reg.getNotifications) return;
+    const porId = rotinas ? new Map(rotinas.map((r) => [String(r.id), r])) : null;
+    const hoje = hojeISO();
+    for (const n of await reg.getNotifications()) {
+      const tag = n.tag || "";
+      const rid = /^rotina-(.+)$/.exec(tag)?.[1];
+      if (rid && porId) {
+        const r = porId.get(rid);
+        if (!r || r.ativo === false || rotinaAdiada(r) || statusRotina(r, hoje).estado === "futura") n.close();
+      } else if (tag === "agua" && aguaMin != null && aguaMin < AGUA_VERMELHO_MIN) n.close();
+    }
+  } catch (e) { /* sem permissão ou sem service worker: nada a fechar */ }
+}
 function alarmeSilenciar(id) {
   try { const o = alarmeSilenciados(); o[id] = Date.now(); localStorage.setItem("tb_alarme_silenciados", JSON.stringify(o)); } catch (e) {}
 }
@@ -8011,13 +8034,22 @@ function ContadorAgua({ db, demo, notify }) {
   const [gravando, setGravando] = useState(false);
   const [, setTique] = useState(0);
   useEffect(() => { const t = window.setInterval(() => setTique((n) => n + 1), 30000); return () => clearInterval(t); }, []);
+  // RELÊ O ÚLTIMO COPO a cada 30 s e ao voltar pro app (23/10/2026: o Bebi da notificação grava no banco e o contador,
+  // que só lia uma vez ao abrir, continuava "sem beber há 3h"). Leu menos de 3h: o aviso de água sai da barra.
   useEffect(() => {
     if (demo || !db) return;
     let vivo = true;
-    db.from("agua").select("bebi_em").order("bebi_em", { ascending: false }).limit(1).then(({ data }) => {
-      if (!vivo) return; setUltima(data && data[0] ? new Date(data[0].bebi_em).getTime() : null); setCarregou(true);
+    const ler = () => db.from("agua").select("bebi_em").order("bebi_em", { ascending: false }).limit(1).then(({ data, error }) => {
+      if (!vivo || error) return;
+      const t = data && data[0] ? new Date(data[0].bebi_em).getTime() : null;
+      setUltima(t); setCarregou(true);
+      if (t) fecharAvisosResolvidos({ aguaMin: Math.floor((Date.now() - t) / 60000) });
     });
-    return () => { vivo = false; };
+    ler();
+    const t = window.setInterval(ler, 30000);
+    const aoVoltar = () => { if (document.visibilityState === "visible") ler(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => { vivo = false; clearInterval(t); document.removeEventListener("visibilitychange", aoVoltar); };
   }, [db, demo]);
   const bebi = async () => {
     setGravando(true);
@@ -8025,6 +8057,7 @@ function ContadorAgua({ db, demo, notify }) {
     setUltima(Date.now()); vibrar(10);
     try {
       if (!demo) { const { error } = await db.from("agua").insert({}); if (error) throw error; }
+      fecharAvisosResolvidos({ aguaMin: 0 });
       notify("💧 Boa! Contador zerado.", "ok");
     } catch (e) { setUltima(antes); notify("Erro: " + e.message, "error"); } finally { setGravando(false); }
   };
