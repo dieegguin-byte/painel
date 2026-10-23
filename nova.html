@@ -4875,7 +4875,7 @@ function Home() {
   // O card continua planejado no banco e o recado aberto em agenda_recados: a rotina do Claude acha os dois e
   // move. Até lá ele sai de toda tela, como a pendência da Regra Nº 12 — por isso o filtro é aqui, na coleção
   // central, e não no card: contador, rota e seletores de horário também deixam de contar com ele.
-  const remarcarAbertos = useMemo(() => new Set(acoesAgenda.recados.filter((r) => !r.processado_em && ACOES_QUE_ESCONDEM_O_CARD.includes(r.acao)).map((r) => r.agenda_id)), [acoesAgenda.recados]);
+  const remarcarAbertos = useMemo(() => idsComToque(acoesAgenda.recados, acoesAgenda.comManu), [acoesAgenda.recados, acoesAgenda.comManu]);
   const agendaVisivel = useMemo(() => compromissosOperacionais(appointments, inbox).filter((a) => !(remarcarAbertos.has(a.id) && someComToque(a))), [appointments, inbox, remarcarAbertos]);
   const claudeQueue = useMemo(() => inbox.filter((item) => ["respondido", "novo"].includes(statusDaCaixa(item))).sort((a, b) => {
     const priority = (value) => value === "respondido" ? 0 : 1;
@@ -6703,7 +6703,26 @@ const ACOES_QUE_ESCONDEM_O_CARD = ["remarcar", "recado"];
 // VISITA NÃO SOME (21/10/2026, Debora: tocou Remarcar às 13h11 na visita das 14h e, na hora de sair pra atender, "essa
 // cliente sumiu"). Card presencial com toque pendente continua na tela, no horário dele, com o selo de remarcar
 // pendente, até a Manu dar a data nova. Os outros cards continuam sumindo como ele pediu em 20/10.
-const someComToque = (a) => !!a && a.tipo !== "presencial";
+// SÓ A VISITA QUE AINDA VAI ACONTECER (23/10/2026, Larissa: "Buscar o sofá" das 13h05, tipo presencial, já atrasado; ele
+// tocou Manu resolve e depois Remarcar às 14h16 e "não sumiu com nenhum dos dois"). A regra da Debora vale pra visita
+// que ainda está pela frente; card presencial cuja hora já passou some com o toque, igual aos outros.
+const someComToque = (a) => {
+  if (!a) return false;
+  if (a.tipo !== "presencial") return true;
+  const quando = a.data && a.hora ? new Date(`${a.data}T${String(a.hora).slice(0, 5)}:00`) : null;
+  return !quando || isNaN(quando.getTime()) || quando <= new Date();
+};
+// Cards com toque pendente: Remarcar e recado ainda não lidos (agenda_recados) e Manu resolve que a Manu ainda não
+// pegou (caixa_entrada origem manu_resolve). Manu resolve entrou em 23/10/2026, pela mesma fala da Larissa.
+function idsComToque(recados, comManu) {
+  const ids = new Set((recados || []).filter((r) => !r.processado_em && ACOES_QUE_ESCONDEM_O_CARD.includes(r.acao)).map((r) => r.agenda_id));
+  for (const m of comManu || []) {
+    if (m.processado) continue;
+    const id = (m.conversa || []).map((c) => c?.meta?.agenda_id).find(Boolean);
+    if (id) ids.add(id);
+  }
+  return ids;
+}
 
 function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointments, recarga = 0 }) {
   const [recados, setRecados] = useState([]);
@@ -10063,7 +10082,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
   // data nova"; agora cumpre: card com recado de remarcar ainda não lido some do Painel (lista e contador) e só
   // volta quando a Manu o mover (o recado processado deixa de esconder) ou se ela não conseguir.
   const acoesCtxPainel = React.useContext(AcoesAgendaCtx);
-  const idsRemarcando = useMemo(() => new Set((acoesCtxPainel?.recados || []).filter((r) => ACOES_QUE_ESCONDEM_O_CARD.includes(r.acao) && !r.processado_em).map((r) => r.agenda_id)), [acoesCtxPainel]);
+  const idsRemarcando = useMemo(() => idsComToque(acoesCtxPainel?.recados, acoesCtxPainel?.comManu), [acoesCtxPainel]);
   // PRIORIDADE DO MOMENTO (Diego, 22/10/2026: "como se eu saísse de lá de dentro dos compromissos e fosse para meus
   // negócios prioridade do momento... e saísse das listas"): card com `urgente` sai de Atrasados, Hoje e Próximos e
   // fica só no topo. Tirar a prioridade devolve ele pro lugar dele.
