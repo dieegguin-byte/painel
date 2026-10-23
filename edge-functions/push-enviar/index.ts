@@ -417,11 +417,13 @@ function avisosDasRotinas(lista: any[]): Envio[] {
 // A ÁGUA não é rotina com hora (Diego, 22/10/2026: "não pode adiar, tem que ficar o tempo todo, só falar quantas horas
 // eu tô sem beber água"). O contador do app fica vermelho com 3h sem Bebi; o aviso sai junto, com 3h, e repete a cada
 // hora enquanto ele não toca em Bebi (chave com o último copo e a vez). Mesma tag, então substitui na barra.
-// Janela própria até 23h: ele roda até tarde, mas aviso de água de madrugada só acorda.
+// Janela própria, das 8h às 3h (Diego, 22/10/2026: "pode ser direto... tem dia que eu tô rodado até 2 horas e 3 horas
+// da manhã"). Só a faixa das 3h às 8h fica calada, que é quando ele dorme.
 const AGUA_AVISA_MIN = 180;
 const AGUA_REPETE_MIN = 60;
 const AGUA_HORA_INICIO = 8;
-const AGUA_HORA_FIM = 23;
+const AGUA_HORA_FIM = 3;
+const aguaNaJanela = (hora: number) => hora >= AGUA_HORA_INICIO || hora < AGUA_HORA_FIM;
 const vezAgua = (ag: any) => Math.floor((Number(ag.minutos) - AGUA_AVISA_MIN) / AGUA_REPETE_MIN);
 const chaveAgua = (ag: any) => `agua:${ag.ultima_id}:${vezAgua(ag)}`;
 
@@ -698,7 +700,7 @@ Deno.serve(async (req) => {
       const naHora = horaDeDia ? (pendencias.agenda_na_hora || []).filter(jaDecidido).filter(aindaInsiste) : [];
       const rotinas = horaDeDia ? (pendencias.rotinas_na_hora || []).map((r: any) => ({ ...r, chave: chaveRotina(r, String(pendencias.hoje)) })) : [];
       const ag = pendencias.agua;
-      const agua = hora >= AGUA_HORA_INICIO && hora < AGUA_HORA_FIM && ag && ag.ultima_id && Number(ag.minutos) >= AGUA_AVISA_MIN ? [ag] : [];
+      const agua = aguaNaJanela(hora) && ag && ag.ultima_id && Number(ag.minutos) >= AGUA_AVISA_MIN ? [ag] : [];
       candidatos = leva.length + caixa.length + contas.length + duvidas.length + naHora.length + rotinas.length + agua.length;
       if (candidatos) {
         const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...naHora.map(chaveNaHora), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`), ...rotinas.map((r: any) => r.chave), ...agua.map(chaveAgua)];
