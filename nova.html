@@ -4606,7 +4606,7 @@ function Home() {
     setOfflineDesde(null);
     const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [], duvidasAgente: da?.data || [], propostas: pr?.data || [] };
     aplicarPacote(pacote);
-    fecharAvisosDeCards(new Set((pacote.appointments || []).map((a) => a.id)));
+    fecharAvisosDeCards(new Set((pacote.appointments || []).map((a) => a.id)), null, new Map((pacote.appointments || []).map((a) => [a.id, a])));
     fecharAvisosResolvidos({ rotinas: pacote.rotinas || [] });
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
@@ -4880,7 +4880,7 @@ function Home() {
   // O AVISO DO CELULAR SAI JUNTO (Diego, 23/10/2026: "está atrasado em relação ao app", com o "Agora 13:05 · Buscar o sofá
   // da Larissa" ainda na barra depois do Remarcar). Card que sumiu da tela pelo toque também sai da barra de notificações.
   const escondidosPeloToque = useMemo(() => appointments.filter((a) => remarcarAbertos.has(a.id) && someComToque(a)).map((a) => a.id).sort().join(","), [appointments, remarcarAbertos]);
-  useEffect(() => { if (escondidosPeloToque) fecharAvisosDeCards(null, escondidosPeloToque.split(",")); }, [escondidosPeloToque]);
+  useEffect(() => { if (escondidosPeloToque) fecharAvisosDeCards(null, escondidosPeloToque.split(",")); }, [escondidosPeloToque, recargaN]);
   const claudeQueue = useMemo(() => inbox.filter((item) => ["respondido", "novo"].includes(statusDaCaixa(item))).sort((a, b) => {
     const priority = (value) => value === "respondido" ? 0 : 1;
     return priority(a.status) - priority(b.status) || new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
@@ -6512,7 +6512,19 @@ function alarmeSilenciados() {
 // da barra fecham sozinhos, mas o Feito dentro do app, o da Manu e o toque pelos atalhos do Niagara (que abre
 // o app em vez de acionar o botão) deixavam o aviso parado. Agora, a cada carga, todo aviso "agenda-<id>" de card
 // que não está mais planejado é fechado; e Adiar 1h no app fecha o aviso daquele card na hora.
-async function fecharAvisosDeCards(manter, fechar) {
+// AVISO COM HORA VELHA SAI TAMBÉM (Diego, 23/10/2026: "está atrasado em relação ao app"). "Agora 10:55 · Cobrar Wedson"
+// ficou 3h na barra depois de o card ir pra segunda 08:50, e o "Agora 13:05 · Buscar o sofá da Larissa" depois de o card
+// ir pras 17:00: os dois continuavam planejados, então a regra de cima mantinha o aviso. O título traz a hora do card
+// ("Agora 13:05 · …" ou "13:05 · …"); se o card mudou de dia ou de hora, o aviso fala de um horário que não existe mais
+// e sai. Na hora nova chega o aviso novo, com a mesma tag.
+function avisoComHoraVelha(n, card) {
+  const hora = /^(?:Agora )?(\d{2}:\d{2}) · /.exec(n.title || "")?.[1];
+  if (!hora || !card) return false;
+  const quando = n.timestamp ? new Date(n.timestamp) : new Date();
+  const dia = `${quando.getFullYear()}-${String(quando.getMonth() + 1).padStart(2, "0")}-${String(quando.getDate()).padStart(2, "0")}`;
+  return String(card.hora || "").slice(0, 5) !== hora || (!!card.data && card.data !== dia);
+}
+async function fecharAvisosDeCards(manter, fechar, cards) {
   try {
     if (!("serviceWorker" in navigator)) return;
     const reg = await navigator.serviceWorker.getRegistration();
@@ -6520,7 +6532,7 @@ async function fecharAvisosDeCards(manter, fechar) {
     for (const n of await reg.getNotifications()) {
       const id = /^agenda-(.+)$/.exec(n.tag || "")?.[1];
       if (!id) continue;
-      if ((fechar && fechar.includes(id)) || (manter && !manter.has(id))) n.close();
+      if ((fechar && fechar.includes(id)) || (manter && !manter.has(id)) || (cards && avisoComHoraVelha(n, cards.get(id)))) n.close();
     }
   } catch (e) { /* sem permissão ou sem service worker: nada a fechar */ }
 }
