@@ -10769,6 +10769,20 @@ function calcularOrcamento({ mo, material, divisor, frete, ajudante, viagem }) {
 // ?ir=resposta&id=<duvidas_agente.id> abre o cartão de envio já respondido: o que foi perguntado, o texto que vai,
 // a opção que ele tocou e quando. Lê a linha direto do banco, em qualquer status (respondida, aplicada, descartada).
 const STATUS_RESPOSTA = { aberta: "Ainda sem resposta", respondida: "Respondida, esperando a Manu", aplicada: "Respondida e já aplicada pela Manu", descartada: "Pulada (não manda)" };
+// ENVIO PELA ZAPIA NÃO É "JÁ APLICADA" (Manu, 23/10/2026, Suzany: o cartão dizia "Respondida e já aplicada pela Manu",
+// a Zapia leu como já enviado e o texto não saiu na rodada das 14h20). No cartão de envio (o texto vai pela Zapia) o
+// status diz o passo real: tocou Manda, a Manu passa o recado pra Zapia, "ainda NÃO enviada, esperando a Zapia", até o
+// RETORNO dela com RECADO ENVIADO, quando a Manu grava duvidas_agente.enviado_em. "Não manda" segue como antes.
+const ehEnvioDaZapia = (d) => Array.isArray(d?.opcoes) && d.opcoes.some((o) => /^manda\b/i.test(String(o)))
+  && (/zapia/i.test(String(d.contexto || "")) || Object.values(d.plano && typeof d.plano === "object" ? d.plano : {}).some((v) => /zapia/i.test(String(v))));
+const vaiPelaZapia = (d) => ehEnvioDaZapia(d) && /^(manda|mudar)/i.test(String(d.resposta || ""));
+function statusDaResposta(d) {
+  if (!vaiPelaZapia(d)) return STATUS_RESPOSTA[d.status] || d.status;
+  if (d.enviado_em) return `✓ Enviada pela Zapia em ${dataHoraCurta(d.enviado_em)}`;
+  if (d.status === "aplicada") return "⏳ Passada pra Zapia · ainda NÃO enviada, esperando a Zapia enviar";
+  if (d.status === "respondida") return "Esperando a Manu passar pra Zapia · ainda NÃO enviada";
+  return STATUS_RESPOSTA[d.status] || d.status;
+}
 // AINDA SEM RESPOSTA = OS BOTÕES (Diego, 23/10/2026, print do cartão da Suzany: "tem que ter o botão lá só para me
 // confirmar, ver o que está sendo enviado, confirmar"). Cartão aberto chega pelo link com o texto que vai e as mesmas
 // opções dos Cartões pra você (DuvidaItem). Tocou, o cartão relê e mostra a resposta com dia e hora, como antes.
@@ -10778,7 +10792,7 @@ function RespostaDoDiego({ db, demo, id, onFechar, notify, customers = [], onOpe
   useEffect(() => {
     if (demo) { setD((demoDuvidas || []).find((x) => String(x.id) === String(id)) || null); return; }
     if (!db) return;
-    db.from("duvidas_agente").select("id,pergunta,contexto,opcoes,resposta,status,respondido_em,aplicado_em,criado_em,origem,cliente_id").eq("id", id).maybeSingle()
+    db.from("duvidas_agente").select("*").eq("id", id).maybeSingle()
       .then(({ data }) => setD(data || null), () => setD(null));
   }, [db, demo, id, releitura]);
   const cliente = d && d.cliente_id ? (customers || []).find((c) => c.id === d.cliente_id) : null;
@@ -10796,11 +10810,11 @@ function RespostaDoDiego({ db, demo, id, onFechar, notify, customers = [], onOpe
         onOpenFicha={onOpenFicha ? (cid) => { onFechar(); onOpenFicha(cid); } : undefined}
         onChanged={() => { setReleitura((n) => n + 1); if (onChanged) onChanged(); }} />}
       {d && d.status !== "aberta" && <div className="form-grid">
-        <p className="resposta-quando">{d.respondido_em ? `Tocou em ${quando(d.respondido_em)}` : "Ainda não respondeu"} · {STATUS_RESPOSTA[d.status] || d.status}</p>
+        <p className="resposta-quando">{d.respondido_em ? `Tocou em ${quando(d.respondido_em)}` : "Ainda não respondeu"} · {statusDaResposta(d)}</p>
         {extra && <p className="caixa-texto"><b>O que ele escreveu:</b> {extra}</p>}
         <p className="caixa-texto"><b>Pergunta:</b> {d.pergunta}</p>
         {d.contexto && <p className="caixa-texto"><b>O que vai:</b> {d.contexto}</p>}
-        <small className="ficha-note">Criado em {quando(d.criado_em)}{d.aplicado_em ? ` · aplicado em ${quando(d.aplicado_em)}` : ""} · código {String(d.id).slice(0, 8)}</small>
+        <small className="ficha-note">Criado em {quando(d.criado_em)}{d.aplicado_em ? ` · ${vaiPelaZapia(d) ? "passado pra Zapia" : "aplicado"} em ${quando(d.aplicado_em)}` : ""} · código {String(d.id).slice(0, 8)}</small>
       </div>}
     </div>
   </div>;
