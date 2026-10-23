@@ -4877,6 +4877,10 @@ function Home() {
   // central, e não no card: contador, rota e seletores de horário também deixam de contar com ele.
   const remarcarAbertos = useMemo(() => idsComToque(acoesAgenda.recados, acoesAgenda.comManu), [acoesAgenda.recados, acoesAgenda.comManu]);
   const agendaVisivel = useMemo(() => compromissosOperacionais(appointments, inbox).filter((a) => !(remarcarAbertos.has(a.id) && someComToque(a))), [appointments, inbox, remarcarAbertos]);
+  // O AVISO DO CELULAR SAI JUNTO (Diego, 23/10/2026: "está atrasado em relação ao app", com o "Agora 13:05 · Buscar o sofá
+  // da Larissa" ainda na barra depois do Remarcar). Card que sumiu da tela pelo toque também sai da barra de notificações.
+  const escondidosPeloToque = useMemo(() => appointments.filter((a) => remarcarAbertos.has(a.id) && someComToque(a)).map((a) => a.id).sort().join(","), [appointments, remarcarAbertos]);
+  useEffect(() => { if (escondidosPeloToque) fecharAvisosDeCards(null, escondidosPeloToque.split(",")); }, [escondidosPeloToque]);
   const claudeQueue = useMemo(() => inbox.filter((item) => ["respondido", "novo"].includes(statusDaCaixa(item))).sort((a, b) => {
     const priority = (value) => value === "respondido" ? 0 : 1;
     return priority(a.status) - priority(b.status) || new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime();
@@ -7015,6 +7019,8 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
 
 // Selo SEMPRE visível (fora do corpo recolhido): remarcação do Claude esperando conferência e recados que a
 // rotina ainda não leu. É o que impede ele de achar que o toque "não pegou".
+// Botões com nome do que fazem (Diego, 23/10/2026: "não estou entendendo esse mudar"): o primeiro só confirma que ele
+// leu e o aviso some, o segundo abre o card pra ele trocar dia ou hora.
 function SelosClaudeDoCard({ a, acoes, onMudar }) {
   const abertos = acoes.recados.filter((r) => r.agenda_id === a.id && !r.processado_em);
   return <>
@@ -7022,8 +7028,8 @@ function SelosClaudeDoCard({ a, acoes, onMudar }) {
       <b>🔁 Mudado pela Manu</b>
       <span>{a.nota_claude}</span>
       <div className="selo-botoes">
-        <button type="button" className="primary" onClick={() => acoes.manter(a)}>Manter</button>
-        <button type="button" className="ghost" onClick={onMudar}>Mudar</button>
+        <button type="button" className="primary" onClick={() => acoes.manter(a)}>👍 Entendi, tá certo</button>
+        <button type="button" className="ghost" onClick={onMudar}>✏️ Mudar dia ou hora</button>
       </div>
     </div>}
     {abertos.length > 0 && <p className="selo-recado">{abertos.some((r) => r.acao === "remarcar") ? "🔁 Remarcar pendente: a Manu escolhe o dia novo. Até lá a visita fica aqui no horário dela." : `⏳ ${abertos.map((r) => ACAO_RECADO_ROTULO[r.acao] || r.acao).join(" · ")} enviado. A Manu lê na próxima rodada (${HORARIOS_ROTINA_RECADOS}).`}</p>}
@@ -9995,8 +10001,8 @@ function MudancasDaManu({ appointments = [] }) {
     {lista.map((a) => <div key={a.id} className="mudanca-linha">
       <span><b>{a.titulo_visivel || a.titulo}</b><small>agora: {a.data ? a.data.split("-").reverse().slice(0, 2).join("/") : "sem data"}{a.hora ? `, ${String(a.hora).slice(0, 5)}` : ""}</small><small className="mudanca-motivo">{a.nota_claude}</small></span>
       <div className="mudanca-botoes">
-        <button type="button" className="primary" disabled={busyId === a.id} onClick={async () => { vibrar(6); setBusyId(a.id); try { await acoes.manter(a); } finally { setBusyId(null); } }}>{busyId === a.id ? "…" : "Manter"}</button>
-        <button type="button" className="ghost" onClick={() => { vibrar(6); FOCO.chegada = a.id; FOCO.abrir(a.id); }}>Mudar</button>
+        <button type="button" className="primary" disabled={busyId === a.id} onClick={async () => { vibrar(6); setBusyId(a.id); try { await acoes.manter(a); } finally { setBusyId(null); } }}>{busyId === a.id ? "…" : "👍 Entendi, tá certo"}</button>
+        <button type="button" className="ghost" onClick={() => { vibrar(6); FOCO.chegada = a.id; FOCO.abrir(a.id); }}>✏️ Mudar dia ou hora</button>
       </div>
     </div>)}
   </CardRecolhivel>;
