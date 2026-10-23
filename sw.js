@@ -230,11 +230,15 @@ self.addEventListener('fetch', (e) => {
 
 // Aviso gerado ha mais que isto chegou atrasado (Chrome dormindo no celular): aparece, mas sem tocar nem vibrar (v28).
 const ATRASO_CALADO_MS = 10 * 60 * 1000;
+// Quantos eventos push estao rodando agora neste SW. Enquanto houver algum, fechar aviso velho nunca esvazia a barra (v28).
+let pushesRodando = 0;
 
 // NOTIFICACAO CHEGANDO. Quem manda e a Edge Function push-enviar; a carga vem cifrada com a chave deste
 // aparelho, entao `e.data.json()` ja e o texto pronto - nada de buscar no Supabase daqui (o SW nao
 // enxerga o localStorage da pagina, logo nao tem a sessao do Diego).
 self.addEventListener('push', (e) => {
+  pushesRodando++;
+  const terminou = function () { pushesRodando = Math.max(0, pushesRodando - 1); };
   let aviso = null;
   try { aviso = e.data ? e.data.json() : null; } catch (err) { aviso = null; }
   // SEMPRE mostrar alguma coisa. Push recebido sem notificacao exibida faz o Android mostrar o aviso
@@ -270,30 +274,42 @@ self.addEventListener('push', (e) => {
     self.registration.showNotification(titulo, opcoes)
       // Se o Chrome recusar alguma opcao, mostra o basico: push sem aviso e pior que aviso simples.
       .catch(function () { return self.registration.showNotification(titulo, { body: corpo, tag: opcoes.tag, data: opcoes.data }); })
-      .then(function () { return fecharAvisosVelhos(recibo, atrasado); })
+      .then(function () { return fecharAvisosVelhos(opcoes.tag, atrasado); })
       .then(avisarAbas)
-  ]));
+  ]).then(terminou, terminou));
 });
 
 // AVISO VELHO SAI SOZINHO (v28). Pergunta ao banco quais dos avisos na barra ja nao valem e fecha esses. O que acabou
-// de chegar fica fora da pergunta (o servidor montou agora), a nao ser que tenha chegado atrasado; e mesmo velho so
-// sai se sobrar outro aviso na barra - push que termina sem nenhum aviso visivel faz o Chrome mostrar o generico
-// "atualizado em segundo plano". Sem rede ou sem resposta em 8 s, nao fecha nada.
-function fecharAvisosVelhos(reciboNovo, novoAtrasado) {
+// de chegar (a tag dele) fica fora da pergunta - o servidor montou agora -, a nao ser que tenha chegado atrasado. Sem
+// rede ou sem resposta em 8 s, nao fecha nada.
+// BARRA NUNCA VAZIA DURANTE UM PUSH: push que termina sem nenhum aviso visivel faz o Chrome mostrar o generico
+// "atualizado em segundo plano". Dois pushes atrasados chegando juntos (o celular acordando) fechavam cada um o do
+// outro e a barra esvaziava (reproduzido no Chromium). Por isso: uma fila so (um fechamento por vez), a barra relida
+// logo antes de fechar, e, com push rodando, o aviso mais novo fica mesmo velho - sai no proximo aviso ou toque.
+let filaDeFechar = Promise.resolve();
+function fecharAvisosVelhos(tagNova, novoAtrasado) {
+  filaDeFechar = filaDeFechar.then(function () { return fecharVelhosAgora(tagNova, novoAtrasado); }).catch(function () {});
+  return filaDeFechar;
+}
+function fecharVelhosAgora(tagNova, novoAtrasado) {
   return self.registration.getNotifications().then(function (lista) {
     const perguntar = lista.filter(function (n) {
-      return n.data && n.data.recibo && (n.data.recibo !== reciboNovo || novoAtrasado);
+      return n.data && n.data.recibo && (n.tag !== tagNova || novoAtrasado);
     });
     if (!perguntar.length) return;
     return perguntarVelhos(perguntar.map(function (n) { return n.data.recibo; })).then(function (velhos) {
-      let restam = lista.length;
-      let novo = null;
-      perguntar.forEach(function (n) {
-        if (velhos.indexOf(n.data.recibo) === -1) return;
-        if (n.data.recibo === reciboNovo) { novo = n; return; }
-        n.close(); restam--;
+      if (!velhos.length) return;
+      return self.registration.getNotifications().then(function (barra) {
+        const fechar = barra.filter(function (n) { return n.data && n.data.recibo && velhos.indexOf(n.data.recibo) !== -1; });
+        if (pushesRodando > 0 && fechar.length && fechar.length === barra.length) {
+          let fica = fechar[0];
+          fechar.forEach(function (n) {
+            if (n.tag === tagNova || (fica.tag !== tagNova && (n.timestamp || 0) > (fica.timestamp || 0))) fica = n;
+          });
+          fechar.splice(fechar.indexOf(fica), 1);
+        }
+        fechar.forEach(function (n) { n.close(); });
       });
-      if (novo && restam > 1) novo.close();
     });
   }).catch(function () {});
 }
@@ -307,12 +323,14 @@ function perguntarVelhos(recibos) {
     .catch(function () { return []; })
     .then(function (velhos) { if (prazo) clearTimeout(prazo); return velhos; });
 }
-// Com o app aberto, a aba recarrega os cards: o que chegou no celular aparece no app (v28).
-function avisarAbas() {
+// Recado pras abas abertas do app, sem abrir nem focar janela (v28): {tipo:'aviso'} recarrega os cards, pro que chegou
+// no celular aparecer no app; {tipo:'ir', url} leva a aba pro link.
+function postarNasAbas(recado) {
   return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (abas) {
-    abas.forEach(function (aba) { try { aba.postMessage({ tipo: 'aviso' }); } catch (err) { /* aba sem message */ } });
+    abas.forEach(function (aba) { try { aba.postMessage(recado); } catch (err) { /* aba sem message */ } });
   }).catch(function () {});
 }
+function avisarAbas() { return postarNasAbas({ tipo: 'aviso' }); }
 
 // DESLIZOU PRA FORA DA BARRA (v28): viu e dispensou. O recibo ganha `dispensado` e o aviso insistente para. Sem isto
 // so o toque contava, e o aviso tirado da barra voltava em 5 min. So dispara quando a PESSOA fecha: o close() do app
@@ -362,7 +380,11 @@ self.addEventListener('notificationclick', (e) => {
         // Gravou: resolvido, a notificacao sai. Nao gravou: fica na barra e o app abre pra ele resolver la.
         if (gravou === true) { e.notification.close(); return; }
         if (gravou === 'lento') {
-          return Promise.all([abrirApp(destino), resposta.then(function (g) { if (g === true) e.notification.close(); })]);
+          return Promise.all([abrirApp(destino), resposta.then(function (g) {
+            if (g === true) { e.notification.close(); return; }
+            // Card de conta (v27) que respondeu depois do prazo: o app ja abriu, e a aba recebe o link da pergunta "Pagou?".
+            if (typeof g === 'string') return postarNasAbas({ tipo: 'ir', url: new URL(g, self.location).href });
+          })]);
         }
         // Card de conta (v27): o banco manda abrir o card com a pergunta "Pagou?" em vez de dar baixa.
         return abrirApp(typeof gravou === 'string' ? new URL(gravou, self.location).href : destino);

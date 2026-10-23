@@ -358,6 +358,7 @@ where r.enviado_em < now() - interval '24 hours'
    or case
      when r.tag like 'agenda-%' then not exists (
        select 1 from agenda a
+       left join pessoais pe on pe.id = a.pessoal_id
        where a.id::text = substr(r.tag, 8)
          and a.status = 'planejado' and a.hora is not null
          and case when r.item ? 'hora'
@@ -365,8 +366,8 @@ where r.enviado_em < now() - interval '24 hours'
                   else ((a.data + a.hora) at time zone 'America/Sao_Paulo') between r.enviado_em - interval '31 minutes' and r.enviado_em + interval '61 minutes'
              end
          and not (a.id in (select ct.id from com_toque ct) and not (a.tipo = 'presencial' and (a.data + a.hora) > agora.t))
-         and coalesce(a.titulo, '') !~* '^\s*decidir\M'
-         and coalesce(a.titulo, '') !~* '^\s*(follow[\s-]?up\s*\d+|contato\s+zapia|zapia\s+(envia|manda))\s*[—–-]')
+         and coalesce(nullif(btrim(pe.titulo), ''), a.titulo, '') !~* '^\s*decidir\M'
+         and coalesce(nullif(btrim(pe.titulo), ''), a.titulo, '') !~* '^\s*(follow[\s-]?up\s*\d+|contato\s+zapia|zapia\s+(envia|manda))\s*[—–-]')
      when r.tag like 'rotina-%' then not exists (
        select 1 from rotinas ro
        where ro.id::text = substr(r.tag, 8) and ro.ativo and ro.fixar_topo
@@ -413,13 +414,19 @@ revoke all on function public.push_segurar_lembrete(uuid) from public, anon;
 
 grant execute on function public.push_segurar_lembrete(uuid) to authenticated, service_role;
 
--- 9. Virada sem repetir (rodar logo antes do deploy do push-enviar): as chaves novas levam o dia, então quem já está
---    na janela de 60 min, ou já recebeu o aviso na hora hoje, ganha a chave nova como já avisado.
+-- 9. Virada sem repetir. Rodar as duas logo ANTES do deploy do push-enviar e de novo logo DEPOIS (pega o que a função
+--    velha mandou no meio; repetir não duplica nada). As chaves novas levam o dia e a hora:
+--    - card que ganhou o lembrete de 60 min na chave velha (agenda:<id>) nos últimos 75 min, pra hora que ele tem agora,
+--      ganha a chave nova como já avisado; card que ainda não ganhou lembrete continua ganhando;
+--    - quem já recebeu o aviso na hora hoje ganha as chaves novas da hora e da repetição.
 insert into public.push_enviados (chave)
 select 'agenda:' || a.id::text || ':' || a.data::text || ':' || to_char(a.hora, 'HH24:MI')
 from public.agenda a
+join public.push_enviados e on e.chave = 'agenda:' || a.id::text
 where a.status = 'planejado' and a.data is not null and a.hora is not null
-  and (a.data + a.hora) <= (now() at time zone 'America/Sao_Paulo') + interval '75 minutes'
+  and (a.data + a.hora) >= (now() at time zone 'America/Sao_Paulo')
+  and e.enviado_em > now() - interval '75 minutes'
+  and ((a.data + a.hora) at time zone 'America/Sao_Paulo') <= e.enviado_em + interval '65 minutes'
 on conflict (chave) do nothing;
 
 insert into public.push_enviados (chave)

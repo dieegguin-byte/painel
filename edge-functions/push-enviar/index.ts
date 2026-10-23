@@ -154,10 +154,12 @@ const MAX_BOTOES = 2;
 // QUANTO TEMPO O AVISO ESPERA NA FILA DO GOOGLE (23/10/2026, revisão "o aviso tem que sumir"). Com o Chrome dormindo
 // no celular, o Google guarda o aviso e entrega quando ele acorda — com TTL de 24h, chegava de uma vez tudo o que tinha
 // saído no dia, horas depois ("Agora 13:05" às 17h). Agora cada aviso diz até quando vale (`ttl`, em segundos: o
-// lembrete de 60 min vale até a hora do card, o da hora 15 min, a água 1h) e o Google descarta o vencido. E o `Topic`
-// (um por tag) faz o aviso novo do mesmo card SUBSTITUIR o que ainda estava na fila, em vez de chegarem os cinco.
+// lembrete de 60 min vale até a hora do card, o da hora 15 min, a água 1h) e o Google descarta o vencido. O que ainda
+// chega atrasado aparece calado e sai da barra pelo modo=validar.
+// SEM `Topic` DE PROPÓSITO: o Google guarda no máximo 4 tópicos por aparelho enquanto ele dorme e descarta os outros
+// sem garantia de quais — com um tópico por card, uma tarde cheia perderia lembrete que ainda valia, e a chave já
+// reservada não deixaria reenviar.
 const TTL_PADRAO = 3600;
-const topicoDe = (tag: unknown) => String(tag || "").replace(/[^A-Za-z0-9]/g, "").slice(-32);
 
 async function entregar(assinatura: Assinatura, aviso: unknown): Promise<{ ok: boolean; status: number; erro: string; recibo?: string }> {
   const vp = await vapid();
@@ -178,7 +180,6 @@ async function entregar(assinatura: Assinatura, aviso: unknown): Promise<{ ok: b
   const recibo = await rpc("push_recibo_abrir", { p_tag: resto.tag ?? null, p_acoes: plano, p_item: item ?? null });
   const carga = { ...resto, recibo, item: item ?? undefined, gerado_em: new Date().toISOString(), acoes: botoes.length ? botoes.map((b) => ({ action: b.action, title: b.title })) : undefined };
   const corpo = await cifrar(JSON.stringify(carga), assinatura.p256dh, assinatura.auth);
-  const topico = topicoDe(resto.tag);
   const r = await fetch(assinatura.endpoint, {
     method: "POST",
     headers: {
@@ -186,7 +187,6 @@ async function entregar(assinatura: Assinatura, aviso: unknown): Promise<{ ok: b
       "Content-Type": "application/octet-stream",
       TTL: String(Math.max(60, Math.round(Number(ttl) || TTL_PADRAO))),
       Urgency: "high",
-      ...(topico ? { Topic: topico } : {}),
       Authorization: `vapid t=${await jwtVapid(audiencia, vp.jwk)}, k=${vp.publica}`,
     },
     body: corpo,
