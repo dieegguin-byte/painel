@@ -89,6 +89,8 @@ window.TB = window.TB || {};
       }
       if (navigator.serviceWorker) {
         const registros = await navigator.serviceWorker.getRegistrations();
+        // Fecha os avisos da barra ANTES de apagar o service worker: depois, ninguém mais alcança eles (23/10/2026).
+        for (const r of registros) { try { if (r.getNotifications) (await r.getNotifications()).forEach((n) => n.close()); } catch (e) {} }
         await Promise.all(registros.map((r) => r.unregister()));
       }
     } catch (e) { /* se não deu pra limpar, recarregar ainda é melhor que ficar parado */ }
@@ -1655,6 +1657,8 @@ function BotaoNotificacao({ db, demo, notify }) {
         await assinatura.unsubscribe();
       }
       marcarAvisoMudo(true);
+      // Desligou: o que já estava na barra sai junto (23/10/2026), senão ficava parado lá sem ninguém pra fechar.
+      fecharTodosOsAvisos();
       setEstado("desligado");
       notify("Aviso desligado neste aparelho: nem push, nem alarme na tela.", "info");
     } catch (e) { notify("Não deu pra desligar: " + (e?.message || e), "error"); }
@@ -4452,8 +4456,11 @@ function Home() {
   // O sw.js v20 só foca a aba e manda a URL por postMessage; aqui ela vira o mesmo que o ?ir= na abertura.
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
+    let recarga = null;
     const ouvir = (ev) => {
       const m = ev.data || {};
+      // CHEGOU AVISO NO CELULAR COM O APP ABERTO (sw.js v28): recarrega os cards, pro app mostrar o mesmo que a barra.
+      if (m.tipo === "aviso") { clearTimeout(recarga); recarga = setTimeout(() => { if (window.__tbAtualizar) window.__tbAtualizar(); }, 1500); return; }
       if (m.tipo !== "ir" || !m.url) return;
       let u; try { u = new URL(m.url, location.href).searchParams; } catch (e) { return; }
       const ir = u.get("ir");
@@ -4463,7 +4470,7 @@ function Home() {
       if (["caixa", "futuro", "compras", "leads"].includes(ir)) setTab(ir);
     };
     navigator.serviceWorker.addEventListener("message", ouvir);
-    return () => navigator.serviceWorker.removeEventListener("message", ouvir);
+    return () => { clearTimeout(recarga); navigator.serviceWorker.removeEventListener("message", ouvir); };
   }, []);
   const [explicar, setExplicar] = useState(null);
   const [concluirAppt, setConcluirAppt] = useState(null);
@@ -4608,6 +4615,7 @@ function Home() {
     aplicarPacote(pacote);
     fecharAvisosDeCards(new Set((pacote.appointments || []).map((a) => a.id)), null, new Map((pacote.appointments || []).map((a) => [a.id, a])));
     fecharAvisosResolvidos({ rotinas: pacote.rotinas || [] });
+    conferirAvisosNoServidor();
     // LEITURA OFFLINE: guarda a última carga boa no aparelho com a hora em que veio. Sem sinal, o app abre
     // com isso em vez de tela vazia — o Diego trabalha em Valparaíso, Novo Gama e Riacho Fundo, onde cair
     // sinal é rotina. Só leitura: gravação offline ficaria numa fila que duplicaria compromisso e bateria
@@ -6517,9 +6525,15 @@ function alarmeSilenciados() {
 // ir pras 17:00: os dois continuavam planejados, então a regra de cima mantinha o aviso. O título traz a hora do card
 // ("Agora 13:05 · …" ou "13:05 · …"); se o card mudou de dia ou de hora, o aviso fala de um horário que não existe mais
 // e sai. Na hora nova chega o aviso novo, com a mesma tag.
+// DIA E HORA DO PRÓPRIO AVISO (23/10/2026, sw.js v28): o aviso novo traz em `data.item` o dia e a hora do card quando
+// saiu. Com ele não precisa adivinhar pelo título — o lembrete de 60 min das 23:30 de um card de 00:15 não parece mais
+// "outro dia". O título fica só pros avisos que chegaram antes do v28.
 function avisoComHoraVelha(n, card) {
+  if (!card) return false;
+  const item = n.data && n.data.item;
+  if (item && item.hora) return String(card.hora || "").slice(0, 5) !== item.hora || (!!item.data && !!card.data && card.data !== item.data);
   const hora = /^(?:Agora )?(\d{2}:\d{2}) · /.exec(n.title || "")?.[1];
-  if (!hora || !card) return false;
+  if (!hora) return false;
   const quando = n.timestamp ? new Date(n.timestamp) : new Date();
   const dia = `${quando.getFullYear()}-${String(quando.getMonth() + 1).padStart(2, "0")}-${String(quando.getDate()).padStart(2, "0")}`;
   return String(card.hora || "").slice(0, 5) !== hora || (!!card.data && card.data !== dia);
@@ -6556,6 +6570,43 @@ async function fecharAvisosResolvidos({ rotinas, aguaMin } = {}) {
       } else if (tag === "agua" && aguaMin != null && aguaMin < AGUA_VERMELHO_MIN) n.close();
     }
   } catch (e) { /* sem permissão ou sem service worker: nada a fechar */ }
+}
+// TODO TIPO DE AVISO, PELO BANCO (Diego, 23/10/2026: "Ela tem que sumir. Não tá sumindo quando eu tô executando"). As duas
+// de cima só olham card, rotina e água, e só o que este aparelho carregou. Esta pergunta ao banco (push-enviar?modo=validar,
+// a mesma que o sw.js v28 faz a cada aviso que chega) quais avisos da barra já não valem — conta paga, cartão respondido,
+// resumo de ontem, caixa processada, card resolvido no PC ou pela Manu — e fecha esses. Uma vez a cada 15 s no máximo:
+// a carga roda a cada evento do canal vivo.
+const PUSH_FUNCAO = `${SUPABASE_URL}/functions/v1/push-enviar`;
+let avisosConferidosEm = 0;
+async function conferirAvisosNoServidor() {
+  try {
+    if (!("serviceWorker" in navigator) || Date.now() - avisosConferidosEm < 15000) return;
+    avisosConferidosEm = Date.now();
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg || !reg.getNotifications) return;
+    const lista = (await reg.getNotifications()).filter((n) => n.data && n.data.recibo).slice(0, 20);
+    if (!lista.length) return;
+    const r = await fetch(`${PUSH_FUNCAO}?modo=validar&recibos=${lista.map((n) => encodeURIComponent(n.data.recibo)).join(",")}`, { cache: "no-store" });
+    if (!r.ok) return;
+    const velhos = new Set(((await r.json()) || {}).velhos || []);
+    for (const n of lista) if (velhos.has(n.data.recibo)) n.close();
+  } catch (e) { /* sem rede ou sem permissão: fica pra próxima carga */ }
+}
+// Fechar TODOS os avisos deste app na barra: ao desligar o aviso e antes de apagar o service worker (Limpar e abrir de
+// novo). Aviso de um service worker apagado fica órfão na barra: o toque não faz mais nada e o app não alcança ele.
+async function fecharTodosOsAvisos() {
+  try {
+    if (!("serviceWorker" in navigator)) return;
+    for (const reg of await navigator.serviceWorker.getRegistrations()) {
+      if (reg.getNotifications) for (const n of await reg.getNotifications()) n.close();
+    }
+  } catch (e) { /* sem permissão: nada a fechar */ }
+}
+// ADIAR 1H NO APP SEGURA O LEMBRETE DE 60 MIN (23/10/2026). A chave do lembrete leva a hora do card: adiado pra daqui a
+// 1h, o card entrava de novo na janela e o celular avisava "em 55 min" logo em seguida. O Adiar da notificação já faz
+// isto no banco; aqui é o mesmo pra o Adiar do card atrasado e do alarme. Falhou, segue: o pior é um lembrete a mais.
+function segurarLembrete(db, id) {
+  try { if (db && id) db.rpc("push_segurar_lembrete", { p_agenda: id }).then(() => {}, () => {}); } catch (e) { /* segue */ }
 }
 function alarmeSilenciar(id) {
   try { const o = alarmeSilenciados(); o[id] = Date.now(); localStorage.setItem("tb_alarme_silenciados", JSON.stringify(o)); } catch (e) {}
@@ -6659,6 +6710,9 @@ function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppoi
       }
       if (!gravou) throw erro || new Error("não deu pra adiar");
       try { await db.from("historico").insert({ o_que: `Adiado 1h: ${alvo.titulo}`, por: "diego", detalhe: "Pelo alarme do app." }); } catch (e) { /* segue */ }
+      // O aviso da barra é do horário velho: sai, e o lembrete de 60 min da hora nova não sai (23/10/2026).
+      fecharAvisosDeCards(null, [alvo.id]);
+      segurarLembrete(db, alvo.id);
       notify("Adiado 1 hora. Aviso de novo na hora nova.", "ok");
       alarmeSilenciar(alvo.id); setAlvo(null);
       if (onChanged) onChanged();
@@ -6822,7 +6876,8 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     // Histórico é registro, não trava: se falhar, a ação já valeu.
     try { await db.from("historico").insert({ o_que: `${ACAO_RECADO_ROTULO[acao]}: ${a.titulo}`, por: "diego", detalhe: limpo || (audioPath ? "(áudio)" : null) }); } catch (e) { /* segue */ }
     setRecados((prev) => [...prev, rec]);
-    if (patch) setAppointments((prev) => prev.filter((x) => x.id !== a.id));
+    // Feito ou Cancelar: o aviso do card sai da barra na hora, sem esperar a recarga (23/10/2026).
+    if (patch) { setAppointments((prev) => prev.filter((x) => x.id !== a.id)); fecharAvisosDeCards(null, [a.id]); }
     notify(acao === "feito" ? "Feito. Saiu da agenda." + avisoPessoal
       : acao === "cancelar" ? "Cancelado. Saiu da agenda." + avisoPessoal
       : acao === "remarcar" ? (someComToque(a) ? `Remarcar anotado. O card sai da tela e volta no dia que a Manu escolher. Desfazer fica na seção da Manu.` : `Remarcar anotado. A visita fica na tela no horário de agora até a Manu dar o dia novo. Desfazer fica na seção da Manu.`)
@@ -6942,6 +6997,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     try { await db.from("historico").insert({ o_que: `Adiado 1h: ${a.titulo}`, por: "diego", detalhe: `Pelo card atrasado, de ${a.data}${a.hora ? " " + String(a.hora).slice(0, 5) : ""} para hoje ${gravou.slice(0, 5)}.` }); } catch (e) { /* segue */ }
     setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, data, hora: gravou } : x));
     fecharAvisosDeCards(null, [a.id]);
+    segurarLembrete(db, a.id);
     notify(`Adiado pra ${gravou.slice(0, 5)}. Aviso de novo na hora nova.`, "ok");
     if (onChanged) onChanged();
     return true;
@@ -10769,6 +10825,20 @@ function calcularOrcamento({ mo, material, divisor, frete, ajudante, viagem }) {
 // ?ir=resposta&id=<duvidas_agente.id> abre o cartão de envio já respondido: o que foi perguntado, o texto que vai,
 // a opção que ele tocou e quando. Lê a linha direto do banco, em qualquer status (respondida, aplicada, descartada).
 const STATUS_RESPOSTA = { aberta: "Ainda sem resposta", respondida: "Respondida, esperando a Manu", aplicada: "Respondida e já aplicada pela Manu", descartada: "Pulada (não manda)" };
+// ENVIO PELA ZAPIA NÃO É "JÁ APLICADA" (Manu, 23/10/2026, Suzany: o cartão dizia "Respondida e já aplicada pela Manu",
+// a Zapia leu como já enviado e o texto não saiu na rodada das 14h20). No cartão de envio (o texto vai pela Zapia) o
+// status diz o passo real: tocou Manda, a Manu passa o recado pra Zapia, "ainda NÃO enviada, esperando a Zapia", até o
+// RETORNO dela com RECADO ENVIADO, quando a Manu grava duvidas_agente.enviado_em. "Não manda" segue como antes.
+const ehEnvioDaZapia = (d) => Array.isArray(d?.opcoes) && d.opcoes.some((o) => /^manda\b/i.test(String(o)))
+  && (/zapia/i.test(String(d.contexto || "")) || Object.values(d.plano && typeof d.plano === "object" ? d.plano : {}).some((v) => /zapia/i.test(String(v))));
+const vaiPelaZapia = (d) => ehEnvioDaZapia(d) && /^(manda|mudar)/i.test(String(d.resposta || ""));
+function statusDaResposta(d) {
+  if (!vaiPelaZapia(d)) return STATUS_RESPOSTA[d.status] || d.status;
+  if (d.enviado_em) return `✓ Enviada pela Zapia em ${dataHoraCurta(d.enviado_em)}`;
+  if (d.status === "aplicada") return "⏳ Passada pra Zapia · ainda NÃO enviada, esperando a Zapia enviar";
+  if (d.status === "respondida") return "Esperando a Manu passar pra Zapia · ainda NÃO enviada";
+  return STATUS_RESPOSTA[d.status] || d.status;
+}
 // AINDA SEM RESPOSTA = OS BOTÕES (Diego, 23/10/2026, print do cartão da Suzany: "tem que ter o botão lá só para me
 // confirmar, ver o que está sendo enviado, confirmar"). Cartão aberto chega pelo link com o texto que vai e as mesmas
 // opções dos Cartões pra você (DuvidaItem). Tocou, o cartão relê e mostra a resposta com dia e hora, como antes.
@@ -10778,7 +10848,7 @@ function RespostaDoDiego({ db, demo, id, onFechar, notify, customers = [], onOpe
   useEffect(() => {
     if (demo) { setD((demoDuvidas || []).find((x) => String(x.id) === String(id)) || null); return; }
     if (!db) return;
-    db.from("duvidas_agente").select("id,pergunta,contexto,opcoes,resposta,status,respondido_em,aplicado_em,criado_em,origem,cliente_id").eq("id", id).maybeSingle()
+    db.from("duvidas_agente").select("*").eq("id", id).maybeSingle()
       .then(({ data }) => setD(data || null), () => setD(null));
   }, [db, demo, id, releitura]);
   const cliente = d && d.cliente_id ? (customers || []).find((c) => c.id === d.cliente_id) : null;
@@ -10796,11 +10866,11 @@ function RespostaDoDiego({ db, demo, id, onFechar, notify, customers = [], onOpe
         onOpenFicha={onOpenFicha ? (cid) => { onFechar(); onOpenFicha(cid); } : undefined}
         onChanged={() => { setReleitura((n) => n + 1); if (onChanged) onChanged(); }} />}
       {d && d.status !== "aberta" && <div className="form-grid">
-        <p className="resposta-quando">{d.respondido_em ? `Tocou em ${quando(d.respondido_em)}` : "Ainda não respondeu"} · {STATUS_RESPOSTA[d.status] || d.status}</p>
+        <p className="resposta-quando">{d.respondido_em ? `Tocou em ${quando(d.respondido_em)}` : "Ainda não respondeu"} · {statusDaResposta(d)}</p>
         {extra && <p className="caixa-texto"><b>O que ele escreveu:</b> {extra}</p>}
         <p className="caixa-texto"><b>Pergunta:</b> {d.pergunta}</p>
         {d.contexto && <p className="caixa-texto"><b>O que vai:</b> {d.contexto}</p>}
-        <small className="ficha-note">Criado em {quando(d.criado_em)}{d.aplicado_em ? ` · aplicado em ${quando(d.aplicado_em)}` : ""} · código {String(d.id).slice(0, 8)}</small>
+        <small className="ficha-note">Criado em {quando(d.criado_em)}{d.aplicado_em ? ` · ${vaiPelaZapia(d) ? "passado pra Zapia" : "aplicado"} em ${quando(d.aplicado_em)}` : ""} · código {String(d.id).slice(0, 8)}</small>
       </div>}
     </div>
   </div>;
@@ -14321,7 +14391,7 @@ if ('serviceWorker' in navigator) {
   };
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (tinhaControle) recarregar(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && recargaPendente) recarregar(); });
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=21').then((reg) => {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=22').then((reg) => {
     const checar = () => reg.update().catch(() => {});
     checar();
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checar(); });

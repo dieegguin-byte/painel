@@ -148,12 +148,23 @@ async function cifrar(texto: string, p256dh: string, auth: string): Promise<Uint
 type Assinatura = { id: string; endpoint: string; p256dh: string; auth: string };
 // Um botão da notificação: `action` é a letra que o aparelho devolve, `title` o rótulo, `plano` o que o banco
 // faz quando ela volta (push_acao). O Chrome no Android mostra no máximo 2.
-type Botao = { action: string; title: string; plano: { tabela: string; id?: string; resposta?: string } };
+type Botao = { action: string; title: string; plano: { tabela: string; id?: string; resposta?: string; data?: string; hora?: string } };
 const MAX_BOTOES = 2;
+
+// QUANTO TEMPO O AVISO ESPERA NA FILA DO GOOGLE (23/10/2026, revisão "o aviso tem que sumir"). Com o Chrome dormindo
+// no celular, o Google guarda o aviso e entrega quando ele acorda — com TTL de 24h, chegava de uma vez tudo o que tinha
+// saído no dia, horas depois ("Agora 13:05" às 17h). Agora cada aviso diz até quando vale (`ttl`, em segundos: o
+// lembrete de 60 min vale até a hora do card, o da hora 15 min, a água 1h) e o Google descarta o vencido. O que ainda
+// chega atrasado aparece calado e sai da barra pelo modo=validar.
+// SEM `Topic` DE PROPÓSITO: o Google guarda no máximo 4 tópicos por aparelho enquanto ele dorme e descarta os outros
+// sem garantia de quais — com um tópico por card, uma tarde cheia perderia lembrete que ainda valia, e a chave já
+// reservada não deixaria reenviar.
+const TTL_PADRAO = 3600;
 
 async function entregar(assinatura: Assinatura, aviso: unknown): Promise<{ ok: boolean; status: number; erro: string; recibo?: string }> {
   const vp = await vapid();
   const audiencia = new URL(assinatura.endpoint).origin;
+  const { ttl, item, ...resto } = (aviso || {}) as any;
   // TELEMETRIA DE ENTREGA. Sem isto eu só enxergo até o Google: ele devolve 201 em 1 segundo e a
   // notificação some de vista. O recibo viaja DENTRO da carga cifrada; o service worker devolve no
   // instante em que o evento `push` chega nele. Comparar as duas horas separa as duas causas
@@ -161,17 +172,20 @@ async function entregar(assinatura: Assinatura, aviso: unknown): Promise<{ ok: b
   // BOTÕES (13/10/2026). O plano do que cada botão faz fica no recibo, no banco; a carga leva só a letra e
   // o rótulo. O aparelho devolve "a0"/"a1" e o banco aplica o que ele mesmo gravou — ninguém consegue
   // mandar uma resposta que a pergunta não ofereceu.
-  const botoes: Botao[] = Array.isArray((aviso as any)?.acoes) ? (aviso as any).acoes : [];
+  // ITEM (23/10/2026): de qual card/rotina/conta é o aviso, e com que dia e hora saiu. Fica no recibo (é com ele que o
+  // push_validar diz "esse já não vale") e vai na carga, junto com a hora em que foi gerado (o SW mostra calado o que
+  // chega atrasado).
+  const botoes: Botao[] = Array.isArray(resto.acoes) ? resto.acoes : [];
   const plano = botoes.length ? Object.fromEntries(botoes.map((b) => [b.action, b.plano])) : null;
-  const recibo = await rpc("push_recibo_abrir", { p_tag: (aviso as any)?.tag ?? null, p_acoes: plano });
-  const carga = { ...(aviso as any), recibo, acoes: botoes.length ? botoes.map((b) => ({ action: b.action, title: b.title })) : undefined };
+  const recibo = await rpc("push_recibo_abrir", { p_tag: resto.tag ?? null, p_acoes: plano, p_item: item ?? null });
+  const carga = { ...resto, recibo, item: item ?? undefined, gerado_em: new Date().toISOString(), acoes: botoes.length ? botoes.map((b) => ({ action: b.action, title: b.title })) : undefined };
   const corpo = await cifrar(JSON.stringify(carga), assinatura.p256dh, assinatura.auth);
   const r = await fetch(assinatura.endpoint, {
     method: "POST",
     headers: {
       "Content-Encoding": "aes128gcm",
       "Content-Type": "application/octet-stream",
-      TTL: "86400",
+      TTL: String(Math.max(60, Math.round(Number(ttl) || TTL_PADRAO))),
       Urgency: "high",
       Authorization: `vapid t=${await jwtVapid(audiencia, vp.jwk)}, k=${vp.publica}`,
     },
@@ -274,14 +288,15 @@ function linhasDaAgenda(lista: any[], max = 8): string {
   return mostradas.join("\n");
 }
 
+// SEM CORRENTE (23/10/2026, revisão "o aviso tem que sumir"): a leva encadeava os seguintes enquanto o intervalo fosse
+// de até 60 min, e quem vinha no fim da corrente ganhava o lembrete horas antes (08:00, 08:45, 09:30, 10:15 → os quatro
+// às 07:00) — e de novo na hora. Desde 15/10 cada compromisso já é um aviso próprio, então a corrente só antecipava.
+// Agora cada card ganha o lembrete quando ELE entra na janela de 60 min. A chave leva o dia e a hora do card
+// (agenda:<id>:<data>:<hora>): card remarcado pra outro horário é lembrado de novo antes da hora nova, e o Adiar 1h
+// (da notificação ou do app) já reserva a chave da hora nova, porque ele acabou de mexer no card.
+const chaveLeva = (a: any) => `agenda:${a.id}:${a.data}:${a.hora}`;
 function levaDaAgenda(agenda: any[]): any[] {
-  if (!agenda.length || !agenda[0].na_janela) return [];
-  const leva = [agenda[0]];
-  for (let i = 1; i < agenda.length; i++) {
-    if (agenda[i].faltam - leva[leva.length - 1].faltam > 60) break;
-    leva.push(agenda[i]);
-  }
-  return leva;
+  return agenda.filter((a) => a.na_janela);
 }
 
 // Recebe SÓ o que ainda não foi notificado (a reserva acontece antes, no roteador). Por isso pode
@@ -297,7 +312,7 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
   // Classic, que não existem mais.)
   for (const a of agenda) {
     lista.push({
-      chaves: [`agenda:${a.id}`],
+      chaves: [chaveLeva(a)],
       aviso: {
         // Título curto (hora + quem/onde) e o card inteiro no corpo: ver textoDoCompromisso.
         titulo: `${a.hora} · ${nomeCurto(a.titulo)}`,
@@ -305,6 +320,9 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
         tag: `agenda-${a.id}`,
         url: a.cliente_id ? `./nova.html?ir=ficha&id=${a.cliente_id}` : `./nova.html?ir=agenda&card=${a.id}`,
         acoes: botoesDoCompromisso(a),
+        item: itemDoCompromisso(a),
+        // Vale até a hora do card: depois dela, quem avisa é o aviso da hora.
+        ttl: Math.max(300, Number(a.faltam || 0) * 60),
       },
     });
   }
@@ -320,6 +338,7 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
         corpo: String(c.texto || "").replace(/\s+/g, " ").slice(0, 140),
         tag: `caixa-${c.id}`,
         url: "./nova.html?ir=caixa",
+        item: { tipo: "caixa", ids: [String(c.id)] },
       },
     });
   } else if (caixa.length > 1) {
@@ -330,6 +349,7 @@ function avisosDaVarredura(agenda: any[], caixa: any[]): Envio[] {
         corpo: caixa.map((c) => String(c.texto || "").replace(/\s+/g, " ").slice(0, 50)).join(" · ").slice(0, 170),
         tag: "caixa-lote",
         url: "./nova.html?ir=caixa",
+        item: { tipo: "caixa", ids: caixa.map((c) => String(c.id)) },
       },
     });
   }
@@ -354,10 +374,13 @@ function textoDoCompromisso(a: any, extra: string | null = null): string {
   const onde = [a.local, a.cidade].filter(Boolean).join(" · ");
   return [String(a.titulo || "").trim(), onde, extra].filter(Boolean).join("\n") || "Compromisso agendado";
 }
+// O plano leva o dia e a hora do card quando o aviso saiu: o Adiar de um aviso velho (card já remarcado) não empurra o
+// horário novo, só tira o aviso da barra (push_acao, 23/10/2026).
 const botoesDoCompromisso = (a: any): Botao[] => [
-  { action: "a0", title: "Feito", plano: { tabela: "agenda", id: String(a.id), resposta: "feito" } },
-  { action: "a1", title: "Adiar 1h", plano: { tabela: "agenda", id: String(a.id), resposta: "adiar" } },
+  { action: "a0", title: "Feito", plano: { tabela: "agenda", id: String(a.id), resposta: "feito", data: a.data ?? undefined, hora: a.hora ?? undefined } },
+  { action: "a1", title: "Adiar 1h", plano: { tabela: "agenda", id: String(a.id), resposta: "adiar", data: a.data ?? undefined, hora: a.hora ?? undefined } },
 ];
+const itemDoCompromisso = (a: any) => ({ tipo: "agenda", id: String(a.id), data: a.data ?? null, hora: a.hora ?? null });
 
 // AVISO INSISTENTE (Diego, 15/10/2026: "meu celular tá do meu lado, mas tá carregando" e o aviso passa
 // despercebido; esqueceu a Luana). Enquanto o card segue planejado e ele NÃO tocou no aviso (corpo ou botão —
@@ -365,11 +388,18 @@ const botoesDoCompromisso = (a: any): Botao[] => [
 // até 5 vezes dentro dos 30 min da janela: mesma tag, então substitui na tela, mas toca e vibra outra vez.
 // A chave leva a hora e a vez (agenda-hora:<id>:<hora>:<n>): Adiar 1h muda a hora, logo a nova hora avisa
 // de novo sem precisar soltar chave nenhuma.
+// REPETIÇÃO CONTADA POR DIA (23/10/2026, revisão "o aviso tem que sumir"): cada remarcada da Manu recomeçava as cinco
+// vezes — o "Wedson, conferir o Pix" mudou de hora três vezes no dia e tocou quinze. Agora a primeira vez de cada
+// horário continua (agenda-hora:<id>:<data>:<hora>:0, o "chegou a hora"), mas as repetições são no máximo 4 por card
+// por dia (agenda-hora:<id>:<data>:r<n>), e param quando ele toca OU desliza o aviso pra fora da barra (`visto` conta
+// o dia inteiro e o dispensado; antes só o toque contava, e o aviso dispensado voltava em 5 min).
 const REPETE_A_CADA_MIN = 5;
 const REPETE_MAX = 5;
 const vezDoAviso = (a: any) => Math.floor(Math.max(0, Number(a.passaram || 0)) / REPETE_A_CADA_MIN);
-const chaveNaHora = (a: any) => `agenda-hora:${a.id}:${a.hora}:${vezDoAviso(a)}`;
+const chaveNaHora = (a: any) => vezDoAviso(a) === 0 ? `agenda-hora:${a.id}:${a.data}:${a.hora}:0` : `agenda-hora:${a.id}:${a.data}:r${vezDoAviso(a)}`;
 const aindaInsiste = (a: any) => vezDoAviso(a) < REPETE_MAX && (vezDoAviso(a) === 0 || !a.visto);
+// Aviso da hora vale 15 min na fila do Google: depois disso já saiu outro, ou o card passou.
+const TTL_NA_HORA = 900;
 
 function avisosNaHora(lista: any[]): Envio[] {
   return lista.map((a) => {
@@ -383,6 +413,8 @@ function avisosNaHora(lista: any[]): Envio[] {
         // Tocar no corpo abre a ficha da cliente (com o WhatsApp dela); sem cliente, a Agenda no card.
         url: a.cliente_id ? `./nova.html?ir=ficha&id=${a.cliente_id}` : `./nova.html?ir=agenda&card=${a.id}`,
         acoes,
+        item: itemDoCompromisso(a),
+        ttl: TTL_NA_HORA,
       },
     };
   });
@@ -410,6 +442,8 @@ function avisosDasRotinas(lista: any[]): Envio[] {
       tag: `rotina-${r.id}`,
       url: "./nova.html",
       acoes: botoesDaRotina(r),
+      item: { tipo: "rotina", id: String(r.id) },
+      ttl: 3600,
     },
   }));
 }
@@ -424,20 +458,39 @@ const AGUA_REPETE_MIN = 60;
 const AGUA_HORA_INICIO = 8;
 const AGUA_HORA_FIM = 3;
 const aguaNaJanela = (hora: number) => hora >= AGUA_HORA_INICIO || hora < AGUA_HORA_FIM;
-const vezAgua = (ag: any) => Math.floor((Number(ag.minutos) - AGUA_AVISA_MIN) / AGUA_REPETE_MIN);
-const chaveAgua = (ag: any) => `agua:${ag.ultima_id}:${vezAgua(ag)}`;
+// ÀS 08:00 UMA VEZ SÓ (23/10/2026, revisão "o aviso tem que sumir"). A vez contava do último copo; com o copo da
+// madrugada, a virada da vez caía logo depois das 08:00 e o celular tocava duas vezes em minutos (08:00 e 08:20).
+// Agora o primeiro aviso é às 3h do último copo OU na abertura da janela (08:00), o que vier depois, e os seguintes de
+// hora em hora a partir dali. Durante o dia dá o mesmo de antes (3h, 4h, 5h…), então a chave não muda. A conta usa o
+// segundo exato do último copo (ultima_id) e o relógio, não minutos arredondados, pra duas varreduras darem a mesma vez.
+const SP_MENOS_UTC_HORAS = 3; // São Paulo sem horário de verão desde 2019: sempre UTC-3.
+const MIN_MS = 60_000;
+function vezAgua(ag: any, agoraSP: string, agoraMs = Date.now()): number {
+  const ultimo = Number(ag.ultima_id) * 1000;
+  const [ano, mes, dia] = String(agoraSP).slice(0, 10).split("-").map(Number);
+  let abertura = Date.UTC(ano, mes - 1, dia, AGUA_HORA_INICIO + SP_MENOS_UTC_HORAS);
+  if (Number(String(agoraSP).slice(11, 13)) < AGUA_HORA_INICIO) abertura -= 24 * 60 * MIN_MS;
+  const primeira = Math.max(ultimo + AGUA_AVISA_MIN * MIN_MS, abertura);
+  const vezDesdeAPrimeira = Math.floor(Math.max(0, agoraMs - primeira) / (AGUA_REPETE_MIN * MIN_MS));
+  const desta = primeira + vezDesdeAPrimeira * AGUA_REPETE_MIN * MIN_MS;
+  return Math.floor((desta - ultimo - AGUA_AVISA_MIN * MIN_MS) / (AGUA_REPETE_MIN * MIN_MS));
+}
+const chaveAgua = (ag: any, agoraSP: string) => `agua:${ag.ultima_id}:${vezAgua(ag, agoraSP)}`;
 
 function avisoDaAgua(ag: any): Envio[] {
   const min = Number(ag.minutos);
   const tempo = `${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}`;
   return [{
-    chaves: [chaveAgua(ag)],
+    chaves: [ag.chave],
     aviso: {
       titulo: `💧 ${tempo} sem beber água`,
       corpo: `Último copo às ${ag.ultima}. Bebe um copo agora.`,
       tag: "agua",
       url: "./nova.html",
       acoes: [{ action: "a0", title: "Bebi", plano: { tabela: "agua", id: String(ag.ultima_id), resposta: "bebi" } }],
+      item: { tipo: "agua", ultima_id: ag.ultima_id },
+      // A próxima vem em 1h: o aviso da fila que passar disso já foi substituído.
+      ttl: AGUA_REPETE_MIN * 60,
     },
   }];
 }
@@ -456,7 +509,20 @@ function avisoDaAgua(ag: any): Envio[] {
 // Pela mesma fala ("a Manu tem que perguntar quando eu abrir o app"), os cartões pra você também ficam só no app.
 // Se ele pedir as perguntas de volta no celular, CARTOES_NO_PUSH = true devolve tudo como era.
 const CARTOES_NO_PUSH = false;
-const jaDecidido = (a: any) => !/^\s*decidir\b/i.test(String(a?.titulo || ""));
+// CARD QUE A ZAPIA MANDA TAMBÉM NÃO (23/10/2026, revisão "o aviso tem que sumir"). "Zapia envia — Alex…", "Follow-up 1 —
+// Gina" e "Contato Zapia — …" são trabalho da Zapia: ele não tem o que executar, então o aviso insistia de 5 em 5 min
+// sem ter como sumir. Mesma regra do verde no app (ehFollowUpZapia), mais o "Zapia envia —" que a Manu cria. O
+// "Follow-up — Nome" sem número é ele quem faz, e continua avisando.
+const ZAPIA_MANDA = /^\s*(follow[\s-]?up\s*\d+|contato\s+zapia|zapia\s+(envia|manda))\s*[—–-]/i;
+const paraODiego = (a: any) => {
+  const titulo = String(a?.titulo || "");
+  return !/^\s*decidir\b/i.test(titulo) && !ZAPIA_MANDA.test(titulo);
+};
+// CAIXA DE ENTRADA SEM AVISO (23/10/2026, mesma revisão). Tudo o que entra na Caixa é o próprio Diego (Anotar, áudio,
+// compartilhar do WhatsApp, Remarcar pessoal, Manu resolve): o aviso "Nova entrada na caixa" contava pra ele o que ele
+// tinha acabado de fazer, e não fechava nunca. O resumo das 07:30 continua dizendo quantos estão na caixa.
+// CAIXA_NO_PUSH = false devolve o aviso como era.
+const CAIXA_NO_PUSH = true;
 
 const quemPergunta = (origem: string) => ({ agente: "Manu", manu: "Manu", auditoria: "Auditoria", pix: "Pix", caixa: "Caixa", claude: "Claude" } as Record<string, string>)[String(origem || "agente").toLowerCase()] || String(origem || "Manu");
 
@@ -470,7 +536,7 @@ function avisosDosCartoes(duvidas: any[]): Envio[] {
     }));
     const corpo = [String(d.pergunta || ""), d.cliente ? `(${d.cliente})` : null, opcoes.length > MAX_BOTOES ? `Mais opções no app.` : null]
       .filter(Boolean).join(" ").slice(0, 240);
-    return { chaves: [`duvida:${d.id}`], aviso: { titulo: `${quemPergunta(d.origem)} pergunta`, corpo, tag: `duvida-${d.id}`, url: "./nova.html", acoes } };
+    return { chaves: [`duvida:${d.id}`], aviso: { titulo: `${quemPergunta(d.origem)} pergunta`, corpo, tag: `duvida-${d.id}`, url: "./nova.html", acoes, item: { tipo: "duvida", id: String(d.id) }, ttl: 6 * 3600 } };
   });
 }
 
@@ -539,6 +605,8 @@ function avisoContasD3(contas: any[]): Envio[] {
       corpo: `${q[0].toUpperCase()}${q.slice(1)}${Number(c.dias) >= 2 ? "" : ` (${dataCurta(c.data)})`} · conta ${c.escopo === "pessoal" ? "pessoal" : "da empresa"}. Fica em ${soMaterial ? "Compras" : "A pagar"} até você marcar como paga.`,
       tag: `conta-${c.id}`,
       url,
+      item: { tipo: "conta", ids: [String(c.id)] },
+      ttl: 6 * 3600,
     } }];
   }
   const ultima = contas.reduce((m, c) => (c.data > m ? c.data : m), contas[0].data);
@@ -547,6 +615,8 @@ function avisoContasD3(contas: any[]): Envio[] {
     corpo: contas.map(linhaConta).join(" · "),
     tag: "contas-d3",
     url,
+    item: { tipo: "conta", ids: contas.map((c) => String(c.id)) },
+    ttl: 6 * 3600,
   } }];
 }
 
@@ -579,7 +649,7 @@ function avisoDoResumo(p: any): Envio[] {
     : "Hoje sem compromisso marcado";
   return [{
     chaves: [`resumo:${p.hoje}`],
-    aviso: { titulo, corpo: partes.join("\n") || "Nada pendente.", tag: "resumo-diario", url: "./nova.html" },
+    aviso: { titulo, corpo: partes.join("\n") || "Nada pendente.", tag: "resumo-diario", url: "./nova.html", item: { tipo: "resumo", dia: p.hoje }, ttl: 6 * 3600 },
     // Contas da janela D-3 que o resumo já chamou pelo nome: contam como avisadas (ver o roteador).
     d3: nomeadas.filter(naJanela).map(chaveConta),
   }];
@@ -625,6 +695,19 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify(saida || { ok: false }), { headers: cabecalhos });
     }
 
+    // AVISO VELHO? (23/10/2026, revisão "o aviso tem que sumir"). O service worker do celular (a cada aviso que chega e
+    // a cada toque) e o app (a cada carga) mandam os recibos dos avisos que estão na barra; o banco diz quais já não
+    // valem (card feito no PC ou pela Manu, remarcado, com toque pendente, rotina feita, água bebida, conta paga, resumo
+    // de ontem) e quem perguntou fecha esses. Mesma confiança do recibo: o uuid só existe dentro da carga cifrada, e a
+    // resposta é só a lista dos que já não valem. GET simples, sem preflight; no máximo 20 por pergunta.
+    if (modo === "validar") {
+      const cabecalhos = { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" };
+      const ids = String(url.searchParams.get("recibos") || "").split(",").map((s) => s.trim())
+        .filter((s) => /^[0-9a-fA-F-]{36}$/.test(s)).slice(0, 20);
+      const velhos = ids.length ? await rpc("push_validar", { p_recibos: ids }) : [];
+      return new Response(JSON.stringify({ velhos: Array.isArray(velhos) ? velhos : [] }), { headers: cabecalhos });
+    }
+
     const segredo = await rpc("push_segredo", { nome: "PUSH_SECRET" });
     if (!segredo || req.headers.get("x-push-secret") !== segredo) {
       return new Response(JSON.stringify({ erro: "sem autorizacao" }), { status: 401, headers: { "Content-Type": "application/json" } });
@@ -641,6 +724,7 @@ Deno.serve(async (req) => {
             corpo: "Se você está lendo isto, a notificação chega. Toque num botão pra testar a resposta. " + new Date().toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo" }),
             tag: "teste",
             url: "./nova.html",
+            ttl: 600,
             // Botões de teste: não mexem em nada, só carimbam o recibo (push_acao, tabela "teste").
             acoes: [
               { action: "a0", title: "Chegou", plano: { tabela: "teste", resposta: "Chegou" } },
@@ -657,7 +741,7 @@ Deno.serve(async (req) => {
     if (modo === "teste-agenda") {
       const id = String(doCorpo.agenda_id || url.searchParams.get("agenda_id") || "");
       if (!/^[0-9a-fA-F-]{36}$/.test(id)) return Response.json({ erro: "agenda_id invalido" }, { status: 400 });
-      const linhas = await rest(`agenda?id=eq.${id}&select=id,titulo,hora,local,cidade,cliente_id,servico_id`);
+      const linhas = await rest(`agenda?id=eq.${id}&select=id,titulo,data,hora,local,cidade,cliente_id,servico_id`);
       if (!linhas?.length) return Response.json({ erro: "card nao achado" }, { status: 404 });
       const a = { ...linhas[0], hora: String(linhas[0].hora || "").slice(0, 5) };
       const envios = avisosNaHora([a]).map((e) => ({ ...e, chaves: [`teste-agenda:${id}:${Date.now()}`] }));
@@ -690,31 +774,31 @@ Deno.serve(async (req) => {
     } else {
       // Só a leva entra na reserva. Reservar as 6 horas inteiras marcaria como "já avisado" um
       // compromisso das 10:30 que ninguém viu ainda, e ele nunca ganharia lembrete.
-      const leva = levaDaAgenda((pendencias.agenda || []).filter(jaDecidido));
-      const caixa = pendencias.caixa || [];
+      const leva = levaDaAgenda((pendencias.agenda || []).filter(paraODiego));
+      const caixa = CAIXA_NO_PUSH ? [] : (pendencias.caixa || []);
       const hora = Number(String(pendencias.agora || "").slice(11, 13));
       const horaDeDia = hora >= HORA_INICIO_CONTAS && hora < HORA_FIM_CONTAS;
       const contas = horaDeDia ? contasComPrazo(pendencias).filter(naJanela) : [];
       const duvidas = horaDeDia && CARTOES_NO_PUSH ? (pendencias.duvidas || []) : [];
       // Na hora, com botões (15/10/2026). Mesma janela de dia dos cartões: fora dela o card fica no app.
-      const naHora = horaDeDia ? (pendencias.agenda_na_hora || []).filter(jaDecidido).filter(aindaInsiste) : [];
+      const naHora = horaDeDia ? (pendencias.agenda_na_hora || []).filter(paraODiego).filter(aindaInsiste) : [];
       const rotinas = horaDeDia ? (pendencias.rotinas_na_hora || []).map((r: any) => ({ ...r, chave: chaveRotina(r, String(pendencias.hoje)) })) : [];
       const ag = pendencias.agua;
-      const agua = aguaNaJanela(hora) && ag && ag.ultima_id && Number(ag.minutos) >= AGUA_AVISA_MIN ? [ag] : [];
+      const agua = aguaNaJanela(hora) && ag && ag.ultima_id && Number(ag.minutos) >= AGUA_AVISA_MIN ? [{ ...ag, chave: chaveAgua(ag, String(pendencias.agora)) }] : [];
       candidatos = leva.length + caixa.length + contas.length + duvidas.length + naHora.length + rotinas.length + agua.length;
       if (candidatos) {
-        const chaves = [...leva.map((a: any) => `agenda:${a.id}`), ...naHora.map(chaveNaHora), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`), ...rotinas.map((r: any) => r.chave), ...agua.map(chaveAgua)];
+        const chaves = [...leva.map(chaveLeva), ...naHora.map(chaveNaHora), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`), ...rotinas.map((r: any) => r.chave), ...agua.map((a: any) => a.chave)];
         const liberadas = new Set<string>(await rpc("push_reservar", { chaves }));
         envios = [
           ...avisosDaVarredura(
-            leva.filter((a: any) => liberadas.has(`agenda:${a.id}`)),
+            leva.filter((a: any) => liberadas.has(chaveLeva(a))),
             caixa.filter((c: any) => liberadas.has(`caixa:${c.id}`)),
           ),
           ...avisosNaHora(naHora.filter((a: any) => liberadas.has(chaveNaHora(a)))),
           ...avisoContasD3(contas.filter((c: any) => liberadas.has(chaveConta(c)))),
           ...avisosDosCartoes(duvidas.filter((d: any) => liberadas.has(`duvida:${d.id}`))),
           ...avisosDasRotinas(rotinas.filter((r: any) => liberadas.has(r.chave))),
-          ...agua.filter((a: any) => liberadas.has(chaveAgua(a))).flatMap(avisoDaAgua),
+          ...agua.filter((a: any) => liberadas.has(a.chave)).flatMap(avisoDaAgua),
         ];
       }
     }

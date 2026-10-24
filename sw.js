@@ -60,7 +60,17 @@
 /* v25 (16/10/2026): celular 9[0-9] depois do DDD (92..95 eram recusados). */
 /* v27 (18/10/2026): CONTA PERGUNTA ANTES. O Feito da notificacao num card de conta nao grava: o banco responde
    ok:false com `abrir` (o card com ?pagou=1) e o app abre ali perguntando "Pagou?". */
-const VERSAO = 'tb-atendimento-v27'; // v26 (18/10/2026): não apaga o transformers-cache (Whisper da Caixa)
+/* v28 (23/10/2026): O AVISO SOME. Diego: "Ela tem que sumir. Nao ta sumindo quando eu to executando." Em 24h sairam
+   302 avisos e 301 ficaram sem toque; o mesmo card voltava de 5 em 5 min.
+   (1) Deslizar o aviso pra fora da barra agora conta: o SW carimba o recibo como `dispensado` e o aviso insistente
+       para (antes so o toque contava, e o aviso dispensado voltava).
+   (2) Aviso velho sai sozinho: a cada aviso que chega e a cada toque, o SW pergunta ao banco (modo=validar) quais dos
+       avisos na barra ja nao valem - card feito no PC ou pela Manu, remarcado, rotina feita, agua bebida, conta paga - e
+       fecha esses, mesmo com o app fechado.
+   (3) Aviso que chega atrasado (Chrome dormindo; o Google entrega a fila quando ele acorda) aparece calado.
+   (4) Botao que o banco nao responde em 5 s abre o app (antes ficava parado ate a rede desistir).
+   (5) Com o app aberto, o aviso que chegou avisa a aba, e os cards recarregam. */
+const VERSAO = 'tb-atendimento-v28'; // v26 (18/10/2026): não apaga o transformers-cache (Whisper da Caixa)
 // Sem segredo aqui de proposito: este arquivo e publico. O que autentica o recibo e o proprio id, que
 // e um uuid que so existe dentro da carga cifrada - quem nao recebeu a notificacao nao tem como chutar.
 const PUSH_FUNCAO = 'https://iymlzdcloaeyybhefywp.supabase.co/functions/v1/push-enviar';
@@ -218,36 +228,116 @@ self.addEventListener('fetch', (e) => {
   })());
 });
 
+// Aviso gerado ha mais que isto chegou atrasado (Chrome dormindo no celular): aparece, mas sem tocar nem vibrar (v28).
+const ATRASO_CALADO_MS = 10 * 60 * 1000;
+// Quantos eventos push estao rodando agora neste SW. Enquanto houver algum, fechar aviso velho nunca esvazia a barra (v28).
+let pushesRodando = 0;
+
 // NOTIFICACAO CHEGANDO. Quem manda e a Edge Function push-enviar; a carga vem cifrada com a chave deste
 // aparelho, entao `e.data.json()` ja e o texto pronto - nada de buscar no Supabase daqui (o SW nao
 // enxerga o localStorage da pagina, logo nao tem a sessao do Diego).
 self.addEventListener('push', (e) => {
+  pushesRodando++;
+  const terminou = function () { pushesRodando = Math.max(0, pushesRodando - 1); };
   let aviso = null;
   try { aviso = e.data ? e.data.json() : null; } catch (err) { aviso = null; }
   // SEMPRE mostrar alguma coisa. Push recebido sem notificacao exibida faz o Android mostrar o aviso
   // generico "atualizado em segundo plano" e, se repetir, revogar a permissao do site calado.
   const titulo = (aviso && aviso.titulo) || 'Painel de Atendimento';
   const corpo = (aviso && aviso.corpo) || (e.data ? String(e.data.text() || '').slice(0, 140) : 'Toque para abrir o painel.');
+  const recibo = (aviso && aviso.recibo) || null;
+  const botoes = botoesDe(aviso);
+  const gerado = aviso && aviso.gerado_em ? Date.parse(aviso.gerado_em) : NaN;
+  const atrasado = Number.isFinite(gerado) && Date.now() - gerado > ATRASO_CALADO_MS;
+  const opcoes = {
+    body: corpo,
+    // A tag carrega o id do item: o mesmo compromisso substitui o aviso anterior em vez de empilhar.
+    tag: (aviso && aviso.tag) || 'painel',
+    renotify: !atrasado,
+    silent: atrasado,
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    // Aviso com botao (compromisso, cartao) e pra resolver: NAO some sozinho da barra ate ele mexer (requireInteraction).
+    requireInteraction: botoes.length > 0,
+    // Botoes (v19). So {action, title}: o que cada um faz ficou no banco, dentro do recibo.
+    actions: botoes,
+    // `item` e `gerado_em` (v28): de qual card e de que hora o aviso fala; o app usa pra fechar o que ficou velho.
+    data: { url: (aviso && aviso.url) || './nova.html', recibo: recibo, item: (aviso && aviso.item) || null, gerado_em: (aviso && aviso.gerado_em) || null }
+  };
+  // Aviso com botao vibra forte - Diego, 15/10/2026: "se for uma notificacao com barulho pequeno, nao da pra saber".
+  // Calado (atrasado) nao pode levar vibrate: o Chrome recusa silent junto com vibrate.
+  if (!atrasado) opcoes.vibrate = botoes.length ? [400, 150, 400, 150, 700] : [80, 40, 80];
   e.waitUntil(Promise.all([
     // O carimbo vem PRIMEIRO na lista de proposito: se o Android matar o processo no meio, prefiro ter
     // o recibo (que me diz o que aconteceu) do que perder as duas coisas.
-    carimbarRecibo(aviso && aviso.recibo, 'recebido'),
-    self.registration.showNotification(titulo, {
-      body: corpo,
-      // A tag carrega o id do item: o mesmo compromisso substitui o aviso anterior em vez de empilhar.
-      tag: (aviso && aviso.tag) || 'painel',
-      renotify: true,
-      icon: './icon-192.png',
-      badge: './icon-192.png',
-      // Aviso com botao (compromisso, cartao) e pra resolver: vibra forte e NAO some sozinho da barra ate ele
-      // mexer (requireInteraction) - Diego, 15/10/2026: "se for uma notificacao com barulho pequeno, nao da pra saber".
-      vibrate: botoesDe(aviso).length ? [400, 150, 400, 150, 700] : [80, 40, 80],
-      requireInteraction: botoesDe(aviso).length > 0,
-      // Botoes (v19). So {action, title}: o que cada um faz ficou no banco, dentro do recibo.
-      actions: botoesDe(aviso),
-      data: { url: (aviso && aviso.url) || './nova.html', recibo: (aviso && aviso.recibo) || null }
-    })
-  ]));
+    carimbarRecibo(recibo, 'recebido'),
+    self.registration.showNotification(titulo, opcoes)
+      // Se o Chrome recusar alguma opcao, mostra o basico: push sem aviso e pior que aviso simples.
+      .catch(function () { return self.registration.showNotification(titulo, { body: corpo, tag: opcoes.tag, data: opcoes.data }); })
+      .then(function () { return fecharAvisosVelhos(opcoes.tag, atrasado); })
+      .then(avisarAbas)
+  ]).then(terminou, terminou));
+});
+
+// AVISO VELHO SAI SOZINHO (v28). Pergunta ao banco quais dos avisos na barra ja nao valem e fecha esses. O que acabou
+// de chegar (a tag dele) fica fora da pergunta - o servidor montou agora -, a nao ser que tenha chegado atrasado. Sem
+// rede ou sem resposta em 8 s, nao fecha nada.
+// BARRA NUNCA VAZIA DURANTE UM PUSH: push que termina sem nenhum aviso visivel faz o Chrome mostrar o generico
+// "atualizado em segundo plano". Dois pushes atrasados chegando juntos (o celular acordando) fechavam cada um o do
+// outro e a barra esvaziava (reproduzido no Chromium). Por isso: uma fila so (um fechamento por vez), a barra relida
+// logo antes de fechar, e, com push rodando, o aviso mais novo fica mesmo velho - sai no proximo aviso ou toque.
+let filaDeFechar = Promise.resolve();
+function fecharAvisosVelhos(tagNova, novoAtrasado) {
+  filaDeFechar = filaDeFechar.then(function () { return fecharVelhosAgora(tagNova, novoAtrasado); }).catch(function () {});
+  return filaDeFechar;
+}
+function fecharVelhosAgora(tagNova, novoAtrasado) {
+  return self.registration.getNotifications().then(function (lista) {
+    const perguntar = lista.filter(function (n) {
+      return n.data && n.data.recibo && (n.tag !== tagNova || novoAtrasado);
+    });
+    if (!perguntar.length) return;
+    return perguntarVelhos(perguntar.map(function (n) { return n.data.recibo; })).then(function (velhos) {
+      if (!velhos.length) return;
+      return self.registration.getNotifications().then(function (barra) {
+        const fechar = barra.filter(function (n) { return n.data && n.data.recibo && velhos.indexOf(n.data.recibo) !== -1; });
+        if (pushesRodando > 0 && fechar.length && fechar.length === barra.length) {
+          let fica = fechar[0];
+          fechar.forEach(function (n) {
+            if (n.tag === tagNova || (fica.tag !== tagNova && (n.timestamp || 0) > (fica.timestamp || 0))) fica = n;
+          });
+          fechar.splice(fechar.indexOf(fica), 1);
+        }
+        fechar.forEach(function (n) { n.close(); });
+      });
+    });
+  }).catch(function () {});
+}
+function perguntarVelhos(recibos) {
+  const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+  const prazo = ctrl ? setTimeout(function () { ctrl.abort(); }, 8000) : null;
+  return fetch(PUSH_FUNCAO + '?modo=validar&recibos=' + recibos.slice(0, 20).map(encodeURIComponent).join(','),
+    { mode: 'cors', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) { return j && Array.isArray(j.velhos) ? j.velhos : []; })
+    .catch(function () { return []; })
+    .then(function (velhos) { if (prazo) clearTimeout(prazo); return velhos; });
+}
+// Recado pras abas abertas do app, sem abrir nem focar janela (v28): {tipo:'aviso'} recarrega os cards, pro que chegou
+// no celular aparecer no app; {tipo:'ir', url} leva a aba pro link.
+function postarNasAbas(recado) {
+  return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (abas) {
+    abas.forEach(function (aba) { try { aba.postMessage(recado); } catch (err) { /* aba sem message */ } });
+  }).catch(function () {});
+}
+function avisarAbas() { return postarNasAbas({ tipo: 'aviso' }); }
+
+// DESLIZOU PRA FORA DA BARRA (v28): viu e dispensou. O recibo ganha `dispensado` e o aviso insistente para. Sem isto
+// so o toque contava, e o aviso tirado da barra voltava em 5 min. So dispara quando a PESSOA fecha: o close() do app
+// ou do proprio SW nao chega aqui.
+self.addEventListener('notificationclose', (e) => {
+  const recibo = e.notification.data && e.notification.data.recibo;
+  e.waitUntil(carimbarRecibo(recibo, 'dispensado'));
 });
 
 function botoesDe(aviso) {
@@ -271,27 +361,43 @@ function responderPeloBotao(recibo, acao) {
 
 // TOQUE NA NOTIFICACAO. Se o app ja esta aberto numa aba, foca ela - reabrir do zero perderia o que ele
 // estava vendo e ainda faria o Babel transpilar 580 KB de novo.
+// Botao sem resposta do banco em tanto tempo: o app abre pra ele resolver la (v28). Se a resposta chegar depois e
+// tiver gravado, o aviso sai do mesmo jeito.
+const BOTAO_PRAZO_MS = 5000;
+
 self.addEventListener('notificationclick', (e) => {
   const destino = new URL((e.notification.data && e.notification.data.url) || './nova.html', self.location).href;
   const recibo = e.notification.data && e.notification.data.recibo;
   // Toque num BOTAO: grava sem abrir o app. Se o banco nao confirmar (sem sinal, recibo ja usado, cartao
   // ja fechado no app), cai no toque comum e abre o app - ele ve o cartao e resolve la.
   if (e.action) {
-    carimbarRecibo(recibo, 'aberto');
-    e.waitUntil(responderPeloBotao(recibo, e.action).then(function (gravou) {
-      // Gravou: resolvido, a notificacao sai. Nao gravou: fica na barra e o app abre pra ele resolver la.
-      if (gravou === true) { e.notification.close(); return; }
-      // Card de conta (v27): o banco manda abrir o card com a pergunta "Pagou?" em vez de dar baixa.
-      return abrirApp(typeof gravou === 'string' ? new URL(gravou, self.location).href : destino);
-    }));
+    const resposta = responderPeloBotao(recibo, e.action);
+    const prazo = new Promise(function (ok) { setTimeout(function () { ok('lento'); }, BOTAO_PRAZO_MS); });
+    e.waitUntil(Promise.all([
+      // O carimbo de aberto vai dentro do waitUntil (v28): solto, o Android podia matar o SW antes de ele sair.
+      carimbarRecibo(recibo, 'aberto'),
+      Promise.race([resposta, prazo]).then(function (gravou) {
+        // Gravou: resolvido, a notificacao sai. Nao gravou: fica na barra e o app abre pra ele resolver la.
+        if (gravou === true) { e.notification.close(); return; }
+        if (gravou === 'lento') {
+          return Promise.all([abrirApp(destino), resposta.then(function (g) {
+            if (g === true) { e.notification.close(); return; }
+            // Card de conta (v27) que respondeu depois do prazo: o app ja abriu, e a aba recebe o link da pergunta "Pagou?".
+            if (typeof g === 'string') return postarNasAbas({ tipo: 'ir', url: new URL(g, self.location).href });
+          })]);
+        }
+        // Card de conta (v27): o banco manda abrir o card com a pergunta "Pagou?" em vez de dar baixa.
+        return abrirApp(typeof gravou === 'string' ? new URL(gravou, self.location).href : destino);
+      }).then(function () { return fecharAvisosVelhos(null, false); })
+    ]));
     return;
   }
   // Toque no corpo: abre o app no lugar certo e a notificacao CONTINUA na barra (v20). Aviso sem botao
   // (caixa, conta, resumo) fecha como antes - nao tem o que resolver por ali.
   const temBotao = !!(e.notification.actions && e.notification.actions.length);
   if (!temBotao) e.notification.close();
-  carimbarRecibo(recibo, 'aberto');
-  e.waitUntil(abrirApp(destino));
+  e.waitUntil(Promise.all([carimbarRecibo(recibo, 'aberto'), abrirApp(destino)])
+    .then(function () { return fecharAvisosVelhos(null, false); }));
 });
 
 function abrirApp(destino) {
