@@ -27,6 +27,21 @@
      de socorro do fim do arquivo, com o motivo escrito e o botão de limpar o cache. Nunca mais tela preta. -->
 <script>
 window.TB = window.TB || {};
+// LINK DIRETO SOBREVIVE À RECARGA DA ATUALIZAÇÃO (24/10/2026, retorno da Zapia das 08h21: "permaneceu na tela
+// Painel"). O app tira o ?ir= do endereço logo ao abrir, e quando um sw.js novo assume a aba ele recarrega a página
+// sozinho: a recarga voltava pro Painel sem o card. Agora o link de entrada fica guardado por 90 s e a primeira
+// RECARGA sem ?ir= dentro desse prazo põe ele de volta no endereço, uma vez só, antes do app ler.
+(function () {
+  const CHAVE = 'tb-link-de-entrada';
+  try {
+    const u = new URL(location.href);
+    if (u.searchParams.has('ir')) { sessionStorage.setItem(CHAVE, JSON.stringify({ busca: u.search, em: Date.now() })); return; }
+    const guardado = JSON.parse(sessionStorage.getItem(CHAVE) || 'null');
+    sessionStorage.removeItem(CHAVE);
+    const recarga = ((performance.getEntriesByType && performance.getEntriesByType('navigation')[0]) || {}).type === 'reload';
+    if (recarga && guardado && Date.now() - guardado.em < 90000 && /[?&]ir=/.test(guardado.busca || '')) history.replaceState(history.state, '', u.pathname + guardado.busca + u.hash);
+  } catch (e) { /* sem sessionStorage o link só não sobrevive à recarga */ }
+})();
 (function () {
   const LIB = {
     supabase: '@supabase/supabase-js@2/dist/umd/supabase.js',
@@ -4613,6 +4628,13 @@ function Home() {
     setOfflineDesde(null);
     const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [], duvidasAgente: da?.data || [], propostas: pr?.data || [] };
     aplicarPacote(pacote);
+    // Link direto pra um card que já saiu da agenda (feito, cancelado): antes o app ficava no Painel calado.
+    if (IR_INICIAL === "card" && IR_ID && !(pacote.appointments || []).some((a) => String(a.id) === IR_ID)) {
+      consumirIrInicial();
+      db.from("agenda").select("status,titulo").eq("id", IR_ID).maybeSingle().then(({ data }) => {
+        notify(data ? `Esse card não está mais na agenda (${data.status}): ${String(data.titulo || "").slice(0, 80)}` : "O card desse link não existe mais.", "info");
+      }, () => {});
+    }
     fecharAvisosDeCards(new Set((pacote.appointments || []).map((a) => a.id)), null, new Map((pacote.appointments || []).map((a) => [a.id, a])));
     fecharAvisosResolvidos({ rotinas: pacote.rotinas || [] });
     conferirAvisosNoServidor();
