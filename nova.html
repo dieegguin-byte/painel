@@ -622,6 +622,7 @@ button.sutil{opacity:.55;font-size:12px}
 .caixa-prints img{max-width:100%;max-height:360px;border-radius:10px;border:1px solid var(--line2)}
 .caixa-conversa{border-top:1px solid var(--line);padding-top:8px}
 .resposta-diego .resposta-quando{margin:0;font-weight:700;color:#9fd9b4}
+.resposta-diego .envio-aprovado{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid #75a98766;border-radius:12px;background:#16241b}.resposta-diego .envio-aprovado p{margin:0}.resposta-diego .envio-aprovado a{overflow-wrap:anywhere}
 .prof-contato{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}.prof-contato>span{display:grid;gap:2px;min-width:0}.prof-contato small{color:var(--muted);font-size:12px}.btn-wpp.prof-wpp{flex:0 0 auto;width:auto;min-width:0;max-width:60%;font-size:12px;padding:6px 10px;min-height:34px;white-space:nowrap}.prof-contato>span{flex:1 1 auto}.vale-fornecedor-head .prof-wpp{margin-left:auto}
 .caixa-bloco{border:1px solid var(--line2);border-radius:12px;padding:8px 10px;min-width:0}.caixa-bloco>summary{cursor:pointer;font-weight:700;font-size:13px}.caixa-bloco[open]>summary{margin-bottom:8px}.caixa-bloco .caixa-resumo{font-weight:400;display:inline-block;max-width:calc(100% - 22px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}.caixa-recado-mais[open]{display:grid;gap:8px}
 .caixa-conversa summary{cursor:pointer;font-size:12px;color:var(--muted)}
@@ -9889,7 +9890,7 @@ function ResumoManhaCard({ avisos, today, db, demo, notify, onOpenFicha, onChang
 // caso, marca `aplicada` e, se vale sempre, escreve em `regra` a versão geral — que ele relê em toda rodada.
 // Não é a Caixa: a Caixa é item que chegou (print, comprovante); isto é o agente pedindo uma decisão.
 // MANU (Diego 12/10/2026: "meu agente chama Manu, igual lá no GPT"): o agente de hora em hora é a Manu.
-const ORIGEM_CARTAO = { agente: "Manu", manu: "Manu", auditoria: "Auditoria 02h20", pix: "Pix", caixa: "Caixa", claude: "Claude" };
+const ORIGEM_CARTAO = { agente: "Manu", manu: "Manu", auditoria: "Auditoria 02h20", pix: "Pix", caixa: "Caixa", claude: "Claude", grok: "Grok" };
 const rotuloOrigem = (o) => ORIGEM_CARTAO[String(o || "agente").toLowerCase()] || String(o);
 // A Caixa já tinha o seu canal de pergunta (item em `aguardando_voce` com a pergunta em conversa[], Regra Nº 13/15).
 // Aqui ela só é MOSTRADA no mesmo card: responder grava do mesmo jeito que a tela da Caixa grava.
@@ -9962,6 +9963,7 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, telefo
     <span className={`duvida-origem ${origem}`}>{rotuloOrigem(origem)}</span>{contatoZapia && <i className="selo-followup zapia" style={{ marginLeft: 7 }}>↻ Contato · Zapia envia</i>}
     <strong>{d.pergunta}</strong>
     {d.contexto && <span className="duvida-contexto">{d.contexto}</span>}
+    {d.texto_envio && <span className="duvida-contexto"><b>Texto exato que vai{canalDoEnvio(d) === "whatsapp_bahia" ? " pelo WhatsApp Bahia" : canalDoEnvio(d) === "zapia_reserva" ? " pela Zapia" : ""}:</b> {d.texto_envio}</span>}
     <span className="duvida-quando">Perguntado {haQuanto()}{nome ? ` · ${nome}` : ""}</span>
     <div className="duvida-links">
     {d.cliente_id && onOpenFicha && <button type="button" className="agente-abrir" onClick={() => { vibrar(6); onOpenFicha(d.cliente_id); }}>Abrir ficha{nome ? ` de ${nome.split(" ")[0]}` : ""} ›</button>}
@@ -10851,15 +10853,46 @@ const STATUS_RESPOSTA = { aberta: "Ainda sem resposta", respondida: "Respondida,
 // a Zapia leu como já enviado e o texto não saiu na rodada das 14h20). No cartão de envio (o texto vai pela Zapia) o
 // status diz o passo real: tocou Manda, a Manu passa o recado pra Zapia, "ainda NÃO enviada, esperando a Zapia", até o
 // RETORNO dela com RECADO ENVIADO, quando a Manu grava duvidas_agente.enviado_em. "Não manda" segue como antes.
-const ehEnvioDaZapia = (d) => Array.isArray(d?.opcoes) && d.opcoes.some((o) => /^manda\b/i.test(String(o)))
-  && (/zapia/i.test(String(d.contexto || "")) || Object.values(d.plano && typeof d.plano === "object" ? d.plano : {}).some((v) => /zapia/i.test(String(v))));
-const vaiPelaZapia = (d) => ehEnvioDaZapia(d) && /^(manda|mudar)/i.test(String(d.resposta || ""));
+// ENVIO PELO WHATSAPP BAHIA (Grok, 25/10/2026, confirmado pelo Diego: "Grok opera tudo agora, Zapia só coleta, envio
+// via WhatsApp Bahia + card"). duvidas_agente.canal_envio diz por onde sai o texto aprovado: whatsapp_bahia (o Grok manda
+// pelo WhatsApp da empresa, sem recado à Zapia) ou zapia_reserva (o caminho antigo, recado à Zapia). texto_envio guarda o
+// texto exato que vai. Cartão antigo sem canal: a opção "Grok manda" conta como WhatsApp Bahia, a Zapia citada conta como reserva.
+const RE_OPCAO_ENVIO = /^(grok\s+)?manda\b/i;
+function canalDoEnvio(d) {
+  if (!d) return null;
+  if (d.canal_envio === "whatsapp_bahia" || d.canal_envio === "zapia_reserva") return d.canal_envio;
+  const opcoes = Array.isArray(d.opcoes) ? d.opcoes.map(String) : [];
+  if (!opcoes.some((o) => RE_OPCAO_ENVIO.test(o))) return null;
+  if (opcoes.some((o) => /^grok\s+manda\b/i.test(o))) return "whatsapp_bahia";
+  const citaZapia = /zapia/i.test(String(d.contexto || "")) || Object.values(d.plano && typeof d.plano === "object" ? d.plano : {}).some((v) => /zapia/i.test(String(v)));
+  return citaZapia ? "zapia_reserva" : null;
+}
+const aprovouEnvio = (d) => !!canalDoEnvio(d) && /^((grok\s+)?manda|mudar)/i.test(String(d.resposta || ""));
+const vaiPelaZapia = (d) => aprovouEnvio(d) && canalDoEnvio(d) === "zapia_reserva";
+const vaiPeloBahia = (d) => aprovouEnvio(d) && canalDoEnvio(d) === "whatsapp_bahia";
 function statusDaResposta(d) {
+  if (vaiPeloBahia(d)) {
+    if (d.enviado_em) return `✓ Enviada pelo WhatsApp Bahia em ${dataHoraCurta(d.enviado_em)}`;
+    return "✅ APROVADO PELO DIEGO · sai pelo WhatsApp Bahia · ainda NÃO enviada";
+  }
   if (!vaiPelaZapia(d)) return STATUS_RESPOSTA[d.status] || d.status;
   if (d.enviado_em) return `✓ Enviada pela Zapia em ${dataHoraCurta(d.enviado_em)}`;
   if (d.status === "aplicada") return "⏳ Passada pra Zapia · ainda NÃO enviada, esperando a Zapia enviar";
   if (d.status === "respondida") return "Esperando a Manu passar pra Zapia · ainda NÃO enviada";
   return STATUS_RESPOSTA[d.status] || d.status;
+}
+// O QUE O GROK PRECISA PRA MANDAR, NUM LUGAR SÓ: nome, número, texto exato e o link wa.me com o texto já escrito.
+// Número: o wa.me do texto do cartão, senão o da ficha. Sem texto_envio o link abre a conversa vazia.
+function EnvioAprovado({ d, cliente }) {
+  const tel = telefoneWhatsapp((RE_WAME_NO_CARTAO.exec(`${d.contexto || ""} ${d.pergunta || ""}`) || [])[1]) || telefoneWhatsapp(cliente ? cliente.telefone : null);
+  const texto = String(d.texto_envio || "").trim();
+  const link = tel ? `https://wa.me/55${tel}${texto ? "?text=" + encodeURIComponent(texto) : ""}` : null;
+  return <div className="envio-aprovado">
+    <p className="caixa-texto"><b>Pra quem:</b> {cliente ? nomeDoCliente(cliente) + " · " : ""}{tel ? `+55 ${tel}` : "sem número no cartão nem na ficha"}</p>
+    {texto ? <p className="caixa-texto"><b>Texto exato:</b> {texto}</p> : <p className="ficha-note">Sem texto exato gravado (texto_envio): o texto está no "O que vai" abaixo.</p>}
+    {link && <p className="caixa-texto"><b>Link:</b> <a href={link} target="_blank" rel="noreferrer">{link.length > 90 ? link.slice(0, 90) + "…" : link}</a></p>}
+    {link && <a className="btn-wpp duvida-wpp" href={urlWhatsapp(tel, texto)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => vibrar(6)}>Abrir no WhatsApp{texto ? " com o texto" : ""}</a>}
+  </div>;
 }
 // AINDA SEM RESPOSTA = OS BOTÕES (Diego, 23/10/2026, print do cartão da Suzany: "tem que ter o botão lá só para me
 // confirmar, ver o que está sendo enviado, confirmar"). Cartão aberto chega pelo link com o texto que vai e as mesmas
@@ -10890,9 +10923,10 @@ function RespostaDoDiego({ db, demo, id, onFechar, notify, customers = [], onOpe
       {d && d.status !== "aberta" && <div className="form-grid">
         <p className="resposta-quando">{d.respondido_em ? `Tocou em ${quando(d.respondido_em)}` : "Ainda não respondeu"} · {statusDaResposta(d)}</p>
         {extra && <p className="caixa-texto"><b>O que ele escreveu:</b> {extra}</p>}
+        {aprovouEnvio(d) && <EnvioAprovado d={d} cliente={cliente} />}
         <p className="caixa-texto"><b>Pergunta:</b> {d.pergunta}</p>
         {d.contexto && <p className="caixa-texto"><b>O que vai:</b> {d.contexto}</p>}
-        <small className="ficha-note">Criado em {quando(d.criado_em)}{d.aplicado_em ? ` · ${vaiPelaZapia(d) ? "passado pra Zapia" : "aplicado"} em ${quando(d.aplicado_em)}` : ""} · código {String(d.id).slice(0, 8)}</small>
+        <small className="ficha-note">Criado em {quando(d.criado_em)}{d.aplicado_em ? ` · ${vaiPelaZapia(d) ? "passado pra Zapia" : vaiPeloBahia(d) ? "conferido pela Manu" : "aplicado"} em ${quando(d.aplicado_em)}` : ""} · código {String(d.id).slice(0, 8)}</small>
       </div>}
     </div>
   </div>;
