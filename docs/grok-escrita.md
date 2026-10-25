@@ -1,6 +1,6 @@
 # Grok: como gravar no app
 
-Escrito pelo Claude em 25/10/2026, a pedido do Grok, com o ok do Diego. Vale junto com o doc 07 (App: links e tabelas). Banco: Supabase, projeto `iymlzdcloaeyybhefywp`. O código do app continua com o Claude.
+Escrito pelo Claude em 25/10/2026, a pedido do Grok, com o ok do Diego, e atualizado no mesmo dia (Manu pausada 11h24, propostas novas suspensas). Vale junto com o doc 07 (App: links e tabelas). Banco: Supabase, projeto `iymlzdcloaeyybhefywp`. O código do app continua com o Claude.
 
 ## Regras de toda escrita
 
@@ -66,10 +66,30 @@ update duvidas_agente set enviado_em = now(), canal_envio = 'whatsapp_bahia' whe
 insert into historico (o_que, por, detalhe) values ('Grok: mandou o texto aprovado pro Leandro pelo WhatsApp Bahia', 'grok', 'cliente <uuid> · duvida <id>')
 ```
 
-O `status` do cartão (`aplicada`) continua com a Manu.
+### 5. Fechar o cartão
+
+A Manu está pausada desde 25/10: depois de fazer o que o Diego respondeu num cartão (mandou, esperou, cancelou), quem marca `aplicada` é você.
+
+```sql
+update duvidas_agente set status = 'aplicada', aplicado_em = now() where id = '<id>' and status = 'respondida' returning id, status
+```
+
+Limites do envio (doc 00, item 4): até 10 por dia, 2 minutos entre um e outro, das 8h às 20h, nunca domingo.
+
+## Recados nos cards (agenda_recados)
+
+Leia primeiro em toda rodada (era da Manu e da rotina Recados da agenda, pausadas em 25/10). O Diego toca Remarcar, Feito, Cancelar ou deixa um recado num card: faça o que ele pediu e feche o recado com uma frase do que você fez, ou com a pergunta ao Diego. O resultado aparece no card.
+
+```sql
+select r.id, r.acao, r.texto, a.id as agenda_id, a.titulo, a.data, a.hora from agenda_recados r join agenda a on a.id = r.agenda_id where r.processado_em is null order by r.criado_em
+```
+
+```sql
+update agenda_recados set processado_em = now(), resultado = 'Remarcado pra ter 27/10 9h30.' where id = '<id>' and processado_em is null returning id
+```
 
 ## O que o app não faz
 
 - Não manda mensagem sozinho: o envio é do Grok, pelo WhatsApp Bahia.
 - Não existe botão "montar por partes": o preço segue no tópico Regra de preço.
-- Propostas de orçamento (Aprovar, Recado, Descartar, Já mandei) continuam ligadas no app. Os textos delas ainda dizem "a Manu passa pra Zapia".
+- Proposta nova está suspensa desde 24/10 (o Diego: "esse negócio de proposta de orçamento bagunça demais"): não crie proposta, o orçamento é montado com ele por partes (doc 02). Os botões das propostas antigas continuam no app: se ele tocar Aprovar numa delas, é o "manda" dele para aquele texto exato e o envio é seu, pelo WhatsApp Bahia (os textos dos botões ainda falam em Manu e Zapia).
