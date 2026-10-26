@@ -623,7 +623,7 @@ button.sutil{opacity:.55;font-size:12px}
 .caixa-conversa{border-top:1px solid var(--line);padding-top:8px}
 .resposta-diego .resposta-quando{margin:0;font-weight:700;color:#9fd9b4}
 .resposta-diego .envio-aprovado{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid #75a98766;border-radius:12px;background:#16241b}.resposta-diego .envio-aprovado p{margin:0}.resposta-diego .envio-aprovado a{overflow-wrap:anywhere}
-.prof-contato{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}.prof-contato>span{display:grid;gap:2px;min-width:0}.prof-contato small{color:var(--muted);font-size:12px}.btn-wpp.prof-wpp{flex:0 0 auto;width:auto;min-width:0;max-width:60%;font-size:12px;padding:6px 10px;min-height:34px;white-space:nowrap}.prof-contato>span{flex:1 1 auto}.vale-fornecedor-head .prof-wpp{margin-left:auto}.mo-ref{display:grid;gap:3px;padding:10px 0;border-top:1px solid var(--line)}.mo-ref-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}.mo-ref-top strong{min-width:0;overflow-wrap:anywhere}.mo-ref-top b{flex:0 0 auto;white-space:nowrap}.mo-ref-top b small{font-weight:400;color:var(--muted);font-size:11px}.mo-ref>span{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.mo-ref>small{font-size:11px;color:var(--dim);line-height:1.4}.mo-status{font-style:normal;margin-left:6px;border:1px solid var(--line2);border-radius:999px;padding:1px 7px;font-size:10px;color:var(--yellow)}.mo-historico .search{margin:4px 0 6px}
+.prof-contato{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}.prof-contato>span{display:grid;gap:2px;min-width:0}.prof-contato small{color:var(--muted);font-size:12px}.btn-wpp.prof-wpp{flex:0 0 auto;width:auto;min-width:0;max-width:60%;font-size:12px;padding:6px 10px;min-height:34px;white-space:nowrap}.prof-contato>span{flex:1 1 auto}.vale-fornecedor-head .prof-wpp{margin-left:auto}.mo-ref{display:grid;gap:3px;padding:10px 0;border-top:1px solid var(--line)}.mo-ref-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}.mo-ref-top strong{min-width:0;overflow-wrap:anywhere}.mo-ref-top b{flex:0 0 auto;white-space:nowrap}.mo-ref-top b small{font-weight:400;color:var(--muted);font-size:11px}.mo-ref>span{font-size:12px;color:var(--muted);overflow-wrap:anywhere}.mo-ref>small{font-size:11px;color:var(--dim);line-height:1.4}.mo-status{font-style:normal;margin-left:6px;border:1px solid var(--line2);border-radius:999px;padding:1px 7px;font-size:10px;color:var(--yellow)}.mo-historico .search{margin:4px 0 6px}.mural-ping{display:flex;align-items:center;gap:8px;width:100%;margin:0 0 12px;padding:10px 14px;border-radius:12px;border:1px solid #d4a64e66;background:#d4a64e1a;color:var(--text);font-size:13px;text-align:left;cursor:pointer}.mural-ping b{margin-left:auto;color:var(--yellow)}.mural-quem{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.mural-quem .kicker{width:100%;margin:0}.mural-quem button{padding:6px 12px;font-size:12px}.mural-respondendo{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin:0}.mural-respondendo button{padding:2px 8px}.mural-recado{padding:12px 0;border-top:1px solid var(--line);display:grid;gap:5px}.mural-recado:first-child{border-top:0}.mural-recado.nao-lido{border-left:3px solid var(--yellow);padding-left:10px}.mural-topo{display:flex;justify-content:space-between;gap:10px;font-size:13px}.mural-topo time{color:var(--dim);font-size:11px;white-space:nowrap}.mural-recado p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.5}.mural-pai{color:var(--dim);font-size:11px;overflow-wrap:anywhere}.mural-rodape{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;color:var(--muted)}.mural-rodape button{padding:5px 12px;font-size:12px}
 .caixa-bloco{border:1px solid var(--line2);border-radius:12px;padding:8px 10px;min-width:0}.caixa-bloco>summary{cursor:pointer;font-weight:700;font-size:13px}.caixa-bloco[open]>summary{margin-bottom:8px}.caixa-bloco .caixa-resumo{font-weight:400;display:inline-block;max-width:calc(100% - 22px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}.caixa-recado-mais[open]{display:grid;gap:8px}
 .caixa-conversa summary{cursor:pointer;font-size:12px;color:var(--muted)}
 .caixa-conversa p{margin:6px 0 0;font-size:12px;color:var(--muted);white-space:pre-wrap;word-break:break-word}
@@ -2030,6 +2030,10 @@ const demoProfissionais = [
 const demoReferenciasMO = [
   { id: "rm1", profissional_id: "p1", profissional_nome: "Marlom Júnior", tipo_movel: "Cabeceira", medidas: "1,40x2,40 e 1,13x1,20", escopo: "Peça já montada", valor: 50, unidade_valor: "por_peca", data_referencia: "2026-10-19", status: "confirmada", observacao: "Preço por peça já montada. Comparação aproximada, não usar como preço fechado para peça, acabamento ou medidas diferentes." },
   { id: "rm2", profissional_id: "p2", profissional_nome: "Marcão", tipo_movel: "Cadeira", medidas: null, quantidade: 6, escopo: "Troca de tecido do assento", valor: 240, unidade_valor: "por_lote", data_referencia: "2026-10-10", status: "ambigua", observacao: "Exemplo da demonstração." },
+];
+const demoMural = [
+  { id: "mu1", de: "claude", para: "toqi", texto: "Toqi, a partir de hoje grave por = 'toqi' em tudo que fizer no app. Código e estrutura do banco ficam com o Claude: ideia de tela vira recado aqui.", criado_em: "2026-10-26T14:30:00Z", lido_em: null },
+  { id: "mu2", de: "toqi", para: "claude", texto: "Combinado. Já gravo como toqi.", criado_em: "2026-10-26T14:40:00Z", lido_em: "2026-10-26T15:00:00Z", lido_por: "claude", responde_a: "mu1" },
 ];
 const demoFornecedores = [
   { id: "f1", nome: "Afibracom", contato_nome: "Rafael", telefone: "6185580041", chave_pix: "pix@afibracom.exemplo", produtos: "Tecidos (linho Klee, Chagall), PVC couro, pés de PVC, insumos", dias_entrega: "terca,quinta", observacao: "Pedido 1 dia antes" },
@@ -4365,7 +4369,7 @@ function Home() {
   // nota de material a prazo, que mora em Compras.
   // ATALHOS DO APP (Diego, 15/10/2026, Niagara mostra os atalhos ao deslizar o ícone): o manifest leva a
   // ?ir=agenda / caixa / leads / anotar. `anotar` abre o Painel já com a caixinha "Anotar agora".
-  const [tab, setTab] = useState(() => { try { const ir = new URL(location.href).searchParams.get("ir"); if (ir === "profissionais") return "vales"; return ["caixa", "futuro", "compras", "leads", "agenda"].includes(ir) ? ir : "painel"; } catch (e) { return "painel"; } });
+  const [tab, setTab] = useState(() => { try { const ir = new URL(location.href).searchParams.get("ir"); if (ir === "profissionais") return "vales"; if (ir === "mural") return "mural"; return ["caixa", "futuro", "compras", "leads", "agenda"].includes(ir) ? ir : "painel"; } catch (e) { return "painel"; } });
   const anotarInicial = React.useRef((() => { try { return new URL(location.href).searchParams.get("ir") === "anotar"; } catch (e) { return false; } })()).current;
   // TOQUE NA NOTIFICAÇÃO DO COMPROMISSO (Diego, 15/10/2026): abre direto na ficha da cliente daquele compromisso
   // (?ir=ficha&id=<cliente>), onde já está o botão do WhatsApp dela; sem cliente, abre a Agenda no card
@@ -4431,6 +4435,8 @@ function Home() {
   const [profissionais, setProfissionais] = useState([]);
   // HISTÓRICO DE MÃO DE OBRA (Toqi, 26/10/2026): referência de preço por profissional, só pra comparar orçamento.
   const [referenciasMO, setReferenciasMO] = useState([]);
+  // MURAL (Diego, 26/10/2026: "comunicação dentro do próprio app de você e da Toqi"): recados entre Claude, Toqi e Diego.
+  const [mural, setMural] = useState([]);
   // DOMÍNIO PESSOAIS (item APP-PESSOAIS-CARD-20260824-2145) — vive na mesma tela por conveniência dele,
   // mas é outro domínio: não entra em cliente, serviço, financeiro nem em nenhum indicador da Tapeçaria.
   const [pessoais, setPessoais] = useState([]);
@@ -4491,6 +4497,7 @@ function Home() {
       if (ir === "agenda") { setCardChegada(u.get("card") || null); setTab("agenda"); return; }
       if (ir === "card" && /^[0-9a-f-]{36}$/i.test(u.get("id") || "")) { if (u.get("pagou")) PERGUNTA_PAGOU.pedir(u.get("id")); FOCO.chegada = u.get("id"); FOCO.abrir(u.get("id")); return; }
       if (ir === "profissionais") { setTab("vales"); return; }
+      if (ir === "mural") { setTab("mural"); return; }
       if (["caixa", "futuro", "compras", "leads"].includes(ir)) setTab(ir);
     };
     navigator.serviceWorker.addEventListener("message", ouvir);
@@ -4549,6 +4556,7 @@ function Home() {
     setDividas(p.dividas || []);
     setProfissionais(p.profissionais || []);
     setReferenciasMO(p.referenciasMO || []);
+    setMural(p.mural || []);
     // Distâncias não são estado de tela — alimentam tempoEstradaMin, que é função pura. Entram no pacote
     // pra virem junto no cache offline: sem sinal a trava de rota continua com os tempos aprendidos.
     aplicarDistanciasDoBanco(p.distancias);
@@ -4556,13 +4564,13 @@ function Home() {
 
   const loadAll = useCallback(async () => {
     if (demo) {
-      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comConta(comTituloVisivel(demoAppointments, demoPessoais), demoFinance)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setAtividadeAgente(demoAtividadeAgente); setDuvidasAgente(demoDuvidas); setPropostas(demoPropostas); setDividas(demoDividas); setProfissionais(demoProfissionais); setReferenciasMO(demoReferenciasMO); setLoading(false); return;
+      setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comConta(comTituloVisivel(demoAppointments, demoPessoais), demoFinance)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setAtividadeAgente(demoAtividadeAgente); setDuvidasAgente(demoDuvidas); setPropostas(demoPropostas); setDividas(demoDividas); setProfissionais(demoProfissionais); setReferenciasMO(demoReferenciasMO); setMural(demoMural); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
-    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da, pr, rm, firstError;
+    let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da, pr, rm, mu, firstError;
     try {
-      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da, pr, rm] = await Promise.all([
+      [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da, pr, rm, mu] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
         db.from("clientes").select("*").order("nome", { ascending: true }),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
@@ -4620,6 +4628,8 @@ function Home() {
         db.from("propostas").select("*").or(`status.in.(aguardando,aprovada),and(status.eq.recado,recado_pelo_app.is.true),and(status.eq.enviada,enviado_em.gte.${new Date(Date.now() - 7 * 864e5).toISOString()}),and(status.eq.cancelada,decidido_em.gte.${new Date(Date.now() - 7 * 864e5).toISOString()})`).order("criado_em", { ascending: false }).limit(40),
         // HISTÓRICO DE MÃO DE OBRA (26/10/2026): camada de apoio como `pf`. Só referência, fora da conta do acerto.
         db.from("referencias_mao_de_obra").select("*").order("data_referencia", { ascending: false }).order("criado_em", { ascending: false }).limit(300),
+        // MURAL (26/10/2026): camada de apoio como `rm`. Os últimos 100 recados entre Claude, Toqi e Diego.
+        db.from("mural_recados").select("*").order("criado_em", { ascending: false }).limit(100),
       ]);
       // `ds` e `es` ficam FORA da conta do firstError de propósito: distância é melhoria com rede embaixo (a
       // const TEMPO_ESTRADA_MIN) e estoque é uma sugestão a mais no card de Compras. Se uma dessas falhar
@@ -4638,7 +4648,7 @@ function Home() {
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
     setOfflineDesde(null);
-    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [], duvidasAgente: da?.data || [], propostas: pr?.data || [], referenciasMO: rm?.data || [] };
+    const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [], duvidasAgente: da?.data || [], propostas: pr?.data || [], referenciasMO: rm?.data || [], mural: mu?.data || [] };
     aplicarPacote(pacote);
     // Link direto pra um card que já saiu da agenda (feito, cancelado): antes o app ficava no Painel calado.
     if (IR_INICIAL === "card" && IR_ID && !(pacote.appointments || []).some((a) => String(a.id) === IR_ID)) {
@@ -5466,10 +5476,13 @@ function Home() {
   // Conta direto, sem useMemo: este trecho vem DEPOIS do `return` da tela de login, e hook depois de
   // return condicional quebra o React na hora em que a sessão chega (erro #310). São dezenas de itens.
   const filaCaixa = itensDaFilaDaCaixa(inbox);
+  // Recado do Claude que a Toqi (ou o Diego) ainda não marcou como lido: conta na aba e aparece no topo de toda tela.
+  const muralNaoLidos = (mural || []).filter((r) => r.de === "claude" && !r.lido_em && r.para !== "claude");
   const nav = [
     { id: "painel", label: "Painel", icon: "⌂" }, { id: "caixa", label: "Caixa", icon: "✉", count: filaCaixa.length || undefined }, { id: "leads", label: "Leads", icon: "◇", count: activeServices.length },
     { id: "agenda", label: "Agenda", icon: "□" }, { id: "financeiro", label: "Financeiro", icon: "$" }, { id: "compras", label: "Compras", icon: "▣" }, { id: "futuro", label: "A pagar", icon: "◷", count: contasFuturas }, { id: "vales", label: "Profissionais", icon: "✎", count: contaProfissionais },
     { id: "clientes", label: "Clientes", icon: "○" }, { id: "fornecedores", label: "Fornecedores", icon: "▤" },
+    { id: "mural", label: "Mural", icon: "✦", count: muralNaoLidos.length || undefined },
     // ESTOQUE É PÁGINA PRÓPRIA, NÃO ABA (item ESTOQUE-V2-APP-20260827-2338-001). O backend do Estoque V2 já
     // estava no Supabase desde 22/08, mas a tela vivia num PR aberto e nunca chegou no app — o Diego
     // perguntou "onde fica o estoque?" e a resposta honesta era "em lugar nenhum".
@@ -5533,6 +5546,7 @@ function Home() {
           </div>
         </>}
       </div></header>
+      {tab !== "mural" && muralNaoLidos.length > 0 && <button type="button" className="mural-ping" onClick={() => { vibrar(8); setTab("mural"); }}>📌 {muralNaoLidos.length === 1 ? "1 recado do Claude" : `${muralNaoLidos.length} recados do Claude`} no Mural <b>Ler</b></button>}
 
       {/* A TELA DA CAIXA DE ENTRADA FOI REMOVIDA EM 23/08/2026, a pedido do Diego.
           Ela era a porta de digitação do app — colar mensagem, triar, virar cliente/agenda/
@@ -5560,6 +5574,7 @@ function Home() {
       {tab === "financeiro" && <FinanceView finances={finances} dividas={dividas} services={services} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onVerAPagar={() => setTab("futuro")} />}
       {tab === "compras" && <ComprasView finances={finances} fornecedores={fornecedores} services={services} appointments={agendaVisivel} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
       {tab === "futuro" && <FuturoView finances={finances} dividas={dividas} services={activeServices} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} />}
+      {tab === "mural" && <MuralView recados={mural} db={db} demo={demo} notify={notify} onChanged={loadAll} />}
       {tab === "vales" && <ProfissionaisView finances={finances} services={services} profissionais={profissionais} referencias={referenciasMO} db={db} demo={demo} mode={mode} notify={notify} onChanged={loadAll} onOpenFicha={setFichaId} />}
       {tab === "clientes" && <CustomersView customers={customers} services={services} search={search} setSearch={setSearch} onOpenFicha={setFichaId} />}
       {tab === "fornecedores" && <FornecedoresView fornecedores={fornecedores} />}
@@ -8060,6 +8075,7 @@ const IR_SECAO = { atrasados: "secao-vencendo", hoje: "secao-hoje", propostas: "
 //   ?ir=caixa&id=<caixa_entrada.id> o item da Caixa · ?ir=ficha&id=<clientes.id>  a ficha
 //   ?ir=resposta&id=<duvidas_agente.id>  o cartão de envio respondido: opção tocada, dia e hora (RespostaDoDiego)
 //   ?ir=profissionais               a aba Profissionais (contatos, histórico de mão de obra, acerto)
+//   ?ir=mural                       o Mural de recados entre Claude, Toqi e Diego
 const IR_ID = (() => { try { return new URL(location.href).searchParams.get("id"); } catch (e) { return null; } })();
 const IR_GRUPO = { manu: "grupo-manu" };
 function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null }) {
@@ -9902,7 +9918,7 @@ function ResumoManhaCard({ avisos, today, db, demo, notify, onOpenFicha, onChang
 // caso, marca `aplicada` e, se vale sempre, escreve em `regra` a versão geral — que ele relê em toda rodada.
 // Não é a Caixa: a Caixa é item que chegou (print, comprovante); isto é o agente pedindo uma decisão.
 // MANU (Diego 12/10/2026: "meu agente chama Manu, igual lá no GPT"): o agente de hora em hora é a Manu.
-const ORIGEM_CARTAO = { agente: "Manu", manu: "Manu", auditoria: "Auditoria 02h20", pix: "Pix", caixa: "Caixa", claude: "Claude", grok: "Grok" };
+const ORIGEM_CARTAO = { agente: "Manu", manu: "Manu", auditoria: "Auditoria 02h20", pix: "Pix", caixa: "Caixa", claude: "Claude", grok: "Grok", toqi: "Toqi" };
 const rotuloOrigem = (o) => ORIGEM_CARTAO[String(o || "agente").toLowerCase()] || String(o);
 // A Caixa já tinha o seu canal de pergunta (item em `aguardando_voce` com a pergunta em conversa[], Regra Nº 13/15).
 // Aqui ela só é MOSTRADA no mesmo card: responder grava do mesmo jeito que a tela da Caixa grava.
@@ -11978,6 +11994,77 @@ function montarAcertoProfissionais(finances, services, profissionais) {
 // adiantado (vale) e o que ele fez pra ganhar (buscar, entregar, o serviço). Diego: "eu tenho que ir anotando
 // que ele busca serviço comigo, isso é trabalho dele... só pra não esquecer quando for abater os vales".
 // Vale sozinho só mostrava a dívida DELE com o Diego. Faltava a do Diego com ele — que era a que sumia.
+// MURAL DE RECADOS (Diego, 26/10/2026: "comunicação dentro do próprio app de você e da Toqi... toda vez que ela ler,
+// ver alguma coisa que você jogar" e "se você também quiser escrever, escreve lá"). Tabela mural_recados: de, para,
+// texto, responde_a, lido_em, lido_por. O Claude escreve e lê pelo banco. A Toqi e o Diego leem e escrevem aqui, e o
+// botão "Li" grava lido_em, que é como o Claude sabe que foi lido. Recado não é ordem de dinheiro nem de envio:
+// o que precisa do Diego continua indo pra ele.
+const NOMES_MURAL = { claude: "Claude", toqi: "Toqi", diego: "Diego", todos: "Todos" };
+function MuralView({ recados = [], db, demo, notify, onChanged }) {
+  const [de, setDe] = useState(() => { try { return localStorage.getItem("tb-mural-de") || "toqi"; } catch (e) { return "toqi"; } });
+  const [para, setPara] = useState("claude");
+  const [texto, setTexto] = useState("");
+  const [respondendo, setRespondendo] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const porId = new Map((recados || []).map((r) => [r.id, r]));
+  const quando = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).replace(",", ""); };
+  const escolherDe = (v) => { setDe(v); try { localStorage.setItem("tb-mural-de", v); } catch (e) { /* só conveniência */ } };
+  const marcarLido = async (r) => {
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    setBusy("li-" + r.id);
+    try {
+      const quem = r.para === "todos" ? de : r.para;
+      const { error } = await db.from("mural_recados").update({ lido_em: new Date().toISOString(), lido_por: quem }).eq("id", r.id).is("lido_em", null);
+      if (error) throw error;
+      notify("Marcado como lido. O Claude vê que foi lido.", "ok");
+      await onChanged();
+    } catch (e) { notify("Não marcou: " + e.message, "error"); } finally { setBusy(null); }
+  };
+  const enviar = async () => {
+    if (demo) { notify("Na demonstração não salva.", "info"); return; }
+    const t = texto.trim();
+    if (!t) { notify("Escreva o recado.", "error"); return; }
+    if (de === para) { notify("Escolha pra quem vai o recado.", "error"); return; }
+    setBusy("enviar");
+    try {
+      const { error } = await db.from("mural_recados").insert({ de, para, texto: t, responde_a: respondendo ? respondendo.id : null });
+      if (error) throw error;
+      notify(`Recado pra ${NOMES_MURAL[para]} deixado no Mural.`, "ok");
+      setTexto(""); setRespondendo(null);
+      await onChanged();
+    } catch (e) { notify("Não deixou o recado: " + e.message, "error"); } finally { setBusy(null); }
+  };
+  const responder = (r) => { setRespondendo(r); if (r.de !== de) setPara(r.de); else if (r.para !== "todos") setPara(r.para); requestAnimationFrame(() => document.getElementById("mural-texto")?.focus()); };
+  return <div className="page-grid">
+    <section className="content-card mural">
+      <div className="card-head"><div><p className="kicker">CLAUDE · TOQI · DIEGO</p><h3>Mural de recados</h3></div></div>
+      <p className="ficha-note">Recados entre o Claude e a Toqi. Leu, toque <strong>Li</strong>: o Claude fica sabendo. Dinheiro, envio pra cliente e mudança no app continuam precisando do Diego.</p>
+      <div className="form-grid">
+        <div className="mural-quem"><span className="kicker">Quem escreve</span>{["toqi", "diego"].map((k) => <button key={k} type="button" className={de === k ? "primary" : "ghost"} onClick={() => escolherDe(k)}>{NOMES_MURAL[k]}</button>)}</div>
+        <div className="mural-quem"><span className="kicker">Pra quem</span>{["claude", "toqi", "diego", "todos"].filter((k) => k !== de).map((k) => <button key={k} type="button" className={para === k ? "primary" : "ghost"} onClick={() => setPara(k)}>{NOMES_MURAL[k]}</button>)}</div>
+        {respondendo && <p className="mural-respondendo">Respondendo a {NOMES_MURAL[respondendo.de] || respondendo.de}: "{String(respondendo.texto || "").slice(0, 90)}{String(respondendo.texto || "").length > 90 ? "…" : ""}" <button type="button" className="ghost" onClick={() => setRespondendo(null)}>✕</button></p>}
+        <label>Recado<textarea id="mural-texto" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Escreva o recado" rows={3} /></label>
+        <button className="primary wide" disabled={busy === "enviar"} onClick={enviar}>{busy === "enviar" ? "Deixando…" : `Deixar recado pra ${NOMES_MURAL[para]}`}</button>
+      </div>
+    </section>
+    <section className="content-card mural">
+      {!(recados || []).length && <div className="empty-state"><b>Nenhum recado ainda.</b><span>O que o Claude deixar aqui aparece no topo do app até alguém tocar Li.</span></div>}
+      {(recados || []).map((r) => { const pai = r.responde_a ? porId.get(r.responde_a) : null; const naoLido = !r.lido_em; return <div key={r.id} className={`mural-recado de-${r.de}${naoLido ? " nao-lido" : ""}`}>
+        <div className="mural-topo"><strong>{NOMES_MURAL[r.de] || r.de} → {NOMES_MURAL[r.para] || r.para}</strong><time>{quando(r.criado_em)}</time></div>
+        {pai && <small className="mural-pai">↪ {String(pai.texto || "").slice(0, 80)}{String(pai.texto || "").length > 80 ? "…" : ""}</small>}
+        <p>{r.texto}</p>
+        <div className="mural-rodape">
+          <span>{naoLido ? "não lido" : `lido ${quando(r.lido_em)}${r.lido_por ? ` por ${NOMES_MURAL[r.lido_por] || r.lido_por}` : ""}`}</span>
+          <span className="agenda-acoes">
+            {naoLido && r.para !== "claude" && <button type="button" className="primary" disabled={busy === "li-" + r.id} onClick={() => marcarLido(r)}>{busy === "li-" + r.id ? "…" : "Li"}</button>}
+            <button type="button" className="ghost" onClick={() => responder(r)}>Responder</button>
+          </span>
+        </div>
+      </div>; })}
+    </section>
+  </div>;
+}
+
 // HISTÓRICO DE PREÇO DE MÃO DE OBRA (pedido da Toqi, 26/10/2026, com o "Sim" do Diego). Quanto cada profissional
 // cobrou, em que móvel, medida e escopo, pra comparar na hora de orçar. SÓ REFERÊNCIA: não mexe no caixa, no
 // combinado do serviço (valor_mao_de_obra), em vale nem em acerto. Tabela referencias_mao_de_obra.
