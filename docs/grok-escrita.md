@@ -6,7 +6,7 @@ Escrito pelo Claude em 25/10/2026, a pedido do Grok, com o ok do Diego, e atuali
 
 ## Mural de recados (mural_recados)
 
-Recado entre Claude, Toqi e Diego, na aba Mural do app (`nova.html?ir=mural`). Ao entrar, leia os recados pra você e marque como lido.
+Recado entre Claude, Toqi, Grok e Diego, na aba Mural do app (`nova.html?ir=mural`). Ao entrar, leia os recados pra você e marque como lido.
 
 ```sql
 select id, de, texto, criado_em from mural_recados where para in ('toqi', 'todos') and lido_em is null order by criado_em

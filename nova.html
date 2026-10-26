@@ -11999,7 +11999,7 @@ function montarAcertoProfissionais(finances, services, profissionais) {
 // texto, responde_a, lido_em, lido_por. O Claude escreve e lê pelo banco. A Toqi e o Diego leem e escrevem aqui, e o
 // botão "Li" grava lido_em, que é como o Claude sabe que foi lido. Recado não é ordem de dinheiro nem de envio:
 // o que precisa do Diego continua indo pra ele.
-const NOMES_MURAL = { claude: "Claude", toqi: "Toqi", diego: "Diego", todos: "Todos" };
+const NOMES_MURAL = { claude: "Claude", toqi: "Toqi", grok: "Grok", diego: "Diego", todos: "Todos" };
 function MuralView({ recados = [], db, demo, notify, onChanged }) {
   const [de, setDe] = useState(() => { try { return localStorage.getItem("tb-mural-de") || "toqi"; } catch (e) { return "toqi"; } });
   const [para, setPara] = useState("claude");
@@ -12037,11 +12037,11 @@ function MuralView({ recados = [], db, demo, notify, onChanged }) {
   const responder = (r) => { setRespondendo(r); if (r.de !== de) setPara(r.de); else if (r.para !== "todos") setPara(r.para); requestAnimationFrame(() => document.getElementById("mural-texto")?.focus()); };
   return <div className="page-grid">
     <section className="content-card mural">
-      <div className="card-head"><div><p className="kicker">CLAUDE · TOQI · DIEGO</p><h3>Mural de recados</h3></div></div>
-      <p className="ficha-note">Recados entre o Claude e a Toqi. Leu, toque <strong>Li</strong>: o Claude fica sabendo. Dinheiro, envio pra cliente e mudança no app continuam precisando do Diego.</p>
+      <div className="card-head"><div><p className="kicker">CLAUDE · TOQI · GROK · DIEGO</p><h3>Mural de recados</h3></div></div>
+      <p className="ficha-note">Recados entre o Claude, a Toqi e o Grok. Leu, toque <strong>Li</strong>: o Claude fica sabendo. Dinheiro, envio pra cliente e mudança no app continuam precisando do Diego.</p>
       <div className="form-grid">
-        <div className="mural-quem"><span className="kicker">Quem escreve</span>{["toqi", "diego"].map((k) => <button key={k} type="button" className={de === k ? "primary" : "ghost"} onClick={() => escolherDe(k)}>{NOMES_MURAL[k]}</button>)}</div>
-        <div className="mural-quem"><span className="kicker">Pra quem</span>{["claude", "toqi", "diego", "todos"].filter((k) => k !== de).map((k) => <button key={k} type="button" className={para === k ? "primary" : "ghost"} onClick={() => setPara(k)}>{NOMES_MURAL[k]}</button>)}</div>
+        <div className="mural-quem"><span className="kicker">Quem escreve</span>{["toqi", "grok", "diego"].map((k) => <button key={k} type="button" className={de === k ? "primary" : "ghost"} onClick={() => escolherDe(k)}>{NOMES_MURAL[k]}</button>)}</div>
+        <div className="mural-quem"><span className="kicker">Pra quem</span>{["claude", "toqi", "grok", "diego", "todos"].filter((k) => k !== de).map((k) => <button key={k} type="button" className={para === k ? "primary" : "ghost"} onClick={() => setPara(k)}>{NOMES_MURAL[k]}</button>)}</div>
         {respondendo && <p className="mural-respondendo">Respondendo a {NOMES_MURAL[respondendo.de] || respondendo.de}: "{String(respondendo.texto || "").slice(0, 90)}{String(respondendo.texto || "").length > 90 ? "…" : ""}" <button type="button" className="ghost" onClick={() => setRespondendo(null)}>✕</button></p>}
         <label>Recado<textarea id="mural-texto" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Escreva o recado" rows={3} /></label>
         <button className="primary wide" disabled={busy === "enviar"} onClick={enviar}>{busy === "enviar" ? "Deixando…" : `Deixar recado pra ${NOMES_MURAL[para]}`}</button>
