@@ -6368,7 +6368,7 @@ function interlocutorCompromisso(a, svc, fornecedores, profissionais) {
   // `fornObj` é o cadastro inteiro (telefone, contato, chave Pix): o card de pagamento abre o WhatsApp de QUEM
   // RECEBE e mostra a chave dele (Diego, 15/10/2026: "era para abrir o WhatsApp de quem eu tenho que pagar").
   const fornObj = (fornecedores || []).filter((f) => f?.nome && !/avulsa|diversos/i.test(f.nome))
-    .find((f) => marcaDoNome(f.nome)?.test(alvo)) || null;
+    .find((f) => marcaDoNome(f.nome)?.test(alvo) || (f.contato_nome && marcaDoNome(f.contato_nome)?.test(alvo))) || null; // pelo contato também: "Edmania" é da Ellis (26/10/2026)
   const forn = fornObj ? fornObj.nome.split(/\s+/).slice(0, 3).join(" ").replace(/[.,]$/, "") : undefined;
   const prof = (profissionais || []).find((n) => marcaDoNome(n)?.test(alvo));
   if (a?.tipo === "operacional") return { destino: "interno", motivo: "compromisso operacional" };
@@ -12070,8 +12070,9 @@ function MuralView({ recados = [], db, demo, notify, onChanged }) {
 // combinado do serviço (valor_mao_de_obra), em vale nem em acerto. Tabela referencias_mao_de_obra.
 const UNIDADE_MO = { por_peca: "por peça", por_metro: "por metro", por_lote: "pelo lote", total: "no total" };
 const STATUS_MO = { ambigua: "ambígua", pendente: "a confirmar" };
+const ORIGENS_MO = ["WhatsApp", "Ligação", "Pessoalmente", "Painel"];
 function HistoricoMaoDeObra({ referencias = [], profissionais = [], db, demo, notify, onChanged }) {
-  const vazio = { profissional_id: "", tipo_movel: "", medidas: "", quantidade: "", escopo: "", material: "", valor: "", unidade_valor: "por_peca", data_referencia: hojeISO(), observacao: "" };
+  const vazio = { profissional_id: "", tipo_movel: "", medidas: "", quantidade: "", escopo: "", material: "", valor: "", unidade_valor: "por_peca", data_referencia: hojeISO(), observacao: "", origem: "WhatsApp", status: "confirmada" };
   const [busca, setBusca] = useState("");
   const [anotando, setAnotando] = useState(false);
   const [novo, setNovo] = useState(vazio);
@@ -12092,7 +12093,7 @@ function HistoricoMaoDeObra({ referencias = [], profissionais = [], db, demo, no
     if (qtd !== null && !(qtd > 0)) { notify("A quantidade não é um número.", "error"); return; }
     setBusy(true);
     try {
-      const { error } = await db.from("referencias_mao_de_obra").insert({ profissional_id: prof.id, profissional_nome: prof.nome, tipo_movel: novo.tipo_movel.trim(), medidas: novo.medidas.trim() || null, quantidade: qtd, escopo: novo.escopo.trim(), material: novo.material.trim() || null, valor, unidade_valor: novo.unidade_valor, data_referencia: novo.data_referencia || hojeISO(), status: "confirmada", origem_evidencia: "Anotado no app pelo Diego", observacao: novo.observacao.trim() || null });
+      const { error } = await db.from("referencias_mao_de_obra").insert({ profissional_id: prof.id, profissional_nome: prof.nome, tipo_movel: novo.tipo_movel.trim(), medidas: novo.medidas.trim() || null, quantidade: qtd, escopo: novo.escopo.trim(), material: novo.material.trim() || null, valor, unidade_valor: novo.unidade_valor, data_referencia: novo.data_referencia || hojeISO(), status: novo.status, origem_evidencia: novo.origem, observacao: novo.observacao.trim() || null });
       if (error) throw error;
       notify(`Referência do ${prof.nome} anotada. Não mexe no caixa nem no acerto.`, "ok");
       setNovo({ ...vazio, profissional_id: prof.id });
@@ -12110,7 +12111,7 @@ function HistoricoMaoDeObra({ referencias = [], profissionais = [], db, demo, no
         <strong>{r.tipo_movel}{r.medidas ? ` · ${r.medidas}` : ""}{r.quantidade ? ` · ${String(Number(r.quantidade)).replace(".", ",")} un.` : ""}</strong>
         <b>{money(r.valor)} <small>{UNIDADE_MO[r.unidade_valor] || r.unidade_valor}</small></b>
       </div>
-      <span>{r.profissional_nome} · {r.escopo}{r.material ? ` · ${r.material}` : ""} · {compactDate(r.data_referencia)}{STATUS_MO[r.status] ? <em className={`mo-status mo-${r.status}`}>{STATUS_MO[r.status]}</em> : null}</span>
+      <span>{r.profissional_nome} · {r.escopo}{r.material ? ` · ${r.material}` : ""} · {compactDate(r.data_referencia)}{r.origem_evidencia ? ` · ${r.origem_evidencia}` : ""}{STATUS_MO[r.status] ? <em className={`mo-status mo-${r.status}`}>{STATUS_MO[r.status]}</em> : null}</span>
       {r.observacao && <small>{r.observacao}</small>}
     </div>)}
     {!termo && lista.length > 12 && <button type="button" className="ghost wide" onClick={() => setTodas(!todas)}>{todas ? "Mostrar menos" : `Ver todas (${lista.length})`}</button>}
@@ -12121,6 +12122,8 @@ function HistoricoMaoDeObra({ referencias = [], profissionais = [], db, demo, no
       <label>O que foi feito*<input value={novo.escopo} onChange={campo("escopo")} placeholder="Peça já montada, troca de tecido…" /></label>
       <div className="row three"><label>Valor R$*<input value={novo.valor} onChange={campo("valor")} inputMode="decimal" placeholder="50" /></label><label>Cobrado<select value={novo.unidade_valor} onChange={campo("unidade_valor")}>{Object.entries(UNIDADE_MO).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label><label>Qtd.<input value={novo.quantidade} onChange={campo("quantidade")} inputMode="decimal" placeholder="2" /></label></div>
       <div className="row"><label>Material<input value={novo.material} onChange={campo("material")} placeholder="se importar" /></label><label>Data<input type="date" value={novo.data_referencia} onChange={campo("data_referencia")} /></label></div>
+      {/* ORIGEM E CONFIANÇA (Toqi, 26/10/2026): as colunas já existiam (origem_evidencia e status), faltava o campo. */}
+      <div className="row"><label>Origem<select value={novo.origem} onChange={campo("origem")}>{ORIGENS_MO.map((o) => <option key={o} value={o}>{o}</option>)}</select></label><label>Confiança<select value={novo.status} onChange={campo("status")}><option value="confirmada">Confirmado</option><option value="pendente">Precisa confirmar</option><option value="ambigua">Ambíguo</option></select></label></div>
       <label>Observação<input value={novo.observacao} onChange={campo("observacao")} placeholder="o que muda o preço" /></label>
       <div className="agenda-acoes"><button className="primary" disabled={busy} onClick={salvar}>{busy ? "Anotando…" : "Anotar referência"}</button><button className="ghost" disabled={busy} onClick={() => setAnotando(false)}>Cancelar</button></div>
     </div>}
