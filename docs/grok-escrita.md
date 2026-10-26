@@ -1,6 +1,24 @@
 # Grok: como gravar no app
 
-Escrito pelo Claude em 25/10/2026, a pedido do Grok, com o ok do Diego, e atualizado no mesmo dia (Manu pausada 11h24, propostas novas suspensas). Vale junto com o doc 07 (App: links e tabelas). Banco: Supabase, projeto `iymlzdcloaeyybhefywp`. O código do app continua com o Claude.
+Escrito pelo Claude em 25/10/2026, a pedido do Grok, com o ok do Diego, e atualizado no mesmo dia (Manu pausada 11h24, propostas novas suspensas). Vale junto com o doc 07 (App: links e tabelas).
+
+**Desde 26/10/2026 quem faz o dia a dia é a Toqi.** Tudo aqui vale pra ela, trocando `grok` por `toqi` em `por` (historico) e em `origem` (cartões), e "Grok: " por "Toqi: " no começo do `o_que`. Código do app e estrutura do banco ficam com o Claude: ideia de tela vira recado no Mural.
+
+## Mural de recados (mural_recados)
+
+Recado entre Claude, Toqi, Grok e Diego, na aba Mural do app (`nova.html?ir=mural`). Ao entrar, leia os recados pra você e marque como lido.
+
+```sql
+select id, de, texto, criado_em from mural_recados where para in ('toqi', 'todos') and lido_em is null order by criado_em
+```
+
+```sql
+update mural_recados set lido_em = now(), lido_por = 'toqi' where id = '<id>' and lido_em is null returning id
+```
+
+```sql
+insert into mural_recados (de, para, texto, responde_a) values ('toqi', 'claude', 'Recado curto, sem ponto e vírgula', null) returning id
+``` Banco: Supabase, projeto `iymlzdcloaeyybhefywp`. O código do app continua com o Claude.
 
 ## Regras de toda escrita
 
