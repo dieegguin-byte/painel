@@ -31,6 +31,71 @@ insert into mural_recados (de, para, texto, responde_a) values ('toqi', 'claude'
 7. Valores no texto sem cifrão ("450 reais").
 8. Gravação recusada ou travada: não tente outro caminho. Anote e tente de novo depois.
 
+## Tudo no app, nada em doc no Drive
+
+Pedido do Diego (26/10/2026): o que você ler no WhatsApp vai direto pro app, e não pra um doc no Drive. Lead novo vira ficha e serviço, conversa vira nota no serviço, pergunta pro Diego vira cartão, tarefa vira card. Não precisa de tarefa agendada escrevendo doc no Drive. Se faltar um campo ou uma tela, deixe recado pro Claude no Mural.
+
+## Lead novo: cadastrar no app
+
+Todo contato que pede orçamento entra no app no mesmo dia, mesmo sem nome, foto ou cidade. Fornecedor, profissional, família e igreja não entram como cliente.
+
+### 1. Já existe?
+
+Procure pelos últimos 8 dígitos do telefone:
+
+```sql
+select c.id, c.nome, c.telefone, c.cidade, s.id as servico_id, s.status, s.titulo from clientes c left join servicos s on s.cliente_id = c.id where right(regexp_replace(c.telefone, '\D', '', 'g'), 8) = '92056793'
+```
+
+Se existir com serviço aberto (lead, orcamento, agendado, producao, pronto), não crie outro: só acrescente a nota (passo 4).
+
+### 2. Ficha (clientes)
+
+- `nome`: o nome que a pessoa usa. Sem nome, use "Cliente" e o fim do número ("Cliente 3681") até ela dizer.
+- `telefone`: sempre `+55 61 9XXXX-XXXX` (55, DDD, 9 e oito dígitos). O banco recusa outro formato.
+- `cidade`: só se ela disse. Não chute.
+- `obs`: de onde veio e quando, curto.
+
+```sql
+insert into clientes (nome, telefone, cidade, obs) values ('Iran', '+55 61 99205-6793', null, 'Lead WhatsApp 26/10 10h28. Fotos na pasta Iran 6793.') returning id
+```
+
+### 3. Serviço (servicos)
+
+- `titulo`: "peça — o que quer — Nome" ("Sofá — troca do forro e das borrachas — Iran").
+- `status`: `lead`. `prazo` é obrigatório: use hoje + 30 dias.
+- `origem`: `Instagram`, `WhatsApp`, `Site` ou `telefone`, com a Ref BH- quando vier.
+- `descricao`: o que a pessoa pediu, medidas, e os links das fotos que a Zapia salvou no Drive.
+- `proxima_acao`: o próximo passo, de quem é a vez, e embaixo as notas com data, hora e "Toqi:".
+
+```sql
+insert into servicos (cliente_id, titulo, descricao, status, prazo, origem, proxima_acao) values ('<cliente uuid>', 'Sofá — troca do forro e das borrachas — Iran', 'Quer trocar o forro e provavelmente as borrachas, o formato fica igual. 4 fotos na pasta Iran 6793.', 'lead', current_date + 30, 'WhatsApp', 'POR TRÁS, vez dele: dizer a cidade. · 26/10 11h30 Toqi: o Diego respondeu por áudio 10h37 que vai analisar e passar um valor aproximado.') returning id
+```
+
+### 4. Conversa nova num lead que já existe
+
+A nota nova entra na frente do `proxima_acao`, com data, hora e "Toqi:". O passo de cima sempre diz de quem é a vez.
+
+```sql
+update servicos set proxima_acao = 'POR TRÁS, vez dela: mandar as fotos. · 26/10 14h10 Toqi: pediu o valor separado de cada peça. · ' || coalesce(proxima_acao, ''), atualizado_em = now() where id = '<servico uuid>' returning id
+```
+
+### 5. Card, cartão ou nada
+
+- Vez do cliente (esperando foto, cidade, resposta): **nada**. Fica "POR TRÁS" no `proxima_acao`, sem card.
+- Vez do Diego (preço, decidir, marcar horário): **cartão** em `duvidas_agente` (seção "Cartão de envio" abaixo, sem `texto_envio` quando não é envio), com o `cliente_id`.
+- Tarefa com dia (visita marcada, falar com profissional, entrega): **card** na `agenda`, um assunto por card, com o nome do cliente no título. Visita (`tipo = 'presencial'`) precisa de hora e cidade.
+
+```sql
+insert into agenda (titulo, data, hora, tipo, cidade, servico_id, cliente_id) values ('Orçamento presencial — Rosimeire — sofá da irmã', '2026-10-27', '10:00', 'presencial', 'Luziânia', '<servico uuid>', '<cliente uuid>') returning id
+```
+
+### 6. Histórico
+
+Uma linha por cadastro: `insert into historico (o_que, por, detalhe) values ('Toqi: cadastrou o lead Iran', 'toqi', 'cliente <uuid> · servico <uuid>')`.
+
+Preço nunca sai da sua cabeça: valor só da Regra de preço ou do Diego. Envio pro cliente só com o Sim do Diego no texto exato.
+
 ## Cartão de envio (Cartões pra você)
 
 Campos que o app mostra:
