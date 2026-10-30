@@ -92,9 +92,9 @@ test('tipo de cada item decide rótulo e botões, e a fila só mostra o que é d
     [item('r2', { conversa: [{ meta: { tipo_operacional: 'remarcacao', agenda_sucessora_id: 'y' } }] }), 'anotacao'],
     [item('p1', { status: 'aguardando_voce', texto: 'Qual foi o valor?' }), 'pergunta'],
     [item('p2', { conversa: [{ meta: { tipo_operacional: 'pergunta_operacao' } }] }), 'pergunta'],
-    [item('l1', { texto: 'BLOQUEIO DE CADASTRO — Fulana — WhatsApp +55 61 9671-8270' }), 'lead'],
-    [item('l2', { texto: '🔴 LEAD BLOQUEADO — Fulana — +55 61 99154-1582' }), 'lead'],
-    [item('l3', { texto: 'Lead WhatsApp +55 61 98165-1527 — quer orçamento' }), 'lead'],
+    [item('l1', { texto: 'BLOQUEIO DE CADASTRO — Fulana — WhatsApp +55 61 9000-0003' }), 'lead'],
+    [item('l2', { texto: '🔴 LEAD BLOQUEADO — Fulana — +55 61 99000-0001' }), 'lead'],
+    [item('l3', { texto: 'Lead WhatsApp +55 61 98000-0002 — quer orçamento' }), 'lead'],
     [item('l4', { texto: '🔴 URGENTE HOJE — lead novo', conversa: [{ meta: { tipo_operacional: 'lead_nao_localizado' } }] }), 'lead'],
     [item('i1', { texto: PRINT }), 'print'],
     [item('a1', { texto: 'CONTABILIDADE — consolidar pendências' }), 'anotacao'],
@@ -113,12 +113,12 @@ test('tipo de cada item decide rótulo e botões, e a fila só mostra o que é d
 });
 
 test('pré-preenchimento lê o jeito que os agentes escrevem na caixa', () => {
-  assert.equal(app.telefoneDoTextoDaCaixa('BLOQUEIO DE CADASTRO — Amanda — WhatsApp +55 61 9671-8270 — Luziânia'), '+55 61 9671-8270');
-  assert.equal(app.corrigirTelefone('+55 61 9671-8270'), '+55 61 99671-8270');
+  assert.equal(app.telefoneDoTextoDaCaixa('BLOQUEIO DE CADASTRO — Amanda — WhatsApp +55 61 9000-0003 — Luziânia'), '+55 61 9000-0003');
+  assert.equal(app.corrigirTelefone('+55 61 9000-0003'), '+55 61 99000-0003');
   assert.equal(app.telefoneDoTextoDaCaixa('Oi, meu WhatsApp é (61) 90000-0000.'), '(61) 90000-0000');
   assert.equal(app.telefoneDoTextoDaCaixa('Pendência de contabilidade de agosto'), '');
-  assert.equal(app.nomeDoTextoDaCaixa('🔴 LEAD BLOQUEADO — Giovanna — +55 61 99154-1582. Pedir cidade'), 'Giovanna');
-  assert.equal(app.nomeDoTextoDaCaixa('Lead WhatsApp +55 61 98165-1527 — mudança para Luziânia — quer orçamento'), '');
+  assert.equal(app.nomeDoTextoDaCaixa('🔴 LEAD BLOQUEADO — Giovanna — +55 61 99000-0001. Pedir cidade'), 'Giovanna');
+  assert.equal(app.nomeDoTextoDaCaixa('Lead WhatsApp +55 61 98000-0002 — mudança para Luziânia — quer orçamento'), '');
   assert.equal(app.nomeDoTextoDaCaixa('Oi, sou Mariana, moro no Jardim Ingá'), 'Mariana');
   assert.equal(app.servicoDoTextoDaCaixa('pediu orçamento para 2 sofás'), 'Reforma de sofá');
   assert.equal(app.servicoDoTextoDaCaixa('orçamento para 2 sofás e 2 poltronas; troca do tecido'), 'Reforma de sofá', 'vale a peça que aparece primeiro');
@@ -216,13 +216,13 @@ describe('gravação — PostgreSQL local com as travas da produção', () => {
   });
 
   test('lead com BLOQUEIO e telefone de 10 dígitos: exige confirmação, grava tudo ligado e não duplica', async () => {
-    const e = await novaEntrada('BLOQUEIO DE CADASTRO — Fulana — WhatsApp +55 61 9671-8270 — Luziânia. Pediu orçamento de sofá.');
-    const dados = { nome: 'Fulana', telefone: '+55 61 99671-8270', cidade: 'Luziânia', servico: 'Reforma de sofá', proximaAcao: 'Mandar o orçamento', data: '2026-09-28', hora: '09:00' };
-    await assert.rejects(app.virarLeadDaCaixa(db, e, { ...dados, telefone: '+55 61 9671-8270', confirmado: true }), /WhatsApp inválido/);
+    const e = await novaEntrada('BLOQUEIO DE CADASTRO — Fulana — WhatsApp +55 61 9000-0003 — Luziânia. Pediu orçamento de sofá.');
+    const dados = { nome: 'Fulana', telefone: '+55 61 99000-0003', cidade: 'Luziânia', servico: 'Reforma de sofá', proximaAcao: 'Mandar o orçamento', data: '2026-09-28', hora: '09:00' };
+    await assert.rejects(app.virarLeadDaCaixa(db, e, { ...dados, telefone: '+55 61 9000-0003', confirmado: true }), /WhatsApp inválido/);
     await assert.rejects(app.virarLeadDaCaixa(db, e, { ...dados, confirmado: false }), /BLOQUEIO DE CADASTRO/);
     assert.equal(await contar('clientes'), 0, 'nada gravado antes da confirmação');
     const r = await app.virarLeadDaCaixa(db, e, { ...dados, confirmado: true });
-    assert.equal(r.cliente.telefone, '+55 61 99671-8270');
+    assert.equal(r.cliente.telefone, '+55 61 99000-0003');
     assert.equal(r.servico.status, 'lead');
     assert.equal(r.compromisso.caixa_entrada_id, e.id);
     assert.equal(r.compromisso.cliente_id, r.cliente.id);
@@ -238,9 +238,9 @@ describe('gravação — PostgreSQL local com as travas da produção', () => {
   });
 
   test('lead cujo WhatsApp já tem ficha vai pra ficha existente, mesmo escrito de outro jeito', async () => {
-    const existente = (await pg.query("INSERT INTO clientes(nome, telefone) VALUES ('Beltrano', '5561991541582') RETURNING id")).rows[0].id;
-    const e = await novaEntrada('Lead WhatsApp +55 61 99154-1582 — quer orçamento de poltrona');
-    const r = await app.virarLeadDaCaixa(db, e, { nome: 'Outro nome', telefone: '+55 61 99154-1582', servico: 'Reforma de poltrona', proximaAcao: 'Responder', data: '2026-09-28', hora: '10:00' });
+    const existente = (await pg.query("INSERT INTO clientes(nome, telefone) VALUES ('Beltrano', '5561990000001') RETURNING id")).rows[0].id;
+    const e = await novaEntrada('Lead WhatsApp +55 61 99000-0001 — quer orçamento de poltrona');
+    const r = await app.virarLeadDaCaixa(db, e, { nome: 'Outro nome', telefone: '+55 61 99000-0001', servico: 'Reforma de poltrona', proximaAcao: 'Responder', data: '2026-09-28', hora: '10:00' });
     assert.equal(r.cliente.id, existente);
     assert.equal(await contar('clientes'), 1);
     assert.equal((await linha('caixa_entrada', e.id)).conversa.some((m) => m.meta?.tipo_operacional === 'cadastro_validado'), false, 'sem bloqueio não carimba validação');
