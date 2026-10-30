@@ -1,4 +1,4 @@
--- CELULAR QUE COMEÇA COM 92..95 (16/10/2026, lead Isa +55 61 92002-4804 recusado): a regra '9[6-9][0-9]{7}' só
+-- CELULAR QUE COMEÇA COM 92..95 (16/10/2026, um lead com celular +55 61 92XXX-XXXX recusado): a regra '9[6-9][0-9]{7}' só
 -- aceitava celular começando com 96..99. Celular no Brasil é 9 + 8 dígitos, então vale '9[0-9]{8}'.
 -- Aplicado no banco em 16/10 por execute_sql, um comando por vez.
 create or replace function private.whatsapp_phone_ok(p_telefone text) returns boolean language sql immutable
