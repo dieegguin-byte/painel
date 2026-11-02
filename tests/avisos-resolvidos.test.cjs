@@ -13,7 +13,7 @@ assert.ok(inicio >= 0 && fim > inicio, 'fecharAvisosDeCards deve vir antes de al
 function montar(tags) {
   const fechados = [];
   const avisos = tags.map((tag) => ({ tag, close: () => fechados.push(tag) }));
-  const ctx = vm.createContext({ navigator: { serviceWorker: { getRegistration: async () => ({ getNotifications: async () => avisos }) } } });
+  const ctx = vm.createContext({ SUPABASE_URL: '', navigator: { serviceWorker: { getRegistration: async () => ({ getNotifications: async () => avisos }) } } });
   vm.runInContext(source.slice(inicio, fim) + '\nthis.fechar = fecharAvisosDeCards;', ctx);
   return { ctx, fechados };
 }
@@ -31,7 +31,7 @@ test('Adiar 1h no app fecha só o aviso daquele card', async () => {
 });
 
 test('sem service worker não quebra', async () => {
-  const ctx = vm.createContext({ navigator: {} });
+  const ctx = vm.createContext({ SUPABASE_URL: '', navigator: {} });
   vm.runInContext(source.slice(inicio, fim) + '\nthis.fechar = fecharAvisosDeCards;', ctx);
   await ctx.fechar(new Set());
 });

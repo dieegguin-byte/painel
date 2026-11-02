@@ -7,7 +7,7 @@ const path = require('node:path');
 const html = fs.readFileSync(path.join(__dirname, '../nova.html'), 'utf8');
 const source = html.match(/<script type="text\/plain" id="app-source">([\s\S]*?)<\/script>/)[1];
 const inicio = source.indexOf('function diasDeAtraso(');
-const fim = source.indexOf('function Dashboard(', inicio);
+const fim = source.indexOf('function GrupoRecolhivel(', inicio); // antes era Dashboard(, mas entre os dois entrou JSX (02/11/2026)
 assert.ok(inicio >= 0 && fim > inicio, 'As funções puras de idade devem preceder Dashboard');
 const ctx = vm.createContext({});
 vm.runInContext(source.slice(inicio, fim), ctx);
