@@ -1,0 +1,57 @@
+# CHECAGEM AUTOMÁTICA (02/11/2026, revisão do app, item 5). Em todo PR e em todo push na main: compila o nova.html com o
+# mesmo Babel que o celular usa e roda os testes que não precisam instalar nada. Não publica, não fala com o banco,
+# não mexe em segredo nenhum. Publicar continua sendo o merge na main, só com o V do Diego.
+#
+# Ficam de fora, de propósito: os testes que precisam de pnpm install (pglite) e o cronograma-tecnico-ui, que tem uma
+# afirmação velha (ver CLAUDE.md, "Testes"). Quando um deles for consertado, entra na lista lá embaixo.
+name: Checar
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checar:
+    name: Compila o nova.html e roda os testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # O app carrega @babel/standalone@7 (o 7 mais novo do CDN). Aqui a versão fica fixa (7.29.12, a testada em
+      # 02/11/2026) pra checagem dar o mesmo resultado sempre; sobe junto se o CDN trocar de major. O Babel fica
+      # fora do repositório (pasta temporária do runner): o package.json da raiz é só do pglite.
+      - name: Baixa o mesmo Babel do app (@babel/standalone 7)
+        working-directory: ${{ runner.temp }}
+        run: |
+          mkdir -p babel && cd babel
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund @babel/standalone@7.29.12
+
+      - name: Sintaxe dos scripts soltos
+        run: |
+          node --check sw.js
+          node --check agenda-caixa.js
+
+      - name: Compila o nova.html e roda os testes que passam sem instalar nada
+        env:
+          BAHIA_BABEL_PATH: ${{ runner.temp }}/babel/node_modules/@babel/standalone/babel.min.js
+        run: >
+          node --test
+          tests/nova-compila.test.cjs
+          tests/atrasados-idade.test.cjs
+          tests/atrasados-passou-da-hora.test.cjs
+          tests/avisos-resolvidos.test.cjs
+          tests/clientes-sem-nome.test.cjs
+          tests/ordem-data-hora.test.cjs
+          tests/pronto-producao.test.cjs
+          tests/texto-pronto-foto.test.cjs
+          tests/whatsapp-comum.test.mjs
