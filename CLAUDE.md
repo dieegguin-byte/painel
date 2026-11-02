@@ -11,7 +11,8 @@ que são longos e explicam o porquê de cada decisão (não apague comentários 
   `sw.js` (service worker), `socorro.html` (tela de socorro quando o app não abre), `icon-*.png`.
 - Dados: Supabase, projeto `iymlzdcloaeyybhefywp` (URL e chave publicável estão no `nova.html`; a chave é
   pública de propósito, quem protege é a RLS). Edge function `edge-functions/push-enviar/index.ts` (push).
-- `index.html` é o app ANTIGO (v4, 16/09/2026), ainda servido na raiz. `nova_teste.html` é sobra de julho.
+- `index.html` só redireciona pra `nova.html` (desde 02/11/2026). O app ANTIGO (v4, 16/09/2026, login próprio e
+  botões de apagar) ficou guardado em `index-antigo.html`, fora do caminho. `nova_teste.html` é sobra de julho.
   `estoque.html` é a tela de estoque. `testes.html` é um laboratório manual, não é CI.
 - `agenda-caixa.js` é carregado pelo `nova.html` antes do fonte (identidade agenda × caixa).
 
