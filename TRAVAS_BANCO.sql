@@ -56,17 +56,17 @@ alter table financeiro add constraint financeiro_material_precisa_fornecedor
 
 -- ----------------------------------------------------------------------------
 -- TRAVA 3 — telefone tem que ser celular brasileiro de verdade
--- O erro real: contar dígitos não basta. "+55 61 92742-2663" tem os 13 dígitos
+-- O erro real: contar dígitos não basta. "+55 61 927XX-XXXX" tem os 13 dígitos
 -- certos e mesmo assim é inválido — depois do DDD vem 9 e depois 6/7/8/9.
--- Foi assim que a Ju entrou duas vezes e ninguém percebeu.
+-- Foi assim que uma cliente entrou duas vezes e ninguém percebeu.
 -- ----------------------------------------------------------------------------
 alter table clientes drop constraint if exists clientes_telefone_celular_br;
 alter table clientes add constraint clientes_telefone_celular_br
   check (telefone is null
          or regexp_replace(telefone, '\D', '', 'g') ~ '^55[1-9][0-9]9[0-9]{8}$') not valid;
--- Linhas velhas em conflito: 4 — Débora Oliveira (85519-9962), Alberto Silva Lima
--- (85986-6685), "Cliente poltrona" (83239-9981) e Ju (92742-2663). Todas precisam
--- do número certo com o Diego; não dá pra deduzir qual dígito ele errou.
+-- Linhas velhas em conflito: 4 (nomes e números ficam no banco, não aqui: o repositório é
+-- público). Todas precisam do número certo com o Diego; não dá pra deduzir qual
+-- dígito ele errou.
 
 
 -- ----------------------------------------------------------------------------

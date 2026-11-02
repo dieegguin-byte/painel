@@ -8,7 +8,8 @@ URL: **https://dieegguin-byte.github.io/painel/** (adicionar à tela inicial do 
 Claude (PC, à noite) -> escreve dados_atendimento.json em ../app_dados_gist/ (Write local)
                      -> git add/commit/push no GIST SECRETO (permissão salva no settings.json)
 GitHub Pages         -> serve o painel (repo público dieegguin-byte/painel, SEM dados de cliente)
-Gist secreto         -> serve os dados (id e837448593fcd4fcea82096b942d93d4, CORS liberado)
+Gist secreto         -> servia os dados (CORS liberado). Id tirado daqui em 30/10/2026: o Gist tem
+                        dados de clientes, o painel atual (nova.html) lê do Supabase e não usa o Gist.
 Celular (PWA)        -> lê o Gist e mostra; Diego conclui/anota itens
 Meu Vivo (WhatsApp)  -> os botões ✔/✏️ mandam comandos "PAINEL ..." pro Meu Vivo (compartilhar);
                         a varredura noturna (23h30) lê e dá baixa no sistema

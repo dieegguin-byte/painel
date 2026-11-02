@@ -39,7 +39,7 @@ describe('Caixa -> Agenda — PostgreSQL local, sem conexão externa',()=>{
   after(async()=>{await pg?.close();});
   beforeEach(async()=>{
     await pg.exec('RESET ROLE; TRUNCATE agenda,caixa_entrada,servicos,clientes;');
-    await pg.query('INSERT INTO clientes VALUES ($1,$2,$3),($4,$5,$6)',[CLIENT,'Nome repetido','+55 61 99999-9999',BAD,'Nome repetido','+55 61 9671-8270']);
+    await pg.query('INSERT INTO clientes VALUES ($1,$2,$3),($4,$5,$6)',[CLIENT,'Nome repetido','+55 61 99999-9999',BAD,'Nome repetido','+55 61 9000-0003']);
     await pg.query('INSERT INTO servicos VALUES ($1,$2,$3,$4)',[SERVICE,CLIENT,'Serviço fictício','lead']);
     await pg.query('INSERT INTO caixa_entrada(id,texto) VALUES ($1,$2),($3,$4)',[BOX,'Entrada fictícia',OTHERBOX,'Entrada fictícia']);
     await pg.query("SELECT set_config('request.jwt.claim.sub',$1,false)",[USER]);
@@ -145,18 +145,18 @@ describe('Caixa -> Agenda — PostgreSQL local, sem conexão externa',()=>{
 });
 
 test('formatação comercial nunca inventa nono dígito e mantém país explícito',()=>{
-  assert.equal(helper.telefoneCadastroEstrito('61 9671-8270'),null);
-  assert.equal(helper.telefoneCadastroEstrito('+55 61 9671-8270'),null);
+  assert.equal(helper.telefoneCadastroEstrito('61 9000-0003'),null);
+  assert.equal(helper.telefoneCadastroEstrito('+55 61 9000-0003'),null);
   assert.equal(helper.telefoneCadastroEstrito('61 99999-9999'),'+5561999999999');
   assert.equal(helper.telefoneCadastroEstrito('+55 61 99999-9999'),'+5561999999999');
-  assert.equal(helper.telefoneCadastroEstrito('+55 61 92002-4804'),'+5561920024804'); // celular novo começa com 92..95
-  assert.equal(helper.telefoneCadastroEstrito('+55 61 8200-2480'),null);
+  assert.equal(helper.telefoneCadastroEstrito('+55 61 92000-0004'),'+5561920000004'); // celular novo começa com 92..95
+  assert.equal(helper.telefoneCadastroEstrito('+55 61 8000-0005'),null);
 });
 
 function mockDb({invalid=false,wrongReadback=false,emptyResolve=false,priorHour=null}={}){
   const calls=[];
   const db={calls,from(table){
-    const q={select(){return q;},eq(){return q;},single:async()=>({data:table==='caixa_entrada'?(emptyResolve?null:{id:BOX,processado:true,status:'resolvido'}):table==='clientes'?{id:CLIENT,telefone:invalid?'+55 61 9671-8270':'+55 61 99999-9999'}:{id:SERVICE,cliente_id:CLIENT},error:null}),maybeSingle:async()=>table==='agenda'?{data:priorHour?{hora:priorHour}:null}:q.single(),update(){calls.push('resolve');return q;},then(resolve){resolve({error:null});}};return q;
+    const q={select(){return q;},eq(){return q;},single:async()=>({data:table==='caixa_entrada'?(emptyResolve?null:{id:BOX,processado:true,status:'resolvido'}):table==='clientes'?{id:CLIENT,telefone:invalid?'+55 61 9000-0003':'+55 61 99999-9999'}:{id:SERVICE,cliente_id:CLIENT},error:null}),maybeSingle:async()=>table==='agenda'?{data:priorHour?{hora:priorHour}:null}:q.single(),update(){calls.push('resolve');return q;},then(resolve){resolve({error:null});}};return q;
   },async rpc(name,args){calls.push({name,args});return {data:{id:'agenda-ficticia',status:'planejado',caixa_entrada_id:BOX,cliente_id:wrongReadback?BAD:args.p_cliente_id,servico_id:args.p_servico_id}};}};
   return db;
 }

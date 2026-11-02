@@ -2121,7 +2121,7 @@ function telefoneWhatsapp(valor) {
 const RE_TRIAGEM_TEL = /^whatsapp:(\d{8,13})$/i;
 // O GATILHO É O CAMPO ESTRUTURADO, NÃO O TÍTULO (adendo de 03/09 ao recado de 01/09).
 // Antes isto olhava só `titulo ~ "TRIAGEM TEMPOR"`. O caso que revelou o buraco: `381dee22`, título
-// "AGUARDANDO RESPOSTA — WhatsApp +55 61 99335-7934 — mensagem enviada", com `local` no formato certo
+// "AGUARDANDO RESPOSTA — WhatsApp +55 61 9XXXX-XXXX — mensagem enviada", com `local` no formato certo
 // e o número ali no próprio registro — e mesmo assim sem botão de WhatsApp, porque o título mudou.
 //
 // Título é texto livre e o Classic reescreve conforme a fase do atendimento ("TRIAGEM TEMPORÁRIA",
@@ -4079,7 +4079,7 @@ function urlWaze(destino) {
 // `https://wa.me/...` é universal link. No navegador comum o Android entrega pro WhatsApp; dentro do app
 // instalado o Chrome trata como PÁGINA e abre a landing "Continuar para o chat", que pede outro toque e
 // nem sempre chega na conversa. Caso real: Shirlei, 31/08 — o telefone estava certo na ficha
-// (+55 61 99852-0902), o botão renderizava, o Diego tocava e a conversa não abria. O número nunca foi o
+// (conferido no banco), o botão renderizava, o Diego tocava e a conversa não abria. O número nunca foi o
 // problema; o transporte era.
 //
 // `S.browser_fallback_url` garante o piso: sem o app instalado (ou se o intent falhar) o Android abre
@@ -4097,23 +4097,34 @@ function urlWaze(destino) {
 // Tirar a linha do `package` faz o Android perguntar qual app usar quando os dois estiverem instalados;
 // é o plano B se o Business não for o certo.
 const WHATSAPP_PACOTE = "com.whatsapp.w4b";
-// EXCEÇÃO POR NÚMERO (recado de 08/09/2026). A conversa da Sabrina (+55 61 99603-1000) começou no OUTRO
-// WhatsApp do Diego, o comum — forçar o Business nela abre conversa vazia no app errado. É uma lista de
-// números, não uma configuração: o padrão continua Business pra todo o resto, que é o que o recado pede.
-// Número no formato de `telefoneWhatsapp` (DDD + 9 dígitos, sem o 55); a comparação tira o 55 se vier.
+// EXCEÇÃO POR CLIENTE (recado de 08/09/2026). Algumas conversas começaram no OUTRO WhatsApp do Diego, o
+// comum — forçar o Business nelas abre conversa vazia no app errado. O padrão continua Business pra todo o
+// resto, que é o que o recado pede.
 // A regra canônica (HANDOFF_TECNICO_WHATSAPP_BUSINESS, 01/09/2026, na Biblioteca) é "sempre Business
-// quando o fluxo nasce no app". Esta lista é a exceção NOMINAL a ela — cada número entra porque o Diego
-// pediu aquele caso, nunca por inferência do app. Segunda entrada: Luana (+55 61 99137-8814), recado de
-// 18/09/2026, mesmo motivo da Sabrina — a conversa dela vive no WhatsApp comum. Terceira: Rosana Alves
-// (+55 61 99184-4530), 08/10/2026 — chegou pelo WhatsApp comum (o número do Google Meu Negócio).
-// Quarta: Carol (+55 61 98127-6678), 13/10/2026 — chegou pelo WhatsApp comum, não pelo Business.
-// Quinta: Caio, Ceilândia (+55 61 99105-2108), 21/10/2026 — Diego: "Caio abrir no WhatsApp normal".
-// Sexta: Larissa Andrade (+55 61 99406-1941), 21/10/2026 — recado no card: "WhatsApp dela tem que abrir no WhatsApp normal".
-const WHATSAPP_COMUM_POR_NUMERO = new Set(["61996031000", "61991378814", "61991844530", "61981276678", "61991052108", "61994061941"]);
-function pacoteWhatsapp(tel) {
+// quando o fluxo nasce no app". Esta exceção é NOMINAL — cada cliente entra porque o Diego pediu aquele
+// caso, nunca por inferência do app. Seis clientes entraram assim entre 08/09 e 21/10/2026.
+// 30/10/2026: a lista saiu do código e foi pro banco. Este repositório é público e ela trazia telefone e
+// nome de cliente. Agora é a coluna `clientes.whatsapp_comum`, atrás do mesmo login do resto da ficha
+// (migracoes/20261030090000_clientes_whatsapp_comum.sql). Pôr um cliente na exceção não precisa mais de
+// PR: `update clientes set whatsapp_comum = true where id = '<id do cliente>'`. NUNCA voltar a escrever
+// telefone de cliente aqui.
+// O conjunto é montado com os telefones dos clientes marcados toda vez que a lista de clientes entra no
+// app (aplicarPacote, que serve a carga online e o cache offline) e quando uma ficha é aberta.
+// Número no formato de `telefoneWhatsapp` (DDD + 9 dígitos, sem o 55); a comparação tira o 55 se vier.
+const WHATSAPP_COMUM_POR_NUMERO = new Set();
+function digitosWhatsappSemPais(tel) {
   const d = String(tel || "").replace(/\D/g, "");
-  const semPais = d.length > 11 && d.startsWith("55") ? d.slice(2) : d;
-  return WHATSAPP_COMUM_POR_NUMERO.has(semPais) ? "com.whatsapp" : WHATSAPP_PACOTE;
+  return d.length > 11 && d.startsWith("55") ? d.slice(2) : d;
+}
+function lembrarWhatsappComum(clientes, { recomecar = false } = {}) {
+  if (recomecar) WHATSAPP_COMUM_POR_NUMERO.clear();
+  for (const c of clientes || []) {
+    const numero = c && c.whatsapp_comum ? digitosWhatsappSemPais(c.telefone) : "";
+    if (numero) WHATSAPP_COMUM_POR_NUMERO.add(numero);
+  }
+}
+function pacoteWhatsapp(tel) {
+  return WHATSAPP_COMUM_POR_NUMERO.has(digitosWhatsappSemPais(tel)) ? "com.whatsapp" : WHATSAPP_PACOTE;
 }
 function urlWhatsapp(tel, texto) {
   const numero = `55${tel}`;
@@ -4541,6 +4552,7 @@ function Home() {
   const aplicarPacote = useCallback((p) => {
     setInbox((p.inbox || []).map((item) => ({ ...item, conversa: comoLista(item.conversa) })));
     setCustomers(p.customers || []); setServices(p.services || []);
+    lembrarWhatsappComum(p.customers, { recomecar: true });
     setAppointments(comConta(comTituloVisivel(p.appointments, p.pessoais), p.finances)); setFinances(p.finances || []); setRotinas(p.rotinas || []);
     setFornecedores(p.fornecedores || []); setPessoais(p.pessoais || []); setAgendaHistorico(p.agendaHistorico || []);
     // Estoque entra no pacote (e portanto no cache offline) porque o aviso "isso você já tem" precisa
@@ -8805,8 +8817,8 @@ function itensDaFilaDaCaixa(inbox, agoraMs = Date.now()) {
     .filter((item) => item && !item.processado && !["operacao_concluida", "operacao_em_curso"].includes(tipoDoItemDaCaixa(item, agoraMs)))
     .sort((a, b) => String(a.criado_em || "").localeCompare(String(b.criado_em || "")));
 }
-// O TEXTO DA CAIXA QUASE NUNCA É MENSAGEM DE CLIENTE: quem escreve é agente ("🔴 LEAD BLOQUEADO — Giovanna —
-// +55 61 99154-1582…", "BLOQUEIO DE CADASTRO — Amanda — WhatsApp +55 61 9671-8270…"). O extractLead foi feito
+// O TEXTO DA CAIXA QUASE NUNCA É MENSAGEM DE CLIENTE: quem escreve é agente ("🔴 LEAD BLOQUEADO — Fulana —
+// +55 61 9XXXX-XXXX…", "BLOQUEIO DE CADASTRO — Beltrana — WhatsApp +55 61 9XXX-XXXX…"). O extractLead foi feito
 // pra mensagem de cliente ("sou a Mariana, meu zap é…") e não pega esse formato; estes pegam os dois.
 // É só PRÉ-PREENCHIMENTO: o formulário mostra, o Diego confere e corrige antes de gravar qualquer coisa.
 function telefoneDoTextoDaCaixa(texto) {
@@ -14128,6 +14140,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
     ]);
     if (c.error) { notify("Erro ao abrir ficha: " + c.error.message, "error"); setLoading(false); return; }
     setCliente(c.data); setServicos(sv.data || []); setFotos(ft.data || []);
+    lembrarWhatsappComum([c.data]);
     const corte = Date.now() - 7 * 86400000;
     setRecadosManu((rc.data || []).filter((r) => !r.processado || new Date(r.processado_em || r.criado_em).getTime() > corte));
     setForm({ nome: c.data.nome || "", telefone: c.data.telefone || "", cidade: c.data.cidade || "", endereco: c.data.endereco || "", obs: c.data.obs || "" });
