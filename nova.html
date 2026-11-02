@@ -1157,6 +1157,8 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .card-acoes-botoes.linha button{padding:0 4px;font-size:11px;letter-spacing:0;white-space:nowrap;min-width:0;overflow:hidden}
 .card-acoes-botoes button.ativo{border-color:var(--orange);color:var(--orange2)}
 .card-recado{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:#ffffff06;border:1px dashed var(--line2)}
+/* REMARCAR NA HORA (02/11/2026): escolha do dia dentro do card */
+.dia-novo .pergunta-pagou-botoes button{display:flex;flex-direction:column;align-items:center;gap:2px;white-space:normal;line-height:1.1}.dia-novo .pergunta-pagou-botoes button small{font-weight:500;font-size:11px;opacity:.8}.dia-novo-campos{display:grid;grid-template-columns:1fr 1fr;gap:8px}.dia-novo-campos label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}.dia-novo-campos input{min-height:44px;border-radius:10px;border:1px solid var(--line2);background:#0f0d0c;color:inherit;padding:0 10px;font-size:16px}
 /* O QUE O AGENTE FEZ (12/10/2026) */
 .grupo-agente .grupo-titulo::before{content:"🤖 ";font-size:12px}
 /* MANU, UM CARD SÓ (13/10/2026): o grupo veste o dourado dos Cartões quando tem pergunta esperando, e os cards de
@@ -4630,7 +4632,7 @@ function Home() {
         // `por` agente/auditoria/claude nos últimos 7 dias. Tabela que já existia; nada de schema novo.
         // `historico_por_check` só aceita 'diego' e 'claude', então as rotinas gravam por='claude' e dizem quem
         // são no começo do `o_que`: "Agente: …" ou "Auditoria: …". O filtro de prefixo fica no JS (AgenteCard).
-        db.from("historico").select("id,o_que,por,detalhe,quando").eq("por", "claude").or("o_que.ilike.Agente:%,o_que.ilike.Manu:%").gte("quando", new Date(Date.now() - 7 * 86400000).toISOString()).order("quando", { ascending: false }).limit(80),
+        db.from("historico").select("id,o_que,por,detalhe,quando").or("por.eq.toqi,and(por.eq.claude,or(o_que.ilike.Agente:%,o_que.ilike.Manu:%))").gte("quando", new Date(Date.now() - 7 * 86400000).toISOString()).order("quando", { ascending: false }).limit(80),
         // DÚVIDAS DO AGENTE (Diego, 12/10/2026): as abertas (ele responde no Painel), as respondidas que o
         // agente ainda não aplicou, e as que viraram regra (vale_sempre). Camada de apoio como `av`/`hs`.
         db.from("duvidas_agente").select("*").or("status.in.(aberta,respondida),vale_sempre.eq.true").order("criado_em", { ascending: false }).limit(80),
@@ -6826,11 +6828,25 @@ function profissionalDoCadastro(cadastro, nome) {
 }
 // A Manu lê os recados de hora em hora, das 8h às 22h (15/10/2026; antes o texto dizia "8h, 12h, 16h e 18h").
 const HORARIOS_ROTINA_RECADOS = "de hora em hora, das 8h às 22h";
+// MANU DESLIGADA (02/11/2026): a rotina de hora em hora e a varredura de recados foram desligadas pra caber no plano.
+// Nada mais lê agenda_recados, caixa_entrada ("Manu resolve", "Recado pra Manu") nem duvidas_agente sozinho. Os
+// caminhos ficam no código atrás desta chave (conserta o caminho, não remove o caminho); ligar de volta = true.
+const MANU_LIGADA = false;
+// MARCA DO RECADO GRAVADO NA HORA (02/11/2026): sem rotina pra processar, o próprio app fecha o toque que gravou
+// (processado_em + este resultado). Assim nenhuma fila fica "aberta" pra sempre esperando quem não vem, e o
+// ↶ Desfazer continua valendo por 24 h pros toques com esta marca (ver recadoDesfazivel).
+const RECADO_DO_APP = "app: gravado na hora, sem fila";
+const ehRecadoDoApp = (r) => String((r && r.resultado) || "").startsWith("app:");
+const RECADO_DESFAZ_MS = 24 * 3600 * 1000;
+const recadoDesfazivel = (r) => !!r && (!r.processado_em || ehRecadoDoApp(r)) && Date.now() - new Date(r.criado_em || 0).getTime() < RECADO_DESFAZ_MS;
 const ACAO_RECADO_ROTULO = { recado: "Recado", feito: "Feito", remarcar: "Remarcar", cancelar: "Cancelar" };
 // RECADO SOME COM O CARD (Diego, 20/10/2026: "o recado sumiu com a ficha... vou falar sobre aquela ficha e sumir.
 // Se for algo pra mudar, eu peço, já tá lá o recado"). Igual ao Remarcar: o card sai de toda tela até a Manu
 // processar, e o ↶ Desfazer (com o texto do recado) fica na seção da Manu.
-const ACOES_QUE_ESCONDEM_O_CARD = ["remarcar", "recado"];
+// NADA ESCONDE MAIS O CARD (02/11/2026): com a Manu desligada, um card escondido "até a Manu processar" sumia pra
+// sempre. Remarcar agora pergunta o dia na hora e grava direto (ver EscolherDiaNovo e `mover`); o recado fica anotado
+// no card. A lista continua existindo pra ligar de volta se um dia houver quem processe a fila.
+const ACOES_QUE_ESCONDEM_O_CARD = [];
 // VISITA NÃO SOME (21/10/2026, Debora: tocou Remarcar às 13h11 na visita das 14h e, na hora de sair pra atender, "essa
 // cliente sumiu"). Card presencial com toque pendente continua na tela, no horário dele, com o selo de remarcar
 // pendente, até a Manu dar a data nova. Os outros cards continuam sumindo como ele pediu em 20/10.
@@ -6866,6 +6882,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     const desde = new Date(Date.now() - 3 * 864e5).toISOString();
     const { data, error } = await db.from("agenda_recados").select("*, agenda(titulo,data,hora,status,pessoal_id)").or(`processado_em.is.null,processado_em.gte.${desde}`).order("criado_em", { ascending: true });
     if (!error) setRecados(data || []);
+    if (!MANU_LIGADA) return;
     const mr = await db.from("caixa_entrada").select("id,processado,processado_em,criado_em,conversa").contains("conversa", [{ meta: { origem: "manu_resolve" } }]).or(`processado.eq.false,processado_em.gte.${desde}`).order("criado_em", { ascending: true });
     if (!mr.error) setComManu(mr.data || []);
   }, [db, demo, session, recarga]);
@@ -6909,7 +6926,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     const textoGravado = antecipado ? [limpo, `[marcado para ${a.data}${a.hora ? " " + a.hora.slice(0, 5) : ""}]`].filter(Boolean).join(" ") : limpo;
     // O recado nasce ANTES da mudança na agenda: se a mudança falhar, ele é apagado; se o recado falhasse
     // depois da mudança, o card sumiria sem a rotina saber que precisa arrumar o resto.
-    const { data: rec, error: recErr } = await db.from("agenda_recados").insert({ agenda_id: a.id, acao, texto: textoGravado, audio_path: audioPath }).select("*, agenda(titulo,data,hora,status,pessoal_id)").single();
+    const { data: rec, error: recErr } = await db.from("agenda_recados").insert({ agenda_id: a.id, acao, texto: textoGravado, audio_path: audioPath, processado_em: MANU_LIGADA ? null : new Date().toISOString(), resultado: MANU_LIGADA ? null : RECADO_DO_APP }).select("*, agenda(titulo,data,hora,status,pessoal_id)").single();
     if (recErr) throw recErr;
     // Feito ANTES do dia (Diego, 11/10: "o concluir não aceita apertar"): resolveu antes da hora, então a data
     // vira hoje — é o que o próprio banco manda fazer, e o mesmo que o Concluir antigo fazia.
@@ -6941,8 +6958,8 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     if (patch) { setAppointments((prev) => prev.filter((x) => x.id !== a.id)); fecharAvisosDeCards(null, [a.id]); }
     notify(acao === "feito" ? "Feito. Saiu da agenda." + avisoPessoal
       : acao === "cancelar" ? "Cancelado. Saiu da agenda." + avisoPessoal
-      : acao === "remarcar" ? (someComToque(a) ? `Remarcar anotado. O card sai da tela e volta no dia que a Manu escolher. Desfazer fica na seção da Manu.` : `Remarcar anotado. A visita fica na tela no horário de agora até a Manu dar o dia novo. Desfazer fica na seção da Manu.`)
-      : `Recado com a Manu. O card sai da tela e ela faz o que você pediu. Desfazer fica na seção da Manu.`, avisoPessoal ? "error" : "ok");
+      : acao === "remarcar" ? `Remarcar anotado no card.`
+      : `Recado anotado no card e no histórico. Pra mudar dia ou hora, use Remarcar.`, avisoPessoal ? "error" : "ok");
     if (onChanged) onChanged();
     return true;
   }, [db, demo, notify, onChanged, setAppointments]);
@@ -6997,14 +7014,66 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     notify("Mantido.", "ok");
   }, [db, demo, notify, setAppointments]);
 
+  // REMARCAR NA HORA (02/11/2026, revisão do app depois das três críticas). Antes o Remarcar só gravava um recado e
+  // escondia o card até a Manu escolher o dia; sem Manu, o card sumia pra sempre. Agora o próprio card pergunta o dia
+  // (Amanhã / Semana que vem / Outro dia), MANTÉM A HORA (dia sem hora mantém a hora: regra do Diego) e grava direto
+  // em `agenda`. Presencial e pessoal não podem repetir data+hora (índice agenda_bloqueio_horario_unico): se bater, o
+  // erro volta marcado com `colisao` e a tela pede outra hora. Card com registro pessoal move os dois lados (a data
+  // que vale é a da agenda; o registro acompanha, como em concluir/cancelar). Item pessoal projetado (sem linha na
+  // agenda) move só `pessoais`, e o bloqueio se existir. Zero fila, zero Toqi, zero token.
+  const mover = useCallback(async (a, { data, hora }) => {
+    const horaNova = hora ? String(hora).slice(0, 5) : (a.hora ? String(a.hora).slice(0, 5) : null);
+    if (!data) throw new Error("escolha o dia");
+    if (!horaNova) throw new Error("escolha a hora: card planejado precisa de hora");
+    const deOnde = `${a.data ? compactDate(a.data) : "sem data"}${a.hora ? " " + String(a.hora).slice(0, 5) : ""}`;
+    const praOnde = `${compactDate(data)} ${horaNova}`;
+    const conferir = a.nota_claude && a.nota_claude_conferida === false ? { nota_claude_conferida: true } : {};
+    if (demo) {
+      setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, data, hora: horaNova + ":00", urgente: false, urgente_em: null, ...conferir } : x));
+      notify(`Remarcado pra ${praOnde} (demo).`, "ok");
+      return true;
+    }
+    const colisao = (error) => Object.assign(new Error(`${compactDate(data)} às ${horaNova} já tem compromisso. Escolha outra hora.`), { colisao: true, causa: error });
+    const moverLinha = async (id) => {
+      // REMARCAR DESAFIXA (22/10/2026): remarcou é porque não vai resolver agora; sai da Prioridade do momento.
+      const desafixar = a.urgente ? { urgente: false, urgente_em: null } : {};
+      const { data: linha, error } = await db.from("agenda").update({ data, hora: horaNova, ...conferir, ...desafixar }).eq("id", id).eq("status", "planejado").select("id").maybeSingle();
+      if (error) { if (/duplicate|unique|23505/i.test(error.message || "")) throw colisao(error); throw error; }
+      if (!linha) throw new Error("esse card já saiu da agenda — recarregue o app");
+    };
+    const agora = new Date().toISOString();
+    const patchPessoal = { data_alvo: data, hora: horaNova, remarcado_de: a.data || null, remarcacoes: Number((a.pessoal && a.pessoal.remarcacoes) || 0) + 1, atualizado_em: agora };
+    let avisoPessoal = "";
+    if (a.pessoal_virtual) {
+      // O fato mora em `pessoais`; se existir bloqueio planejado na agenda, ele vai junto (e é ele que pode colidir).
+      const { data: bloqueio } = await db.from("agenda").select("id").eq("pessoal_id", a.pessoal_id).eq("status", "planejado").order("data").limit(1).maybeSingle();
+      if (bloqueio) await moverLinha(bloqueio.id);
+      const { error: pErr } = await db.from("pessoais").update(patchPessoal).eq("id", a.pessoal_id).eq("status", "PENDENTE");
+      if (pErr) throw pErr;
+    } else {
+      await moverLinha(a.id);
+      if (a.pessoal_id) {
+        const { error: pErr } = await db.from("pessoais").update(patchPessoal).eq("id", a.pessoal_id).eq("status", "PENDENTE");
+        if (pErr) avisoPessoal = " O registro pessoal NÃO acompanhou (" + pErr.message + ") — confira no card Pessoais.";
+      }
+    }
+    // Histórico é registro, não trava: se falhar, a mudança já valeu.
+    try { await db.from("historico").insert({ o_que: `Remarcado: ${a.titulo_visivel || a.titulo || "compromisso"}`, por: "diego", detalhe: `Pelo card, de ${deOnde} para ${praOnde}.` }); } catch (e) { /* segue */ }
+    setAppointments((prev) => prev.map((x) => x.id === a.id ? { ...x, data, hora: horaNova + ":00", urgente: false, urgente_em: null, ...conferir } : x));
+    fecharAvisosDeCards(null, [a.id]);
+    notify(`Remarcado pra ${praOnde}.` + avisoPessoal, avisoPessoal ? "error" : "ok");
+    if (onChanged) onChanged();
+    return true;
+  }, [db, demo, notify, onChanged, setAppointments]);
+
   const desfazer = useCallback(async (r) => {
     if (demo) { setRecados((prev) => prev.filter((x) => x.id !== r.id)); notify("Desfeito (demo).", "ok"); return; }
     try {
       // Confere no banco: se a rotina já processou, desfazer aqui deixaria o Claude e a agenda discordando.
-      const { data: atual, error: lerErr } = await db.from("agenda_recados").select("id,processado_em").eq("id", r.id).maybeSingle();
+      const { data: atual, error: lerErr } = await db.from("agenda_recados").select("id,processado_em,resultado").eq("id", r.id).maybeSingle();
       if (lerErr) throw lerErr;
       if (!atual) { setRecados((prev) => prev.filter((x) => x.id !== r.id)); return; }
-      if (atual.processado_em) { notify("O Claude já processou esse. Mande um recado no card dizendo que foi engano.", "error"); if (onChanged) onChanged(); return; }
+      if (atual.processado_em && !ehRecadoDoApp(atual)) { notify("Esse toque já foi processado por fora do app. Mande um recado no card dizendo que foi engano.", "error"); if (onChanged) onChanged(); return; }
       if (r.acao === "feito" || r.acao === "cancelar") {
         const m = /\[marcado para (\d{4}-\d{2}-\d{2})(?: (\d{2}:\d{2}))?\]/.exec(r.texto || "");
         const volta = { status: "planejado", ...(m ? { data: m[1], ...(m[2] ? { hora: m[2] } : {}) } : {}) };
@@ -7022,7 +7091,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
           if (pErr) notify("O bloqueio voltou, mas o registro pessoal NÃO (" + pErr.message + ") — confira no card Pessoais.", "error");
         }
       }
-      const { error: delErr } = await db.from("agenda_recados").delete().eq("id", r.id).is("processado_em", null);
+      const { error: delErr } = await db.from("agenda_recados").delete().eq("id", r.id).or("processado_em.is.null,resultado.like.app:*");
       if (delErr) throw delErr;
       try { await db.from("historico").insert({ o_que: `Desfeito: ${ACAO_RECADO_ROTULO[r.acao]} — ${r.agenda?.titulo || ""}`, por: "diego", detalhe: "Toque errado, desfeito no app." }); } catch (e) { /* segue */ }
       setRecados((prev) => prev.filter((x) => x.id !== r.id));
@@ -7144,7 +7213,7 @@ function useRecadosAgenda({ db, demo, session, notify, onChanged, setAppointment
     return true;
   }, [db, demo, notify, setAppointments, enviar]);
 
-  return useMemo(() => ({ recados, enviar, receber, pagarCompra, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, marcarUrgente, notify, comManu, pedirManu }), [recados, enviar, receber, pagarCompra, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, marcarUrgente, notify, comManu, pedirManu]);
+  return useMemo(() => ({ recados, enviar, mover, receber, pagarCompra, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, marcarUrgente, notify, comManu, pedirManu: MANU_LIGADA ? pedirManu : null }), [recados, enviar, mover, receber, pagarCompra, concluirPessoal, cancelarPessoal, remarcarPessoal, pessoaisRemarcando, manter, ouvir, desfazer, adiar1h, marcarUrgente, notify, comManu, pedirManu]);
 }
 
 // Selo SEMPRE visível (fora do corpo recolhido): remarcação do Claude esperando conferência e recados que a
@@ -7171,21 +7240,63 @@ function MudarComManu({ a, acoes, onFechar }) {
     <button type="button" className="ghost" disabled={!!busy} onClick={onFechar}>Voltar</button>
   </div>;
 }
+// REMARCAR NA HORA (02/11/2026). O card pergunta o dia e grava direto (ver `mover` em useRecadosAgenda). Dois toques
+// resolvem o comum (Amanhã, Semana que vem); "Outro dia" abre o calendário do aparelho. A hora é a que o card já tem
+// (regra do Diego: dia sem hora mantém a hora); só pede hora se o card não tiver ou se o banco recusar o horário
+// (presencial e pessoal não repetem data+hora). Usado pelo botão Remarcar, pelo item pessoal, pelo card Pessoais e
+// pelo "Mudar" das mudanças pra conferir. Substitui o MudarComManu (que fica no código, desligado com a Manu).
+const diaSemanaCurto = (iso) => { try { return new Date(iso + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", ""); } catch (e) { return ""; } };
+function EscolherDiaNovo({ a, acoes, onFechar }) {
+  const hoje = hojeISO();
+  const amanha = somarDias(hoje, 1), semana = somarDias(hoje, 7);
+  const [data, setData] = useState("");
+  const [hora, setHora] = useState(a.hora ? String(a.hora).slice(0, 5) : "");
+  const [pedirHora, setPedirHora] = useState(!a.hora);
+  const [outro, setOutro] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const rotulo = (iso) => `${diaSemanaCurto(iso)} ${compactDate(iso)}`;
+  const gravar = async (d) => {
+    if (busy) return;
+    if (!d) { acoes.notify("Escolha o dia.", "error"); return; }
+    if (!hora) { setPedirHora(true); setData(d); acoes.notify("Esse card não tem hora. Escolha a hora.", "error"); return; }
+    setBusy(true);
+    try { await acoes.mover(a, { data: d, hora }); vibrar(8); if (onFechar) onFechar(); }
+    catch (e) {
+      if (e && e.colisao) { setData(d); setPedirHora(true); }
+      acoes.notify((e && e.colisao ? "" : "Não remarcou: ") + ((e && e.message) || e), "error");
+    } finally { setBusy(false); }
+  };
+  const confirmar = outro || (pedirHora && !!data);
+  return <div className="card-recado dia-novo">
+    <p className="kicker" style={{ margin: 0 }}>REMARCAR PRA QUANDO? · {a.hora ? `mantém ${String(a.hora).slice(0, 5)}` : "sem hora ainda"}</p>
+    <div className="pergunta-pagou-botoes">
+      <button type="button" className="secondary" disabled={busy} onClick={() => gravar(amanha)}>Amanhã<small>{rotulo(amanha)}</small></button>
+      <button type="button" className="secondary" disabled={busy} onClick={() => gravar(semana)}>Semana que vem<small>{rotulo(semana)}</small></button>
+    </div>
+    {!outro && <button type="button" className="ghost" disabled={busy} onClick={() => { vibrar(6); setOutro(true); }}>📅 Outro dia</button>}
+    {confirmar && <div className="dia-novo-campos">
+      {outro && <label>Dia<input type="date" min={hoje} value={data} onChange={(e) => setData(e.target.value)} /></label>}
+      {pedirHora && <label>Hora<input type="time" value={hora} onChange={(e) => setHora(e.target.value)} /></label>}
+    </div>}
+    {confirmar && !!data && <button type="button" className="primary" disabled={busy || !data || !hora} onClick={() => gravar(data)}>{busy ? "…" : `Confirmar ${rotulo(data)}${hora ? " às " + hora : ""}`}</button>}
+    <button type="button" className="ghost" disabled={busy} onClick={onFechar}>Voltar</button>
+  </div>;
+}
 // Botões com nome do que fazem (Diego, 23/10/2026: "não estou entendendo esse mudar"): o primeiro só confirma que ele
 // leu e o aviso some, o segundo abre o card pra ele trocar dia ou hora.
 function SelosClaudeDoCard({ a, acoes }) {
-  const abertos = acoes.recados.filter((r) => r.agenda_id === a.id && !r.processado_em);
+  const abertos = acoes.recados.filter((r) => r.agenda_id === a.id && recadoDesfazivel(r));
   const [mudando, setMudando] = useState(false);
   return <>
     {a.nota_claude && a.nota_claude_conferida === false && !checklistDaNota(a.nota_claude) && <div className="selo-claude">
-      <b>🔁 Mudado pela Manu</b>
+      <b>🔁 Mudança pra você conferir</b>
       <span>{a.nota_claude}</span>
-      {mudando ? <MudarComManu a={a} acoes={acoes} onFechar={() => setMudando(false)} /> : <div className="selo-botoes">
+      {mudando ? <EscolherDiaNovo a={a} acoes={acoes} onFechar={() => setMudando(false)} /> : <div className="selo-botoes">
         <button type="button" className="primary" onClick={() => acoes.manter(a)}>👍 Entendi, tá certo</button>
         <button type="button" className="ghost" onClick={() => setMudando(true)}>✏️ Mudar</button>
       </div>}
     </div>}
-    {abertos.length > 0 && <p className="selo-recado">{abertos.some((r) => r.acao === "remarcar") ? "🔁 Remarcar pendente: a Manu escolhe o dia novo. Até lá a visita fica aqui no horário dela." : `⏳ ${abertos.map((r) => ACAO_RECADO_ROTULO[r.acao] || r.acao).join(" · ")} enviado. A Manu lê na próxima rodada (${HORARIOS_ROTINA_RECADOS}).`}</p>}
+    {abertos.length > 0 && <p className="selo-recado">📝 {abertos.map((r) => ACAO_RECADO_ROTULO[r.acao] || r.acao).join(" · ")} anotado no card. Dá pra desfazer no grupo Toqi, no fim do Painel.</p>}
   </>;
 }
 
@@ -7282,11 +7393,11 @@ function DesfazerRecados() {
   const acoes = React.useContext(AcoesAgendaCtx);
   const [busyId, setBusyId] = useState(null);
   if (!acoes) return null;
-  const abertos = acoes.recados.filter((r) => !r.processado_em).sort((x, y) => (y.criado_em || "").localeCompare(x.criado_em || ""));
+  const abertos = acoes.recados.filter(recadoDesfazivel).sort((x, y) => (y.criado_em || "").localeCompare(x.criado_em || ""));
   if (!abertos.length) return null;
   const icone = { feito: "✅", cancelar: "✖", remarcar: "🔁", recado: "💬" };
   return <CardRecolhivel className="content-card desfazer-faixa" selo={abertos.length} tom="azul" icone="↶"
-    cabecalho={<><p className="kicker">TOQUES NOS CARDS · COM A MANU</p><h3>{abertos.length} esperando a Manu · dá pra desfazer</h3></>}>
+    cabecalho={<><p className="kicker">TOQUES NOS CARDS · ÚLTIMAS 24 H</p><h3>{abertos.length} toque{abertos.length === 1 ? "" : "s"} · dá pra desfazer</h3></>}>
     {abertos.slice(0, 6).map((r) => <div key={r.id} className="desfazer-linha">
       <span>{icone[r.acao] || "•"} <b>{ACAO_RECADO_ROTULO[r.acao] || r.acao}</b> · {r.agenda?.titulo || "compromisso"}{r.texto && <small className="desfazer-texto">“{r.texto}”</small>}<small>{new Date(r.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</small></span>
       {/* CONFIRMA ANTES (Diego, 14/10/2026: desfez 6 itens sem querer só pra ler o que tinha escrito). O texto do recado
@@ -7300,11 +7411,11 @@ function DesfazerRecados() {
 function RecadoEnviado({ r, acoes }) {
   const [url, setUrl] = useState(null);
   return <div>
-    <em>{ACAO_RECADO_ROTULO[r.acao] || r.acao} · {new Date(r.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}{r.processado_em ? " · lido pelo Claude" : " · esperando o Claude"}</em>
+    <em>{ACAO_RECADO_ROTULO[r.acao] || r.acao} · {new Date(r.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}{ehRecadoDoApp(r) ? " · anotado" : r.processado_em ? " · lido" : " · esperando leitura"}</em>
     {r.texto && <span>{r.texto.replace(/\s*\[saida [0-9a-f-]{36}\]/i, "")}</span>}
     {r.audio_path && (url ? <audio controls src={url} style={{ display: "block", maxWidth: "100%", marginTop: 4 }} />
       : <button type="button" className="ghost" onClick={async () => setUrl(await acoes.ouvir(r.audio_path))}>🔊 Ouvir áudio</button>)}
-    {r.resultado && <span style={{ display: "block", marginTop: 4, color: "#e8c06d" }}>Claude: {r.resultado}</span>}
+    {r.resultado && !ehRecadoDoApp(r) && <span style={{ display: "block", marginTop: 4, color: "#e8c06d" }}>Claude: {r.resultado}</span>}
   </div>;
 }
 
@@ -7459,7 +7570,7 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "", temMaterial 
   // só; o campo "Recado pro Claude" e o microfone só aparecem quando ele toca em Remarcar, Cancelar ou Recado.
   // Feito continua direto (com a confirmação de sempre).
   const [modo, setModo] = useState(null);
-  const ROTULO = { remarcar: "Remarcar", cancelar: "Cancelar", recado: "Só recado" };
+  const ROTULO = { remarcar: "Remarcar", cancelar: "Cancelar", recado: "Anotar no card" };
   const abrir = (m) => { vibrar(6); setModo((atual) => (atual === m ? null : m)); };
   return <div className="card-acoes">
     {doCard.length > 0 && <div className="recados-do-card">{doCard.map((r) => <RecadoEnviado key={r.id} r={r} acoes={acoes} />)}</div>}
@@ -7467,8 +7578,10 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "", temMaterial 
       <button type="button" className="primary" onClick={() => (contaAberta ? (vibrar(6), setPerguntaPago(true)) : compra ? (vibrar(6), setPagando(true)) : enviar("feito"))} disabled={!!busy || perguntaPago || recebendo || pagando}>{busy === "feito" ? "…" : "✅ Feito"}</button>
       {/* REMARCAR COM UM TOQUE (Diego, 20/10/2026: "só clicar nele e ele sumir da minha vista e a Manu decidir qual
           dia que remarca. Se eu precisar escrever, vou lá no recado. Se clicar sem querer, vou lá na Manu e desmarco").
-          Sem caixa de texto: o card some na hora e o ↶ Desfazer fica na seção da Manu. */}
-      <button type="button" className="secondary" onClick={() => { vibrar(6); setModo(null); enviar("remarcar"); }} disabled={!!busy}>{busy === "remarcar" ? "…" : "🔁 Remarcar"}</button>
+          Sem caixa de texto: o card some na hora e o ↶ Desfazer fica na seção da Manu.
+          REMARCAR NA HORA (02/11/2026): sem a Manu, o toque abre aqui mesmo a escolha do dia (Amanhã / Semana que vem /
+          Outro dia), mantém a hora e grava direto. O card não some: muda de dia. Ver EscolherDiaNovo e `mover`. */}
+      <button type="button" className={`secondary${modo === "remarcar" ? " ativo" : ""}`} onClick={() => abrir("remarcar")} disabled={!!busy}>🔁 Remarcar</button>
       <button type="button" className={`ghost perigo${modo === "cancelar" ? " ativo" : ""}`} onClick={() => abrir("cancelar")} disabled={!!busy}>✖ Cancelar</button>
       <button type="button" className={`ghost${modo === "recado" ? " ativo" : ""}`} onClick={() => abrir("recado")} disabled={!!busy} aria-label="Só recado">💬</button>
     </div>
@@ -7503,16 +7616,17 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "", temMaterial 
         <button type="button" className="ghost" disabled={!!busy} onClick={() => { setPagando(false); enviar("feito"); }}>Feito sem gasto</button>
       </div>
     </div>}
-    {modo && <div className="card-recado">
-      <p className="kicker" style={{ margin: 0 }}>RECADO PRA MANU · {ROTULO[modo]}</p>
-      <textarea autoFocus value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy) enviar(modo); })} placeholder={modo === "remarcar" ? "Ex.: cliente pediu pra passar depois das 14h" : modo === "cancelar" ? "Motivo do cancelamento" : "O que a Manu precisa fazer ou saber"} />
+    {modo === "remarcar" && <EscolherDiaNovo a={a} acoes={acoes} onFechar={() => setModo(null)} />}
+    {modo && modo !== "remarcar" && <div className="card-recado">
+      <p className="kicker" style={{ margin: 0 }}>{modo === "cancelar" ? "CANCELAR · MOTIVO (OPCIONAL)" : "ANOTAR NO CARD"}</p>
+      <textarea autoFocus value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={salvarComEnter(() => { if (!busy) enviar(modo); })} placeholder={modo === "cancelar" ? "Motivo do cancelamento" : "O que anotar sobre este card"} />
       <DicaEnter />
       <GravadorAudio audio={audio} onAudio={setAudio} onTexto={(t) => setTexto((prev) => (prev.trim() ? prev.trim() + " " : "") + t)} disabled={!!busy} />
       <div className="card-acoes-botoes">
         <button type="button" className="primary" onClick={() => enviar(modo)} disabled={!!busy}>{busy === modo ? "…" : `Enviar ${ROTULO[modo].toLowerCase()}`}</button>
         <button type="button" className="ghost" onClick={() => setModo(null)} disabled={!!busy}>Voltar</button>
       </div>
-      {modo === "recado" && <small>O card sai da tela e a Manu faz o que você pedir. Desfazer fica na seção da Manu.</small>}
+      {modo === "recado" && <small>Fica anotado no card e no histórico. Pra mudar dia ou hora, use Remarcar.</small>}
     </div>}
     {!modo && futuro && <small>Feito antes do dia: a data vira hoje.</small>}
     {/* O CONTEXTO DO CARD VAI JUNTO (Diego, 17/10/2026: "se conseguisse carregar o contexto do card seria bem melhor"):
@@ -7575,6 +7689,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   // Sem `notify` aqui (o card não recebe a prop) — o aviso da cópia vive no próprio card.
   const [avisoGPT, setAvisoGPT] = useState("");
   const [busyPessoal, setBusyPessoal] = useState(false);
+  const [remarcandoPessoal, setRemarcandoPessoal] = useState(false); // Remarcar na hora (02/11/2026)
   // ITEM PESSOAL PROJETADO (ver pessoaisNaFila): não existe linha de agenda por trás dele. Remarcar continua
   // no card Pessoais (é lá que mora a data), mas o FEITO escreve direto em `pessoais` (Diego, 13/10/2026:
   // "não tem como eu marcar feito naquele compromisso do carro" — o botão tem que estar onde o card está).
@@ -7602,9 +7717,9 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       : a.detalhe_visivel && <p className="compromisso-material">{a.detalhe_visivel}</p>}
       {acoes?.concluirPessoal && <div className="card-acoes"><div className="card-acoes-botoes linha">
         <button type="button" className="primary" onClick={feitoPessoal} disabled={busyPessoal}>{busyPessoal ? "…" : "✅ Feito"}</button>
-        <button type="button" className="secondary" onClick={acaoPessoal(acoes.remarcarPessoal)} disabled={busyPessoal}>🔁 Remarcar</button>
+        <button type="button" className={`secondary${remarcandoPessoal ? " ativo" : ""}`} onClick={() => { vibrar(6); setRemarcandoPessoal((v) => !v); }} disabled={busyPessoal}>🔁 Remarcar</button>
         <button type="button" className="ghost" onClick={acaoPessoal(acoes.cancelarPessoal)} disabled={busyPessoal}>✖ Cancelar</button>
-      </div></div>}</div>}
+      </div>{remarcandoPessoal && <EscolherDiaNovo a={a} acoes={acoes} onFechar={() => setRemarcandoPessoal(false)} />}</div>}</div>}
   </article>;
   // A sugestão GRAVADA vence sempre: ela nasce da conversa real, com julgamento comercial.
   // Só quando ela falta é que o app escreve — e apenas se provar que o interlocutor é o cliente.
@@ -8509,6 +8624,7 @@ const PESSOAL_INSTRUCAO_GPT = "Localize o compromisso pessoal atual pelo identif
 
 function PessoaisCard({ pessoais, bloqueios = [], hoje, db, demo, notify, onChanged }) {
   const [verConcluidos, setVerConcluidos] = useState(false);
+  const [remarcandoId, setRemarcandoId] = useState(null); // Remarcar na hora (02/11/2026): pergunta o dia aqui mesmo
   const [busy, setBusy] = useState(null);
   const [avisoGPT, setAvisoGPT] = useState("");
   const acoes = React.useContext(AcoesAgendaCtx);
@@ -8547,7 +8663,7 @@ function PessoaisCard({ pessoais, bloqueios = [], hoje, db, demo, notify, onChan
   };
 
   // REMARCAR E CANCELAR IGUAIS AOS CARDS DA AGENDA (Diego, 16/10/2026): sem pedir data. Ver remarcarPessoal/cancelarPessoal.
-  const comoCard = (p) => ({ id: "pessoal:" + p.id, pessoal_id: p.id, titulo: p.titulo, data: p.data_alvo, hora: p.hora });
+  const comoCard = (p) => ({ id: "pessoal:" + p.id, pessoal_virtual: true, pessoal: p, pessoal_id: p.id, titulo: p.titulo, data: p.data_alvo, hora: p.hora });
   const viaAcoes = (fn, p) => async () => {
     if (!fn) return;
     setBusy(p.id);
@@ -8573,9 +8689,10 @@ function PessoaisCard({ pessoais, bloqueios = [], hoje, db, demo, notify, onChan
       </div>
       {p.status === "PENDENTE" && <div className="ficha-actions" style={{ width: "100%" }}>
         <button className="ghost" disabled={busy === p.id} onClick={() => concluir(p)}>{busy === p.id ? "..." : "✓ Concluir"}</button>
-        <button className="ghost" disabled={busy === p.id} onClick={viaAcoes(acoes?.remarcarPessoal, p)}>🔁 Remarcar</button>
+        <button className="ghost" disabled={busy === p.id} onClick={() => { vibrar(6); setRemarcandoId(remarcandoId === p.id ? null : p.id); }}>🔁 Remarcar</button>
         <button className="ghost" disabled={busy === p.id} onClick={viaAcoes(acoes?.cancelarPessoal, p)}>✖ Cancelar</button>
       </div>}
+      {remarcandoId === p.id && acoes && <div style={{ width: "100%" }}><EscolherDiaNovo a={comoCard(p)} acoes={acoes} onFechar={() => setRemarcandoId(null)} /></div>}
     </article>;
   };
 
@@ -9812,11 +9929,14 @@ function GrupoRecolhivel({ titulo, legenda = null, resumo = null, contagem = nul
 // 7 dias. Só linhas "Agente:" entram no card (12/10: "Auditoria nem precisa"). Fechado mostra a última rodada e quantas ações hoje;
 // aberto, a lista por dia. "Agente: Rodou — nada novo" é a batida de presença de cada hora: entra na conta
 // da última vez e fica de fora da lista.
-const AGENTE_PREFIXO = /^(agente|manu|auditoria)\s*:\s*/i;
+const AGENTE_PREFIXO = /^(agente|manu|toqi|auditoria)\s*:\s*/i;
 const AGENTE_BATIDA = /^rodou\b/i;
 function separarFonteAgente(h) {
+  // TOQI ENTRA (02/11/2026): as linhas dela têm por='toqi' e começam com "Toqi: "; sem o prefixo entram do mesmo jeito.
+  if (h && h.por === "toqi") { const mt = AGENTE_PREFIXO.exec(String(h.o_que || "")); return { ...h, fonte: "agente", quem: "toqi", texto: String(h.o_que || "").slice(mt ? mt[0].length : 0).trim() }; }
   const m = AGENTE_PREFIXO.exec(String(h.o_que || "")); if (!m) return null;
-  return { ...h, fonte: m[1].toLowerCase() === "manu" ? "agente" : m[1].toLowerCase(), texto: String(h.o_que).slice(m[0].length).trim() };
+  const quem = m[1].toLowerCase();
+  return { ...h, fonte: quem === "manu" || quem === "toqi" ? "agente" : quem, quem, texto: String(h.o_que).slice(m[0].length).trim() };
 }
 // O DETALHE DIZ O QUE MUDOU (Diego, 12/10/2026: "não dá para saber as mudanças que ele fez"). As rotinas gravam no
 // `detalhe` referências ("cliente <id>", "servico <id>", "agenda <id>", "financeiro <id>") e, quando alteraram algo,
@@ -9856,17 +9976,17 @@ function AgenteCard({ itens, today, services, appointments, customers, finances,
   const hora = (h) => { const d = new Date(h.quando); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
   const haQuanto = (h) => { const minutos = Math.max(0, Math.round((Date.now() - new Date(h.quando).getTime()) / 60000)); return minutos < 2 ? "agora" : minutos < 60 ? `há ${minutos} min` : minutos < 36 * 60 ? `há ${Math.round(minutos / 60)} h` : compactDate(diaDe(h)); };
   // Desde 13/10/2026 isto é um card DENTRO do grupo Manu (ver ManuCard), não um grupo solto no fim do Painel.
-  if (!linhas.length) return <CardRecolhivel className="content-card" cabecalho={<><p className="kicker">O QUE A MANU FEZ</p><h3>Ainda não rodou</h3></>}>
-    <p className="ficha-note agente-vazio">Quando a Manu (o agente de hora em hora) fizer algo sozinha, aparece aqui.</p>
+  if (!linhas.length) return <CardRecolhivel className="content-card" cabecalho={<><p className="kicker">O QUE A TOQI FEZ</p><h3>Nada ainda</h3></>}>
+    <p className="ficha-note agente-vazio">Quando a Toqi gravar algo pelo Mural (card, ficha, serviço, histórico), aparece aqui.</p>
   </CardRecolhivel>;
   const acoes = linhas.filter((h) => !AGENTE_BATIDA.test(h.texto));
   const rodada = linhas.find((h) => AGENTE_BATIDA.test(h.texto));
   const hojeN = acoes.filter((h) => diaDe(h) === today).length;
-  const resumo = `última rodada ${haQuanto(linhas[0])} · ${hojeN ? `${hojeN} ${hojeN === 1 ? "ação" : "ações"} hoje` : "nada hoje"}`;
+  const resumo = `último lançamento ${haQuanto(linhas[0])} · ${hojeN ? `${hojeN} ${hojeN === 1 ? "ação" : "ações"} hoje` : "nada hoje"}`;
   const grupos = []; acoes.forEach((h) => { const dia = diaDe(h); const g = grupos[grupos.length - 1]; if (g && g.dia === dia) g.itens.push(h); else grupos.push({ dia, itens: [h] }); });
-  return <CardRecolhivel className="content-card" cabecalho={<><p className="kicker">O QUE A MANU FEZ</p><h3>{resumo}</h3></>}>
+  return <CardRecolhivel className="content-card" cabecalho={<><p className="kicker">O QUE A TOQI FEZ</p><h3>{resumo}</h3></>}>
     {rodada && <p className="agente-rodada">Última rodada {hora(rodada)} ({haQuanto(rodada)}): {rodada.texto.replace(AGENTE_BATIDA, "").replace(/^\s*[—-]\s*/, "")}{rodada.detalhe ? ` · ${parseDetalheAgente(rodada.detalhe).texto}` : ""}</p>}
-    {!acoes.length && <p className="ficha-note agente-vazio">Nenhuma ação automática nos últimos 7 dias, só rodadas sem novidade.</p>}
+    {!acoes.length && <p className="ficha-note agente-vazio">Nenhum lançamento nos últimos 7 dias.</p>}
     {grupos.slice(0, 7).map((g) => <div className="agente-dia" key={g.dia}>
       <p className="agente-dia-titulo">{rotuloDia(g.dia)}</p>
       {g.itens.map((h) => { const d = parseDetalheAgente(h.detalhe); const r = resolverRefsAgente(d.refs, { services, appointments, customers, finances }); const nome = r.clienteId ? nomeDe(r.clienteId) : null; return <div className="agente-item" key={h.id}>
@@ -10095,6 +10215,7 @@ function RecadoPraManu({ db, demo, notify }) {
     } catch (e) { notify(e.message, "error"); }
     finally { setEnviando(false); }
   }
+  if (!MANU_LIGADA) return null; // Manu desligada em 02/11/2026: ninguém lê caixa_entrada; o caminho fica, atrás da chave
   return <div className="recado-manu-secao">
     {!aberto
       ? <button type="button" className="botao-claude botao-manu" onClick={() => { vibrar(6); setAberto(true); }}>🗣 Deixar recado pra Manu</button>
@@ -10123,12 +10244,12 @@ function ManuCard({ duvidas, inbox = [], atividadeAgente = [], today, db, demo, 
   const respondidas = (duvidas || []).filter((d) => d.status === "respondida").length + (inbox || []).filter((it) => it && it.status === "respondido" && !it.processado).length;
   const ultima = (atividadeAgente || []).filter((h) => h && h.quando).map(separarFonteAgente).filter((h) => h && h.fonte === "agente").sort((a, b) => String(b.quando).localeCompare(String(a.quando)))[0];
   const acoesAgenda = React.useContext(AcoesAgendaCtx);
-  const enviados = acoesAgenda ? acoesAgenda.recados.filter((r) => !r.processado_em).length : 0;
-  const resumo = abertas ? `${abertas} pergunta${abertas === 1 ? "" : "s"} pra você` : respondidas ? `${respondidas} resposta${respondidas === 1 ? "" : "s"} esperando ela` : enviados ? `${enviados} toque${enviados === 1 ? "" : "s"} nos cards esperando · dá pra desfazer` : ultima ? `última rodada ${idadeDoDado(new Date(ultima.quando).getTime())}` : "ainda não rodou";
+  const enviados = acoesAgenda ? acoesAgenda.recados.filter(recadoDesfazivel).length : 0;
+  const resumo = abertas ? `${abertas} pergunta${abertas === 1 ? "" : "s"} pra você` : respondidas ? `${respondidas} resposta${respondidas === 1 ? "" : "s"} esperando aplicação` : enviados ? `${enviados} toque${enviados === 1 ? "" : "s"} nos cards · dá pra desfazer` : ultima ? `último lançamento da Toqi ${idadeDoDado(new Date(ultima.quando).getTime())}` : "nada ainda";
   // BARREIRA PRÓPRIA (14/10/2026): um dado fora do padrão vindo da Manu (histórico, pergunta ou regra) não pode
   // derrubar o Painel inteiro — se algo quebrar aqui dentro, só este card avisa, e Atrasados/Hoje seguem na tela.
-  return <GrupoRecolhivel id="grupo-manu" titulo="Manu" className={`grupo-agente grupo-manu${abertas ? " com-perguntas" : ""}`} semContador resumo={resumo} abertoInicial={abertas > 0}>
-    <BarreiraDaAba nome="O card da Manu">
+  return <GrupoRecolhivel id="grupo-manu" titulo="Toqi" className={`grupo-agente grupo-manu${abertas ? " com-perguntas" : ""}`} semContador resumo={resumo} abertoInicial={abertas > 0}>
+    <BarreiraDaAba nome="O card da Toqi">
       <RecadoPraManu db={db} demo={demo} notify={notify} />
       <DuvidasAgenteCard duvidas={duvidas} inbox={inbox} today={today} db={db} demo={demo} notify={notify} customers={customers} onOpenFicha={onOpenFicha} onAbrirCaixa={onAbrirCaixa} onChanged={onChanged} />
       <RespondidasAoClaude duvidas={duvidas} inbox={inbox} db={db} demo={demo} notify={notify} onChanged={onChanged} />
@@ -10154,14 +10275,14 @@ function MudancasDaManu({ appointments = [] }) {
     .sort((x, y) => `${x.data || ""} ${x.hora || ""}`.localeCompare(`${y.data || ""} ${y.hora || ""}`));
   if (!lista.length) return null;
   return <CardRecolhivel className="content-card mudancas-manu" selo={lista.length} tom="ambar" icone="🔁"
-    cabecalho={<><p className="kicker">O QUE A MANU MUDOU NA AGENDA</p><h3>{lista.length} mudança{lista.length === 1 ? "" : "s"} pra você ver</h3></>}>
+    cabecalho={<><p className="kicker">MUDANÇAS NA AGENDA PRA VOCÊ CONFERIR</p><h3>{lista.length} mudança{lista.length === 1 ? "" : "s"} pra você conferir</h3></>}>
     {lista.map((a) => <div key={a.id} className="mudanca-linha">
       <span><b>{a.titulo_visivel || a.titulo}</b><small>agora: {a.data ? a.data.split("-").reverse().slice(0, 2).join("/") : "sem data"}{a.hora ? `, ${String(a.hora).slice(0, 5)}` : ""}</small><small className="mudanca-motivo">{a.nota_claude}</small></span>
       <div className="mudanca-botoes">
         <button type="button" className="primary" disabled={busyId === a.id} onClick={async () => { vibrar(6); setBusyId(a.id); try { await acoes.manter(a); } finally { setBusyId(null); } }}>{busyId === a.id ? "…" : "👍 Entendi, tá certo"}</button>
         <button type="button" className="ghost" onClick={() => { vibrar(6); setMudandoId(mudandoId === a.id ? null : a.id); }}>✏️ Mudar</button>
       </div>
-      {mudandoId === a.id && <MudarComManu a={a} acoes={acoes} onFechar={() => setMudandoId(null)} />}
+      {mudandoId === a.id && <EscolherDiaNovo a={a} acoes={acoes} onFechar={() => setMudandoId(null)} />}
     </div>)}
   </CardRecolhivel>;
 }
@@ -10175,12 +10296,12 @@ function RegrasAprendidasCard({ duvidas, db, demo, notify, onChanged }) {
     setBusyId(d.id);
     try {
       if (!demo) { const { error } = await db.from("duvidas_agente").update({ vale_sempre: false }).eq("id", d.id); if (error) throw error; }
-      vibrar(8); notify("Regra retirada. A Manu volta a perguntar se precisar.", "ok"); if (onChanged && !demo) onChanged();
+      vibrar(8); notify("Regra retirada. Volta a ser perguntado se precisar.", "ok"); if (onChanged && !demo) onChanged();
     } catch (e) { notify("Erro ao retirar a regra: " + e.message, "error"); } finally { setBusyId(null); }
   };
-  return <CardRecolhivel className="content-card grupo-regras" cabecalho={<><p className="kicker">📌 REGRAS QUE A MANU APRENDEU</p><h3>{regras.length} regra{regras.length === 1 ? "" : "s"} · vale sempre</h3></>}>
+  return <CardRecolhivel className="content-card grupo-regras" cabecalho={<><p className="kicker">📌 REGRAS QUE VALEM SEMPRE</p><h3>{regras.length} regra{regras.length === 1 ? "" : "s"} · vale sempre</h3></>}>
     {regras.map((d) => <div className="regra-item" key={d.id}>
-      <div><strong>{d.regra || d.resposta}</strong><span>{d.pergunta}{d.respondido_em ? ` · ${compactDate(String(d.respondido_em).slice(0, 10))}` : ""}{d.regra ? "" : " · a Manu ainda vai escrever a regra geral"}</span></div>
+      <div><strong>{d.regra || d.resposta}</strong><span>{d.pergunta}{d.respondido_em ? ` · ${compactDate(String(d.respondido_em).slice(0, 10))}` : ""}{d.regra ? "" : " · regra geral ainda não escrita"}</span></div>
       <button type="button" className="ghost" disabled={busyId === d.id} onClick={() => tirar(d)}>Não vale mais</button>
     </div>)}
   </CardRecolhivel>;
