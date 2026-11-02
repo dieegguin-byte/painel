@@ -44,7 +44,7 @@ Todo contato que pede orçamento entra no app no mesmo dia, mesmo sem nome, foto
 Procure pelos últimos 8 dígitos do telefone:
 
 ```sql
-select c.id, c.nome, c.telefone, c.cidade, s.id as servico_id, s.status, s.titulo from clientes c left join servicos s on s.cliente_id = c.id where right(regexp_replace(c.telefone, '\D', '', 'g'), 8) = '92056793'
+select c.id, c.nome, c.telefone, c.cidade, s.id as servico_id, s.status, s.titulo from clientes c left join servicos s on s.cliente_id = c.id where right(regexp_replace(c.telefone, '\D', '', 'g'), 8) = '99990000'
 ```
 
 Se existir com serviço aberto (lead, orcamento, agendado, producao, pronto), não crie outro: só acrescente a nota (passo 4).
@@ -57,19 +57,19 @@ Se existir com serviço aberto (lead, orcamento, agendado, producao, pronto), n�
 - `obs`: de onde veio e quando, curto.
 
 ```sql
-insert into clientes (nome, telefone, cidade, obs) values ('Iran', '+55 61 99205-6793', null, 'Lead WhatsApp 26/10 10h28. Fotos na pasta Iran 6793.') returning id
+insert into clientes (nome, telefone, cidade, obs) values ('Fulano', '+55 61 99999-0000', null, 'Lead WhatsApp dd/mm HHhMM. Fotos na pasta Fulano 0000.') returning id
 ```
 
 ### 3. Serviço (servicos)
 
-- `titulo`: "peça — o que quer — Nome" ("Sofá — troca do forro e das borrachas — Iran").
+- `titulo`: "peça — o que quer — Nome" ("Sofá — troca do forro e das borrachas — Fulano").
 - `status`: `lead`. `prazo` é obrigatório: use hoje + 30 dias.
 - `origem`: `Instagram`, `WhatsApp`, `Site` ou `telefone`, com a Ref BH- quando vier.
 - `descricao`: o que a pessoa pediu, medidas, e os links das fotos que a Zapia salvou no Drive.
 - `proxima_acao`: o próximo passo, de quem é a vez, e embaixo as notas com data, hora e "Toqi:".
 
 ```sql
-insert into servicos (cliente_id, titulo, descricao, status, prazo, origem, proxima_acao) values ('<cliente uuid>', 'Sofá — troca do forro e das borrachas — Iran', 'Quer trocar o forro e provavelmente as borrachas, o formato fica igual. 4 fotos na pasta Iran 6793.', 'lead', current_date + 30, 'WhatsApp', 'POR TRÁS, vez dele: dizer a cidade. · 26/10 11h30 Toqi: o Diego respondeu por áudio 10h37 que vai analisar e passar um valor aproximado.') returning id
+insert into servicos (cliente_id, titulo, descricao, status, prazo, origem, proxima_acao) values ('<cliente uuid>', 'Sofá — troca do forro e das borrachas — Fulano', 'Quer trocar o forro e provavelmente as borrachas, o formato fica igual. 4 fotos na pasta Fulano 0000.', 'lead', current_date + 30, 'WhatsApp', 'POR TRÁS, vez dele: dizer a cidade. · dd/mm HHhMM Toqi: o Diego respondeu que vai analisar e passar um valor aproximado.') returning id
 ```
 
 ### 4. Conversa nova num lead que já existe
@@ -92,7 +92,7 @@ insert into agenda (titulo, data, hora, tipo, cidade, servico_id, cliente_id) va
 
 ### 6. Histórico
 
-Uma linha por cadastro: `insert into historico (o_que, por, detalhe) values ('Toqi: cadastrou o lead Iran', 'toqi', 'cliente <uuid> · servico <uuid>')`.
+Uma linha por cadastro: `insert into historico (o_que, por, detalhe) values ('Toqi: cadastrou o lead Fulano', 'toqi', 'cliente <uuid> · servico <uuid>')`.
 
 Preço nunca sai da sua cabeça: valor só da Regra de preço ou do Diego. Envio pro cliente só com o Sim do Diego no texto exato.
 
