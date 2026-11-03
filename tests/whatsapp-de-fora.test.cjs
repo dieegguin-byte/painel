@@ -21,10 +21,10 @@ const funcao = (nome) => {
 const ctx = vm.createContext({ navigator: { userAgent: 'iPhone' } });
 vm.runInContext([
   funcao('normalizePhone'), funcao('ehTelefoneInternacional'), funcao('ehTelefoneFixo'), funcao('corrigirTelefone'), funcao('telefoneWhatsapp'),
-  linha('const RE_WAME_NA_NOTA'), funcao('telefoneDaNota'), linha('function ehAndroid('), linha('const WHATSAPP_PACOTE'),
+  linha('const RE_WAME_NA_NOTA'), linha('function telefoneDoWaMe('), funcao('telefoneDaNota'), linha('function ehAndroid('), linha('const WHATSAPP_PACOTE'),
   linha('const WHATSAPP_COMUM_POR_NUMERO'), funcao('digitosWhatsappSemPais'), funcao('pacoteWhatsapp'), linha('function numeroWhatsappComPais('),
   funcao('urlWhatsapp'), funcao('telefoneQuebrado'),
-  'Object.assign(this, { ehTelefoneInternacional, corrigirTelefone, telefoneWhatsapp, telefoneDaNota, digitosWhatsappSemPais, urlWhatsapp, telefoneQuebrado, ehTelefoneFixo })',
+  'Object.assign(this, { ehTelefoneInternacional, corrigirTelefone, telefoneWhatsapp, telefoneDaNota, telefoneDoWaMe, digitosWhatsappSemPais, urlWhatsapp, telefoneQuebrado, ehTelefoneFixo })',
 ].join('\n'), ctx);
 
 test('número de fora com + e país é reconhecido e gravado como +dígitos', () => {
@@ -70,4 +70,11 @@ test('wa.me na nota: número de fora vira +país, celular brasileiro segue igual
   assert.equal(ctx.telefoneDaNota({ nota_claude: 'WhatsApp: https://wa.me/15550100199' }), '+15550100199');
   assert.equal(ctx.telefoneDaNota({ nota_claude: 'WhatsApp: https://wa.me/5561999990000' }), '61999990000');
   assert.equal(ctx.telefoneDaNota({ nota_claude: 'WhatsApp: https://wa.me/61999990000' }), '61999990000');
+});
+
+test('wa.me do cartão usa a mesma regra da ficha (número com zero na frente não vira +)', () => {
+  assert.equal(ctx.telefoneDoWaMe('15550100199'), '+15550100199');
+  assert.equal(ctx.telefoneDoWaMe('5561999990000'), '61999990000');
+  assert.notEqual(ctx.telefoneDoWaMe('061999990000').charAt(0), '+');
+  assert.equal(ctx.telefoneDoWaMe(undefined), '');
 });
