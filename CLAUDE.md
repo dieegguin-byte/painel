@@ -39,6 +39,9 @@ que são longos e explicam o porquê de cada decisão (não apague comentários 
 - **Dinheiro, preço, Ads, site e funcionalidade nova: só com a palavra dele.** A Toqi nunca mexe em preço,
   dinheiro ou apaga nada (as políticas `toqi_*` já impedem; não as afrouxe).
 - Telefone gravado no padrão `^55[1-9][0-9]9[0-9]{8}$` (DF/GO: 55 + 61 + 9 + 8 dígitos).
+  Desde 03/11/2026 também vale número de fora do Brasil, gravado como `+<dígitos>`: começa com "+", país diferente
+  de 55, 11 a 15 dígitos (`ehTelefoneInternacional` no app, `private.whatsapp_phone_ok` e a trava `clientes_telefone_whatsapp`
+  no banco). Sem "+" continua sendo lido como celular brasileiro. A Caixa (`agenda_criar_da_caixa`) segue só com número BR.
 - Texto de tela: português curto, sem "!", e o botão promete só o que acontece de verdade.
 - Fuso: Brasília. `hojeISO()` usa o relógio do aparelho; as travas do banco usam `America/Sao_Paulo`.
 

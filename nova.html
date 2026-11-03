@@ -2076,7 +2076,20 @@ function normalizePhone(value) {
 // FIXO NÃO LEVA 9. Celular é DDD + 9 + 8 dígitos; fixo é DDD + 8 dígitos começando em 2-5. Os dois têm 10
 // dígitos quando o celular está sem o 9, e a regra antiga enfiava o 9 nos dois — ou seja, todo fixo salvo pela
 // ficha virava um celular que não existe, sem avisar ninguém. Fixo não abre WhatsApp, mas o número é bom.
+// NÚMERO DE FORA DO BRASIL (Diego, 03/11/2026, cliente com WhatsApp dos Estados Unidos: "Ela só tem esse", "Abre no
+// WhatsApp normal também"). Até aqui todo número era tratado como celular brasileiro, e o banco recusava o serviço.
+// Número de fora é reconhecido só quando começa com "+" e o código do país não é 55: sem o "+", um 1 555 010-0199
+// (11 dígitos) é igual a um celular de DDD 19, e o app não tem como saber. Fica gravado como "+<dígitos>" e o
+// wa.me usa os dígitos como estão, sem pôr 55 na frente. Mesma regra de private.whatsapp_phone_ok no banco.
+// "+61 99999-0000" é engano de digitação de celular de Brasília, não Austrália: com 10 dígitos, ou 11 com o 9 do
+// celular no terceiro lugar, continua sendo brasileiro (nos EUA e Canadá nenhum código de área tem 9 no meio).
+function ehTelefoneInternacional(tel) {
+  const s = String(tel || "").trim();
+  const d = s.replace(/\D/g, "");
+  return s.startsWith("+") && !d.startsWith("55") && /^[1-9]\d{10,14}$/.test(d) && !(d.length === 11 && d[2] === "9");
+}
 function ehTelefoneFixo(tel) {
+  if (ehTelefoneInternacional(tel)) return false;
   const d = String(tel || "").replace(/\D/g, "");
   const semPais = d.startsWith("55") && d.length > 11 ? d.slice(2) : d;
   return semPais.length === 10 && /^[2-5]/.test(semPais.slice(2));
@@ -2084,6 +2097,7 @@ function ehTelefoneFixo(tel) {
 function corrigirTelefone(value) {
   let d = String(value || "").replace(/\D/g, "");
   if (!d) return "";
+  if (ehTelefoneInternacional(value)) return "+" + d;
   if (d.length > 11 && d.startsWith("55")) d = d.slice(2);
   if (ehTelefoneFixo(d)) return `+55 ${d.slice(0, 2)} ${d.slice(2, 6)}-${d.slice(6)}`;
   if (d.length === 10) d = d.slice(0, 2) + "9" + d.slice(2); // faltava o 9 do celular
@@ -2109,6 +2123,7 @@ function corrigirTelefone(value) {
 // quebrado é pior que botão ausente.
 function telefoneWhatsapp(valor) {
   if (!valor) return "";
+  if (ehTelefoneInternacional(valor)) return "+" + String(valor).replace(/\D/g, ""); // de fora: "+<dígitos>"
   if (ehTelefoneFixo(valor)) return "";
   const formatado = corrigirTelefone(valor);
   return formatado ? normalizePhone(formatado) : "";
@@ -2143,9 +2158,12 @@ function ehEnvelopeDeTriagem(a) {
 // "WhatsApp: https://wa.me/<número>". Esse link é o contato que ela mesma escolheu, então vira o botão quando a ficha
 // não dá telefone. Só o link wa.me explícito conta: número solto no texto continua sem botão.
 const RE_WAME_NA_NOTA = /wa\.me\/\+?(\d{10,13})\b/i;
+// O wa.me já traz o país, sem o "+". Lido com a mesma regra da ficha (ehTelefoneInternacional): o que ela aceita como
+// número de fora (wa.me/15550100199, 03/11/2026) fica com o país; o resto segue como celular brasileiro, igual antes.
+function telefoneDoWaMe(d) { if (!d) return ""; return ehTelefoneInternacional("+" + d) ? "+" + d : telefoneWhatsapp(d); }
 function telefoneDaNota(a) {
   const m = RE_WAME_NA_NOTA.exec(String((a && a.nota_claude) || ""));
-  return m ? telefoneWhatsapp(m[1]) : "";
+  return m ? telefoneDoWaMe(m[1]) : "";
 }
 function telefoneDaTriagem(a) {
   if (!ehEnvelopeDeTriagem(a)) return "";
@@ -4116,6 +4134,7 @@ const WHATSAPP_PACOTE = "com.whatsapp.w4b";
 const WHATSAPP_COMUM_POR_NUMERO = new Set();
 function digitosWhatsappSemPais(tel) {
   const d = String(tel || "").replace(/\D/g, "");
+  if (ehTelefoneInternacional(tel)) return "+" + d; // de fora fica com o país, igual ao que telefoneWhatsapp devolve
   return d.length > 11 && d.startsWith("55") ? d.slice(2) : d;
 }
 function lembrarWhatsappComum(clientes, { recomecar = false } = {}) {
@@ -4128,8 +4147,10 @@ function lembrarWhatsappComum(clientes, { recomecar = false } = {}) {
 function pacoteWhatsapp(tel) {
   return WHATSAPP_COMUM_POR_NUMERO.has(digitosWhatsappSemPais(tel)) ? "com.whatsapp" : WHATSAPP_PACOTE;
 }
+// Número que vai no wa.me: celular BR chega como DDD + número e ganha o 55; o de fora já chega com "+" e o país.
+function numeroWhatsappComPais(tel) { return String(tel || "").startsWith("+") ? String(tel).replace(/\D/g, "") : `55${tel}`; }
 function urlWhatsapp(tel, texto) {
-  const numero = `55${tel}`;
+  const numero = numeroWhatsappComPais(tel);
   const web = `https://wa.me/${numero}${texto ? "?text=" + encodeURIComponent(texto) : ""}`;
   if (!ehAndroid()) return web;
   const qs = `phone=${numero}${texto ? "&text=" + encodeURIComponent(texto) : ""}`;
@@ -4336,6 +4357,7 @@ function encaixesDeRota(avisos, appointments, agendaHistorico, services, custome
 // TRAVA DE CONTATO: celular BR válido tem 11 dígitos (DDD + 9 + 8) ou 13 com o 55. Ficha sem o 9 não abre o
 // WhatsApp - já aconteceu com 19 fichas de uma vez, e é lead parado por um motivo bobo. Melhor gritar cedo.
 function telefoneQuebrado(tel) {
+  if (ehTelefoneInternacional(tel)) return false;
   const d = String(tel || "").replace(/\D/g, "");
   if (!d) return true;
   const semPais = d.startsWith("55") ? d.slice(2) : d;
@@ -10145,7 +10167,7 @@ function DuvidaItem({ d, caixaItem = null, today, db, demo, notify, nome, telefo
   // se bate"). A Manu escreve no cartão de envio o número pra onde a Zapia manda ("— Nome +55 61 9… https://wa.me/…").
   // O botão abre ESSE número e mostra os dígitos; sem link no texto, vale o da ficha. Profissional e fornecedor não têm
   // ficha de cliente, então só o link do texto dá o botão. Se o texto e a ficha discordam, os dois aparecem com aviso.
-  const telTexto = telefoneWhatsapp((RE_WAME_NO_CARTAO.exec(`${d.contexto || ""} ${d.pergunta || ""}`) || [])[1]);
+  const telTexto = telefoneDoWaMe((RE_WAME_NO_CARTAO.exec(`${d.contexto || ""} ${d.pergunta || ""}`) || [])[1]);
   const telFicha = telefoneWhatsapp(telefone);
   const digitos = (t) => (corrigirTelefone(t) || t).replace(/^\+55\s*/, "");
   const telVai = telTexto || telFicha;
@@ -11080,11 +11102,11 @@ function statusDaResposta(d) {
 // O QUE O GROK PRECISA PRA MANDAR, NUM LUGAR SÓ: nome, número, texto exato e o link wa.me com o texto já escrito.
 // Número: o wa.me do texto do cartão, senão o da ficha. Sem texto_envio o link abre a conversa vazia.
 function EnvioAprovado({ d, cliente }) {
-  const tel = telefoneWhatsapp((RE_WAME_NO_CARTAO.exec(`${d.contexto || ""} ${d.pergunta || ""}`) || [])[1]) || telefoneWhatsapp(cliente ? cliente.telefone : null);
+  const tel = telefoneDoWaMe((RE_WAME_NO_CARTAO.exec(`${d.contexto || ""} ${d.pergunta || ""}`) || [])[1]) || telefoneWhatsapp(cliente ? cliente.telefone : null);
   const texto = String(d.texto_envio || "").trim();
-  const link = tel ? `https://wa.me/55${tel}${texto ? "?text=" + encodeURIComponent(texto) : ""}` : null;
+  const link = tel ? `https://wa.me/${numeroWhatsappComPais(tel)}${texto ? "?text=" + encodeURIComponent(texto) : ""}` : null;
   return <div className="envio-aprovado">
-    <p className="caixa-texto"><b>Pra quem:</b> {cliente ? nomeDoCliente(cliente) + " · " : ""}{tel ? `+55 ${tel}` : "sem número no cartão nem na ficha"}</p>
+    <p className="caixa-texto"><b>Pra quem:</b> {cliente ? nomeDoCliente(cliente) + " · " : ""}{tel ? (tel.startsWith("+") ? tel : `+55 ${tel}`) : "sem número no cartão nem na ficha"}</p>
     {texto ? <p className="caixa-texto"><b>Texto exato:</b> {texto}</p> : <p className="ficha-note">Sem texto exato gravado (texto_envio): o texto está no "O que vai" abaixo.</p>}
     {link && <p className="caixa-texto"><b>Link:</b> <a href={link} target="_blank" rel="noreferrer">{link.length > 90 ? link.slice(0, 90) + "…" : link}</a></p>}
     {link && <a className="btn-wpp duvida-wpp" href={urlWhatsapp(tel, texto)} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer" onClick={() => vibrar(6)}>Abrir no WhatsApp{texto ? " com o texto" : ""}</a>}
@@ -14339,7 +14361,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
   const saveCliente = async (forcar = false) => {
     if (!form.nome.trim()) { notify("Nome é obrigatório.", "error"); return; }
     const telefone = corrigirTelefone(form.telefone);
-    if (telefone === null) { notify("Telefone incompleto — celular precisa de DDD + 8 ou 9 dígitos.", "error"); return; }
+    if (telefone === null) { notify("Telefone incompleto — celular precisa de DDD + 8 ou 9 dígitos. De fora do Brasil, comece com + e o código do país.", "error"); return; }
     if (demo) { notify("Na demonstração a ficha não é salva.", "info"); setEditing(false); return; }
     setSaving(true);
     if (!forcar && telefone) {
@@ -14521,7 +14543,7 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
           </div>}
           {colarLink && <div className="responsavel-edit-row"><input value={linkDraft} onChange={(e) => setLinkDraft(e.target.value)} placeholder="Cole o link do Google Maps já aberto" autoFocus /><button className="ghost" onClick={usarLinkMaps}>Salvar ponto</button></div>}
         </div> : <div className="ficha-edit form-grid">
-          <div className="row"><label>Nome*<input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} /></label><label>Telefone<input value={form.telefone} onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))} /></label></div>
+          <div className="row"><label>Nome*<input value={form.nome} onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))} /></label><label>Telefone<input value={form.telefone} onChange={(e) => setForm((f) => ({ ...f, telefone: e.target.value }))} placeholder="DDD + número · de fora: +1 555…" /></label></div>
           <div className="row"><label>Cidade<input value={form.cidade} onChange={(e) => setForm((f) => ({ ...f, cidade: e.target.value }))} /></label><label>Endereço<input value={form.endereco} onChange={(e) => setForm((f) => ({ ...f, endereco: e.target.value }))} /></label></div>
           <label>Observações<textarea value={form.obs} onChange={(e) => setForm((f) => ({ ...f, obs: e.target.value }))} /></label>
           {avisoDuplicado && <div className="duplicate-warning"><b>⚠ Esse telefone já é de {avisoDuplicado.nome}{avisoDuplicado.cidade ? ` · ${avisoDuplicado.cidade}` : ""}</b>
