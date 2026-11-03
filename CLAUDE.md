@@ -12,7 +12,7 @@ que são longos e explicam o porquê de cada decisão (não apague comentários 
 - Dados: Supabase, projeto `iymlzdcloaeyybhefywp` (URL e chave publicável estão no `nova.html`; a chave é
   pública de propósito, quem protege é a RLS). Edge function `edge-functions/push-enviar/index.ts` (push).
 - `index.html` só redireciona pra `nova.html` (desde 02/11/2026). O app ANTIGO (v4, 16/09/2026, login próprio e
-  botões de apagar) ficou guardado em `index-antigo.html`, fora do caminho. `nova_teste.html` é sobra de julho.
+  botões de apagar) ficou guardado em `index-antigo.html`, fora do caminho. (`nova_teste.html`, sobra de julho, foi apagado em 02/11/2026 com o ok do Diego.)
   `estoque.html` é a tela de estoque. `testes.html` é um laboratório manual, não é CI.
 - `agenda-caixa.js` é carregado pelo `nova.html` antes do fonte (identidade agenda × caixa).
 
@@ -117,7 +117,7 @@ das 02h20 (Claude) confere o dia.
   `bahia-conferencia-pronto-v1` está desligado.
 - Edge functions no Supabase: `push-enviar` (modos `varredura`, `resumo`, `chave`, `recibo`, `acao`,
   `validar`, `teste`: os três do meio não pedem segredo, são protegidos pelo uuid do recibo que só o aparelho
-  tem), `zapia-lancar` (segredo), `marketing-track`; `zapia-ping` (morta, 410) e `github-bridge` (legado).
+  tem), `zapia-lancar` (segredo), `marketing-track`; `zapia-ping` (morta, 410; o Diego deu ok pra apagar em 02/11/2026, sai pelo painel do Supabase) e `github-bridge` (legado).
 
 ## Testes
 
