@@ -21,7 +21,7 @@ function pegar(nome) {
   return source.slice(ini, source.indexOf('\n}\n', ini) + 3);
 }
 
-const nomes = ['WHATSAPP_PACOTE', 'WHATSAPP_COMUM_POR_NUMERO', 'digitosWhatsappSemPais', 'lembrarWhatsappComum', 'pacoteWhatsapp'];
+const nomes = ['WHATSAPP_PACOTE', 'WHATSAPP_COMUM_POR_NUMERO', 'ehTelefoneInternacional', 'digitosWhatsappSemPais', 'lembrarWhatsappComum', 'pacoteWhatsapp'];
 const app = vm.createContext({});
 vm.runInContext(nomes.map(pegar).join('\n') + '\nthis.app = { lembrarWhatsappComum, pacoteWhatsapp, WHATSAPP_COMUM_POR_NUMERO };', app);
 const { lembrarWhatsappComum, pacoteWhatsapp, WHATSAPP_COMUM_POR_NUMERO } = app.app;
@@ -52,4 +52,10 @@ test('a ficha só acrescenta; a carga da lista recomeça do zero', () => {
   lembrarWhatsappComum([{ telefone: '+55 61 99000-0003', whatsapp_comum: false }], { recomecar: true });
   assert.equal(pacoteWhatsapp('61990000001'), 'com.whatsapp.w4b');
   assert.equal(pacoteWhatsapp('61990000003'), 'com.whatsapp.w4b');
+});
+
+test('número de fora marcado abre no WhatsApp comum pelo número com o país (03/11/2026)', () => {
+  lembrarWhatsappComum([{ telefone: '+1 555 010 0199', whatsapp_comum: true }], { recomecar: true });
+  assert.equal(pacoteWhatsapp('+15550100199'), 'com.whatsapp');
+  assert.equal(pacoteWhatsapp('15550100199'), 'com.whatsapp.w4b');
 });

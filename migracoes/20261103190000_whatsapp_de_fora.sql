@@ -1,0 +1,10 @@
+-- WhatsApp de fora do Brasil (Diego, 03/11/2026: cliente com número dos Estados Unidos, "Ela só tem esse").
+-- Até aqui só celular brasileiro passava (55 + DDD + 9 + 8 dígitos), e o serviço e o card de quem tem número de fora
+-- eram recusados. Agora também passa número que começa com "+", com código de país diferente de 55 e 11 a 15
+-- dígitos. Ficam de fora, de propósito: sem "+" (1 908 733-6312 é igual a um celular de DDD 19) e "+61 9…" com
+-- 11 dígitos (engano de digitação de celular de Brasília, não Austrália). Mesma regra de ehTelefoneInternacional
+-- no nova.html. A regra do celular brasileiro não muda. A Caixa (agenda_criar_da_caixa) continua só com número BR.
+-- Nada é apagado: a trava nova aceita tudo que a velha aceitava.
+create or replace function private.whatsapp_phone_ok(p_telefone text) returns boolean language sql immutable set search_path to 'pg_catalog' as $f$ select p_telefone is not null and (regexp_replace(p_telefone, '\D', '', 'g') ~ '^55[1-9][0-9]9[0-9]{8}$' or (btrim(p_telefone) ~ '^[+]' and regexp_replace(p_telefone, '\D', '', 'g') ~ '^[1-9][0-9]{10,14}$' and regexp_replace(p_telefone, '\D', '', 'g') !~ '^55' and regexp_replace(p_telefone, '\D', '', 'g') !~ '^[0-9]{2}9[0-9]{8}$')) $f$;
+alter table public.clientes drop constraint if exists clientes_telefone_celular_br, add constraint clientes_telefone_whatsapp check (telefone is null or regexp_replace(telefone, '\D', '', 'g') ~ '^55[1-9][0-9]9[0-9]{8}$' or (btrim(telefone) ~ '^[+]' and regexp_replace(telefone, '\D', '', 'g') ~ '^[1-9][0-9]{10,14}$' and regexp_replace(telefone, '\D', '', 'g') !~ '^55' and regexp_replace(telefone, '\D', '', 'g') !~ '^[0-9]{2}9[0-9]{8}$'));
+select private.whatsapp_phone_ok('+1 555 010 0199') as de_fora, private.whatsapp_phone_ok('+55 61 99999-0000') as brasil, private.whatsapp_phone_ok('15550100199') as sem_mais, private.whatsapp_phone_ok('+61 99999-0000') as engano_df, (select count(*) from pg_constraint where conname = 'clientes_telefone_whatsapp') as trava_nova;
