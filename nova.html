@@ -6288,7 +6288,7 @@ function textoRotina(st) {
 }
 // CARDS LIGADOS (Diego, 14/10/2026). A Manu cria as tarefas de uma mesma parada como cards separados, 1 minuto um do
 // outro, com o título começando pelo lugar ou pela pessoa ("Marlom Júnior — pegar cola quente", "Marlom Júnior — buscar
-// o sofá"). O app reconhece o grupo sozinho, sem campo novo no banco: mesmo dia, mesmo começo de título antes do
+// o sofá"). O app reconhece o grupo sozinho (desde 03/11 também pela coluna agenda.saida): mesmo dia, mesmo começo de título antes do
 // travessão (ou mesmo cliente), e horário até 20 minutos depois do card anterior do grupo. Devolve, por id, a cor do
 // grupo (1..5, trocando a cada grupo do dia), a posição no grupo (ini/meio/fim) e o tamanho.
 // Só cards PRESENCIAIS formam grupo (15/10/2026): remoto não é parada de rota.
@@ -6302,6 +6302,19 @@ function inicioDoTitulo(titulo) {
   return m ? semAcento(m[1]).replace(/[^a-z0-9]+/g, " ").trim() : "";
 }
 function minutosDaHora(hora) { const m = /^(\d{1,2}):(\d{2})/.exec(String(hora || "")); return m ? Number(m[1]) * 60 + Number(m[2]) : null; }
+// CIDADE SÓ PELO NOME (Diego, 03/11/2026: "um card ficar da mesma coisa do outro sendo para o mesmo destino nao esta
+// dando certo"). No banco a mesma cidade vem escrita de vários jeitos: "Luziânia", "Luziânia/GO", "Luziânia - GO",
+// "Jardim Ingá — Luziânia/GO", "Brasília-DF (Asa Norte)". Aqui vira uma lista de partes sem acento, sem UF e sem
+// "de/do/da"; duas cidades são a mesma se alguma parte de uma é igual a uma parte da outra ou começa por ela seguida
+// de espaço ("valparaiso" = "valparaiso goias"), nunca no meio ("gama" ≠ "novo gama", "riacho fundo i" ≠ "ii").
+function partesDaCidade(cidade) {
+  return semAcento(cidade).replace(/\(([^)]*)\)/g, " / $1 ").replace(/[-/]\s*\b(?:go|df|mg)\b/g, " / ")
+    .split(/[—–,/]|\s-\s/).map((p) => p.replace(/[^a-z0-9]+/g, " ").replace(/\b(?:de|do|da|dos|das|go|df|mg)\b/g, " ").replace(/\s+/g, " ").trim()).filter(Boolean);
+}
+function mesmaCidade(a, b) {
+  const comeca = (x, y) => x === y || x.startsWith(y + " ") || y.startsWith(x + " ");
+  return a.some((x) => b.some((y) => comeca(x, y)));
+}
 const TITULO_BUSCA_ENTREGA = /\b(busc|retir|entreg|levar|pegar)/i;
 function ligacoesDaLista(lista) {
   const mapa = new Map();
@@ -6313,21 +6326,39 @@ function ligacoesDaLista(lista) {
   if (cards.length < 2) return mapa;
   const ordenados = [...presenciais].sort((a, b) => (a.data + (a.hora || "99")).localeCompare(b.data + (b.hora || "99")));
   const grupos = []; const corPorDia = {};
+  // MESMA SAÍDA (Diego, 03/11/2026): a coluna agenda.saida guarda o id do primeiro card da saída. Cards com a mesma
+  // saída e a mesma data são uma viagem só, com qualquer hora e cidade (Marlom 14h em Luziânia → Iris 15h30 em Santa
+  // Maria). O primeiro card pode ficar com saida vazia: ele entra porque o id dele é a saída dos outros. Agrupa por
+  // saída E data, porque card remarcado pra outro dia não leva a viagem junto.
+  const saidas = new Set(ordenados.map((a) => a.saida).filter(Boolean));
+  const porSaida = new Map(); const soltos = [];
   for (const a of ordenados) {
-    const min = minutosDaHora(a.hora); const cidade = semAcento(a.cidade || "");
+    const saida = a.saida || (saidas.has(a.id) ? a.id : null);
+    if (!saida) { soltos.push(a); continue; }
+    const chave = saida + "|" + a.data;
+    if (!porSaida.has(chave)) { const g = { data: a.data, cards: [] }; porSaida.set(chave, g); grupos.push(g); }
+    porSaida.get(chave).cards.push(a);
+  }
+  for (const a of soltos) {
+    const min = minutosDaHora(a.hora); const cidade = partesDaCidade(a.cidade);
     let dono = null;
     // UMA SAÍDA SÓ (Diego, 16/10/2026: "não ligou a Marlom Júnior... levar as rodinhas lá nele e pegar a cola, ainda o
     // aditivo dividiu"): presenciais do mesmo dia, um atrás do outro com até LIGA_MINUTOS entre um e o próximo, são a
     // mesma viagem — com cliente diferente ou sem cliente (Pau Brasil 9h35 → Marlom 9h50 → cola 9h51 → aditivo 9h52).
     // Até 15/10 só ligava mesma parada (mesmo começo de título ou mesmo cliente), e a saída aparecia partida em 3.
+    // MESMA HORA NÃO É VIAGEM (03/11/2026): dois cards presenciais no mesmo minuto são dois lugares ao mesmo tempo,
+    // um conflito. Até aqui `min < g.ultimo` deixava diferença 0 ligar (Marlom 14h com Maria Rita 14h).
     if (min !== null) for (const g of grupos) {
-      if (g.data !== a.data || g.ultimo === null || min - g.ultimo > LIGA_MINUTOS || min < g.ultimo) continue;
-      if (cidade && g.cidade && g.cidade !== cidade) continue;
+      if (!g.porHora || g.data !== a.data || g.ultimo === null || min - g.ultimo > LIGA_MINUTOS || min <= g.ultimo) continue;
+      if (cidade.length && g.cidade.length && !mesmaCidade(g.cidade, cidade)) continue;
       dono = g; break;
     }
-    if (dono) { dono.cards.push(a); dono.ultimo = min; if (!dono.cidade) dono.cidade = cidade; }
-    else grupos.push({ data: a.data, cidade, ultimo: min, cards: [a] });
+    if (dono) { dono.cards.push(a); dono.ultimo = min; if (!dono.cidade.length) dono.cidade = cidade; }
+    else grupos.push({ porHora: true, data: a.data, cidade, ultimo: min, cards: [a] });
   }
+  // A cor troca a cada grupo do dia, na ordem da hora do primeiro card (os grupos de saída nascem antes dos outros).
+  const inicio = (g) => g.data + (g.cards[0].hora || "99");
+  grupos.sort((x, y) => inicio(x).localeCompare(inicio(y)));
   for (const g of grupos) {
     if (g.cards.length < 2) continue;
     corPorDia[g.data] = (corPorDia[g.data] || 0) + 1;
@@ -10580,10 +10611,14 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
   const hojePassouDaHora = porTipo(passouDaHoraAll).length;
   const irParaVencendo = () => { if (!atrasos.recentes.length) return; setFiltroTipo("todos"); requestAnimationFrame(() => document.getElementById("secao-vencendo")?.scrollIntoView({ behavior: "smooth", block: "start" })); };
   const semHora = cobrancasAll;
-  // Cards ligados (14/10/2026): o grupo é descoberto por lista — Atrasados, Hoje e Próximos, cada uma a sua.
-  const ligacoesAtrasados = useMemo(() => ligacoesDaLista(atrasados), [atrasados]);
-  const ligacoesHoje = useMemo(() => ligacoesDaLista(hoje), [hoje]);
-  const ligacoesFuturos = useMemo(() => ligacoesDaLista(futuros), [futuros]);
+  // Cards ligados (14/10/2026). Até 03/11 o grupo era descoberto em cada lista separada, e a saída se partia: às 14h05
+  // a parada das 14h ia pra Atrasados (passou da hora) e a das 15h30 ficava em Hoje, cada uma sozinha. Agora as
+  // ligações saem de todas as listas juntas e a mesma resposta vale pras três.
+  const ligacoesTodas = useMemo(() => {
+    const vistos = new Set();
+    return ligacoesDaLista([...atrasados, ...antigos, ...hoje, ...futuros].filter((a) => a && !vistos.has(a.id) && vistos.add(a.id)));
+  }, [atrasados, antigos, hoje, futuros]);
+  const ligacoesAtrasados = ligacoesTodas; const ligacoesHoje = ligacoesTodas; const ligacoesFuturos = ligacoesTodas;
   // PRIORIDADE DO MOMENTO NO TOPO (Diego, 22/10/2026, depois de marcar dois e nada subir: "eu já sei que esse negócio eu
   // vou resolver agora"). Sobe NA HORA em que ele marca, sem esperar o horário do card, todos os marcados, o mais antigo
   // primeiro. Ignora os filtros (prioridade não pode sumir por filtro esquecido). É o card de sempre, com os botões dele.
