@@ -2875,6 +2875,47 @@ function cabecalhoAjusteDeData(agendaId, dataProvisoria, explicacao) {
     "---",
   ].join("\n");
 }
+// ===== CARGA SEM CORTE (11/11/2026) =====
+// A API do Supabase devolve no máximo 1000 linhas por pedido e NÃO AVISA: o pedido volta 200, e só o cabeçalho
+// Content-Range ("0-999/*") conta que cortou. Medido nos registros da API em 10/11/2026: `financeiro` tinha passado
+// de mil em 23/10 e desde então o app recebia só os mil lançamentos de data mais nova (os de 17 a 30/07 tinham
+// sumido do mês de julho na tela); a agenda fora do planejado estava em 995; `clientes` e `servicos`, em 473 e 467
+// crescendo uns 60 por semana, chegariam lá em uns dois meses, e aí cliente sumiria da busca pela ordem alfabética.
+// Isto busca em páginas até acabar. `montar` devolve a consulta nova a cada volta, JÁ ORDENADA e com
+// `count: "exact"` no select; a ordem tem que terminar numa coluna que não repete (id), senão duas linhas com a
+// mesma data podem trocar de lugar na virada da página e uma repetir enquanto a outra falta.
+// Erro em qualquer página vira erro da carga inteira: carga pela metade com cara de inteira era justamente o defeito.
+const PAGINA_DA_API = 1000;
+async function buscarTudo(montar, pagina = PAGINA_DA_API) {
+  const todas = [];
+  const vistos = new Set();
+  // `de` anda pelo que o servidor entregou, não pelo que ficou na lista: linha repetida é descartada e não pode
+  // fazer o próximo pedido voltar pro mesmo lugar.
+  let de = 0;
+  for (let volta = 0; volta < 200; volta++) {
+    const r = await montar().range(de, de + pagina - 1);
+    if (r.error) {
+      // Pediu depois do fim (a contagem mudou entre uma página e outra): acabou, não é falha.
+      if (de > 0 && r.error.code === "PGRST103") break;
+      return { data: null, error: r.error };
+    }
+    const linhas = r.data || [];
+    const antes = todas.length;
+    // Linha que entrou no meio da busca empurra as outras e uma pode vir de novo na página seguinte.
+    for (const linha of linhas) {
+      const id = linha && linha.id;
+      if (id != null) { if (vistos.has(id)) continue; vistos.add(id); }
+      todas.push(linha);
+    }
+    de += linhas.length;
+    const total = typeof r.count === "number" ? r.count : null;
+    // Página vazia, página que não trouxe nada de novo, ou resposta maior que o pedido (o servidor ignorou a
+    // página e mandou tudo de uma vez): acabou. Sem isto um servidor diferente do esperado prenderia a carga num laço.
+    if (!linhas.length || todas.length === antes || linhas.length > pagina) break;
+    if (total != null ? de >= total : linhas.length < pagina) break;
+  }
+  return { data: todas, error: null };
+}
 // LEITURA OFFLINE (25/07/2026). Guarda a última carga boa do Supabase no aparelho. Não é sincronização:
 // é só pra o app abrir com a agenda, os telefones e os endereços quando o sinal cai no meio da rota.
 const CACHE_OFFLINE = "tb-novo-cache-offline";
@@ -4608,17 +4649,18 @@ function Home() {
     try {
       [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da, pr, rm, mu] = await Promise.all([
         db.from("caixa_entrada").select("*").eq("processado", false).order("criado_em", { ascending: true }),
-        db.from("clientes").select("*").order("nome", { ascending: true }),
+        // As cinco tabelas que crescem sem parar vêm por buscarTudo (ver CARGA SEM CORTE): a API corta em mil linhas.
+        buscarTudo(() => db.from("clientes").select("*", { count: "exact" }).order("nome", { ascending: true }).order("id", { ascending: true })),
         // `endereco` entrou em 23/08/2026: sem ele o botão de rota do compromisso só teria a
         // cidade, e "Luziânia" não leva ninguém à casa do cliente.
-        db.from("servicos").select("*,clientes(id,nome,telefone,cidade,endereco,obs,latitude,longitude,localizacao_confianca),profissional_cadastro:profissionais!servicos_profissional_id_fkey(id,nome)").order("criado_em", { ascending: false }),
+        buscarTudo(() => db.from("servicos").select("*,clientes(id,nome,telefone,cidade,endereco,obs,latitude,longitude,localizacao_confianca),profissional_cadastro:profissionais!servicos_profissional_id_fkey(id,nome)", { count: "exact" }).order("criado_em", { ascending: false }).order("id", { ascending: true })),
         db.from("agenda").select("*").eq("status", "planejado").order("data", { ascending: true }).order("hora", { ascending: true }),
-        db.from("financeiro").select("*").order("data", { ascending: false }),
+        buscarTudo(() => db.from("financeiro").select("*", { count: "exact" }).order("data", { ascending: false }).order("id", { ascending: true })),
         db.from("rotinas").select("*").eq("ativo", true).order("criado_em", { ascending: true }),
         db.from("fornecedores").select("*").order("nome", { ascending: true }),
         // Traz tudo, inclusive concluído e cancelado: o volume é minúsculo e a lista de concluídos é o que
         // prova que "Concluir" não apagou nada. Quem filtra é a tela.
-        db.from("pessoais").select("*").order("data_alvo", { ascending: true }),
+        buscarTudo(() => db.from("pessoais").select("*", { count: "exact" }).order("data_alvo", { ascending: true }).order("id", { ascending: true })),
         db.from("distancias").select("cidade_a,cidade_b,minutos"),
         // AGENDA QUE NÃO ESTÁ MAIS PLANEJADA — só o suficiente pra explicar POR QUE um serviço parou.
         // A carga principal filtra `status = planejado` (e tem que continuar filtrando: é ela que alimenta
@@ -4634,7 +4676,7 @@ function Home() {
         // ÓRFÃO — servico_id e cliente_id nulos — então não há por onde chegar na região a não ser pela
         // própria linha da agenda. Sem esta coluna o cartão apareceria sem dizer PRA ONDE é a viagem, que
         // é a única informação que decide se o encaixe cabe na rota. Continua sendo contexto, não agenda.
-        db.from("agenda").select("id,servico_id,status,titulo,data,local,cidade").neq("status", "planejado").order("data", { ascending: false }),
+        buscarTudo(() => db.from("agenda").select("id,servico_id,status,titulo,data,local,cidade", { count: "exact" }).neq("status", "planejado").order("data", { ascending: false }).order("id", { ascending: true })),
         // ESTOQUE — para o card de Compras poder perguntar "isso você já tem?". A view é security_invoker,
         // então respeita a mesma trava de RLS do resto; sem autorização ela volta VAZIA em vez de dar erro,
         // e o app simplesmente deixa de sugerir — que é o comportamento de antes, não uma tela quebrada.
@@ -9110,7 +9152,8 @@ async function virarLeadDaCaixa(db, item, { nome, telefone, cidade, servico, pro
   const feitos = [];
   try {
     // 1. Ficha. Relida do banco: a lista da tela pode estar velha, e ficha dupla separa o histórico.
-    const { data: comTelefone, error: fichaErr } = await db.from("clientes").select("id,nome,telefone,cidade").not("telefone", "is", null);
+    // buscarTudo: com mais de mil fichas a API cortaria a lista e a ficha que já existe não seria achada (ficha dupla).
+    const { data: comTelefone, error: fichaErr } = await buscarTudo(() => db.from("clientes").select("id,nome,telefone,cidade", { count: "exact" }).not("telefone", "is", null).order("id", { ascending: true }));
     if (fichaErr) throw fichaErr;
     const iguais = (comTelefone || []).filter((c) => BahiaAgendaCaixa.telefoneCadastroEstrito(c.telefone) === estrito);
     let cliente = clienteId ? iguais.find((c) => c.id === clienteId) || null : null;

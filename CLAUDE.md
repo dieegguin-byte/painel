@@ -116,6 +116,10 @@ das 02h20 (Claude) confere o dia.
   `agenda_sem_duplicata` (`servico_id+titulo+data`), `agenda_servico_exige_whatsapp`,
   `agenda_baixa_financeiro` (Feito em card com conta baixa a conta), `propostas_fecha_card`,
   `servicos.atualizado_em` sobe sozinho. Histórico delas em `TRAVAS_BANCO.sql` e `CICLO_COBRANCA.sql`.
+- A API do Supabase devolve no máximo 1000 linhas por pedido e não avisa (volta 200; só o `Content-Range` conta).
+  Tabela que cresce sem parar (`clientes`, `servicos`, `financeiro`, `pessoais`, agenda fora do planejado) é lida
+  com `buscarTudo` (em páginas, ordem terminando em `id`). Consulta nova numa dessas tabelas: use `buscarTudo`
+  (`tests/carga-sem-corte.test.cjs`). O `financeiro` passou de mil em 23/10/2026 e o app ficou sem julho até isto.
 - Cron (pg_cron): `push-varredura` (*/5), `push-resumo` (10h30), `pessoal-some-sozinho` (*/15);
   `bahia-conferencia-pronto-v1` está desligado.
 - Edge functions no Supabase: `push-enviar` (modos `varredura`, `resumo`, `chave`, `recibo`, `acao`,
