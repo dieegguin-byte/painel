@@ -79,11 +79,14 @@ Procure pelo nome (as linhas mudam). Ordem no arquivo:
      (`ehRemoto`, `paradaFisica`), `// ===== PORTA ÚNICA DA OPERAÇÃO BAHIA` (`processarEventoOperacaoBahia`:
      toda gravação de serviço/financeiro passa por aqui);
    - `function Home()`: estado global, `loadAll` (baixa tudo: serviços, financeiro, clientes, agenda
-     planejada, mural…), canal realtime `operacao-viva` (debounce 0,7 s → `loadAll`), cache offline em
-     localStorage `tb-novo-cache-offline`, abas;
+     planejada, mural…), canal realtime `operacao-viva` (debounce 0,7 s → `loadAll({ deFora: true })`), cache
+     offline em localStorage `tb-novo-cache-offline`, abas. `criarOrdemDeCargas` decide qual carga vale quando
+     várias voltam fora de ordem (carga pedida antes do último toque do Diego não redesenha a tela);
    - cards da agenda: `useRecadosAgenda` (Feito/Cancelar/recado/Remarcar/Adiar 1h, Desfazer),
      `AcoesDoCompromisso` (botões do card), `CompromissoCard`, `FocoDoCard`/`FocoGlobal`, alarme
-     (`AlarmeCompromisso`), avisos da barra (`fecharAvisosDeCards`, `conferirAvisosNoServidor`);
+     (`AlarmeCompromisso`), avisos da barra (`fecharAvisosDeCards`, `conferirAvisosNoServidor`).
+     `perguntaDoFeito` é a regra única do que o Feito pergunta antes de gravar ("Pagou?" na conta ligada, quanto e
+     de onde saiu na compra): botão novo de Feito passa por ela, nunca grava direto;
    - `// ===== DOMÍNIO PESSOAIS` (`PessoaisCard`), `PropostasCard`, `RotinasCard`, `ContadorAgua`;
    - `// ===== A CAIXA VOLTA COMO FILA` (`CaixaCard`, `CaixaView`, `CaixaForm*`);
    - cards do Painel: `RetornosVencidosCard`, `CapacidadeCard`, `MateriaisCard`, `GrupoRecolhivel`,
@@ -134,6 +137,9 @@ das 02h20 (Claude) confere o dia.
   o teste nº 11 falha por isso, não por erro no app.
 - Compilar o app inteiro: `BAHIA_BABEL_PATH=... node --test tests/nova-compila.test.cjs` (quando existir a
   checagem automática, é o que ela roda em todo PR).
+- `tests/painel-consertos.test.cjs` (sem instalar nada): a pergunta do Feito, o aviso por cima das listas, o card
+  aberto que não herda o painel do vizinho e a ordem das cargas. Mexeu em `BotaoAdiar1h`, `AcoesDoCompromisso`,
+  `notify`, `FocoDoCard` ou `loadAll`, rode.
 
 ## Documentos do repositório
 

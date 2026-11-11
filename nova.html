@@ -733,6 +733,11 @@ button.sutil{opacity:.55;font-size:12px}
 .notice{display:flex;align-items:center;gap:10px;overflow:hidden;animation:avisoMola .5s cubic-bezier(.2,.9,.3,1.2) backwards;touch-action:none}
 .notice::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:currentColor;opacity:.35;transform-origin:left;animation:avisoTempo 4.2s linear forwards}
 .notice.saindo{transition:transform .2s ease,opacity .2s ease;opacity:0}
+/* AVISO POR CIMA DE TUDO (11/11/2026). O aviso era desenhado dentro da casca do app (.product-shell, isolation:isolate),
+   e as listas e o card aberto são portais no body (z-index 2000): com qualquer lista aberta o aviso ficava ATRÁS dela.
+   "Não salvou", "Escolha outra hora" e "Escreva quanto pagou" apareciam sem ninguém ver. Agora ele é um portal no
+   body (ver `notice` no Home) e fica acima das listas. */
+.notice{z-index:2100}
 .notice-check{flex:0 0 22px;width:22px;height:22px;fill:none;stroke:#8fe0a6;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:24;stroke-dashoffset:24;animation:checkDesenha .45s .15s ease-out forwards}
 /* 5. Pílula que escorrega entre as abas da barra de baixo */
 .mobile-nav button{position:relative;z-index:1}
@@ -4387,6 +4392,26 @@ function semONoveInventado(tel) {
 }
 function sugerirPendente(titulo) { const t = (titulo || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); if (/mensagem|whatsapp|contato|ligar|liguei/.test(t)) return "Aguardar resposta do cliente"; if (/visita|avaliar|orcamento|medir/.test(t)) return "Reagendar visita ou avaliação"; if (/entrega|retirada|buscar|levar/.test(t)) return "Reagendar retirada ou entrega"; if (/pagamento|cobranca|cobrar/.test(t)) return "Cobrar pagamento"; return "Revisar e continuar"; }
 
+// ORDEM DAS CARGAS (11/11/2026). O app recarrega tudo depois de cada toque, a cada evento do canal vivo e ao voltar pro
+// primeiro plano: num toque só costumam sair 2 ou 3 cargas, e a resposta de cada uma chega quando chega. Antes, a que
+// chegava por último ganhava, mesmo sendo a mais velha: um card recém-resolvido voltava pra tela (carga pedida ANTES
+// do Feito chegando depois dele) e ficava lá até a recarga seguinte.
+// Cada carga pega um número ao ser pedida, e na chegada só entra na tela se:
+//   · nenhuma carga pedida depois dela já entrou (dado mais novo não é trocado por mais velho);
+//   · ela não foi pedida antes da última carga do próprio app (toque, Atualizar): essa nasce depois de uma gravação,
+//     então tudo que foi pedido antes dela é retrato de antes da gravação.
+// Carga "de fora" (canal vivo, volta ao primeiro plano, rede de volta) não derruba as anteriores: numa rajada de
+// eventos cada resposta entra na ordem, e a tela não fica esperando a rajada acabar.
+function criarOrdemDeCargas() {
+  let pedida = 0, piso = 0, aplicada = 0;
+  return {
+    pedir(deFora) { const n = ++pedida; if (!deFora) piso = n; return n; },
+    vale(n) { return n >= piso && n >= aplicada; },
+    aplicar(n) { aplicada = n; },
+    jaAplicou() { return aplicada > 0; },
+  };
+}
+
 function Home() {
   const [db, setDb] = useState(null);
   const [session, setSession] = useState(null);
@@ -4542,10 +4567,14 @@ function Home() {
   const [concluirAppt, setConcluirAppt] = useState(null);
   const [addAgendaOpen, setAddAgendaOpen] = useState(false);
 
+  // Cada aviso tem o seu número, e o relógio de 4,2 s só apaga o aviso que o criou. Antes o relógio do primeiro aviso
+  // apagava o segundo antes da hora (o "Feito" sumia com o "Não salvou" que veio logo depois).
+  const avisoN = React.useRef(0);
   const notify = useCallback((text, kind = "info") => {
-    setNotice({ text, kind, id: Date.now() });
+    const id = ++avisoN.current;
+    setNotice({ text, kind, id });
     if (kind === "ok") vibrar([12, 40, 12]);
-    window.setTimeout(() => setNotice(null), 4200);
+    window.setTimeout(() => setNotice((atual) => (atual && atual.id === id ? null : atual)), 4200);
   }, []);
 
   useEffect(() => {
@@ -4598,12 +4627,17 @@ function Home() {
     aplicarDistanciasDoBanco(p.distancias);
   }, []);
 
-  const loadAll = useCallback(async () => {
+  const ordemCargas = React.useRef(null);
+  if (!ordemCargas.current) ordemCargas.current = criarOrdemDeCargas();
+  // `opcoes.deFora`: só o canal vivo, a volta ao primeiro plano e a rede de volta passam (ver recarregarLogo).
+  // Qualquer outra chamada (depois de gravar, botão Atualizar, puxar pra atualizar) conta como carga do próprio app.
+  const loadAll = useCallback(async (opcoes) => {
     if (demo) {
       setInbox(demoInbox.map((item) => ({ ...item, conversa: comoLista(item.conversa) }))); setCustomers(demoCustomers); setServices(demoServices); setAppointments(comConta(comTituloVisivel(demoAppointments, demoPessoais), demoFinance)); setFinances(demoFinance); setRotinas(demoRotinas); setFornecedores(demoFornecedores); setPessoais(demoPessoais); setAgendaHistorico(demoAgendaHistorico); setEstoque(demoEstoque); setAvisos(demoAvisos); setAtividadeAgente(demoAtividadeAgente); setDuvidasAgente(demoDuvidas); setPropostas(demoPropostas); setDividas(demoDividas); setProfissionais(demoProfissionais); setReferenciasMO(demoReferenciasMO); setMural(demoMural); setLoading(false); return;
     }
     if (!db || !session) return;
     setLoading(true);
+    const minhaCarga = ordemCargas.current.pedir(!!(opcoes && opcoes.deFora === true));
     let cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da, pr, rm, mu, firstError;
     try {
       [cx, cl, sv, ag, fn, rt, fo, ps, ds, ah, es, av, dv, pf, hs, da, pr, rm, mu] = await Promise.all([
@@ -4677,12 +4711,20 @@ function Home() {
       // defeito de 13/09. Melhor cair no cache offline, que pelo menos avisa a idade dos dados.
       firstError = [cx, cl, sv, ag, fn, rt, fo, ps, dv].find((result) => result.error)?.error;
     } catch (e) { firstError = e; }
+    // Resposta velha (ver ORDEM DAS CARGAS): não entra na tela, nem a boa nem a que falhou. Sempre existe uma carga
+    // mais nova em voo ou já aplicada, e é ela que desliga a barra de carregando.
+    if (!ordemCargas.current.vale(minhaCarga)) return;
     // SEM SINAL: em vez de tela vazia, abre com a última carga guardada e avisa a idade dela.
     if (firstError) {
       const guardado = lerCacheOffline();
-      if (guardado) { aplicarPacote(guardado.pacote); setOfflineDesde(guardado.em); setLoading(false); return; }
+      // A RECARGA FALHOU COM O APP JÁ ABERTO (11/11/2026): a tela fica como está e só ganha a faixa de sem conexão.
+      // Antes o pacote guardado era posto por cima; ele é da última carga boa, de ANTES do toque, e o card que o
+      // Diego tinha acabado de resolver voltava pra tela como se o Feito não tivesse valido (valeu: a gravação
+      // passou, só a recarga é que caiu). O pacote guardado só entra na abertura, quando ainda não há nada na tela.
+      if (guardado) { if (!ordemCargas.current.jaAplicou()) aplicarPacote(guardado.pacote); setOfflineDesde(guardado.em); setLoading(false); return; }
       notify(`Erro ao carregar: ${firstError.message}`, "error"); setLoading(false); return;
     }
+    ordemCargas.current.aplicar(minhaCarga);
     setOfflineDesde(null);
     const pacote = { inbox: cx.data || [], customers: cl.data || [], services: sv.data || [], appointments: ag.data || [], finances: fn.data || [], rotinas: rt.data || [], fornecedores: fo.data || [], pessoais: ps.data || [], distancias: ds?.data || [], agendaHistorico: ah?.data || [], estoque: es?.data || [], avisos: av?.data || [], dividas: dv.data || [], profissionais: pf?.data || [], atividadeAgente: hs?.data || [], duvidasAgente: da?.data || [], propostas: pr?.data || [], referenciasMO: rm?.data || [], mural: mu?.data || [] };
     aplicarPacote(pacote);
@@ -4841,7 +4883,7 @@ function Home() {
   useEffect(() => {
     if (!db || !session || demo) return;
     let timer = null;
-    const recarregarLogo = () => { clearTimeout(timer); timer = setTimeout(() => loadAll(), 700); };
+    const recarregarLogo = () => { clearTimeout(timer); timer = setTimeout(() => loadAll({ deFora: true }), 700); };
     // UM canal só para as sete: cada `.on()` é uma inscrição barata, mas cada CANAL é um socket a mais.
     // E como todas caem no mesmo `recarregarLogo` com debounce, uma escrita do Classic que toca serviço +
     // financeiro + agenda de uma vez vira UMA recarga, não três.
@@ -5540,14 +5582,15 @@ function Home() {
     {/* ALARME DENTRO DO APP DESLIGADO (Diego, 15/10/2026 14h42: "bipar dentro do aplicativo, não"; o que ele quer é a
         notificação do Windows no canto, que aparece em qualquer aba — o push com o 🔔 ligado no PC faz isso).
         O componente AlarmeCompromisso fica no código, sem montar, caso ele mude de ideia. */}
-    {notice && <div key={notice.id} className={`notice ${notice.kind}`}
+    {/* Portal no body: o aviso fica por cima das listas e do card aberto, que também são portais (ver .notice no CSS). */}
+    {notice && ReactDOM.createPortal(<div key={notice.id} className={`notice ${notice.kind}`}
       onTouchStart={(e) => { const t = e.touches[0]; e.currentTarget._x0 = t.clientX; e.currentTarget._y0 = t.clientY; }}
       onTouchMove={(e) => { const el = e.currentTarget, t = e.touches[0]; const dx = t.clientX - el._x0, dy = Math.min(0, t.clientY - el._y0); el.style.transform = `translate(${dx}px, ${dy}px)`; el.style.opacity = String(Math.max(0.2, 1 - Math.abs(dx) / 260)); }}
       onTouchEnd={(e) => { const el = e.currentTarget, t = e.changedTouches[0]; const dx = t.clientX - el._x0, dy = t.clientY - el._y0;
         if (Math.abs(dx) > 70 || dy < -40) { el.classList.add("saindo"); el.style.transform = Math.abs(dx) > 70 ? `translateX(${dx > 0 ? 120 : -120}%)` : "translateY(-130%)"; setTimeout(() => setNotice(null), 200); }
         else { el.style.transform = ""; el.style.opacity = ""; } }}>
       {notice.kind === "ok" && <svg className="notice-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
-      <span>{notice.text}</span></div>}
+      <span>{notice.text}</span></div>, document.body)}
     <div className="fundo-vivo" aria-hidden="true" />
     {loading && <div className="barra-carregando" />}
     {/* SEM SINAL: a tela precisa dizer que está velha, senão ele decide em cima de dado defasado sem saber.
@@ -6848,16 +6891,21 @@ function AlarmeCompromisso({ appointments, db, demo, notify, onChanged, setAppoi
 const AcoesAgendaCtx = React.createContext(null);
 // Botões "Feito" e "Adiar 1h" direto no card atrasado da lista, iguais aos da notificação do celular (Diego, 16/10/2026,
 // 14h14: "tem que colocar um botão lá feito, porque é coisa rápida"). O Feito é o mesmo de dentro do card (acoes.enviar,
-// sem confirmação, com o ↶ Desfazer da faixa "Enviado ao Claude"; card de pagar ligado já baixa a conta em Dinheiro).
+// sem confirmação, com o ↶ Desfazer da faixa "Enviado ao Claude").
 // Ficam fora do botão do cabeçalho pra não abrir o foco; tocar no resto do card continua abrindo o card.
-function BotaoAdiar1h({ a, acoes }) {
+// FEITO RÁPIDO NÃO PULA A PERGUNTA (11/11/2026). As regras de 18/10 ("Pagou?" antes de dar baixa numa conta) e de 19/10
+// (card de compra pergunta quanto e de onde saiu) entraram no Feito de dentro do card e no da notificação, e este botão,
+// que é de 16/10, ficou de fora: um toque nele dava a conta ligada como paga, sem perguntar. Agora, no card que tem
+// pergunta, o toque não grava nada: abre o card já na pergunta, igual ao Feito da notificação (PERGUNTA_PAGOU).
+function BotaoAdiar1h({ a, acoes, temMaterial = false }) {
   const [ocupado, setOcupado] = useState(null);
   const tocar = (qual, fn) => async (e) => {
     e.stopPropagation(); if (ocupado) return; vibrar(6); setOcupado(qual);
     try { await fn(); alarmeSilenciar(a.id); } catch (err) { acoes.notify((qual === "feito" ? "Não salvou: " : "Não deu pra adiar: ") + (err?.message || err), "error"); } finally { setOcupado(null); }
   };
+  const abrirNaPergunta = (e) => { e.stopPropagation(); vibrar(6); PERGUNTA_PAGOU.pedir(String(a.id)); FOCO.abrir(String(a.id)); };
   return <div className="adiar-linha">
-    {acoes.enviar && <button type="button" className="primary" disabled={!!ocupado} onClick={tocar("feito", () => acoes.enviar(a, { acao: "feito" }))}>{ocupado === "feito" ? "…" : "✅ Feito"}</button>}
+    {acoes.enviar && <button type="button" className="primary" disabled={!!ocupado} onClick={perguntaDoFeito(a, temMaterial) ? abrirNaPergunta : tocar("feito", () => acoes.enviar(a, { acao: "feito" }))}>{ocupado === "feito" ? "…" : "✅ Feito"}</button>}
     <button type="button" className="ghost" disabled={!!ocupado} onClick={tocar("adiar", () => acoes.adiar1h(a))}>{ocupado === "adiar" ? "…" : "⏰ Adiar 1h"}</button>
   </div>;
 }
@@ -7525,6 +7573,15 @@ const FORMAS_RECEBIMENTO = [
 // Lembrete sem dinheiro (ligar, calibrar) continua só com Feito.
 const RE_CARD_DE_COMPRA = /^\s*(?:🔥\s*)?(?:comprar|abastecer|pagar|pix\s+(?:pro|pra|para))\b/i;
 function ehCardDeCompra(a) { return !a.financeiro_id && RE_CARD_DE_COMPRA.test(a.titulo || ""); }
+// O QUE O FEITO PRECISA PERGUNTAR ANTES DE GRAVAR. Uma regra só, usada pelo Feito de dentro do card e pelo Feito
+// rápido da lista (BotaoAdiar1h):
+//   "conta"  = card ligado a uma conta ainda aberta (o banco baixa a conta junto): pergunta "Pagou?" / "Recebeu?" (18/10/2026);
+//   "compra" = card de compra sem conta ligada e sem material a pagar: pergunta quanto pagou e de onde saiu (19/10/2026);
+//   null     = grava direto.
+function perguntaDoFeito(a, temMaterial) {
+  if (a.financeiro_id && (!a.conta || ["a_pagar", "a_receber"].includes(a.conta.status))) return "conta";
+  return !temMaterial && ehCardDeCompra(a) ? "compra" : null;
+}
 function ehCardPessoal(a) { return !!(a.pessoal_id || a.pessoal || a.tipo === "pessoal" || a.tipo === "bloqueio_pessoal"); }
 // De onde saiu. Pix pessoal é sempre gasto pessoal; dinheiro segue o card (pessoal ou empresa). Cartão de crédito não
 // mexe em saldo nenhum hoje: sai na fatura, que é paga depois (conta cartao_credito não está em contas_saldo).
@@ -7546,19 +7603,23 @@ function AcoesDoCompromisso({ a, acoes, today, contextoClaude = "", temMaterial 
   const futuro = !!a.data && a.data > today;
   const doCard = acoes.recados.filter((r) => r.agenda_id === a.id);
   // Card ligado a conta ainda aberta: o Feito baixa a conta junto (gatilho do banco), então pergunta antes.
-  const contaAberta = !!a.financeiro_id && (!a.conta || ["a_pagar", "a_receber"].includes(a.conta.status));
+  const pergunta = perguntaDoFeito(a, temMaterial);
+  const contaAberta = pergunta === "conta";
+  const compra = pergunta === "compra";
   const ehReceber = a.conta?.status === "a_receber";
   const [perguntaPago, setPerguntaPago] = useState(() => contaAberta && PERGUNTA_PAGOU.id === String(a.id));
+  const [pagando, setPagando] = useState(() => compra && PERGUNTA_PAGOU.id === String(a.id));
+  // Card que chega perguntando (Feito da notificação ou Feito rápido da lista): abre a pergunta que é dele.
   useEffect(() => {
-    const f = () => { if (contaAberta && PERGUNTA_PAGOU.id === String(a.id)) setPerguntaPago(true); };
+    const f = () => { if (PERGUNTA_PAGOU.id !== String(a.id)) return; if (contaAberta) setPerguntaPago(true); else if (compra) setPagando(true); };
     PERGUNTA_PAGOU.ouvintes.add(f); return () => PERGUNTA_PAGOU.ouvintes.delete(f);
-  }, [a.id, contaAberta]);
+  }, [a.id, contaAberta, compra]);
+  // O pedido vale uma vez: respondeu ou fechou a pergunta da compra, o card não volta a abrir perguntando sozinho.
+  useEffect(() => { if (compra && !pagando) PERGUNTA_PAGOU.limpar(String(a.id)); }, [a.id, compra, pagando]);
   // Card de cobrar: o Sim abre "quanto e por onde entrou" (ver `receber`), e o Ainda não fecha o card como "cobrei"
   // com o valor continuando a receber. Card de pagar segue como antes: Sim dá Feito, Ainda não deixa o card aberto.
   const [recebendo, setRecebendo] = useState(false);
   const [valorRecebido, setValorRecebido] = useState("");
-  const compra = !contaAberta && !temMaterial && ehCardDeCompra(a);
-  const [pagando, setPagando] = useState(false);
   const [valorPago, setValorPago] = useState("");
   const confirmarPago = async (forma) => {
     if (busy) return;
@@ -7926,7 +7987,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
       </span>
       <span className="compromisso-seta">{emFoco ? "" : "›"}</span>
     </button>
-    {!emFoco && acoes?.adiar1h && !a.pessoal_id && (diasAtraso > 0 || passouDaHora) && <BotaoAdiar1h a={a} acoes={acoes} />}
+    {!emFoco && acoes?.adiar1h && !a.pessoal_id && (diasAtraso > 0 || passouDaHora) && <BotaoAdiar1h a={a} acoes={acoes} temMaterial={(materiais || []).length > 0} />}
     {revisaoData && <p className="revisao-data">Remarcação pendente · idade calculada pela data original. A data precisa de revisão.</p>}
     {acoes && <SelosClaudeDoCard a={a} acoes={acoes} />}
     {/* "⚠ Parece duplicado" SAIU DO CARD (Diego, 15/10/2026: "se tá uma coisa em dúvida, não deveria voltar para você?").
@@ -8089,7 +8150,10 @@ function FocoDoCard({ props, onFechar }) {
   const quando = `${compactDate(a.data)}${a.hora ? ` · ${a.hora.slice(0, 5)}` : ""}`;
   return <ListaLateral cabecalho={<><p className="kicker">{pos.n > 1 ? `Card ${pos.i + 1} de ${pos.n}` : "Card"}</p><h2>{quando}</h2>{pos.n > 1 && <span className="foco-dica">{pos.i > 0 ? "‹ " : ""}deslize pro lado pra trocar de card{pos.i < pos.n - 1 ? " ›" : ""}</span>}</>} onFechar={onFechar} semGestos>
     <div className="foco-deslize" onTouchStart={gestoInicio} onTouchMove={gestoMove} onTouchEnd={gestoFim} onTouchCancel={() => { toque.current = null; }}>
-      <CompromissoCard {...props} emFoco onSairFoco={onFechar} />
+      {/* `key` pelo card (11/11/2026): sem ela, deslizar pro card do lado reaproveitava o mesmo componente e o painel
+          aberto no card anterior (Remarcar com a hora dele, "Pagou?", "Quanto pagou?", texto do recado) aparecia no
+          card seguinte. Com a chave, cada card abre com o estado dele. */}
+      <CompromissoCard key={String(a.id)} {...props} emFoco onSairFoco={onFechar} />
     </div>
     {/* VOLTAR GRANDE (Diego, 20/10/2026, print com o lugar marcado: "coloque botão voltar aqui maior"). Saiu do canto
         de baixo e virou um botão largo logo embaixo do card. */}
