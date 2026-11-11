@@ -59,7 +59,12 @@ function openNew(){const root=$('#modal');root.innerHTML=`<div class="modal" id=
 async function createItem(){const item=$('#newName').value.trim();const unit=$('#newUnit').value.trim();const qty=num($('#newQty').value);const minRaw=$('#newMin').value.trim();const min=minRaw?num(minRaw):0;if(!item||!unit){notify('Informe material e unidade.','error');return}if(qty<=0){notify('A quantidade inicial precisa ser maior que zero.','error');return}if(minRaw&&min<=0){notify('O mínimo precisa ser maior que zero.','error');return}const {data,error}=await db.from('estoque').insert({item,unidade:unit,quantidade:qty,minimo:min,minimo_definido:!!minRaw,comprar:minRaw?qty<=min:false,obs:'Cadastrado pela aba Estoque V2'}).select('id').single();if(error){notify(error.code==='23505'?'Esse material/unidade já existe no estoque.':error.message,'error');return}$('#modal').innerHTML='';notify('Item cadastrado.','ok');await loadAll(false);if(data?.id)await selectItem(data.id)}
 $('#search').oninput=(e)=>{state.search=e.target.value;renderList()};$('#refreshBtn').onclick=()=>loadAll(true);$('#newBtn').onclick=openNew;
 window.addEventListener('load',()=>loadAll(false));
-if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js?v=17').catch(()=>{}));
+// O service worker é do app: o nova.html registra o endereço dele (./sw.js?v=N) e cuida da troca de versão. Esta
+// página só registra quando ainda não existe nenhum (aberta direto, sem o app nunca ter sido aberto no aparelho).
+// De 13/10 a 11/11/2026 ela registrava SEMPRE, com outro endereço (?v=17 contra o ?v= do app). Endereço diferente
+// é service worker novo: ele assumia, o app (que recarrega quando o service worker muda) reiniciava, registrava o
+// dele de volta e reiniciava de novo. A aba Estoque aparecia um instante e o app voltava pro Painel, sempre.
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.getRegistration().then((r)=>r||navigator.serviceWorker.register('./sw.js?v=23')).catch(()=>{}));
 </script>
 </body>
 </html>

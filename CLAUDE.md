@@ -27,6 +27,11 @@ que são longos e explicam o porquê de cada decisão (não apague comentários 
   entra na mesma abertura). Com cópia boa guardada, a rede tem 4 s pra responder; passou disso o app abre com a
   cópia e a versão nova fica pra abertura seguinte.
 - Mudou `sw.js`? Suba `VERSAO` dentro dele e o `?v=` do `register('./sw.js?v=N')` no fim do `nova.html`.
+  Só o `nova.html` registra o service worker. O `estoque.html` (que abre dentro do app) só registra quando não há
+  nenhum: endereço diferente do do app troca o service worker e o app recarrega duas vezes (a aba Estoque não ficava
+  aberta, 13/10 a 11/11/2026). Página nova no mesmo site: não registre outro `?v=`.
+- Link de aviso e atalho do ícone abrem `./nova.html?ir=...`. O `sw.js` guarda e procura a página pelo endereço sem o
+  `?...` (uma cópia só, que serve pra qualquer link e abre sem sinal). O app continua lendo `location.search`.
 - Antes de abrir PR: compile o `nova.html` com o mesmo Babel e rode os testes (ver "Testes"). Tela preta já
   aconteceu duas vezes (22/08 e 02/09/2026) por erro de código publicado sem checar.
 
@@ -135,7 +140,8 @@ das 02h20 (Claude) confere o dia.
   tests/texto-pronto-foto.test.cjs tests/whatsapp-comum.test.mjs tests/abrir-sem-babel.test.cjs
   tests/sw-documento.test.cjs` (o `pronto-producao` pede
   `BAHIA_BABEL_PATH=<caminho>/@babel/standalone/babel.min.js`). Os dois últimos rodam o boot do `nova.html` e o
-  `sw.js` num navegador de mentira: mexeu em `montar()`, `TB.carregar*` ou no `fetch`/`activate` do `sw.js`, rode.
+  `sw.js` num navegador de mentira: mexeu em `montar()`, `TB.carregar*`, no `fetch`/`activate` do `sw.js` ou no
+  registro do service worker do `estoque.html`, rode.
 - Precisam de `pnpm install` (pglite): `agenda-caixa-identidade`, `caixa-fila`, `card-pagamento-ligado`,
   `conferencia-monitor`, `engenharia-itens`.
 - `cronograma-tecnico-ui` tem uma afirmação velha (o `CronogramaTecnico` não está mais montado no Painel):

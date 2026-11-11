@@ -216,11 +216,24 @@ self.addEventListener('fetch', (e) => {
   // Cinto e suspensorio: se o pedido com `no-cache` falhar por qualquer motivo, cai no fetch normal antes de
   // ir pro cache. Assim este caminho nunca fica PIOR do que era.
   const ehDocumento = req.mode === 'navigate' || new URL(req.url).pathname.endsWith('.html');
+  // UMA COPIA POR PAGINA, SEM O "?..." (v29). O aviso do celular abre ./nova.html?ir=ficha&id=..., o atalho do icone
+  // abre ./nova.html?ir=hoje, o compartilhar abre ./nova.html?compartilhado=1. O arquivo e o mesmo; so o endereco muda.
+  // Ate a v28 a copia era guardada e procurada pelo endereco INTEIRO. Medido em 11/11/2026: sem sinal, tocar num
+  // aviso (endereco que nunca foi aberto) dava a tela de erro do Chrome com o app inteiro guardado ao lado, e cada
+  // endereco diferente guardava mais uma copia de 1,3 MB. Essa copia so era renovada quando AQUELE endereco abria de
+  // novo com rede: um atalho usado semanas atras guardava o app daquele dia, e era essa copia velha que abria sem
+  // sinal (com a espera de 4 s, abriria tambem no sinal fraco).
+  // Agora, pra abrir pagina (navegacao), a copia e o pedido ao servidor usam o endereco sem o "?...": uma copia so,
+  // renovada por qualquer abertura, e o servidor responde 304 tambem pro link de aviso. A pagina continua enxergando o
+  // endereco completo (location.search), que e o que o app le pra saber aonde ir.
+  // Pedido de .html que NAO e abrir pagina (o teste de internet da socorro.html, com fetch) fica como era: endereco
+  // inteiro e sem copia emprestada, senao o teste diria "baixou do servidor" com a rede caida.
+  const chaveDoc = req.mode === 'navigate' ? url.origin + url.pathname : req;
   const ESPERA_DOCUMENTO_MS = 4000;
   const buscarNaRede = async () => {
     if (!ehDocumento) return fetch(req);
     try {
-      return await fetch(new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' }));
+      return await fetch(new Request(req.mode === 'navigate' ? chaveDoc : req.url, { cache: 'no-cache', credentials: 'same-origin' }));
     } catch (err) {
       return fetch(req);
     }
@@ -232,13 +245,13 @@ self.addEventListener('fetch', (e) => {
       const resp = await buscarNaRede();
       if (resp && resp.ok) {
         const copia = resp.clone();
-        caches.open(VERSAO).then((c) => c.put(req, copia)).catch(() => {});
+        caches.open(VERSAO).then((c) => c.put(chaveDoc, copia)).catch(() => {});
       }
       return resp;
     })();
     try {
       if (ehDocumento) {
-        const guardado = await caches.match(req);
+        const guardado = await caches.match(chaveDoc);
         if (guardado && guardado.ok) {
           // SINAL FRACO NAO SEGURA A ABERTURA (v29): com copia boa guardada, a rede tem 4 s pra responder. Passou
           // disso, abre com a copia; o pedido continua por tras (waitUntil) e guarda a versao nova pra proxima.
@@ -255,10 +268,10 @@ self.addEventListener('fetch', (e) => {
       const resp = await daRede;
       if (resp && resp.ok) return resp;
       // 404, 5xx, portal de operadora: nao guarda e prefere a copia boa que ja existe.
-      const salvo = await caches.match(req);
+      const salvo = await caches.match(chaveDoc);
       return salvo || resp;
     } catch (err) {
-      const salvo = await caches.match(req);
+      const salvo = await caches.match(chaveDoc);
       return salvo || Response.error();
     }
   })());
