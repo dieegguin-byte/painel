@@ -76,15 +76,23 @@ window.TB = window.TB || {};
     TB.faltando.push(nome);
   }
 
-  // ReactDOM só executa depois do React; os outros dois são independentes e vão em paralelo,
+  // ReactDOM só executa depois do React; o supabase é independente e vai em paralelo,
   // senão a abertura ficaria mais lenta do que era com as quatro tags soltas.
+  // O BABEL SAIU DAQUI (11/11/2026). Ele pesa 3 MB e só serve pra compilar o app, o que acontece uma vez por versão
+  // publicada; nas outras aberturas o código já compilado vem do cache (ver montar(), no fim do arquivo). Mesmo
+  // assim ele era carregado e executado em TODA abertura antes de o app aparecer: medido com dados do tamanho real
+  // e freio de CPU de celular (4x a 6x), 0,7 a 1,2 s por abertura só nisso. Agora quem pede o Babel é o montar(),
+  // e só quando vai compilar de verdade (TB.carregarBabel).
   TB.carregarTudo = async function () {
     await Promise.all([
       garantir('supabase'),
-      garantir('Babel'),
       garantir('React').then(() => garantir('ReactDOM'))
     ]);
     if (TB.faltando.length) throw new Error('não carregou: ' + TB.faltando.join(', '));
+  };
+  TB.carregarBabel = async function () {
+    await garantir('Babel');
+    if (!window.Babel) throw new Error('não carregou: Babel');
   };
 
   // Guarda o primeiro erro real da página. É o que o Diego consegue me mandar quando algo quebrar.
@@ -14683,7 +14691,8 @@ const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<Barreira><Home /></Barreira>);
 </script>
 <script>
-// O app só monta depois que as quatro bibliotecas responderam de verdade (ver o comentário lá no <head>).
+// O app só monta depois que as bibliotecas responderam de verdade (ver o comentário lá no <head>): React, ReactDOM
+// e supabase sempre; o Babel só quando há o que compilar (11/11/2026).
 // Antes isto rodava solto: se o Babel não estivesse na página, estourava aqui e a tela ficava preta e muda.
 (function () {
   // ⚠ TRANSPILAR NO CELULAR CUSTA CARO, E CUSTAVA TODA ABERTURA (04/09/2026).
@@ -14742,16 +14751,22 @@ root.render(<Barreira><Home /></Barreira>);
   }
 
   async function montar() {
+    // As bibliotecas que o app usa pra RODAR (React, ReactDOM, supabase) começam a baixar já; a conta do hash e a
+    // leitura do cache correm junto. O Babel fica de fora até se saber que vai precisar dele (11/11/2026).
+    const bibliotecas = TB.carregarTudo();
+    bibliotecas.catch(() => {}); // o erro é tratado em quem espera por ela logo abaixo; isto só cala o aviso do navegador
     const source = document.getElementById("app-source").textContent;
     let chave = null;
     try { chave = "/__tb-app-" + (await hashDo(source)) + ".js"; } catch (e) { chave = null; }
 
     if (chave) {
       const guardado = await doCache(chave);
-      // ATALHO: mesmo fonte, mesmo resultado. Pula o Babel inteiro.
-      if (guardado) { injetar(guardado); return; }
+      // ATALHO: mesmo fonte, mesmo resultado. Pula o Babel inteiro — nem baixa, nem executa.
+      if (guardado) { await bibliotecas; injetar(guardado); return; }
     }
 
+    // Versão nova (ou aparelho sem cache): aí sim o Babel entra, junto com as outras três.
+    await Promise.all([bibliotecas, TB.carregarBabel()]);
     const output = Babel.transform(source, {
       presets: [["react", { runtime: "classic" }], "typescript"],
       filename: "app.tsx",
@@ -14762,8 +14777,7 @@ root.render(<Barreira><Home /></Barreira>);
     if (chave) guardarNoCache(chave, output);
   }
 
-  TB.carregarTudo()
-    .then(montar)
+  montar()
     .catch((e) => TB.telaDeSocorro("erro ao montar o app: " + (e && e.message ? e.message : String(e))));
 
   // Cão de guarda. Erro dentro do próprio app não volta pro try/catch acima (script injetado avisa o
