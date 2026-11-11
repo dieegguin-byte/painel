@@ -89,7 +89,8 @@ Procure pelo nome (as linhas mudam). Ordem no arquivo:
    - cards do Painel: `RetornosVencidosCard`, `CapacidadeCard`, `MateriaisCard`, `GrupoRecolhivel`,
      `AgenteCard` ("O que a Toqi fez", lê `historico`), `ResumoManhaCard`, `DuvidasAgenteCard`,
      `ManuCard` (grupo no fim do Painel), `MudancasDaManu` (cards com `nota_claude_conferida = false`);
-   - `function Dashboard(`: o Painel (Atrasados / Hoje / Próximos, cobranças, pendências);
+   - `function Dashboard(`: o Painel (Atrasados / Hoje / Próximos, cobranças, pendências). O card "Agenda de hoje"
+     fechado lista a hora e o nome do que ainda vem (`linhasDeHojeFechado`, `tests/hoje-fechado.test.cjs`);
    - `// ===== CALCULADORA RÁPIDA`, `LeadsView`, `AgendaView` + `AddAgendaModal` + `ConcluirModal` +
      `AgendaPicker` (dia e hora livres, igreja, almoço, estrada), `FinanceView` (+ `calcularSaldosPorConta`:
      "Em caixa" soma todo financeiro pago desde `contas_saldo.data_inicial`), `MuralView`,
