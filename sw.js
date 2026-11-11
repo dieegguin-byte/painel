@@ -213,7 +213,7 @@ self.addEventListener('fetch', (e) => {
   // arquivo novo se mudou. O max-age=600 continua sem efeito, que era o objetivo. Icone, manifest e a biblioteca
   // do CDN seguem como estavam - eles quase nunca mudam e sao justamente o que vale a pena ficar cacheado.
   //
-  // Cinto e suspensorio: se o pedido com `reload` falhar por qualquer motivo, cai no fetch normal antes de
+  // Cinto e suspensorio: se o pedido com `no-cache` falhar por qualquer motivo, cai no fetch normal antes de
   // ir pro cache. Assim este caminho nunca fica PIOR do que era.
   const ehDocumento = req.mode === 'navigate' || new URL(req.url).pathname.endsWith('.html');
   const ESPERA_DOCUMENTO_MS = 4000;
