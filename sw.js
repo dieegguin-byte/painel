@@ -70,7 +70,18 @@
    (3) Aviso que chega atrasado (Chrome dormindo; o Google entrega a fila quando ele acorda) aparece calado.
    (4) Botao que o banco nao responde em 5 s abre o app (antes ficava parado ate a rede desistir).
    (5) Com o app aberto, o aviso que chegou avisa a aba, e os cards recarregam. */
-const VERSAO = 'tb-atendimento-v28'; // v26 (18/10/2026): não apaga o transformers-cache (Whisper da Caixa)
+/* v29 (11/11/2026): ABRIR MAIS RAPIDO. Tres coisas, medidas num navegador de verdade contra um servidor que imita o
+   GitHub Pages (ETag + max-age=600):
+   (1) O nova.html era baixado INTEIRO em toda abertura (404 kB comprimido) por causa do `cache: 'reload'`. Agora o
+       pedido e `cache: 'no-cache'`: o navegador pergunta ao servidor se mudou; nao mudou, volta um 304 de poucos bytes
+       e o arquivo sai do cache do aparelho; mudou, baixa inteiro e a versao nova entra NA MESMA abertura, como antes.
+   (2) Sinal fraco nao segura a abertura: se a rede nao respondeu em 4 s e existe copia boa guardada, o app abre com
+       ela (antes esperava a rede desistir: 20 s no teste). O pedido termina por tras e a proxima abertura ja vem nova.
+   (3) A troca de versao deste arquivo apagava tambem o cache do app ja compilado (`tb-babel-v1`), e o celular compilava
+       duas vezes na primeira abertura depois de publicar (uma antes e outra depois da recarga da troca). Agora fica. */
+const VERSAO = 'tb-atendimento-v29'; // v26 (18/10/2026): não apaga o transformers-cache (Whisper da Caixa)
+// Cache do app já compilado pelo Babel (quem grava e faz a faxina dele é o nova.html, pela chave do hash do fonte).
+const CACHE_COMPILADO = 'tb-babel-v1';
 // Sem segredo aqui de proposito: este arquivo e publico. O que autentica o recibo e o proprio id, que
 // e um uuid que so existe dentro da carga cifrada - quem nao recebeu a notificacao nao tem como chutar.
 const PUSH_FUNCAO = 'https://iymlzdcloaeyybhefywp.supabase.co/functions/v1/push-enviar';
@@ -122,7 +133,7 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((chaves) =>
       // Só apaga cache NOSSO de versão velha: o "transformers-cache" guarda o Whisper (~80 MB) baixado uma vez.
-      Promise.all(chaves.filter((k) => k !== VERSAO && k.startsWith('tb-')).map((k) => caches.delete(k)))
+      Promise.all(chaves.filter((k) => k !== VERSAO && k !== CACHE_COMPILADO && k.startsWith('tb-')).map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });
@@ -195,29 +206,54 @@ self.addEventListener('fetch', (e) => {
   // Custou tres rodadas de "saiu em branco de novo" ate eu baixar o arquivo do servidor e ver que o
   // servidor estava certo. Fechar o app NAO fura esse cache; so a URL com query nova furava.
   //
-  // Para DOCUMENTO (navegacao ou .html) o fetch passa a ser `cache: 'reload'`, que ignora o cache HTTP na
-  // ida e ainda revalida. Icone, manifest e a biblioteca do CDN seguem como estavam - eles quase nunca
-  // mudam e sao justamente o que vale a pena ficar cacheado no celular dele.
+  // Para DOCUMENTO (navegacao ou .html) o fetch nunca aceita a copia do cache HTTP sem perguntar ao servidor.
+  // De 02/09 a 11/11/2026 isso era `cache: 'reload'`, que resolve o problema acima mas baixa o arquivo inteiro
+  // toda vez (404 kB comprimido por abertura, no 4G dele). Desde a v29 e `cache: 'no-cache'`: o pedido sai SEMPRE,
+  // com If-None-Match; o servidor responde 304 se nao mudou (e o corpo vem do cache do aparelho) ou 200 com o
+  // arquivo novo se mudou. O max-age=600 continua sem efeito, que era o objetivo. Icone, manifest e a biblioteca
+  // do CDN seguem como estavam - eles quase nunca mudam e sao justamente o que vale a pena ficar cacheado.
   //
   // Cinto e suspensorio: se o pedido com `reload` falhar por qualquer motivo, cai no fetch normal antes de
   // ir pro cache. Assim este caminho nunca fica PIOR do que era.
   const ehDocumento = req.mode === 'navigate' || new URL(req.url).pathname.endsWith('.html');
+  const ESPERA_DOCUMENTO_MS = 4000;
   const buscarNaRede = async () => {
     if (!ehDocumento) return fetch(req);
     try {
-      return await fetch(new Request(req.url, { cache: 'reload', credentials: 'same-origin' }));
+      return await fetch(new Request(req.url, { cache: 'no-cache', credentials: 'same-origin' }));
     } catch (err) {
       return fetch(req);
     }
   };
   e.respondWith((async () => {
-    try {
+    // Um pedido so pra rede. Resposta boa entra no cache mesmo quando chega depois de o app ja ter aberto com a
+    // copia guardada (caso do sinal fraco, logo abaixo).
+    const daRede = (async () => {
       const resp = await buscarNaRede();
       if (resp && resp.ok) {
         const copia = resp.clone();
         caches.open(VERSAO).then((c) => c.put(req, copia)).catch(() => {});
-        return resp;
       }
+      return resp;
+    })();
+    try {
+      if (ehDocumento) {
+        const guardado = await caches.match(req);
+        if (guardado && guardado.ok) {
+          // SINAL FRACO NAO SEGURA A ABERTURA (v29): com copia boa guardada, a rede tem 4 s pra responder. Passou
+          // disso, abre com a copia; o pedido continua por tras (waitUntil) e guarda a versao nova pra proxima.
+          e.waitUntil(daRede.catch(() => {}));
+          const venceu = await Promise.race([
+            daRede.catch(() => null),
+            new Promise((ok) => setTimeout(() => ok('demorou'), ESPERA_DOCUMENTO_MS))
+          ]);
+          if (venceu && venceu !== 'demorou' && venceu.ok) return venceu;
+          // Rede lenta, rede caida, 404, 5xx ou portal de operadora: a copia boa ganha.
+          return guardado;
+        }
+      }
+      const resp = await daRede;
+      if (resp && resp.ok) return resp;
       // 404, 5xx, portal de operadora: nao guarda e prefere a copia boa que ja existe.
       const salvo = await caches.match(req);
       return salvo || resp;
