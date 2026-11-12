@@ -249,7 +249,15 @@ async function difundir(envios: Envio[]): Promise<any[]> {
         saidas.push({ ok: false, status: 0, erro: String((e as Error)?.message || e).slice(0, 300) });
       }
     }
-    if (!saidas.some((s) => s.ok)) await rpc("push_soltar", { chaves: item.chaves });
+    if (!saidas.some((s) => s.ok)) {
+      // Soltar também é pedido ao banco, e quando o envio estourou por causa do banco ele costuma falhar junto. Aí esta
+      // chave fica presa (sem banco não há como soltar), mas os outros avisos da varredura seguem.
+      try {
+        await rpc("push_soltar", { chaves: item.chaves });
+      } catch (e) {
+        console.error("push_soltar falhou", item.chaves, String((e as Error)?.message || e));
+      }
+    }
     relatorio.push({
       chaves: item.chaves,
       entregues: saidas.filter((s) => s.ok).length,

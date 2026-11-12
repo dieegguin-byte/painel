@@ -164,11 +164,13 @@ das 02h20 (Claude) confere o dia.
 - `tests/painel-consertos.test.cjs` (sem instalar nada): a pergunta do Feito, o aviso por cima das listas, o card
   aberto que não herda o painel do vizinho e a ordem das cargas. Mexeu em `BotaoAdiar1h`, `AcoesDoCompromisso`,
   `notify`, `FocoDoCard` ou `loadAll`, rode.
-- Busca de Leads e Clientes: `buscaBate` (ignora acento; termo só de números, 4 ou mais, compara os dígitos do
-  telefone). Busca nova numa lista passa por ele (`tests/busca-acha.test.cjs`). Botão, caixa e lista da Manu na ficha
+- Busca de Leads e Clientes: `buscaBate` (nome e serviço ignoram acento; termo só de números, 4 ou mais, compara os
+  dígitos do telefone, só em Clientes). A cidade fica fora dele de propósito: sem acento, "Luzia" acharia quase a base
+  inteira. Busca nova numa lista passa por ele (`tests/busca-acha.test.cjs`). Botão, caixa e lista da Manu na ficha
   ficam atrás de `MANU_LIGADA` (`tests/ficha-sem-manu.test.cjs`).
 - `tests/avisos-envio-falha.test.cjs` (pede `BAHIA_BABEL_PATH`) roda a `push-enviar` inteira com banco e Google de
-  mentira: um envio que estoura solta só a chave dele, e a anotação do aparelho que falha não desfaz um envio aceito.
+  mentira: um envio que estoura solta só a chave dele (se o soltar também falha, ela fica presa e os outros seguem), e
+  a anotação do aparelho que falha não desfaz um envio aceito.
   Mexeu em `entregar` ou `difundir`, rode.
 
 ## Documentos do repositório

@@ -11502,7 +11502,7 @@ function LeadsView({ services, appointments, agendaHistorico, inbox, search, set
   // Mesma fila do card de Capacidade: produção primeiro (peça na bancada, prazo correndo), agendado no
   // final (fechado mas nem começou), e dentro de cada faixa o prazo mais apertado na frente.
   const ORDEM_FILA = { pronto: 0, producao: 0, lead: 1, orcamento: 1, agendado: 2, entregue: 3, pago: 4, perdido: 5 };
-  const visible = services.filter((service) => buscaBate(search, [service.clientes?.nome, service.titulo, service.clientes?.cidade], [service.clientes?.telefone])).filter((service) => filtroStatus === "todos"
+  const visible = services.filter((service) => buscaBate(search, [service.clientes?.nome, service.titulo])).filter((service) => filtroStatus === "todos"
       || (filtroStatus === "sem_acao" ? fluxoDe(service).estado === "sem_acao"
         : filtroStatus === "precisa_avancar" ? fluxoDe(service).estado === "precisa_avancar"
           : filtroStatus === "retorno_vencido" ? retornoVencido(service, hojeISO())
@@ -13713,9 +13713,10 @@ const MAT_A_CAMINHO = /\b(a[_ ]caminho|em[_ ]transito|pedido[_ ](feito|enviado))
 const MAT_INDEFINIDO = /(pendente|nao[_ ]informad|nao[_ ]confirmad|a[_ ]confirmar|estimativa|planejado|levantado[_ ]em[_ ]avaliacao|a[_ ]definir)/i;
 function semAcentoBaixo(t) { return String(t == null ? "" : t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
 // BUSCA QUE ACHA QUEM ESTÁ LÁ (11/11/2026, lista de melhorias do app; V do Diego no App). "jose" não achava "José" (nem
-// "conceicao" a "Conceição", "luziania" a "Luziânia"), e telefone só batia digitado com a mesma pontuação gravada:
-// "61999990000" não achava "+55 61 99999-0000". Agora a busca de Leads e de Clientes ignora acento e maiúscula, e um
-// termo só de números (4 dígitos ou mais, sem letra) compara só os dígitos do telefone. Termo vazio mostra tudo.
+// "conceicao" a "Conceição"), e telefone só batia digitado com a mesma pontuação gravada: "61999990000" não achava
+// "+55 61 99999-0000". Agora o nome (e o serviço, em Leads) ignora acento e maiúscula, e um termo só de números (4 dígitos
+// ou mais, sem letra) compara só os dígitos do telefone. Termo vazio mostra tudo. A CIDADE fica fora daqui de propósito:
+// sem acento, "Luzia" acharia todo cliente de Luziânia (quase a base inteira) e "antonio" todo Santo Antônio.
 function buscaBate(termo, textos, telefones = []) {
   const t = semAcentoBaixo(termo).trim();
   if (!t) return true;
@@ -14418,7 +14419,9 @@ function CustomersView({ customers, services, search, setSearch, onOpenFicha }) 
   const [soQuebrados, setSoQuebrados] = useState(false);
   const quebrados = customers.filter((customer) => telefoneCorrigivel(customer.telefone));
   const visible = customers
-    .filter((customer) => buscaBate(search, [nomeDoCliente(customer), customer.telefone, customer.cidade], [customer.telefone]))
+    // A cidade fica como era (acento conta): sem acento, "Luzia" achava todo cliente de Luziânia. Ver buscaBate.
+    .filter((customer) => buscaBate(search, [nomeDoCliente(customer), customer.telefone], [customer.telefone])
+      || String(customer.cidade || "").toLowerCase().includes(String(search || "").trim().toLowerCase()))
     .filter((customer) => !soQuebrados || telefoneCorrigivel(customer.telefone));
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">BASE ÚNICA</p><h3>{visible.length} clientes</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome, telefone ou cidade" /></div>
     {quebrados.length > 0 && <div className="duplicate-warning"><b>⚠ {quebrados.length} ficha(s) com telefone que não abre o WhatsApp</b><button onClick={() => setSoQuebrados((v) => !v)}>{soQuebrados ? "Ver todos os clientes" : "Ver só essas fichas"}</button></div>}

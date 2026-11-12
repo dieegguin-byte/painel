@@ -28,7 +28,7 @@ test('acento e maiúscula não atrapalham, nos dois sentidos', () => {
   assert.equal(buscaBate('jose', ['José Fulano']), true);
   assert.equal(buscaBate('JOSÉ', ['jose fulano']), true);
   assert.equal(buscaBate('conceicao', ['Maria da Conceição']), true);
-  assert.equal(buscaBate('luziania', ['Fulana', 'Luziânia']), true);
+  assert.equal(buscaBate('antonio', ['Antônio Fulano']), true);
   assert.equal(buscaBate('sofa', ['Reforma de sofá 3 lugares']), true);
   assert.equal(buscaBate('jose', ['Fulana']), false);
 });
@@ -58,11 +58,12 @@ test('ficha sem telefone e sem cidade não quebra', () => {
   assert.equal(buscaBate('6199', [null], [undefined, null]), false);
 });
 
-test('Leads e Clientes usam a busca nova (e Leads acha por cidade e telefone)', () => {
+test('Leads e Clientes usam a busca nova; a cidade continua com acento contando', () => {
   const leads = source.slice(source.indexOf('const ORDEM_FILA = {'), source.indexOf('function AgendaView('));
-  assert.match(leads, /buscaBate\(search, \[service\.clientes\?\.nome, service\.titulo, service\.clientes\?\.cidade\], \[service\.clientes\?\.telefone\]\)/);
+  assert.match(leads, /buscaBate\(search, \[service\.clientes\?\.nome, service\.titulo\]\)/);
   const clientes = source.slice(source.indexOf('function CustomersView('), source.indexOf('function CustomersView(') + 3000);
-  assert.match(clientes, /buscaBate\(search, \[nomeDoCliente\(customer\), customer\.telefone, customer\.cidade\], \[customer\.telefone\]\)/);
+  assert.match(clientes, /buscaBate\(search, \[nomeDoCliente\(customer\), customer\.telefone\], \[customer\.telefone\]\)\n\s*\|\| String\(customer\.cidade \|\| ""\)\.toLowerCase\(\)\.includes\(String\(search \|\| ""\)\.trim\(\)\.toLowerCase\(\)\)/);
+  assert.doesNotMatch(source, /buscaBate\([^)]*cidade/, 'cidade sem acento acharia meia base ("Luzia" acha Luziânia)');
   assert.doesNotMatch(source, /toLowerCase\(\)\.includes\(search\.toLowerCase\(\)\)/, 'sobrou busca que não ignora acento');
 });
 

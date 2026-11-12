@@ -26,7 +26,7 @@ const PENDENCIAS = {
   resumo: {},
 };
 
-async function varredura({ falharEnvioN = null, falharAnotacao = false } = {}) {
+async function varredura({ falharEnvioN = null, falharAnotacao = false, bancoSoluca = false } = {}) {
   const par = await sub.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
   const jwk = await sub.exportKey('jwk', par.privateKey);
   const publica = b64(await sub.exportKey('raw', par.publicKey));
@@ -34,7 +34,7 @@ async function varredura({ falharEnvioN = null, falharAnotacao = false } = {}) {
   const p256dh = b64(await sub.exportKey('raw', aparelho.publicKey));
   const auth = b64(globalThis.crypto.getRandomValues(new Uint8Array(16)));
   const reservadas = [], soltas = [], entregues = [];
-  let nEnvio = 0, handler = null;
+  let nEnvio = 0, handler = null, reciboFalhou = false, soltarFalhou = false;
   const resp = (corpo, status = 200) => ({ ok: status >= 200 && status < 300, status, text: async () => (corpo === undefined ? '' : JSON.stringify(corpo)) });
   const fetchFalso = async (url, init = {}) => {
     url = String(url);
@@ -48,8 +48,14 @@ async function varredura({ falharEnvioN = null, falharAnotacao = false } = {}) {
     if (url.includes('/rpc/push_segredo')) return resp({ VAPID_PRIVATE_JWK: JSON.stringify(jwk), VAPID_PUBLIC: publica, PUSH_SECRET: 'segredo' }[corpo.nome] ?? null);
     if (url.includes('/rpc/push_pendencias')) return resp(PENDENCIAS);
     if (url.includes('/rpc/push_reservar')) { reservadas.push(...corpo.chaves); return resp(corpo.chaves); }
-    if (url.includes('/rpc/push_soltar')) { soltas.push(...corpo.chaves); return resp(null); }
-    if (url.includes('/rpc/push_recibo_abrir')) return resp(globalThis.crypto.randomUUID());
+    if (url.includes('/rpc/push_soltar')) {
+      if (bancoSoluca && !soltarFalhou) { soltarFalhou = true; return resp({ message: 'banco fora' }, 503); }
+      soltas.push(...corpo.chaves); return resp(null);
+    }
+    if (url.includes('/rpc/push_recibo_abrir')) {
+      if (bancoSoluca && !reciboFalhou) { reciboFalhou = true; return resp({ message: 'banco fora' }, 503); }
+      return resp(globalThis.crypto.randomUUID());
+    }
     if (url.includes('/push_assinaturas?ativo=eq.true')) return resp([{ id: 'a1', endpoint: 'https://push.exemplo/envio/abc', p256dh, auth }]);
     if (url.includes('/push_assinaturas?id=eq.')) return falharAnotacao ? resp({ message: 'tempo esgotado' }, 500) : resp(undefined, 204);
     throw new Error('pedido sem resposta no teste: ' + url);
@@ -91,4 +97,13 @@ test('a anotação do aparelho falha depois do envio: os 4 avisos contam como en
   assert.equal(v.entregues.length, 4);
   assert.deepEqual(v.soltas, [], 'aviso que o Google aceitou não volta pra fila (senão sairia duas vezes)');
   assert.ok(v.corpo.relatorio.every((x) => x.entregues === 1));
+});
+
+test('o banco soluça no 1º aviso (recibo e soltar dão 503): a chave dele fica presa, os outros 3 saem, sem 500', async () => {
+  const v = await varredura({ bancoSoluca: true });
+  assert.equal(v.status, 200, JSON.stringify(v.corpo));
+  assert.equal(v.entregues.length, 3);
+  assert.deepEqual(v.soltas, [], 'o soltar falhou: nada voltou pra fila, mas a varredura não caiu');
+  const falho = v.corpo.relatorio.find((x) => x.entregues === 0);
+  assert.match(falho.erros[0], /push_recibo_abrir 503/);
 });
