@@ -6407,7 +6407,8 @@ function horaFalada(hora) {
 // HOJE_FECHADO_MAX linhas, depois "e mais N".
 // QUEM É: quando o título não diz o nome do cliente (a regra do card, sem contar acento), o primeiro nome entra NA
 // FRENTE do título ("14:00 Fulana · Entrega do sofá"). Na frente porque a linha é uma só e corta no fim: os títulos
-// têm umas 60 letras em média, e o nome no fim sumiria atrás do "…".
+// de verdade são compridos (62 letras na mediana dos cards planejados, medido em 11/11/2026), e o nome no fim sumiria
+// atrás do "…".
 const HOJE_FECHADO_MAX = 4;
 function linhasDeHojeFechado(compromissos, rotinasNoPrazo, nomeDoClienteDe) {
   const hhmm = (hora) => (hora ? String(hora).slice(0, 5) : "");
