@@ -120,3 +120,24 @@ test('cada linha do card fechado ocupa uma linha só, com "…" no fim se não c
   assert.match(toque[1], /width:100%/);
   assert.match(toque[1], /text-align:left/);
 });
+
+// PLURAL DE VERDADE NOS TÍTULOS DO PAINEL: "1 compromisso(s) hoje · 1 rotina(s)" era o texto de toda abertura.
+test('os cabeçalhos dos cards do Painel dizem "1 compromisso" e "3 compromissos", sem "(s)"', () => {
+  assert.equal(ctx.quantos(1, 'compromisso', 'compromissos'), '1 compromisso');
+  assert.equal(ctx.quantos(3, 'compromisso', 'compromissos'), '3 compromissos');
+  assert.equal(ctx.quantos(0, 'rotina', 'rotinas'), '0 rotinas');
+  assert.equal(ctx.quantos('1', 'dia', 'dias'), '1 dia');
+  const painel = source.slice(source.indexOf('function Dashboard('), source.indexOf('// ===== CALCULADORA RÁPIDA'));
+  // Precisa resolver, Agenda de hoje, Próximos compromissos (este não tem id) e Revisão antiga.
+  for (const marca of ['id="secao-vencendo"', 'id="secao-hoje"', '>PRÓXIMOS COMPROMISSOS<', 'id="secao-revisao-antiga"']) {
+    const i = painel.indexOf(marca);
+    assert.ok(i >= 0, `falta o card ${marca}`);
+    const doCabecalho = painel.lastIndexOf('cabecalho=', i) > painel.lastIndexOf('<CardRecolhivel', i) ? painel.lastIndexOf('cabecalho=', i) : painel.indexOf('cabecalho=', i);
+    const cabecalho = painel.slice(doCabecalho, painel.indexOf('}>', doCabecalho));
+    assert.ok(cabecalho.length > 40, `cabeçalho de ${marca} não achado`);
+    assert.doesNotMatch(cabecalho, /\(s\)/, `o cabeçalho de ${marca} ainda tem "(s)"`);
+  }
+  assert.match(painel, /quantos\(hoje\.length, "compromisso", "compromissos"\)\} hoje/);
+  assert.match(painel, /futuros\.length === 1 \? "1 próximo compromisso" : `\$\{futuros\.length\} próximos compromissos`/);
+  assert.match(source, /quantos\(pendentes\.length, "rotina", "rotinas"\)\} pra hoje/);
+});

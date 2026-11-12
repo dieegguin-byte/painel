@@ -6427,6 +6427,10 @@ function linhasDeHojeFechado(compromissos, rotinasNoPrazo, nomeDoClienteDe) {
   if (ordenados.length > HOJE_FECHADO_MAX) linhas.push({ mais: true, texto: `e mais ${ordenados.length - HOJE_FECHADO_MAX}` });
   return linhas;
 }
+// PLURAL DE VERDADE NOS TÍTULOS DO PAINEL (11/11/2026). "1 compromisso(s) hoje · 1 rotina(s)" é o texto que ele lê
+// toda vez que abre o app; passa a ser "1 compromisso hoje · 1 rotina", "3 compromissos". Só os cabeçalhos dos
+// cards do Painel mudaram; o resto do app segue com "(s)".
+function quantos(n, um, varios) { return `${n} ${Number(n) === 1 ? um : varios}`; }
 // NÚMERO NUNCA APARECE CORTADO NO MEIO (11/11/2026, crítica da prévia do Painel). O título do card corta com "…" onde
 // a largura acaba, e o corte caía no meio do valor: um "R$ 100" aparecia como "R$ 10…", e valor cortado lê como outro
 // valor (em 30 dias, 7 dos 17 títulos com "R$" tinham o valor bem onde a segunda linha termina). Cada pedaço com
@@ -8435,7 +8439,7 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = fal
     </div>;
   }
   return <CardRecolhivel
-    cabecalho={<><p className="kicker">ROTINAS RECORRENTES</p><h3>{pendentes.length} rotina(s) pra hoje</h3></>}
+    cabecalho={<><p className="kicker">ROTINAS RECORRENTES</p><h3>{quantos(pendentes.length, "rotina", "rotinas")} pra hoje</h3></>}
     resumo={<p className="ficha-note">{atrasadas.length ? `${atrasadas.length} atrasada(s)` : "Nenhuma atrasada"}{doDia.length ? ` · ${doDia.length} pra hoje` : ""}</p>}>
     {!!atrasadas.length && <><p className="kicker">🔴 ATRASADAS</p><div className="rotina-lista">{atrasadas.map(linha)}</div></>}
     {!!doDia.length && <><p className="kicker" style={{ marginTop: atrasadas.length ? 14 : 0 }}>🟡 PRA HOJE</p><div className="rotina-lista">{doDia.map(linha)}</div></>}
@@ -10841,10 +10845,10 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
         Pessoais, onde o card Manu já ficava. */}
     {/* O card existe se há compromisso OU rotina atrasada — inclusive o de hoje que passou da hora (13/10/2026). */}
     {totalAtrasados > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes topo-card tom-vermelho" selo={totalAtrasados} tom="vermelho" icone="⏰"
-      cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{[atrasados.length ? `${atrasados.length} compromisso(s)` : null, rotinasAtrasadas ? `${rotinasAtrasadas} rotina(s)` : null].filter(Boolean).join(" · ")} com atraso</h3>
+      cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{[atrasados.length ? quantos(atrasados.length, "compromisso", "compromissos") : null, rotinasAtrasadas ? quantos(rotinasAtrasadas, "rotina", "rotinas") : null].filter(Boolean).join(" · ")} com atraso</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
-        ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasMaisAntigo > 0 ? `${diasMaisAntigo} dia(s)` : `hoje às ${String(atrasadoMaisAntigo.hora || "").slice(0, 5)}`}${hojePassouDaHora ? ` · ${hojePassouDaHora} de hoje já ${hojePassouDaHora > 1 ? "passaram" : "passou"} da hora` : ""}`
-        : "Rotina(s) que passaram do dia ou da hora"}</span>{seloFiltro}</>}>
+        ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasMaisAntigo > 0 ? quantos(diasMaisAntigo, "dia", "dias") : `hoje às ${String(atrasadoMaisAntigo.hora || "").slice(0, 5)}`}${hojePassouDaHora ? ` · ${hojePassouDaHora} de hoje já ${hojePassouDaHora > 1 ? "passaram" : "passou"} da hora` : ""}`
+        : rotinasAtrasadas === 1 ? "Rotina que passou do dia ou da hora" : "Rotinas que passaram do dia ou da hora"}</span>{seloFiltro}</>}>
       {faixaFiltro}
       {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}
       <RotinasCard rotinas={rotinasSoltas} hoje={today} agora={agoraHHMM} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} soLista apenas="atrasadas" />
@@ -10856,7 +10860,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     <CardRecolhivel id="secao-hoje" className="content-card hoje-card" resumoAbre
       resumo={hojeFechado.length > 0 ? <span className="hoje-linhas">{hojeFechado.map((linha, i) => <span key={i} className={`hoje-linha${linha.rotina ? " rotina" : ""}${linha.mais ? " mais" : ""}`}>{comNumeroInteiro(linha.texto)}</span>)}</span> : null}
       cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
-      <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${rotinasPendentesHoje} rotina(s)` : ""}</h3>
+      <h3>{hoje.length ? `${quantos(hoje.length, "compromisso", "compromissos")} hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${quantos(rotinasPendentesHoje, "rotina", "rotinas")}` : ""}</h3>
       {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora · {hojePassouDaHora > 1 ? "estão" : "está"} em Precisa resolver</span>}{seloFiltro}</>}>
       {faixaFiltro}
       {hoje.length > 0
@@ -10872,7 +10876,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     {/* Só data POSTERIOR a hoje. O "N ainda hoje" saiu daqui: hoje tem card próprio, e repetir o mesmo
         compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
     {futuros.length > 0 && <CardRecolhivel className="content-card topo-card tom-laranja" selo={futuros.length} tom="laranja" icone="📅"
-      cabecalho={<><p className="kicker">PRÓXIMOS COMPROMISSOS</p><h3>{futuros.length} próximo(s) compromisso(s)</h3>{seloFiltro}</>}>
+      cabecalho={<><p className="kicker">PRÓXIMOS COMPROMISSOS</p><h3>{futuros.length === 1 ? "1 próximo compromisso" : `${futuros.length} próximos compromissos`}</h3>{seloFiltro}</>}>
       {faixaFiltro}
       {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} ligado={ligacoesFuturos.get(a.id) || null} />)}</CardRecolhivel>}
     {/* ENVIADO AO CLAUDE vem DEPOIS de Atrasados, Hoje e Próximos (Diego, 12/10: "os compromissos de hoje,
@@ -10893,7 +10897,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
         conversa recente que encerrou sem virar nada. */}
     <GrupoRecolhivel titulo="Pendências" legenda="parado há mais de 14 dias · cobrança sem hora · conversa sem destino" contagem={contagemPendencias} verTudo="ver a agenda toda ›" onVerTudo={onVerAgenda}>
     {antigos.length > 0 && <CardRecolhivel id="secao-revisao-antiga" className="content-card revisao-antiga" selo={antigos.length} tom="ambar" icone="🗂"
-      cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
+      cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{quantos(antigos.length, "compromisso", "compromissos")} com mais de 14 dias</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{antigosAcima30.length} com mais de 30 dias · histórico preservado para revisão</span></>}>
       {[...antigos].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {/* COBRANÇAS SEM HORA (12/10/2026): vieram da aba Agenda, que saiu da barra. Remoto sem hora não é rota, então
