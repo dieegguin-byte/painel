@@ -21,8 +21,17 @@ que são longos e explicam o porquê de cada decisão (não apague comentários 
 - Publicar = fazer merge na `main` (o Pages serve a `main`). **Só com o "V" do Diego** no projeto. PR que
   toca dado de cliente pediu palavra explícita dele (caso do PR 197).
 - Não existe build: o `nova.html` que está na `main` é o que o celular baixa. O Babel compila uma vez por
-  versão e guarda em Cache Storage (`tb-babel-v1`, chave = SHA-256 do fonte); nada a fazer nisso.
+  versão e guarda em Cache Storage (`tb-babel-v1`, chave = SHA-256 do fonte); nada a fazer nisso. Desde 11/11/2026
+  o Babel só é baixado quando há o que compilar, e a troca de versão do `sw.js` não apaga esse cache.
+- O `sw.js` pede o `nova.html` com `cache: 'no-cache'` (o servidor responde 304 quando não mudou; versão nova
+  entra na mesma abertura). Com cópia boa guardada, a rede tem 4 s pra responder; passou disso o app abre com a
+  cópia e a versão nova fica pra abertura seguinte.
 - Mudou `sw.js`? Suba `VERSAO` dentro dele e o `?v=` do `register('./sw.js?v=N')` no fim do `nova.html`.
+  Só o `nova.html` registra o service worker. O `estoque.html` (que abre dentro do app) só registra quando não há
+  nenhum: endereço diferente do do app troca o service worker e o app recarrega duas vezes (a aba Estoque não ficava
+  aberta, 13/10 a 11/11/2026). Página nova no mesmo site: não registre outro `?v=`.
+- Link de aviso e atalho do ícone abrem `./nova.html?ir=...`. O `sw.js` guarda e procura a página pelo endereço sem o
+  `?...` (uma cópia só, que serve pra qualquer link e abre sem sinal). O app continua lendo `location.search`.
 - Antes de abrir PR: compile o `nova.html` com o mesmo Babel e rode os testes (ver "Testes"). Tela preta já
   aconteceu duas vezes (22/08 e 02/09/2026) por erro de código publicado sem checar.
 
@@ -70,7 +79,8 @@ a da Toqi é a trava dela. Não junte.
 Procure pelo nome (as linhas mudam). Ordem no arquivo:
 
 1. `<style>` até ~1250: CSS. Blocos comentados por data e pedido do Diego.
-2. `<script>` de boot (`TB.carregarTudo`): bibliotecas por CDN com 3 espelhos (jsdelivr, unpkg, cdnjs).
+2. `<script>` de boot: `TB.carregarTudo` (supabase, React, ReactDOM) e `TB.carregarBabel` (só quando o `montar()`
+   vai compilar). Três tentativas por biblioteca: jsdelivr, jsdelivr furando o cache, unpkg.
 3. `<script type="text/plain" id="app-source">`: o app. Dentro dele, nesta ordem:
    - constantes e helpers: `SUPABASE_URL`/`SUPABASE_KEY`, `PIN_LIGADO`, `compactDate`, `hojeISO`,
      `somarDias`, `DIAS_SEMANA`, demo data (`demoAppointments`…), `comConta`, `comTituloVisivel`,
@@ -98,8 +108,9 @@ Procure pelo nome (as linhas mudam). Ordem no arquivo:
      "Em caixa" soma todo financeiro pago desde `contas_saldo.data_inicial`), `MuralView`,
      `ProfissionaisView`, `// ===== CONFIRMAÇÃO DE SERVIÇO` (PDF no aparelho), `ComprasView`,
      `ListaDeCompras`, `FuturoView`, `FornecedoresView`, `CustomersView`, `FichaModal`.
-4. `<script>` final: compila o fonte com `Babel.transform(presets: react classic + typescript)`, cache por
-   hash, cão de guarda de 20 s (`telaDeSocorro`), registro do service worker.
+4. `<script>` final (`montar()`): se a cópia compilada desta versão está no cache (chave = hash do fonte), injeta
+   e pronto, sem Babel; senão baixa o Babel, compila com `Babel.transform(presets: react classic + typescript)` e
+   guarda. Cão de guarda de 20 s (`telaDeSocorro`), registro do service worker.
 
 Fluxo de hoje (desde 02/11/2026): o Diego fala só com a Toqi no WhatsApp; ela escreve no Mural
 (`PRA LANÇAR:` → `LANÇADO:`) e grava cards/fichas/serviços/histórico com o login dela. A Manu (rotina de hora
@@ -133,8 +144,11 @@ das 02h20 (Claude) confere o dia.
 
 - Rodam com o Node 22, sem instalar nada: `node --test tests/atrasados-passou-da-hora.test.cjs
   tests/clientes-sem-nome.test.cjs tests/ordem-data-hora.test.cjs tests/pronto-producao.test.cjs
-  tests/texto-pronto-foto.test.cjs tests/whatsapp-comum.test.mjs` (o `pronto-producao` pede
-  `BAHIA_BABEL_PATH=<caminho>/@babel/standalone/babel.min.js`).
+  tests/texto-pronto-foto.test.cjs tests/whatsapp-comum.test.mjs tests/abrir-sem-babel.test.cjs
+  tests/sw-documento.test.cjs` (o `pronto-producao` pede
+  `BAHIA_BABEL_PATH=<caminho>/@babel/standalone/babel.min.js`). Os dois últimos rodam o boot do `nova.html` e o
+  `sw.js` num navegador de mentira: mexeu em `montar()`, `TB.carregar*`, no `fetch`/`activate` do `sw.js` ou no
+  registro do service worker do `estoque.html`, rode.
 - Precisam de `pnpm install` (pglite): `agenda-caixa-identidade`, `caixa-fila`, `card-pagamento-ligado`,
   `conferencia-monitor`, `engenharia-itens`.
 - `cronograma-tecnico-ui` tem uma afirmação velha (o `CronogramaTecnico` não está mais montado no Painel):

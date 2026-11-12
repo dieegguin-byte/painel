@@ -59,3 +59,5 @@ jobs:
           tests/whatsapp-comum.test.mjs
           tests/whatsapp-de-fora.test.cjs
           tests/cards-ligados-saida.test.cjs
+          tests/abrir-sem-babel.test.cjs
+          tests/sw-documento.test.cjs
