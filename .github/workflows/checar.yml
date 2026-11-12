@@ -56,6 +56,8 @@ jobs:
           tests/painel-consertos.test.cjs
           tests/pronto-producao.test.cjs
           tests/texto-pronto-foto.test.cjs
+          tests/hoje-fechado.test.cjs
+          tests/titulo-do-card.test.cjs
           tests/whatsapp-comum.test.mjs
           tests/whatsapp-de-fora.test.cjs
           tests/cards-ligados-saida.test.cjs

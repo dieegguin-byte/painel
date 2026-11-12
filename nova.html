@@ -185,7 +185,14 @@ body{margin:0;min-height:100%;background:var(--bg);color:var(--text)}body{font-f
    o card — sem isso, um cliente de nome grande estoura a largura da tela no celular. */
 .compromisso-cab{display:grid;grid-template-columns:88px minmax(0,1fr) 20px;gap:13px;align-items:center;width:100%;background:none;border:0;color:inherit;text-align:left;padding:0;cursor:pointer;font:inherit}
 .compromisso-idc{display:flex;flex-direction:column;gap:3px;min-width:0}
-.compromisso-idc strong{font-size:15px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* TÍTULO EM ATÉ 2 LINHAS (11/11/2026). Numa linha só, no celular (169 px de título) cabiam umas 19 letras: "Buscar o
+   tecido na…". Os títulos planejados tinham 62 letras na mediana (lido em 11/11), então quase todos cortavam cedo, e
+   dois cards que começam igual ("Pagar Pix…") ficavam iguais na lista: pra saber qual era, só abrindo, o que desfaz o
+   Feito rápido. Com 2 linhas aparece o dobro (umas 38 letras: o quê e de quem); título comprido continua terminando
+   em "…" (o inteiro está dentro do card aberto). Custo medido: o card só cresce (15 px) quando tem 2 linhas de título
+   E a linha do nome do cliente embaixo. O nome do cliente e a linha de baixo seguem numa linha só
+   (tests/titulo-do-card.test.cjs). */
+.compromisso-idc strong{font-size:15px;font-weight:700;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;overflow-wrap:anywhere}
 .compromisso-cliente{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .compromisso-idc>span{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .selo-followup{display:inline-block;font-style:normal;font-size:11px;font-weight:700;color:#8fc3e6;background:#4a90c41f;border:1px solid #4a90c459;border-radius:999px;padding:1px 8px;margin-right:7px;vertical-align:1px}
@@ -964,6 +971,15 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .hoje-card::before{content:"";position:absolute;top:-20%;bottom:-20%;left:0;width:34%;background:linear-gradient(90deg,transparent,#ffb07a14,transparent);pointer-events:none;animation:luzPassa 7s 1.2s ease-in-out infinite}
 .hoje-card .card-toggle .kicker{font-size:11px;letter-spacing:2px;color:#ffb07a}
 .hoje-card .card-toggle h3{font:500 25px Georgia,serif;color:#fff3e4}
+/* AGENDA DE HOJE FECHADA DIZ O QUE TEM (11/11/2026): embaixo da contagem, a hora e o nome do que ainda vem hoje, um por
+   linha, sem quebrar (o que não cabe termina em "…"). Ficam fora da linha do "abrir" pra usar a largura toda do card, e
+   tocar nelas abre o card igual tocar no título (.card-resumo-toque). */
+.card-resumo-toque{display:block;width:100%;background:transparent;border:0;color:inherit;text-align:left;padding:0;margin:0;font:inherit;cursor:pointer}
+.hoje-linhas{display:block;position:relative;margin-top:8px}
+.hoje-linha{display:block;font-size:13px;line-height:1.55;color:#f3dfc9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hoje-linha.rotina,.hoje-linha.mais{color:#f3dfc9b8}
+/* NÚMERO NUNCA CORTADO NO MEIO (11/11/2026): cada pedaço com número é um bloco que não se parte (ver pedacosComNumero). */
+.num-inteiro{display:inline-block;white-space:nowrap}
 /* RESUMO DA MANHÃ (12/10/2026): card do topo, lido de avisos_operacionais (domínio resumo_manha) */
 .resumo-card{position:relative;overflow:hidden;background:linear-gradient(160deg,#1b2a2a 0,#17201e 40%,#141110 100%);border-color:#75a98755;box-shadow:inset 0 1px 0 #ffffff1a,0 1px 2px #0000004d,0 18px 40px -18px #000000cc}
 .resumo-card::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,#9bc7a7,#75a98700 70%)}
@@ -6498,6 +6514,60 @@ function horaFalada(hora) {
   const [h, m] = hora.slice(0, 5).split(":");
   return m === "00" ? `${parseInt(h, 10)} horas` : `${parseInt(h, 10)}h${m}`;
 }
+// AGENDA DE HOJE FECHADA DIZ O QUE TEM (11/11/2026). O card fechado do Painel só contava ("1 compromisso(s) hoje ·
+// 1 rotina(s)"): pra saber o que era e a que horas, só abrindo. É a mesma conta que pôs o "Há mais tempo: fulano" no
+// cabeçalho do Precisa resolver: o número não diz o que é, e o card continua fechado, então quem fala é o cabeçalho.
+// Devolve as linhas pequenas do card fechado, na ordem da hora: os compromissos que ainda vêm hoje ("HH:MM título")
+// e as rotinas do dia que ainda estão no prazo ("🔁 HH:MM título"; rotina sem hora vai pro fim). No máximo
+// HOJE_FECHADO_MAX linhas, depois "e mais N".
+// QUEM É: quando o título não diz o nome do cliente (a regra do card, sem contar acento), o primeiro nome entra NA
+// FRENTE do título ("14:00 Fulana · Entrega do sofá"). Na frente porque a linha é uma só e corta no fim: os títulos
+// de verdade são compridos (62 letras na mediana dos cards planejados, medido em 11/11/2026), e o nome no fim sumiria
+// atrás do "…".
+const HOJE_FECHADO_MAX = 4;
+function linhasDeHojeFechado(compromissos, rotinasNoPrazo, nomeDoClienteDe) {
+  const hhmm = (hora) => (hora ? String(hora).slice(0, 5) : "");
+  const comparavel = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const itens = [];
+  for (const a of compromissos || []) {
+    const titulo = String(a.titulo_visivel || a.titulo || "").trim();
+    const primeiroNome = String((nomeDoClienteDe && nomeDoClienteDe(a)) || "").trim().split(/\s+/)[0];
+    const oQue = !titulo ? (primeiroNome || "Compromisso")
+      : primeiroNome && !comparavel(titulo).includes(comparavel(primeiroNome)) ? `${primeiroNome} · ${titulo}` : titulo;
+    itens.push({ hora: hhmm(a.hora), texto: oQue, rotina: false });
+  }
+  for (const { r } of rotinasNoPrazo || []) itens.push({ hora: hhmm(r.hora), texto: String(r.titulo || "Rotina").trim(), rotina: true });
+  // Ordem da hora; sem hora vai pro fim; na mesma hora o compromisso vem antes da rotina (a ordem de entrada decide o resto).
+  const ordenados = itens.map((item, i) => ({ item, i })).sort((x, y) => (x.item.hora || "99:99").localeCompare(y.item.hora || "99:99") || Number(x.item.rotina) - Number(y.item.rotina) || x.i - y.i).map((x) => x.item);
+  const linhas = ordenados.slice(0, HOJE_FECHADO_MAX).map((item) => ({ rotina: item.rotina, texto: `${item.rotina ? "🔁 " : ""}${item.hora ? item.hora + " " : ""}${item.texto}` }));
+  if (ordenados.length > HOJE_FECHADO_MAX) linhas.push({ mais: true, texto: `e mais ${ordenados.length - HOJE_FECHADO_MAX}` });
+  return linhas;
+}
+// PLURAL DE VERDADE NOS TÍTULOS DO PAINEL (11/11/2026). "1 compromisso(s) hoje · 1 rotina(s)" é o texto que ele lê
+// toda vez que abre o app; passa a ser "1 compromisso hoje · 1 rotina", "3 compromissos". Só os cabeçalhos dos
+// cards do Painel mudaram; o resto do app segue com "(s)".
+function quantos(n, um, varios) { return `${n} ${Number(n) === 1 ? um : varios}`; }
+// NÚMERO NUNCA APARECE CORTADO NO MEIO (11/11/2026, crítica da prévia do Painel). O título do card corta com "…" onde
+// a largura acaba, e o corte caía no meio do valor: um "R$ 100" aparecia como "R$ 10…", e valor cortado lê como outro
+// valor (em 30 dias, 7 dos 17 títulos com "R$" tinham o valor bem onde a segunda linha termina). Cada pedaço com
+// número (valor com o "R$" junto, data, hora, quantidade) vira um bloco que não se parte: ou aparece inteiro, ou fica
+// pra quando o card abre. Pedaço comprido demais (um link, um código) fica como texto comum, pra não estourar a linha.
+const RE_PEDACO_COM_NUMERO = /(?:R\$\s?)?[^\s]*\d[^\s]*/g;
+const NUMERO_INTEIRO_MAX = 16;
+function pedacosComNumero(texto) {
+  const t = String(texto == null ? "" : texto);
+  const pedacos = [];
+  let fim = 0, m;
+  RE_PEDACO_COM_NUMERO.lastIndex = 0;
+  while ((m = RE_PEDACO_COM_NUMERO.exec(t))) {
+    if (m[0].length > NUMERO_INTEIRO_MAX) continue;
+    if (m.index > fim) pedacos.push({ t: t.slice(fim, m.index), inteiro: false });
+    pedacos.push({ t: m[0], inteiro: true });
+    fim = m.index + m[0].length;
+  }
+  if (fim < t.length) pedacos.push({ t: t.slice(fim), inteiro: false });
+  return pedacos;
+}
 // "hoje"/"amanhã" soa mais natural numa mensagem pro cliente do que a data cheia.
 function quandoFalado(data, hora, hoje) {
   const amanha = new Date(hoje + "T12:00:00"); amanha.setDate(amanha.getDate() + 1);
@@ -7892,7 +7962,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         {idadeAtraso || <span>{compactDate(a.data)}</span>}
       </span>
       <span className="compromisso-idc">
-        <strong>{a.titulo || "Compromisso pessoal"}</strong>
+        <strong>{comNumeroInteiro(a.titulo || "Compromisso pessoal")}</strong>
         <span>{a.cidade || "pessoal"}</span>
       </span>
       <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
@@ -8053,7 +8123,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         {/* TÍTULO NA FRENTE, CLIENTE EMBAIXO (Diego, 16/10/2026, 10h36, print: dois cards da Simone, 9h35 "Comprar rodinhas na
             Pau Brasil" e 9h50 "Marlom Júnior — levar Colorado e rodinhas", apareciam os dois só como "Simone Batista Pinheiro"
             e ele achou que era duplicado). O título já diz quem + o quê; o nome da cliente vira a linha de baixo. */}
-        <strong>{tituloCard || nomeCliente}</strong>
+        <strong>{comNumeroInteiro(tituloCard || nomeCliente)}</strong>
         {cli?.nome && tituloCard && !tituloCard.toLowerCase().includes(cli.nome.split(" ")[0].toLowerCase()) && <small className="compromisso-cliente">{cli.nome}</small>}
         <span>{ligado && ligado.cor && <i className="selo-ligado" title="Mesma saída: cards separados, mas é uma viagem só">⛓ {ligado.indice}/{ligado.n}</i>}{fixadoHoje(a) && <i className="selo-urgente">📌 Fixado</i>}{ehQuente(a) && <i className="selo-quente">🔥 Quente</i>}{vaiAudio ? <i className="selo-followup zapia selo-audio">🎤 Vai o seu áudio</i> : seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
       </span>
@@ -8394,7 +8464,13 @@ const IR_SECAO = { atrasados: "secao-vencendo", hoje: "secao-hoje", propostas: "
 //   ?ir=mural                       o Mural de recados entre Claude, Toqi e Diego
 const IR_ID = (() => { try { return new URL(location.href).searchParams.get("id"); } catch (e) { return null; } })();
 const IR_GRUPO = { manu: "grupo-manu" };
-function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null }) {
+// O texto com os pedaços de número em bloco inteiro (ver pedacosComNumero). Sem número, devolve o texto como veio.
+function comNumeroInteiro(texto) {
+  const pedacos = pedacosComNumero(texto);
+  if (!pedacos.some((p) => p.inteiro)) return String(texto == null ? "" : texto);
+  return pedacos.map((p, i) => (p.inteiro ? <span className="num-inteiro" key={i}>{p.t}</span> : p.t));
+}
+function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null, resumoAbre = false }) {
   const naLista = React.useContext(DentroDaLista);
   const [aberto, setAberto] = useState(false);
   // TOCAR ABRE POR CIMA (Diego, 15/10/2026, depois de testar: "clicar e abrir ela inteira"): no Painel, o toque e o
@@ -8413,7 +8489,9 @@ function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = nul
       <div>{typeof cabecalho === "function" ? cabecalho(aberto) : cabecalho}</div>
       <i>{aberto ? "▾ fechar" : "▸ abrir"}</i>
     </button>
-    {resumo}
+    {/* `resumoAbre` (11/11/2026): o resumo de baixo vira parte do toque que abre o card. Sem ele o resumo é só texto,
+        como sempre foi (Propostas, Rotinas, Materiais). Usado pela Agenda de hoje, que lista ali o que vem no dia. */}
+    {resumoAbre && resumo ? <button type="button" className="card-resumo-toque" onClick={abrir}>{resumo}</button> : resumo}
     {aberto && <div className="card-corpo">{children}</div>}
   </section>;
 }
@@ -8498,7 +8576,7 @@ function RotinasCard({ rotinas, hoje, db, demo, notify, onChanged, soLista = fal
     </div>;
   }
   return <CardRecolhivel
-    cabecalho={<><p className="kicker">ROTINAS RECORRENTES</p><h3>{pendentes.length} rotina(s) pra hoje</h3></>}
+    cabecalho={<><p className="kicker">ROTINAS RECORRENTES</p><h3>{quantos(pendentes.length, "rotina", "rotinas")} pra hoje</h3></>}
     resumo={<p className="ficha-note">{atrasadas.length ? `${atrasadas.length} atrasada(s)` : "Nenhuma atrasada"}{doDia.length ? ` · ${doDia.length} pra hoje` : ""}</p>}>
     {!!atrasadas.length && <><p className="kicker">🔴 ATRASADAS</p><div className="rotina-lista">{atrasadas.map(linha)}</div></>}
     {!!doDia.length && <><p className="kicker" style={{ marginTop: atrasadas.length ? 14 : 0 }}>🟡 PRA HOJE</p><div className="rotina-lista">{doDia.map(linha)}</div></>}
@@ -10795,6 +10873,8 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
   // Rotinas de hoje ainda no prazo, com a rotina junto: a Agenda de hoje as desenha na hora delas (intercalarRotinas).
   const rotinasHojeNoPrazo = rotinasSoltas.map((r) => ({ r, st: statusRotina(r, today, agoraHHMM) })).filter((x) => x.st.estado === "hoje" && !rotinaAtrasada(x.st));
   const rotinasPendentesHoje = statusRotinas.length - rotinasAtrasadas;
+  // O que o card "Agenda de hoje" diz quando está fechado (ver linhasDeHojeFechado).
+  const hojeFechado = linhasDeHojeFechado(hoje, rotinasHojeNoPrazo, (a) => (svcDe(a)?.clientes || (customers || []).find((c) => c.id === a.cliente_id))?.nome);
   const totalAtrasados = atrasados.length + rotinasAtrasadas;
   const atrasadoMaisAntigo = atrasados.length ? [...atrasados].sort(ordenarPorHora)[0] : null;
   const diasMaisAntigo = atrasadoMaisAntigo ? diasDeAtraso(atrasadoMaisAntigo.data, today) : 0;
@@ -10903,10 +10983,10 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
         Pessoais, onde o card Manu já ficava. */}
     {/* O card existe se há compromisso OU rotina atrasada — inclusive o de hoje que passou da hora (13/10/2026). */}
     {totalAtrasados > 0 && <CardRecolhivel id="secao-vencendo" className="content-card atrasados-recentes topo-card tom-vermelho" selo={totalAtrasados} tom="vermelho" icone="⏰"
-      cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{[atrasados.length ? `${atrasados.length} compromisso(s)` : null, rotinasAtrasadas ? `${rotinasAtrasadas} rotina(s)` : null].filter(Boolean).join(" · ")} com atraso</h3>
+      cabecalho={<><p className="kicker">PRECISA RESOLVER</p><h3>{[atrasados.length ? quantos(atrasados.length, "compromisso", "compromissos") : null, rotinasAtrasadas ? quantos(rotinasAtrasadas, "rotina", "rotinas") : null].filter(Boolean).join(" · ")} com atraso</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{atrasadoMaisAntigo
-        ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasMaisAntigo > 0 ? `${diasMaisAntigo} dia(s)` : `hoje às ${String(atrasadoMaisAntigo.hora || "").slice(0, 5)}`}${hojePassouDaHora ? ` · ${hojePassouDaHora} de hoje já ${hojePassouDaHora > 1 ? "passaram" : "passou"} da hora` : ""}`
-        : "Rotina(s) que passaram do dia ou da hora"}</span>{seloFiltro}</>}>
+        ? `Há mais tempo: ${quemEspera(atrasadoMaisAntigo)} · ${diasMaisAntigo > 0 ? quantos(diasMaisAntigo, "dia", "dias") : `hoje às ${String(atrasadoMaisAntigo.hora || "").slice(0, 5)}`}${hojePassouDaHora ? ` · ${hojePassouDaHora} de hoje já ${hojePassouDaHora > 1 ? "passaram" : "passou"} da hora` : ""}`
+        : rotinasAtrasadas === 1 ? "Rotina que passou do dia ou da hora" : "Rotinas que passaram do dia ou da hora"}</span>{seloFiltro}</>}>
       {faixaFiltro}
       {[...atrasados].sort(ordenarCompromisso).map(cardAtrasado)}
       <RotinasCard rotinas={rotinasSoltas} hoje={today} agora={agoraHHMM} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} soLista apenas="atrasadas" />
@@ -10915,9 +10995,10 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
     {/* PROPOSTAS DE ORÇAMENTO (Diego, 16/10/2026, 08h46): antes da agenda do dia porque é dinheiro parado esperando um toque. */}
     <PropostasCard propostas={propostas} customers={customers} services={services} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
-    <CardRecolhivel id="secao-hoje" className="content-card hoje-card"
+    <CardRecolhivel id="secao-hoje" className="content-card hoje-card" resumoAbre
+      resumo={hojeFechado.length > 0 ? <span className="hoje-linhas">{hojeFechado.map((linha, i) => <span key={i} className={`hoje-linha${linha.rotina ? " rotina" : ""}${linha.mais ? " mais" : ""}`}>{comNumeroInteiro(linha.texto)}</span>)}</span> : null}
       cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
-      <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${rotinasPendentesHoje} rotina(s)` : ""}</h3>
+      <h3>{hoje.length ? `${quantos(hoje.length, "compromisso", "compromissos")} hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${quantos(rotinasPendentesHoje, "rotina", "rotinas")}` : ""}</h3>
       {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora · {hojePassouDaHora > 1 ? "estão" : "está"} em Precisa resolver</span>}{seloFiltro}</>}>
       {faixaFiltro}
       {hoje.length > 0
@@ -10933,7 +11014,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     {/* Só data POSTERIOR a hoje. O "N ainda hoje" saiu daqui: hoje tem card próprio, e repetir o mesmo
         compromisso em dois blocos é o tipo de contador que faz ele parar de confiar na conta. */}
     {futuros.length > 0 && <CardRecolhivel className="content-card topo-card tom-laranja" selo={futuros.length} tom="laranja" icone="📅"
-      cabecalho={<><p className="kicker">PRÓXIMOS COMPROMISSOS</p><h3>{futuros.length} próximo(s) compromisso(s)</h3>{seloFiltro}</>}>
+      cabecalho={<><p className="kicker">PRÓXIMOS COMPROMISSOS</p><h3>{futuros.length === 1 ? "1 próximo compromisso" : `${futuros.length} próximos compromissos`}</h3>{seloFiltro}</>}>
       {faixaFiltro}
       {[...futuros].sort(ordenarCompromisso).map((a) => <CompromissoCard key={a.id} a={a} svc={services.find((s) => s.id === a.servico_id)} cliente={(customers || []).find((c) => c.id === a.cliente_id)} today={today} onConcluir={onConcluir} onReschedule={onReschedule} materiais={materiaisDoCompromisso(finances, a.id)} fornecedores={fornecedores} profissionais={profissionais} ligado={ligacoesFuturos.get(a.id) || null} />)}</CardRecolhivel>}
     {/* ENVIADO AO CLAUDE vem DEPOIS de Atrasados, Hoje e Próximos (Diego, 12/10: "os compromissos de hoje,
@@ -10954,7 +11035,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
         conversa recente que encerrou sem virar nada. */}
     <GrupoRecolhivel titulo="Pendências" legenda="parado há mais de 14 dias · cobrança sem hora · conversa sem destino" contagem={contagemPendencias} verTudo="ver a agenda toda ›" onVerTudo={onVerAgenda}>
     {antigos.length > 0 && <CardRecolhivel id="secao-revisao-antiga" className="content-card revisao-antiga" selo={antigos.length} tom="ambar" icone="🗂"
-      cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{antigos.length} compromisso(s) com mais de 14 dias</h3>
+      cabecalho={<><p className="kicker">REVISÃO ANTIGA</p><h3>{quantos(antigos.length, "compromisso", "compromissos")} com mais de 14 dias</h3>
       <span className="ficha-note" style={{ margin: 0 }}>{antigosAcima30.length} com mais de 30 dias · histórico preservado para revisão</span></>}>
       {[...antigos].sort(ordenarCompromisso).map(cardAtrasado)}</CardRecolhivel>}
     {/* COBRANÇAS SEM HORA (12/10/2026): vieram da aba Agenda, que saiu da barra. Remoto sem hora não é rota, então
