@@ -15027,7 +15027,7 @@ if ('serviceWorker' in navigator) {
   };
   navigator.serviceWorker.addEventListener('controllerchange', () => { if (tinhaControle) recarregar(); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && recargaPendente) recarregar(); });
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=23').then((reg) => {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=24').then((reg) => {
     const checar = () => reg.update().catch(() => {});
     checar();
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checar(); });

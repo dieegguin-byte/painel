@@ -64,7 +64,7 @@ window.addEventListener('load',()=>loadAll(false));
 // De 13/10 a 11/11/2026 ela registrava SEMPRE, com outro endereço (?v=17 contra o ?v= do app). Endereço diferente
 // é service worker novo: ele assumia, o app (que recarrega quando o service worker muda) reiniciava, registrava o
 // dele de volta e reiniciava de novo. A aba Estoque aparecia um instante e o app voltava pro Painel, sempre.
-if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.getRegistration().then((r)=>r||navigator.serviceWorker.register('./sw.js?v=23')).catch(()=>{}));
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.getRegistration().then((r)=>r||navigator.serviceWorker.register('./sw.js?v=24')).catch(()=>{}));
 </script>
 </body>
 </html>

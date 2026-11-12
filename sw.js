@@ -79,7 +79,12 @@
        ela (antes esperava a rede desistir: 20 s no teste). O pedido termina por tras e a proxima abertura ja vem nova.
    (3) A troca de versao deste arquivo apagava tambem o cache do app ja compilado (`tb-babel-v1`), e o celular compilava
        duas vezes na primeira abertura depois de publicar (uma antes e outra depois da recarga da troca). Agora fica. */
-const VERSAO = 'tb-atendimento-v29'; // v26 (18/10/2026): não apaga o transformers-cache (Whisper da Caixa)
+/* v30 (11/11/2026): A AGUA TOCA UMA VEZ, DEPOIS SO TROCA AS HORAS. O aviso de agua saia de hora em hora tocando e
+   vibrando (138 em 8 dias, "Bebi" marcado 5 vezes). O servidor continua mandando de hora em hora, mas as repeticoes
+   vem com `atualiza_calado`: se ja ha na barra um aviso da mesma tag que tocou (`data.tocou`), o novo so troca o texto,
+   sem som nem vibracao. Sem aviso na barra (ele tirou sem beber, o primeiro se perdeu ou chegou atrasado), toca. O
+   primeiro de cada serie (3h depois do copo, e todo dia as 08:00) vem sem o sinal e toca sempre. */
+const VERSAO = 'tb-atendimento-v30'; // v26 (18/10/2026): não apaga o transformers-cache (Whisper da Caixa)
 // Cache do app já compilado pelo Babel (quem grava e faz a faxina dele é o nova.html, pela chave do hash do fonte).
 const CACHE_COMPILADO = 'tb-babel-v1';
 // Sem segredo aqui de proposito: este arquivo e publico. O que autentica o recibo e o proprio id, que
@@ -298,12 +303,13 @@ self.addEventListener('push', (e) => {
   const botoes = botoesDe(aviso);
   const gerado = aviso && aviso.gerado_em ? Date.parse(aviso.gerado_em) : NaN;
   const atrasado = Number.isFinite(gerado) && Date.now() - gerado > ATRASO_CALADO_MS;
+  // ATUALIZA CALADO (v30): a repeticao que so troca o texto (a agua, de hora em hora) vem com este sinal.
+  // Toca quando nao ha aviso da mesma tag na barra que ja tenha tocado; havendo, substitui calado (ver `mostrar`).
+  const atualizaCalado = !!(aviso && aviso.atualiza_calado);
   const opcoes = {
     body: corpo,
     // A tag carrega o id do item: o mesmo compromisso substitui o aviso anterior em vez de empilhar.
     tag: (aviso && aviso.tag) || 'painel',
-    renotify: !atrasado,
-    silent: atrasado,
     icon: './icon-192.png',
     badge: './icon-192.png',
     // Aviso com botao (compromisso, cartao) e pra resolver: NAO some sozinho da barra ate ele mexer (requireInteraction).
@@ -313,16 +319,32 @@ self.addEventListener('push', (e) => {
     // `item` e `gerado_em` (v28): de qual card e de que hora o aviso fala; o app usa pra fechar o que ficou velho.
     data: { url: (aviso && aviso.url) || './nova.html', recibo: recibo, item: (aviso && aviso.item) || null, gerado_em: (aviso && aviso.gerado_em) || null }
   };
-  // Aviso com botao vibra forte - Diego, 15/10/2026: "se for uma notificacao com barulho pequeno, nao da pra saber".
-  // Calado (atrasado) nao pode levar vibrate: o Chrome recusa silent junto com vibrate.
-  if (!atrasado) opcoes.vibrate = botoes.length ? [400, 150, 400, 150, 700] : [80, 40, 80];
+  // `jaTocou`: ha na barra um aviso desta tag que tocou (data.tocou). So importa pro aviso que atualiza calado.
+  // O aviso novo herda a marca; o que chegou atrasado (calado) sem nada antes fica sem ela, e o seguinte toca.
+  const mostrar = function (jaTocou) {
+    const calado = atrasado || (atualizaCalado && jaTocou);
+    opcoes.renotify = !calado;
+    opcoes.silent = calado;
+    opcoes.data.tocou = !calado || jaTocou;
+    // Aviso com botao vibra forte - Diego, 15/10/2026: "se for uma notificacao com barulho pequeno, nao da pra saber".
+    // Calado nao pode levar vibrate: o Chrome recusa silent junto com vibrate.
+    if (!calado) opcoes.vibrate = botoes.length ? [400, 150, 400, 150, 700] : [80, 40, 80];
+    return self.registration.showNotification(titulo, opcoes)
+      // Se o Chrome recusar alguma opcao, mostra o basico: push sem aviso e pior que aviso simples.
+      .catch(function () { return self.registration.showNotification(titulo, { body: corpo, tag: opcoes.tag, data: opcoes.data }); });
+  };
+  // Ler a barra so quando o aviso pede (um pedido a mais por push de agua). Se a leitura falhar, toca: errar pro
+  // lado do barulho e melhor que um aviso que nunca tocou.
+  const jaTocouNaBarra = atualizaCalado
+    ? Promise.resolve().then(function () { return self.registration.getNotifications({ tag: opcoes.tag }); })
+      .then(function (lista) { return (lista || []).some(function (n) { return !!(n && n.data && n.data.tocou === true); }); })
+      .catch(function () { return false; })
+    : Promise.resolve(false);
   e.waitUntil(Promise.all([
     // O carimbo vem PRIMEIRO na lista de proposito: se o Android matar o processo no meio, prefiro ter
     // o recibo (que me diz o que aconteceu) do que perder as duas coisas.
     carimbarRecibo(recibo, 'recebido'),
-    self.registration.showNotification(titulo, opcoes)
-      // Se o Chrome recusar alguma opcao, mostra o basico: push sem aviso e pior que aviso simples.
-      .catch(function () { return self.registration.showNotification(titulo, { body: corpo, tag: opcoes.tag, data: opcoes.data }); })
+    jaTocouNaBarra.then(mostrar)
       .then(function () { return fecharAvisosVelhos(opcoes.tag, atrasado); })
       .then(avisarAbas)
   ]).then(terminou, terminou));

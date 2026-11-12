@@ -465,7 +465,9 @@ const aguaNaJanela = (hora: number) => hora >= AGUA_HORA_INICIO || hora < AGUA_H
 // segundo exato do último copo (ultima_id) e o relógio, não minutos arredondados, pra duas varreduras darem a mesma vez.
 const SP_MENOS_UTC_HORAS = 3; // São Paulo sem horário de verão desde 2019: sempre UTC-3.
 const MIN_MS = 60_000;
-function vezAgua(ag: any, agoraSP: string, agoraMs = Date.now()): number {
+// `vez` é o número da chave (conta do último copo, não muda desde 23/10). `repeticao` conta a partir do primeiro aviso
+// da série (0 = o primeiro: 3h depois do copo, ou a abertura das 08:00); é o que decide se o aviso toca (ver avisoDaAgua).
+function passoAgua(ag: any, agoraSP: string, agoraMs = Date.now()): { vez: number; repeticao: number } {
   const ultimo = Number(ag.ultima_id) * 1000;
   const [ano, mes, dia] = String(agoraSP).slice(0, 10).split("-").map(Number);
   let abertura = Date.UTC(ano, mes - 1, dia, AGUA_HORA_INICIO + SP_MENOS_UTC_HORAS);
@@ -473,8 +475,9 @@ function vezAgua(ag: any, agoraSP: string, agoraMs = Date.now()): number {
   const primeira = Math.max(ultimo + AGUA_AVISA_MIN * MIN_MS, abertura);
   const vezDesdeAPrimeira = Math.floor(Math.max(0, agoraMs - primeira) / (AGUA_REPETE_MIN * MIN_MS));
   const desta = primeira + vezDesdeAPrimeira * AGUA_REPETE_MIN * MIN_MS;
-  return Math.floor((desta - ultimo - AGUA_AVISA_MIN * MIN_MS) / (AGUA_REPETE_MIN * MIN_MS));
+  return { vez: Math.floor((desta - ultimo - AGUA_AVISA_MIN * MIN_MS) / (AGUA_REPETE_MIN * MIN_MS)), repeticao: vezDesdeAPrimeira };
 }
+function vezAgua(ag: any, agoraSP: string, agoraMs = Date.now()): number { return passoAgua(ag, agoraSP, agoraMs).vez; }
 const chaveAgua = (ag: any, agoraSP: string) => `agua:${ag.ultima_id}:${vezAgua(ag, agoraSP)}`;
 
 function avisoDaAgua(ag: any): Envio[] {
@@ -489,6 +492,13 @@ function avisoDaAgua(ag: any): Envio[] {
       url: "./nova.html",
       acoes: [{ action: "a0", title: "Bebi", plano: { tabela: "agua", id: String(ag.ultima_id), resposta: "bebi" } }],
       item: { tipo: "agua", ultima_id: ag.ultima_id },
+      // TOCA UMA VEZ, DEPOIS SÓ TROCA AS HORAS (11/11/2026). De 04 a 11/11 saíram 138 avisos de água, um por hora, e
+      // "Bebi" foi marcado 5 vezes. O pedido de 22/10 era "ficar o tempo todo, só falar quantas horas eu tô sem beber
+      // água": o aviso continua saindo de hora em hora, mas só o primeiro de cada série toca sempre (3h depois do
+      // copo, e todo dia na abertura das 08:00). As repetições levam este sinal: o service worker (v30) troca o texto
+      // calado quando já há na barra um aviso de água que tocou, e toca se não houver (o primeiro se perdeu, chegou
+      // atrasado ou ele tirou da barra sem beber). Service worker antigo ignora o sinal e toca toda hora, como antes.
+      ...(Number(ag.repeticao) > 0 ? { atualiza_calado: true } : {}),
       // A próxima vem em 1h: o aviso da fila que passar disso já foi substituído.
       ttl: AGUA_REPETE_MIN * 60,
     },
@@ -784,7 +794,7 @@ Deno.serve(async (req) => {
       const naHora = horaDeDia ? (pendencias.agenda_na_hora || []).filter(paraODiego).filter(aindaInsiste) : [];
       const rotinas = horaDeDia ? (pendencias.rotinas_na_hora || []).map((r: any) => ({ ...r, chave: chaveRotina(r, String(pendencias.hoje)) })) : [];
       const ag = pendencias.agua;
-      const agua = aguaNaJanela(hora) && ag && ag.ultima_id && Number(ag.minutos) >= AGUA_AVISA_MIN ? [{ ...ag, chave: chaveAgua(ag, String(pendencias.agora)) }] : [];
+      const agua = aguaNaJanela(hora) && ag && ag.ultima_id && Number(ag.minutos) >= AGUA_AVISA_MIN ? [{ ...ag, chave: chaveAgua(ag, String(pendencias.agora)), repeticao: passoAgua(ag, String(pendencias.agora)).repeticao }] : [];
       candidatos = leva.length + caixa.length + contas.length + duvidas.length + naHora.length + rotinas.length + agua.length;
       if (candidatos) {
         const chaves = [...leva.map(chaveLeva), ...naHora.map(chaveNaHora), ...caixa.map((c: any) => `caixa:${c.id}`), ...contas.map(chaveConta), ...duvidas.map((d: any) => `duvida:${d.id}`), ...rotinas.map((r: any) => r.chave), ...agua.map((a: any) => a.chave)];
