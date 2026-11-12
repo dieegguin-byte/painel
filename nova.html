@@ -11502,7 +11502,7 @@ function LeadsView({ services, appointments, agendaHistorico, inbox, search, set
   // Mesma fila do card de Capacidade: produção primeiro (peça na bancada, prazo correndo), agendado no
   // final (fechado mas nem começou), e dentro de cada faixa o prazo mais apertado na frente.
   const ORDEM_FILA = { pronto: 0, producao: 0, lead: 1, orcamento: 1, agendado: 2, entregue: 3, pago: 4, perdido: 5 };
-  const visible = services.filter((service) => `${service.clientes?.nome} ${service.titulo}`.toLowerCase().includes(search.toLowerCase())).filter((service) => filtroStatus === "todos"
+  const visible = services.filter((service) => buscaBate(search, [service.clientes?.nome, service.titulo])).filter((service) => filtroStatus === "todos"
       || (filtroStatus === "sem_acao" ? fluxoDe(service).estado === "sem_acao"
         : filtroStatus === "precisa_avancar" ? fluxoDe(service).estado === "precisa_avancar"
           : filtroStatus === "retorno_vencido" ? retornoVencido(service, hojeISO())
@@ -13712,6 +13712,19 @@ const MAT_A_CAMINHO = /\b(a[_ ]caminho|em[_ ]transito|pedido[_ ](feito|enviado))
 // "NAO_INFORMADA"), e é assim que tem que ser — a decisão sai do dado, não do nome do cliente.
 const MAT_INDEFINIDO = /(pendente|nao[_ ]informad|nao[_ ]confirmad|a[_ ]confirmar|estimativa|planejado|levantado[_ ]em[_ ]avaliacao|a[_ ]definir)/i;
 function semAcentoBaixo(t) { return String(t == null ? "" : t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+// BUSCA QUE ACHA QUEM ESTÁ LÁ (11/11/2026, lista de melhorias do app; V do Diego no App). "jose" não achava "José" (nem
+// "conceicao" a "Conceição"), e telefone só batia digitado com a mesma pontuação gravada: "61999990000" não achava
+// "+55 61 99999-0000". Agora o nome (e o serviço, em Leads) ignora acento e maiúscula, e um termo só de números (4 dígitos
+// ou mais, sem letra) compara só os dígitos do telefone. Termo vazio mostra tudo. A CIDADE fica fora daqui de propósito:
+// sem acento, "Luzia" acharia todo cliente de Luziânia (quase a base inteira) e "antonio" todo Santo Antônio.
+function buscaBate(termo, textos, telefones = []) {
+  const t = semAcentoBaixo(termo).trim();
+  if (!t) return true;
+  if (semAcentoBaixo((textos || []).filter(Boolean).join(" ")).includes(t)) return true;
+  const digitos = t.replace(/\D/g, "");
+  if (digitos.length < 4 || /[a-z]/.test(t)) return false;
+  return (telefones || []).some((tel) => String(tel || "").replace(/\D/g, "").includes(digitos));
+}
 // Junta os valores de TEXTO do item num alvo só. Números e booleanos ficam de fora: `quantidade: 4` não
 // diz nada sobre estar definido, e `comprado: false` é lido pelo campo, não pela varredura.
 // Devolve os pedaços de texto do item preservando o ORIGINAL (com acento) ao lado da versão normalizada:
@@ -14406,7 +14419,9 @@ function CustomersView({ customers, services, search, setSearch, onOpenFicha }) 
   const [soQuebrados, setSoQuebrados] = useState(false);
   const quebrados = customers.filter((customer) => telefoneCorrigivel(customer.telefone));
   const visible = customers
-    .filter((customer) => [nomeDoCliente(customer), customer.telefone, customer.cidade].filter(Boolean).join(" ").toLowerCase().includes(search.toLowerCase()))
+    // A cidade fica como era (acento conta): sem acento, "Luzia" achava todo cliente de Luziânia. Ver buscaBate.
+    .filter((customer) => buscaBate(search, [nomeDoCliente(customer), customer.telefone], [customer.telefone])
+      || String(customer.cidade || "").toLowerCase().includes(String(search || "").trim().toLowerCase()))
     .filter((customer) => !soQuebrados || telefoneCorrigivel(customer.telefone));
   return <section className="content-card full"><div className="card-head"><div><p className="kicker">BASE ÚNICA</p><h3>{visible.length} clientes</h3></div><input className="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome, telefone ou cidade" /></div>
     {quebrados.length > 0 && <div className="duplicate-warning"><b>⚠ {quebrados.length} ficha(s) com telefone que não abre o WhatsApp</b><button onClick={() => setSoQuebrados((v) => !v)}>{soQuebrados ? "Ver todos os clientes" : "Ver só essas fichas"}</button></div>}
@@ -14531,8 +14546,11 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
       db.from("clientes").select("*").eq("id", clienteId).single(),
       db.from("servicos").select("*").eq("cliente_id", clienteId).order("criado_em", { ascending: false }),
       db.from("fotos").select("*").eq("cliente_id", clienteId).order("criado_em", { ascending: false }),
-      // Recados deste cliente pra Manu: só os que ainda interessam (abertos, ou vistos nos últimos 7 dias).
-      db.from("caixa_entrada").select("id,texto,processado,processado_em,criado_em,conversa").contains("conversa", [{ meta: { tipo_operacional: "recado_manu", cliente_id: clienteId } }]).order("criado_em", { ascending: false }).limit(8),
+      // Recados deste cliente pra Manu: só os que ainda interessam (abertos, ou vistos nos últimos 7 dias). Com a Manu
+      // desligada (MANU_LIGADA) nem pergunta: ninguém lê esses recados, e o pedido só atrasava a ficha.
+      MANU_LIGADA
+        ? db.from("caixa_entrada").select("id,texto,processado,processado_em,criado_em,conversa").contains("conversa", [{ meta: { tipo_operacional: "recado_manu", cliente_id: clienteId } }]).order("criado_em", { ascending: false }).limit(8)
+        : Promise.resolve({ data: [] }),
     ]);
     if (c.error) { notify("Erro ao abrir ficha: " + c.error.message, "error"); setLoading(false); return; }
     setCliente(c.data); setServicos(sv.data || []); setFotos(ft.data || []);
@@ -14731,20 +14749,24 @@ function FichaModal({ db, demo, notify, clienteId, fornecedores, onClose, onChan
               : <span className="ficha-loc falta">⚠ Sem ponto no mapa — a rota vai {cliente.endereco ? "pelo endereço escrito" : "pela cidade"}</span>}
             {cliente.obs && <span className="ficha-obs">📝 {cliente.obs}</span>}
           </div>
-          <div className="ficha-botoes">
+          {/* BOTÃO MANU GUARDADO (11/11/2026, lista de melhorias; V do Diego no App). A Manu está desligada desde 02/11
+              (MANU_LIGADA): o botão gravava "Recado deixado pra Manu. Ela lê no próximo ciclo." e ninguém lia. O caminho
+              fica no código atrás da chave, como o recado do Painel. As colunas seguem o número de botões, pra fileira
+              não ficar com buraco (o "mais" continua estreito no fim). */}
+          <div className="ficha-botoes" style={{ gridTemplateColumns: `repeat(${(telefoneWhatsapp(cliente.telefone) ? 1 : 0) + (MANU_LIGADA ? 1 : 0) + 2}, 1fr) 48px` }}>
             {telefoneWhatsapp(cliente.telefone) && <a className="ficha-botao" href={urlWhatsapp(telefoneWhatsapp(cliente.telefone), "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer"><i>💬</i>WhatsApp</a>}
             {cliente.latitude != null
               ? <a className="ficha-botao" href={urlWaze({ ll: `${cliente.latitude},${cliente.longitude}` })} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer"><i>🧭</i>Rota</a>
               : <button type="button" className="ficha-botao" onClick={capturarGPS} disabled={capturando}><i>⌖</i>{capturando ? "Buscando…" : "Capturar aqui"}</button>}
-            <button type="button" className={`ficha-botao${falarManu ? " aberto" : ""}`} onClick={() => setFalarManu((v) => !v)}><i>🗣</i>Manu</button>
+            {MANU_LIGADA && <button type="button" className={`ficha-botao${falarManu ? " aberto" : ""}`} onClick={() => setFalarManu((v) => !v)}><i>🗣</i>Manu</button>}
             <button type="button" className="ficha-botao" onClick={() => setEditing(true)}><i>✎</i>Editar</button>
             <button type="button" className={`ficha-botao mais${maisAcoes ? " aberto" : ""}`} aria-label="Mais ações" aria-expanded={maisAcoes} onClick={() => setMaisAcoes((v) => !v)}><i>⋯</i>mais</button>
           </div>
-          {falarManu && <div className="recado-manu-caixa">
+          {MANU_LIGADA && falarManu && <div className="recado-manu-caixa">
             <textarea value={recadoManu} onChange={(e) => setRecadoManu(e.target.value)} autoFocus rows={3} placeholder={`O que a Manu deve fazer com ${nomeDoCliente(cliente)}? Pode ditar.`} />
             <div className="ficha-actions"><button className="primary" onClick={enviarRecadoManu} disabled={enviandoManu || !recadoManu.trim()}>{enviandoManu ? "Enviando…" : "Mandar pra Manu"}</button><button className="ghost" onClick={() => { setFalarManu(false); setRecadoManu(""); }}>Cancelar</button></div>
           </div>}
-          {recadosManu.length > 0 && <div className="recados-manu">{recadosManu.map((r) => {
+          {MANU_LIGADA && recadosManu.length > 0 && <div className="recados-manu">{recadosManu.map((r) => {
             const pedido = (r.conversa || []).find((m) => m?.tipo === "recado_manu");
             const respostas = (r.conversa || []).filter((m) => m && m.de !== "diego" && m.tipo !== "sistema" && m.texto).slice(-1);
             return <div key={r.id} className={`recado-manu${r.processado ? " visto" : ""}`}>

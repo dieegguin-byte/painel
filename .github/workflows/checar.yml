@@ -64,3 +64,6 @@ jobs:
           tests/abrir-sem-babel.test.cjs
           tests/sw-documento.test.cjs
           tests/avisos-agua-calada.test.cjs
+          tests/busca-acha.test.cjs
+          tests/ficha-sem-manu.test.cjs
+          tests/avisos-envio-falha.test.cjs
