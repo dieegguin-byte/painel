@@ -50,6 +50,7 @@ jobs:
           tests/atrasados-idade.test.cjs
           tests/atrasados-passou-da-hora.test.cjs
           tests/avisos-resolvidos.test.cjs
+          tests/carga-sem-corte.test.cjs
           tests/clientes-sem-nome.test.cjs
           tests/ordem-data-hora.test.cjs
           tests/painel-consertos.test.cjs
