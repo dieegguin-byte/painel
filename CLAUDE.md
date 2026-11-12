@@ -29,9 +29,14 @@ que são longos e explicam o porquê de cada decisão (não apague comentários 
 - Mudou `sw.js`? Suba `VERSAO` dentro dele e o `?v=` do `register('./sw.js?v=N')` no fim do `nova.html`.
   Só o `nova.html` registra o service worker. O `estoque.html` (que abre dentro do app) só registra quando não há
   nenhum: endereço diferente do do app troca o service worker e o app recarrega duas vezes (a aba Estoque não ficava
-  aberta, 13/10 a 11/11/2026). Página nova no mesmo site: não registre outro `?v=`.
+  aberta, 13/10 a 11/11/2026). Página nova no mesmo site: não registre outro `?v=`. O `?v=` do `estoque.html` anda
+  junto com o do `nova.html` (`tests/avisos-agua-calada.test.cjs` confere).
 - Link de aviso e atalho do ícone abrem `./nova.html?ir=...`. O `sw.js` guarda e procura a página pelo endereço sem o
   `?...` (uma cópia só, que serve pra qualquer link e abre sem sinal). O app continua lendo `location.search`.
+- Aviso do celular: a função `push-enviar` decide quando o aviso sai e o `sw.js` decide se apita. A água sai de hora
+  em hora, mas só o primeiro de cada série apita sempre (3h depois do copo, e na abertura das 08:00); a repetição
+  leva `atualiza_calado` e o `sw.js` troca o texto calado enquanto o aviso que apitou está na barra (`data.tocou`).
+  Mudou a função? O merge não publica função: sobe pelo Supabase (`deploy_edge_function`), também só com o V.
 - Antes de abrir PR: compile o `nova.html` com o mesmo Babel e rode os testes (ver "Testes"). Tela preta já
   aconteceu duas vezes (22/08 e 02/09/2026) por erro de código publicado sem checar.
 

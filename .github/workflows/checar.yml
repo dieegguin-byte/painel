@@ -63,3 +63,4 @@ jobs:
           tests/cards-ligados-saida.test.cjs
           tests/abrir-sem-babel.test.cjs
           tests/sw-documento.test.cjs
+          tests/avisos-agua-calada.test.cjs
