@@ -52,6 +52,7 @@ jobs:
           tests/avisos-resolvidos.test.cjs
           tests/clientes-sem-nome.test.cjs
           tests/ordem-data-hora.test.cjs
+          tests/painel-consertos.test.cjs
           tests/pronto-producao.test.cjs
           tests/texto-pronto-foto.test.cjs
           tests/whatsapp-comum.test.mjs
