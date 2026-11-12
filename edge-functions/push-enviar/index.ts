@@ -191,21 +191,28 @@ async function entregar(assinatura: Assinatura, aviso: unknown): Promise<{ ok: b
     },
     body: corpo,
   });
-  const erro = r.ok ? "" : (await r.text()).slice(0, 300);
+  const erro = r.ok ? "" : (await r.text().catch(() => "")).slice(0, 300);
   // 404/410 = o Android desinstalou/reinstalou o app e esse endpoint morreu. Some da lista sozinho,
   // senão toda varredura futura gasta uma requisição em algo que nunca mais vai entregar.
-  if (r.status === 404 || r.status === 410) {
-    await rest(`push_assinaturas?id=eq.${assinatura.id}`, {
-      method: "PATCH", headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ ativo: false, ultimo_erro: `${r.status} endpoint morto` }),
-    });
-  } else {
-    await rest(`push_assinaturas?id=eq.${assinatura.id}`, {
-      method: "PATCH", headers: { Prefer: "return=minimal" },
-      body: JSON.stringify(r.ok
-        ? { ultimo_ok: new Date().toISOString(), ultimo_erro: null, falhas: 0 }
-        : { ultimo_erro: `${r.status} ${erro}` }),
-    });
+  // A ANOTAÇÃO NÃO DESFAZ O ENVIO (11/11/2026, lista de melhorias; V do Diego no App). Se esta gravação falhava depois
+  // de o Google aceitar o aviso, o erro subia, a varredura inteira terminava em 500 e os outros avisos da mesma
+  // varredura nunca saíam (as chaves ficavam reservadas). Agora a falha da anotação fica só no log.
+  try {
+    if (r.status === 404 || r.status === 410) {
+      await rest(`push_assinaturas?id=eq.${assinatura.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ ativo: false, ultimo_erro: `${r.status} endpoint morto` }),
+      });
+    } else {
+      await rest(`push_assinaturas?id=eq.${assinatura.id}`, {
+        method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify(r.ok
+          ? { ultimo_ok: new Date().toISOString(), ultimo_erro: null, falhas: 0 }
+          : { ultimo_erro: `${r.status} ${erro}` }),
+      });
+    }
+  } catch (e) {
+    console.error("push_assinaturas: anotação falhou", String((e as Error)?.message || e));
   }
   return { ok: r.ok, status: r.status, erro, recibo };
 }
@@ -230,8 +237,18 @@ async function difundir(envios: Envio[]): Promise<any[]> {
       relatorio.push({ chaves: item.chaves, status: "sem aparelho inscrito" });
       continue;
     }
-    const saidas = [];
-    for (const alvo of alvos) saidas.push(await entregar(alvo, item.aviso));
+    // UM ENVIO QUE ESTOURA NÃO DERRUBA A VARREDURA (11/11/2026, lista de melhorias; V do Diego no App). Se a rede caía
+    // no meio de um envio, o erro subia, a varredura terminava em 500 com todas as chaves reservadas e nada as soltava:
+    // o lembrete de 60 min, a conta, a rotina do dia e o resumo daquela varredura se perdiam pra sempre. Agora o envio
+    // que estoura conta como não entregue, a chave dele é solta (a próxima varredura tenta de novo) e os outros seguem.
+    const saidas: { ok: boolean; status: number; erro: string; recibo?: string }[] = [];
+    for (const alvo of alvos) {
+      try {
+        saidas.push(await entregar(alvo, item.aviso));
+      } catch (e) {
+        saidas.push({ ok: false, status: 0, erro: String((e as Error)?.message || e).slice(0, 300) });
+      }
+    }
     if (!saidas.some((s) => s.ok)) await rpc("push_soltar", { chaves: item.chaves });
     relatorio.push({
       chaves: item.chaves,
