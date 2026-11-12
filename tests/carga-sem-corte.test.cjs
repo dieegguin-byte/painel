@@ -18,7 +18,9 @@ const { buscarTudo } = ctx;
 
 // Uma API de mentira com as mesmas regras da de verdade: corta em `teto` linhas por pedido, devolve a contagem
 // quando pedem, e responde PGRST103 quando o começo pedido fica depois do fim (medido na API real em 11/11/2026).
-function apiDeMentira(linhas, { teto = 1000, conta = true, falhaNoPedido = 0, entraNoMeio = null } = {}) {
+// `mexer(n, tabela)` roda antes de cada pedido e devolve a tabela como ela está naquele instante (o que outro aparelho
+// ou a Toqi gravaram entre um pedido e outro).
+function apiDeMentira(linhas, { teto = 1000, conta = true, falhaNoPedido = 0, entraNoMeio = null, mexer = null } = {}) {
   const pedidos = [];
   let tabela = linhas.slice();
   const montar = () => ({
@@ -27,6 +29,7 @@ function apiDeMentira(linhas, { teto = 1000, conta = true, falhaNoPedido = 0, en
       const n = pedidos.length;
       if (falhaNoPedido && n === falhaNoPedido) return Promise.resolve({ data: null, error: { message: 'caiu a rede', code: 'X' }, count: null });
       if (entraNoMeio && n === entraNoMeio.antesDoPedido) tabela = [entraNoMeio.linha, ...tabela];
+      if (mexer) tabela = mexer(n, tabela);
       if (conta && de > 0 && de >= tabela.length) return Promise.resolve({ data: null, error: { message: 'Requested range not satisfiable', code: 'PGRST103' }, count: null });
       const fatia = tabela.slice(de, Math.min(ate + 1, de + teto));
       return Promise.resolve({ data: fatia, error: null, count: conta ? tabela.length : null });
@@ -102,14 +105,57 @@ test('erro já no primeiro pedido volta como erro', async () => {
   assert.ok(r.error);
 });
 
-test('linha que entra no meio da busca não aparece duas vezes', async () => {
+test('linha que entra no topo no meio da busca: não aparece duas vezes e vem na mesma carga', async () => {
   const api = apiDeMentira(linhas(1147), { entraNoMeio: { antesDoPedido: 2, linha: { id: 'nova', n: -1 } } });
   const r = await buscarTudo(api.montar);
   const ids = Array.from(r.data, (l) => l.id);
   assert.equal(new Set(ids).size, ids.length, 'sem id repetido');
   assert.equal(ids.filter((id) => id === 'l999').length, 1);
-  assert.equal(r.data.length, 1147); // a nova entrou antes da primeira página; vem na próxima carga
-  assert.deepEqual(api.pedidos, [[0, 999], [1000, 1999]], 'e não fica pedindo a mesma página de novo');
+  // A contagem passou de 1147 pra 1148 entre as páginas: busca de novo e a nova vem já nesta carga.
+  assert.equal(r.data.length, 1148);
+  assert.equal(ids[0], 'nova');
+  assert.deepEqual(api.pedidos, [[0, 999], [1000, 1999], [0, 999], [1000, 1999]], 'uma volta a mais, só');
+});
+
+// Os três casos abaixo foram montados pela revisão técnica de 11/11/2026 contra a versão sem a segunda volta: em
+// cada um, uma linha que existe ficava fora das duas páginas.
+const vivas = (tabela) => new Set(tabela.map((l) => l.id));
+test('card que sai da lista entre as páginas (Desfazer de um Feito): nenhuma linha viva fica de fora', async () => {
+  let depois = null;
+  const api = apiDeMentira(linhas(1147), { mexer: (n, t) => (n === 2 ? (depois = t.filter((l) => l.id !== 'l10')) : t) });
+  const r = await buscarTudo(api.montar);
+  const ids = new Set(Array.from(r.data, (l) => l.id));
+  assert.equal(r.error, null);
+  assert.deepEqual([...vivas(depois)].filter((id) => !ids.has(id)), [], 'linha viva fora da lista');
+  assert.ok(!ids.has('l10'), 'a que saiu não fica na lista');
+  assert.equal(r.data.length, 1146);
+  assert.equal(api.pedidos.length, 4);
+});
+
+test('lançamento antigo que muda de data pra hoje (sobe do fim pro topo): nenhuma linha viva fica de fora', async () => {
+  const api = apiDeMentira(linhas(1147), { mexer: (n, t) => (n === 2 ? [t.find((l) => l.id === 'l1100'), ...t.filter((l) => l.id !== 'l1100')] : t) });
+  const r = await buscarTudo(api.montar);
+  const ids = Array.from(r.data, (l) => l.id);
+  assert.equal(new Set(ids).size, 1147);
+  assert.ok(ids.includes('l1100'), 'o lançamento que mudou de data continua na lista');
+  assert.equal(ids[0], 'l1100', 'e na ordem nova');
+  assert.equal(api.pedidos.length, 4);
+});
+
+test('tabela que não para de mexer: no máximo três voltas, e fica com a última (sem erro, sem laço)', async () => {
+  let k = 0;
+  const api = apiDeMentira(linhas(1147), { mexer: (n, t) => [{ id: 'nova' + ++k, n: -k }, ...t] });
+  const r = await buscarTudo(api.montar);
+  assert.equal(r.error, null);
+  assert.equal(api.pedidos.length, 6, 'três voltas de duas páginas');
+  assert.ok(r.data.length >= 1147);
+});
+
+test('nada mudou: duas páginas e pronto, sem volta a mais', async () => {
+  const api = apiDeMentira(linhas(2500), { mexer: (n, t) => t });
+  const r = await buscarTudo(api.montar);
+  assert.equal(r.data.length, 2500);
+  assert.equal(api.pedidos.length, 3);
 });
 
 test('página que só traz linha repetida não prende a busca num laço', async () => {
@@ -128,19 +174,21 @@ test('servidor que ignora a página e manda tudo de uma vez: um pedido só, sem 
   assert.equal(n, 1);
 });
 
-test('"depois do fim" (PGRST103) numa página seguinte é fim da lista, não falha', async () => {
-  // a contagem dizia 1147, mas na segunda volta a tabela "encolheu" pra mil: a API responde PGRST103
+test('"depois do fim" (PGRST103) numa página seguinte não é falha: busca de novo e fica com a tabela como ficou', async () => {
+  // a contagem dizia 1147, mas antes da segunda página a tabela "encolheu" pra mil: a API responde PGRST103
   let n = 0;
   const montar = () => ({
-    range() {
+    range(de) {
       n++;
       if (n === 1) return Promise.resolve({ data: linhas(1000), error: null, count: 1147 });
-      return Promise.resolve({ data: null, error: { code: 'PGRST103', message: 'Requested range not satisfiable' }, count: null });
+      if (de > 0) return Promise.resolve({ data: null, error: { code: 'PGRST103', message: 'Requested range not satisfiable' }, count: null });
+      return Promise.resolve({ data: linhas(1000), error: null, count: 1000 });
     },
   });
   const r = await buscarTudo(montar);
   assert.equal(r.error, null);
   assert.equal(r.data.length, 1000);
+  assert.equal(n, 3, 'primeira página, o "depois do fim", e a volta que confirma as mil');
 });
 
 test('a carga do app usa buscarTudo nas tabelas que crescem, com ordem que termina no id', () => {
