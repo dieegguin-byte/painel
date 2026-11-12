@@ -965,6 +965,8 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .hoje-linhas{display:block;position:relative;margin-top:8px}
 .hoje-linha{display:block;font-size:13px;line-height:1.55;color:#f3dfc9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hoje-linha.rotina,.hoje-linha.mais{color:#f3dfc9b8}
+/* NÚMERO NUNCA CORTADO NO MEIO (11/11/2026): cada pedaço com número é um bloco que não se parte (ver pedacosComNumero). */
+.num-inteiro{display:inline-block;white-space:nowrap}
 /* RESUMO DA MANHÃ (12/10/2026): card do topo, lido de avisos_operacionais (domínio resumo_manha) */
 .resumo-card{position:relative;overflow:hidden;background:linear-gradient(160deg,#1b2a2a 0,#17201e 40%,#141110 100%);border-color:#75a98755;box-shadow:inset 0 1px 0 #ffffff1a,0 1px 2px #0000004d,0 18px 40px -18px #000000cc}
 .resumo-card::before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,#9bc7a7,#75a98700 70%)}
@@ -6425,6 +6427,27 @@ function linhasDeHojeFechado(compromissos, rotinasNoPrazo, nomeDoClienteDe) {
   if (ordenados.length > HOJE_FECHADO_MAX) linhas.push({ mais: true, texto: `e mais ${ordenados.length - HOJE_FECHADO_MAX}` });
   return linhas;
 }
+// NÚMERO NUNCA APARECE CORTADO NO MEIO (11/11/2026, crítica da prévia do Painel). O título do card corta com "…" onde
+// a largura acaba, e o corte caía no meio do valor: um "R$ 100" aparecia como "R$ 10…", e valor cortado lê como outro
+// valor (em 30 dias, 7 dos 17 títulos com "R$" tinham o valor bem onde a segunda linha termina). Cada pedaço com
+// número (valor com o "R$" junto, data, hora, quantidade) vira um bloco que não se parte: ou aparece inteiro, ou fica
+// pra quando o card abre. Pedaço comprido demais (um link, um código) fica como texto comum, pra não estourar a linha.
+const RE_PEDACO_COM_NUMERO = /(?:R\$\s?)?[^\s]*\d[^\s]*/g;
+const NUMERO_INTEIRO_MAX = 16;
+function pedacosComNumero(texto) {
+  const t = String(texto == null ? "" : texto);
+  const pedacos = [];
+  let fim = 0, m;
+  RE_PEDACO_COM_NUMERO.lastIndex = 0;
+  while ((m = RE_PEDACO_COM_NUMERO.exec(t))) {
+    if (m[0].length > NUMERO_INTEIRO_MAX) continue;
+    if (m.index > fim) pedacos.push({ t: t.slice(fim, m.index), inteiro: false });
+    pedacos.push({ t: m[0], inteiro: true });
+    fim = m.index + m[0].length;
+  }
+  if (fim < t.length) pedacos.push({ t: t.slice(fim), inteiro: false });
+  return pedacos;
+}
 // "hoje"/"amanhã" soa mais natural numa mensagem pro cliente do que a data cheia.
 function quandoFalado(data, hora, hoje) {
   const amanha = new Date(hoje + "T12:00:00"); amanha.setDate(amanha.getDate() + 1);
@@ -7801,7 +7824,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         {idadeAtraso || <span>{compactDate(a.data)}</span>}
       </span>
       <span className="compromisso-idc">
-        <strong>{a.titulo || "Compromisso pessoal"}</strong>
+        <strong>{comNumeroInteiro(a.titulo || "Compromisso pessoal")}</strong>
         <span>{a.cidade || "pessoal"}</span>
       </span>
       <span className="compromisso-seta">{aberto ? "▾" : "▸"}</span>
@@ -7962,7 +7985,7 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
         {/* TÍTULO NA FRENTE, CLIENTE EMBAIXO (Diego, 16/10/2026, 10h36, print: dois cards da Simone, 9h35 "Comprar rodinhas na
             Pau Brasil" e 9h50 "Marlom Júnior — levar Colorado e rodinhas", apareciam os dois só como "Simone Batista Pinheiro"
             e ele achou que era duplicado). O título já diz quem + o quê; o nome da cliente vira a linha de baixo. */}
-        <strong>{tituloCard || nomeCliente}</strong>
+        <strong>{comNumeroInteiro(tituloCard || nomeCliente)}</strong>
         {cli?.nome && tituloCard && !tituloCard.toLowerCase().includes(cli.nome.split(" ")[0].toLowerCase()) && <small className="compromisso-cliente">{cli.nome}</small>}
         <span>{ligado && ligado.cor && <i className="selo-ligado" title="Mesma saída: cards separados, mas é uma viagem só">⛓ {ligado.indice}/{ligado.n}</i>}{fixadoHoje(a) && <i className="selo-urgente">📌 Fixado</i>}{ehQuente(a) && <i className="selo-quente">🔥 Quente</i>}{vaiAudio ? <i className="selo-followup zapia selo-audio">🎤 Vai o seu áudio</i> : seloTipo && <i className={`selo-followup${seloTipo[1] ? " " + seloTipo[1] : ""}`}>{seloTipo[0]}</i>}{cidadeCard}</span>
       </span>
@@ -8300,6 +8323,12 @@ const IR_SECAO = { atrasados: "secao-vencendo", hoje: "secao-hoje", propostas: "
 //   ?ir=mural                       o Mural de recados entre Claude, Toqi e Diego
 const IR_ID = (() => { try { return new URL(location.href).searchParams.get("id"); } catch (e) { return null; } })();
 const IR_GRUPO = { manu: "grupo-manu" };
+// O texto com os pedaços de número em bloco inteiro (ver pedacosComNumero). Sem número, devolve o texto como veio.
+function comNumeroInteiro(texto) {
+  const pedacos = pedacosComNumero(texto);
+  if (!pedacos.some((p) => p.inteiro)) return String(texto == null ? "" : texto);
+  return pedacos.map((p, i) => (p.inteiro ? <span className="num-inteiro" key={i}>{p.t}</span> : p.t));
+}
 function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null, resumoAbre = false }) {
   const naLista = React.useContext(DentroDaLista);
   const [aberto, setAberto] = useState(false);
@@ -10825,7 +10854,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     {/* PROPOSTAS DE ORÇAMENTO (Diego, 16/10/2026, 08h46): antes da agenda do dia porque é dinheiro parado esperando um toque. */}
     <PropostasCard propostas={propostas} customers={customers} services={services} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CardRecolhivel id="secao-hoje" className="content-card hoje-card" resumoAbre
-      resumo={hojeFechado.length > 0 ? <span className="hoje-linhas">{hojeFechado.map((linha, i) => <span key={i} className={`hoje-linha${linha.rotina ? " rotina" : ""}${linha.mais ? " mais" : ""}`}>{linha.texto}</span>)}</span> : null}
+      resumo={hojeFechado.length > 0 ? <span className="hoje-linhas">{hojeFechado.map((linha, i) => <span key={i} className={`hoje-linha${linha.rotina ? " rotina" : ""}${linha.mais ? " mais" : ""}`}>{comNumeroInteiro(linha.texto)}</span>)}</span> : null}
       cabecalho={<><p className="kicker">AGENDA DE HOJE · {compactDate(today)}</p>
       <h3>{hoje.length ? `${hoje.length} compromisso(s) hoje` : "Nenhum compromisso hoje"}{rotinasPendentesHoje ? ` · ${rotinasPendentesHoje} rotina(s)` : ""}</h3>
       {hojePassouDaHora > 0 && <span className="ficha-note" style={{ margin: 0 }}>{hojePassouDaHora} já {hojePassouDaHora > 1 ? "passaram" : "passou"} da hora · {hojePassouDaHora > 1 ? "estão" : "está"} em Precisa resolver</span>}{seloFiltro}</>}>
