@@ -998,6 +998,29 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .resumo-bloco.prioridades ul{counter-reset:prio}
 .resumo-bloco.prioridades li::before{content:counter(prio);width:22px;height:22px;border-radius:7px;background:linear-gradient(145deg,#ed9057,#c8551f);color:#fff8f0;font:800 12px/22px Inter,system-ui,sans-serif;text-align:center;margin-top:0;box-shadow:none}
 .resumo-card p.resumo-livre{margin:6px 0 0;font-size:14px;line-height:1.5;color:var(--cream);white-space:pre-wrap}
+.resumo-bloco li .resumo-fichas{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.resumo-bloco li .resumo-fichas button{background:#ffffff10;border:1px solid #ffffff22;color:var(--cream);border-radius:999px;padding:5px 11px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer}
+/* LEADS A RESOLVER (Diego, 13/11/2026): logo abaixo do Resumo da manhã. Um lead por linha, resumo do caso, WhatsApp,
+   Concluir e Cancelar. Botões grandes pro polegar; a linha que saiu fica um instante com "Desfazer". */
+.leads-resolver{border-color:#ed905755}
+.leads-resolver .kicker{color:#ed9057;letter-spacing:2px;font-size:11px;margin:0}
+.leads-resolver h3{margin:2px 0 10px}
+.lead-item{border:1px solid #ffffff14;background:#ffffff08;border-radius:12px;padding:10px 11px;margin-top:8px}
+.lead-item.esperando{border-color:#ed905766;background:#d86d3612}
+.lead-nome{display:flex;align-items:baseline;gap:8px;width:100%;background:transparent;border:0;padding:0;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.lead-nome b{font-size:15px}
+.lead-nome span{color:var(--dim);font-size:12px}
+.lead-nome i{font-style:normal;color:var(--dim);margin-left:auto;font-size:18px}
+.lead-resumo{margin:5px 0 2px;font-size:14px;line-height:1.4;color:var(--cream);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lead-desde{display:block;color:var(--dim);font-size:11px}
+.lead-botoes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}
+.lead-botoes>*{min-height:44px;min-width:0;display:flex;align-items:center;justify-content:center;padding:8px 6px}
+.lead-botoes .lead-wpp{min-width:0;font-size:13px}
+.lead-botoes .lead-concluir{background:linear-gradient(135deg,#2f7d4f,#1f5a38);color:#eafff0;border:1px solid #3f9160;border-radius:10px;font:750 13px Inter,system-ui,sans-serif}
+.lead-botoes .lead-cancelar{background:transparent;color:#f0a48a;border:1px solid #d86d3699;border-radius:10px;font:700 13px Inter,system-ui,sans-serif}
+.lead-botoes .lead-wpp{background:#25d36622;border-color:#25d36666}
+.lead-saiu{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding:8px 11px;border-radius:12px;border:1px dashed #ffffff22;color:var(--dim);font-size:13px}
+.lead-saiu .ghost{min-height:40px;padding:6px 12px;white-space:nowrap;flex:0 0 auto}
 /* GRUPOS RECOLHIDOS (Diego, 12/10/2026: "quero tudo recolhido para ficar mais mínima na lista"). O corpo fica
    montado mas escondido (height 0 + visibility), não display:none: assim o contador CSS das linhas continua
    contando e o grupo vazio continua sumindo pelo :has(). */
@@ -4764,7 +4787,7 @@ function Home() {
         // CAIXA DE AVISOS OPERACIONAIS (item AGENDA-CAIXA-AVISOS-20260831-001). Condição viva que quem vai
         // marcar compromisso precisa ver ANTES de marcar. Só os ativos e só os que ainda não expiraram —
         // aviso vencido é ruído, e ruído faz ele parar de ler o aviso que importa.
-        db.from("avisos_operacionais").select("id,dominio,aviso,prioridade,expira_em,referencia_id").eq("ativo", true),
+        db.from("avisos_operacionais").select("id,dominio,aviso,prioridade,expira_em,referencia_id,criado_em").eq("ativo", true),
         // DÍVIDAS: tudo que não está quitado. Filtro por EXCLUSÃO, não por igualdade com "aberta" — um status
         // que alguém invente amanhã (ou nulo) tem que APARECER com o nome dele, não sumir como os tipos de
         // agenda sumiam do filtro Presencial/Remoto. Volume minúsculo: 6 linhas em 13/09.
@@ -8470,7 +8493,7 @@ function comNumeroInteiro(texto) {
   if (!pedacos.some((p) => p.inteiro)) return String(texto == null ? "" : texto);
   return pedacos.map((p, i) => (p.inteiro ? <span className="num-inteiro" key={i}>{p.t}</span> : p.t));
 }
-function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null, resumoAbre = false }) {
+function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = null, tom = "laranja", icone = null, seloTexto = null, resumoAbre = false, onFechar = null }) {
   const naLista = React.useContext(DentroDaLista);
   const [aberto, setAberto] = useState(false);
   // TOCAR ABRE POR CIMA (Diego, 15/10/2026, depois de testar: "clicar e abrir ela inteira"): no Painel, o toque e o
@@ -8479,18 +8502,20 @@ function CardRecolhivel({ className, id, cabecalho, resumo, children, selo = nul
   // ATALHO DO ÍCONE (Diego, 16/10/2026, 07h19: "Atrasados, compromissos de hoje"): ?ir=atrasados / ?ir=hoje abre a
   // seção inteira por cima já na chegada, uma vez só (consome o pedido pra não reabrir ao trocar de aba).
   const [porCima, setPorCima] = useState(() => { if (naLista || !id || IR_SECAO[IR_INICIAL] !== id) return false; consumirIrInicial(); return true; });
-  const abrir = () => { if (aberto) setAberto(false); else if (naLista) setAberto(true); else setPorCima(true); };
+  // `onFechar` (13/11/2026): avisa quem usa o card que a lista fechou (Leads a resolver limpa ali as linhas de Desfazer).
+  const abrir = () => { if (aberto) { setAberto(false); if (onFechar) onFechar(); } else if (naLista) setAberto(true); else setPorCima(true); };
   const arraste = usarArrastePraDireita(() => setPorCima(true));
   const comSelo = (selo !== null && selo !== undefined) || !!seloTexto;
   return <section id={id} className={`${className || "content-card"}${comSelo ? ` com-selo tom-${tom}` : ""}${aberto ? " aberto" : ""}`} {...(naLista ? {} : arraste)}>
-    {porCima && !naLista && ReactDOM.createPortal(<ListaLateral cabecalho={<>{typeof cabecalho === "function" ? cabecalho(true) : cabecalho}</>} onFechar={() => setPorCima(false)}>{children}</ListaLateral>, document.body)}
+    {porCima && !naLista && ReactDOM.createPortal(<ListaLateral cabecalho={<>{typeof cabecalho === "function" ? cabecalho(true) : cabecalho}</>} onFechar={() => { setPorCima(false); if (onFechar) onFechar(); }}>{children}</ListaLateral>, document.body)}
     <button type="button" className="card-toggle" aria-expanded={aberto} onClick={abrir}>
       {comSelo && <span className={`selo-num${seloTexto ? " selo-txt" : ""}`} aria-hidden="true"><b>{seloTexto || selo}</b>{icone && <small>{icone}</small>}</span>}
       <div>{typeof cabecalho === "function" ? cabecalho(aberto) : cabecalho}</div>
       <i>{aberto ? "▾ fechar" : "▸ abrir"}</i>
     </button>
     {/* `resumoAbre` (11/11/2026): o resumo de baixo vira parte do toque que abre o card. Sem ele o resumo é só texto,
-        como sempre foi (Propostas, Rotinas, Materiais). Usado pela Agenda de hoje, que lista ali o que vem no dia. */}
+        como sempre foi (Propostas, Rotinas, Materiais). Usado pela Agenda de hoje, que lista ali o que vem no dia, e pelos
+        Leads a resolver (13/11/2026), que mostram ali os nomes. */}
     {resumoAbre && resumo ? <button type="button" className="card-resumo-toque" onClick={abrir}>{resumo}</button> : resumo}
     {aberto && <div className="card-corpo">{children}</div>}
   </section>;
@@ -10281,13 +10306,17 @@ function parseResumoManha(texto) {
   String(texto || "").split(/\r?\n/).forEach((linhaBruta) => {
     const linha = linhaBruta.trim(); if (!linha) return;
     if (/:$/.test(linha) && !/^[-•*]/.test(linha)) { atual = { titulo: linha.replace(/:$/, ""), itens: [] }; blocos.push(atual); return; }
-    const m = linha.match(/^[-•*]\s*(.*?)(?:\s*\{cliente:([\w-]+)\})?$/i);
-    const item = m ? { texto: m[1], clienteId: m[2] || null } : { texto: linha, clienteId: null };
+    // VÁRIOS CLIENTES NUMA LINHA (13/11/2026): "Fulana ... e o Fulano ... {cliente:A} {cliente:B}". O leitor só
+    // entendia o último código: o primeiro aparecia cru na tela e o toque abria só o segundo. Agora todo código sai
+    // do texto e cada cliente vira um toque próprio (ver Item no ResumoManhaCard).
+    const ids = [];
+    const corpo = linha.replace(/^[-•*]\s*/, "").replace(/\s*\{cliente:([\w-]+)\}/gi, (_, id) => { ids.push(id); return ""; }).trim();
+    const item = { texto: corpo, clienteId: ids[0] || null, clienteIds: ids };
     if (atual) atual.itens.push(item); else soltas.push(item);
   });
   return { blocos, soltas };
 }
-function ResumoManhaCard({ avisos, today, db, demo, notify, onOpenFicha, onChanged }) {
+function ResumoManhaCard({ avisos, customers, today, db, demo, notify, onOpenFicha, onChanged }) {
   const [escondido, setEscondido] = useState(null);
   const [busy, setBusy] = useState(false);
   const resumo = useMemo(() => (avisos || [])
@@ -10302,13 +10331,158 @@ function ResumoManhaCard({ avisos, today, db, demo, notify, onOpenFicha, onChang
       setEscondido(resumo.id); vibrar(12); if (onChanged && !demo) onChanged();
     } catch (e) { notify("Erro ao fechar o resumo: " + e.message, "error"); } finally { setBusy(false); }
   };
-  const Item = ({ it }) => <li className={it.clienteId && onOpenFicha ? "com-ficha" : ""} onClick={it.clienteId && onOpenFicha ? () => onOpenFicha(it.clienteId) : undefined}>{it.texto}{it.clienteId && onOpenFicha && <i>›</i>}</li>;
+  const primeiroNomeDe = (id) => String((customers || []).find((c) => c.id === id)?.nome || "").trim().split(/\s+/)[0] || "Ficha";
+  const Item = ({ it }) => {
+    const ids = it.clienteIds || (it.clienteId ? [it.clienteId] : []);
+    if (ids.length > 1 && onOpenFicha) return <li><span>{it.texto}<span className="resumo-fichas">{ids.map((id) => <button type="button" key={id} onClick={() => onOpenFicha(id)}>{primeiroNomeDe(id)} ›</button>)}</span></span></li>;
+    return <li className={it.clienteId && onOpenFicha ? "com-ficha" : ""} onClick={it.clienteId && onOpenFicha ? () => onOpenFicha(it.clienteId) : undefined}>{it.texto}{it.clienteId && onOpenFicha && <i>›</i>}</li>;
+  };
   return <section className="content-card resumo-card">
     <div className="resumo-topo"><div><p className="kicker">RESUMO DA MANHÃ · {compactDate(resumo.expira_em || today)}</p><h3>Bom dia, Diego</h3></div>
       <button type="button" className="ghost" disabled={busy} onClick={entendi}>{busy ? "…" : "Entendi"}</button></div>
     {soltas.length > 0 && <p className="resumo-livre">{soltas.map((it) => it.texto).join("\n")}</p>}
     {blocos.map((b, i) => <div key={i} className={`resumo-bloco${/priorid/i.test(b.titulo) ? " prioridades" : ""}`}><b>{b.titulo}</b><ul>{b.itens.map((it, j) => <Item key={j} it={it} />)}</ul></div>)}
   </section>;
+}
+// ===== LEADS A RESOLVER (Diego, 13/11/2026, olhando o Resumo da manhã: "quando toco em entendi não vai para Cards. Pra
+// mim está faltando Leads a Resolver coisa do tipo e resumo rápido da situação e o WhatsApp"; "nem precisa virar card se não
+// andar"; "Botão concluir para sumir"; "Cancelar ... porque eu decido até se nem falo com ele"; "quando cancela você já sabe
+// que foi perdido"; "Tem que ser prático e rápido") =====
+// A auditoria das 02h20 grava UMA linha por lead que espera o Diego em avisos_operacionais: dominio "lead",
+// referencia_id = id do serviço, aviso = o resumo rápido do caso, prioridade "alta" quando o cliente espera resposta. Lead
+// que já tem linha ativa ganha o texto atualizado, não outra linha. O "Entendi" do Resumo da manhã fecha só o resumo.
+// O Painel lista só as linhas cujo serviço ainda é lead/orçamento e não tem card planejado: quando o lead anda (marcou
+// visita, produção, fechou) ele sai sozinho, sem toque, e quem cuida dali em diante é o card (mesma regra dos Encaixes de
+// rota). Card cancelado com o serviço ainda lead: a linha volta. Um toque por ação, sem pergunta:
+//   Concluir = sai da lista (ativo=false). O serviço não muda.
+//   Cancelar = sai da lista e o serviço vira "perdido", sem motivo a escrever, no formato que a auditoria já confere pro
+//   encerramento (passos-1l-1v, ponto 6): "ENCERRADO pelo Diego dd/mm (lista de leads), ficha fica" na frente da
+//   proxima_acao, o texto antigo embaixo, e "antes: status <x>" no historico. O cancelamento é do cliente inteiro (Diego
+//   17/10: "quando eu cancelo é cancelado total"): os outros pedidos dele em lead/orçamento também viram perdido, menos o
+//   que tem card planejado (o card cuida) ou dinheiro pago. Serviço com dinheiro pago não vira perdido (seria mentir sobre
+//   o dinheiro, ver onEncerrar): só sai da lista, e o app diz isso.
+// Todo toque grava no historico "servico <id> · aviso <id>" no começo do detalhe: é por esse id, nunca pelo nome, que a
+// auditoria sabe que o Diego já decidiu e só traz o lead de volta se o cliente escrever depois.
+// Toque errado tem volta: a linha encolhe numa faixa "✓ Fulana · concluído · ↶ Desfazer" no fim da lista até ela fechar,
+// e o Desfazer pergunta antes, como todo Desfazer do app.
+const DOMINIO_LEAD = "lead";
+const LEAD_STATUS_ABERTO = ["lead", "orcamento"];
+function leadsAResolver(avisos, services, agendaPlanejada) {
+  const porId = new Map((services || []).map((s) => [s.id, s]));
+  const comCard = new Set((agendaPlanejada || []).map((a) => a.servico_id).filter(Boolean));
+  // Uma linha por serviço: se por engano houver duas ativas pro mesmo serviço, vale a mais nova.
+  const porServico = new Map();
+  for (const av of avisos || []) {
+    if (av.dominio !== DOMINIO_LEAD || av.ativo === false || !av.referencia_id) continue;
+    const atual = porServico.get(av.referencia_id);
+    if (!atual || String(av.criado_em || "") > String(atual.criado_em || "")) porServico.set(av.referencia_id, av);
+  }
+  const alta = (l) => (l.aviso.prioridade === "alta" ? 0 : 1);
+  return [...porServico.values()]
+    .map((av) => ({ aviso: av, svc: porId.get(av.referencia_id) || null }))
+    .filter((l) => l.svc && LEAD_STATUS_ABERTO.includes(l.svc.status || "lead") && !comCard.has(l.svc.id))
+    .sort((a, b) => alta(a) - alta(b) || String(a.aviso.criado_em || "").localeCompare(String(b.aviso.criado_em || "")));
+}
+// "entrou hoje" / "na lista desde ontem" / "na lista há 3 dias": conta pronta, sem data pra fazer de cabeça. O criado_em
+// vem em UTC: o dia conta no fuso de Brasília (linha gravada às 22h não pode dizer "desde ontem" na manhã seguinte).
+function tempoNaLista(criadoEm, hoje) {
+  if (!criadoEm || !hoje) return "";
+  const dia = String(criadoEm).length > 10 ? cronogramaDiaLocal(new Date(criadoEm).getTime()) : String(criadoEm);
+  if (!dia) return "";
+  const dias = Math.round((new Date(`${hoje}T12:00:00`) - new Date(`${dia}T12:00:00`)) / 86400000);
+  if (!(dias > 0)) return "entrou hoje";
+  return dias === 1 ? "na lista desde ontem" : `na lista há ${dias} dias`;
+}
+function LeadsAResolverCard({ avisos, services, agendaPlanejada, finances, today, db, demo, notify, onOpenFicha, onChanged }) {
+  const [saidas, setSaidas] = useState([]); // o que saiu da lista enquanto ela está aberta, pro Desfazer
+  const [busy, setBusy] = useState(null);
+  const lista = useMemo(() => leadsAResolver(avisos, services, agendaPlanejada), [avisos, services, agendaPlanejada]);
+  const primeiro = (nome) => String(nome || "").trim().split(/\s+/)[0] || "Cliente";
+  const sair = async (l, tipo) => {
+    const svc = l.svc;
+    const nome = svc.clientes?.nome || "Cliente";
+    const pagoDe = (id) => (finances || []).filter((f) => f.servico_id === id && f.tipo === "entrada" && f.status === "pago").reduce((t, f) => t + Number(f.valor || 0), 0);
+    const pago = pagoDe(svc.id);
+    const viraPerdido = tipo === "cancelar" && !(pago > 0);
+    // Cancelado total: os outros pedidos abertos do mesmo cliente vão junto, menos o que tem card planejado ou dinheiro pago.
+    const clienteId = svc.cliente_id || svc.clientes?.id || null;
+    const comCard = new Set((agendaPlanejada || []).map((a) => a.servico_id).filter(Boolean));
+    const alvos = !viraPerdido ? [] : [svc, ...(services || []).filter((s) => s.id !== svc.id && clienteId && s.cliente_id === clienteId
+      && LEAD_STATUS_ABERTO.includes(s.status || "lead") && !comCard.has(s.id) && !(pagoDe(s.id) > 0))];
+    const ids = new Set([svc.id, ...alvos.map((s) => s.id)]);
+    const avisoIds = (avisos || []).filter((av) => av.dominio === DOMINIO_LEAD && ids.has(av.referencia_id) && av.ativo !== false).map((av) => av.id);
+    const antes = alvos.map((s) => ({ id: s.id, status: s.status || "lead", proxima_acao: s.proxima_acao ?? null }));
+    const ddmm = `${String(today).slice(8, 10)}/${String(today).slice(5, 7)}`;
+    const resumoCaso = String(l.aviso.aviso || "").slice(0, 300);
+    vibrar(8); setBusy(svc.id);
+    try {
+      if (!demo) {
+        for (const a of antes) {
+          const proxima = `ENCERRADO pelo Diego ${ddmm} (lista de leads), ficha fica${a.proxima_acao ? "\n" + a.proxima_acao : ""}`;
+          const { error } = await db.from("servicos").update({ status: "perdido", proxima_acao: proxima, atualizado_em: new Date().toISOString() }).eq("id", a.id);
+          if (error) throw error;
+        }
+        if (avisoIds.length) { const { error } = await db.from("avisos_operacionais").update({ ativo: false }).in("id", avisoIds); if (error) throw error; }
+        const marca = (id) => `servico ${id} · aviso ${avisoIds.join(",") || "nenhum"}`;
+        const linhas = viraPerdido
+          ? antes.map((a) => ({ o_que: `Lead cancelado (perdido) na lista de leads: ${nome}`, por: "diego", detalhe: `${marca(a.id)} · antes: status ${a.status} · ${a.id === svc.id ? resumoCaso : "outro pedido do mesmo cliente"}` }))
+          : [{ o_que: `${tipo === "cancelar" ? "Lead saiu da lista (já tem pagamento, não virou perdido)" : "Lead concluído na lista de leads"}: ${nome}`, por: "diego", detalhe: `${marca(svc.id)} · ${resumoCaso}` }];
+        await db.from("historico").insert(linhas);
+      }
+      const como = viraPerdido ? "perdido" : tipo === "cancelar" ? "pago" : "concluido";
+      setSaidas((s) => [...s.filter((x) => x.svcId !== svc.id), { svcId: svc.id, nome, avisoIds, antes, viraPerdido, como }]);
+      if (onChanged && !demo) onChanged();
+    } catch (e) { notify("Não saiu da lista: " + e.message, "error"); } finally { setBusy(null); }
+  };
+  const desfazer = async (sv) => {
+    // Confirma antes (Diego, 14/10/2026): todo Desfazer do app pergunta.
+    if (!window.confirm(`Voltar ${primeiro(sv.nome)} pra lista?${sv.viraPerdido ? " O serviço deixa de ser perdido." : ""}`)) return;
+    vibrar(6); setBusy(sv.svcId);
+    try {
+      if (!demo) {
+        // Volta exatamente o que estava antes do toque (status e texto do caso, sem a linha do ENCERRADO).
+        for (const a of sv.antes) {
+          const { error } = await db.from("servicos").update({ status: a.status, proxima_acao: a.proxima_acao, atualizado_em: new Date().toISOString() }).eq("id", a.id);
+          if (error) throw error;
+        }
+        if (sv.avisoIds.length) { const { error } = await db.from("avisos_operacionais").update({ ativo: true }).in("id", sv.avisoIds); if (error) throw error; }
+        await db.from("historico").insert({ o_que: `Lead voltou pra lista: ${sv.nome}`, por: "diego", detalhe: `servico ${sv.svcId} · aviso ${sv.avisoIds.join(",") || "nenhum"} · Desfazer logo depois do toque.` });
+      }
+      setSaidas((s) => s.filter((x) => x.svcId !== sv.svcId));
+      if (onChanged && !demo) onChanged();
+    } catch (e) { notify("Não desfez: " + e.message, "error"); } finally { setBusy(null); }
+  };
+  const saiu = new Set(saidas.map((x) => x.svcId));
+  const visiveis = lista.filter((l) => !saiu.has(l.svc.id));
+  if (!visiveis.length && !saidas.length) return null;
+  const nomes = visiveis.map((l) => primeiro(l.svc.clientes?.nome));
+  const resumo = nomes.length ? <span className="ficha-note leads-nomes">{nomes.slice(0, 2).join(" · ")}{nomes.length > 2 ? ` · e mais ${nomes.length - 2}` : ""}</span> : null;
+  return <CardRecolhivel className="content-card leads-resolver" selo={visiveis.length || null} tom="laranja" icone="💬" resumo={resumo} resumoAbre onFechar={() => setSaidas([])}
+    cabecalho={<><p className="kicker">LEADS A RESOLVER</p><h3>{visiveis.length === 1 ? "1 lead esperando você" : visiveis.length ? `${visiveis.length} leads esperando você` : "Nenhum lead esperando"}</h3></>}>
+    {visiveis.map((l) => {
+      const c = l.svc.clientes || {};
+      const tel = telefoneWhatsapp(c.telefone);
+      const clienteId = l.svc.cliente_id || c.id;
+      const quando = tempoNaLista(l.aviso.criado_em, today);
+      return <article className={`lead-item${l.aviso.prioridade === "alta" ? " esperando" : ""}`} key={l.aviso.id}>
+        <button type="button" className="lead-nome" onClick={() => { if (onOpenFicha && clienteId) { vibrar(6); onOpenFicha(clienteId); } }}>
+          <b>{c.nome || "Cliente"}</b>{c.cidade && <span>{c.cidade}</span>}<i>›</i>
+        </button>
+        <p className="lead-resumo">{l.aviso.aviso}</p>
+        {quando && <span className="lead-desde">{quando}</span>}
+        {/* Concluir à esquerda, Cancelar à direita, WhatsApp no meio: o toque que escorrega cai no WhatsApp, que só abre a conversa. */}
+        <div className="lead-botoes">
+          <button type="button" className="lead-concluir" disabled={busy === l.svc.id} onClick={() => sair(l, "concluir")}>✓ Concluir</button>
+          {tel ? <a className="btn-wpp lead-wpp" href={urlWhatsapp(tel, "")} target={ehAndroid() ? undefined : "_blank"} rel="noreferrer">WhatsApp</a> : <span />}
+          <button type="button" className="lead-cancelar" disabled={busy === l.svc.id} onClick={() => sair(l, "cancelar")}>✖ Cancelar</button>
+        </div>
+      </article>;
+    })}
+    {saidas.map((sv) => <div className="lead-saiu" key={"saiu-" + sv.svcId}>
+      <span>{sv.como === "pago" ? `${primeiro(sv.nome)} já tem pagamento. Saiu da lista, mas não virou perdido.` : sv.como === "perdido" ? `✖ ${primeiro(sv.nome)} · perdido${sv.antes.length > 1 ? ` (${sv.antes.length} pedidos)` : ""}` : `✓ ${primeiro(sv.nome)} · concluído`}</span>
+      <button type="button" className="ghost" disabled={busy === sv.svcId} onClick={() => desfazer(sv)}>↶ Desfazer</button>
+    </div>)}
+  </CardRecolhivel>;
 }
 // ===== DÚVIDAS DO AGENTE (Diego, 12/10/2026: "um local onde se o Agente tiver dúvidas ele me perguntar e eu
 // responder lá, para a próxima vez ele pegar") =====
@@ -10978,7 +11152,7 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
       <p className="kicker">📌 NÃO ESQUECE HOJE</p>
       <RotinasCard rotinas={rotinasFixadas} hoje={today} agora={agoraHHMM} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} soLista semTitulo comAdiar />
     </section>}
-    <ResumoManhaCard avisos={avisos} today={today} db={db} demo={demo} notify={notify} onOpenFicha={onOpenFicha} onChanged={onServicoChanged} />
+    <ResumoManhaCard avisos={avisos} customers={customers} today={today} db={db} demo={demo} notify={notify} onOpenFicha={onOpenFicha} onChanged={onServicoChanged} />
     {/* O card da Manu NÃO fica no topo (Diego, 13/10/2026: "Não quero da Manu no topo"): está no fim, depois de
         Pessoais, onde o card Manu já ficava. */}
     {/* O card existe se há compromisso OU rotina atrasada — inclusive o de hoje que passou da hora (13/10/2026). */}
@@ -10994,6 +11168,8 @@ function Dashboard({ anotarInicial = false, inbox, services, appointments, agend
     {/* AGENDA DE HOJE — o único card do Painel que aparece VAZIO de propósito. "Nenhum compromisso hoje" é
         informação: some do card e ele fica sem saber se o dia está livre ou se o app não carregou. */}
     {/* PROPOSTAS DE ORÇAMENTO (Diego, 16/10/2026, 08h46): antes da agenda do dia porque é dinheiro parado esperando um toque. */}
+    {/* LEADS A RESOLVER (13/11/2026): fechado como os outros, logo antes das Propostas e da Agenda de hoje. */}
+    <LeadsAResolverCard avisos={avisos} services={services} agendaPlanejada={agendaPlanejada} finances={finances} today={today} db={db} demo={demo} notify={notify} onOpenFicha={onOpenFicha} onChanged={onServicoChanged} />
     <PropostasCard propostas={propostas} customers={customers} services={services} db={db} demo={demo} notify={notify} onChanged={onRotinaChanged} />
     <CardRecolhivel id="secao-hoje" className="content-card hoje-card" resumoAbre
       resumo={hojeFechado.length > 0 ? <span className="hoje-linhas">{hojeFechado.map((linha, i) => <span key={i} className={`hoje-linha${linha.rotina ? " rotina" : ""}${linha.mais ? " mais" : ""}`}>{comNumeroInteiro(linha.texto)}</span>)}</span> : null}
