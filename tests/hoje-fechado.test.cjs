@@ -105,8 +105,9 @@ test('o card "Agenda de hoje" mostra essas linhas fechado e tocar nelas abre o c
   const recolhivel = source.slice(source.indexOf('function CardRecolhivel('), source.indexOf('function CardRecolhivel(') + 3500);
   assert.match(recolhivel, /resumoAbre = false/, 'os outros cards recolhíveis não mudam: o resumo deles segue só texto');
   assert.match(recolhivel, /\{resumoAbre && resumo \? <button type="button" className="card-resumo-toque" onClick=\{abrir\}>\{resumo\}<\/button> : resumo\}/);
-  // Só o card de hoje usa a novidade.
-  assert.equal(source.split('resumoAbre').length - 1, 4, 'resumoAbre: parâmetro, comentário, uso no CardRecolhivel e o card de hoje');
+  // Só o card de hoje e o de Leads a resolver (13/11/2026: tocar nos nomes abre a lista) usam a novidade.
+  assert.equal(source.split('resumoAbre').length - 1, 5, 'resumoAbre: parâmetro, comentário, uso no CardRecolhivel, o card de hoje e o de leads');
+  assert.match(source, /<CardRecolhivel className="content-card leads-resolver"[^\n]*\bresumoAbre\b/);
 });
 
 test('cada linha do card fechado ocupa uma linha só, com "…" no fim se não couber', () => {
