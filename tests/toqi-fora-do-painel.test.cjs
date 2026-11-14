@@ -33,3 +33,16 @@ test('sem o grupo, a linha "Pergunta pra você" da Caixa abre a Caixa em vez de 
   const soltos = source.match(/t === "pergunta" \? \(\) => \{ vibrar\(6\); document\.getElementById\("grupo-manu"\)/g);
   assert.equal(soltos, null);
 });
+
+test('sem o grupo, nenhum texto manda o Diego pro card da Manu ou pro grupo Toqi', () => {
+  assert.match(source, /\{t === "pergunta" && TOQI_NO_PAINEL \? <span className="linha-sub">responda no card da Manu<\/span> : null\}/);
+  assert.match(source, /<i>\{t === "pergunta" && TOQI_NO_PAINEL \? "Manu ↓" : "abrir ›"\}<\/i>/);
+  assert.match(source, /\{TOQI_NO_PAINEL \? "Dá pra desfazer no grupo Toqi, no fim do Painel\." : "Dá pra desfazer em “Toques nos cards”, no fim do Painel\."\}/);
+  const soltos = source.match(/[^"]Dá pra desfazer no grupo Toqi/g);
+  assert.equal(soltos, null, 'texto do grupo Toqi sem a chave');
+});
+
+test('a pergunta da Caixa abre a Caixa na própria pergunta', () => {
+  assert.match(source, /t === "pergunta" \? \(\) => onAbrirCaixa\(filaCaixa\.find\(\(it\) => tipoDoItemDaCaixa\(it\) === "pergunta"\)\?\.id\) : onAbrirCaixa\}/);
+  assert.match(source, /onAbrirCaixa=\{\(id\) => \{ setCaixaAbrirId\(typeof id === "string" \|\| typeof id === "number" \? id : null\); setTab\("caixa"\); window\.scrollTo\(0, 0\); \}\}/);
+});
