@@ -1353,6 +1353,37 @@ button.responsavel-badge,a.responsavel-badge,.ficha-servico-pills .responsavel-b
 .content-card .ficha-note{line-height:1.35}
 .grupo-card.fechado{padding:6px 14px}
 .grupo-card .grupo-titulo{font-size:18px}
+/* Depois da crítica do dono (14/11/2026), olhando a prévia no celular:
+   - card aberto: o Feito ficava o menor botão da linha (62 de largura, letra 13). Agora tem a linha dele, como o
+     "Marcar como entregue" da ficha; Remarcar, Cancelar e 💬 embaixo, em 14.
+   - rotina com quatro botões (Feito, Não fiz, Adiar 1h, Fiz ontem): grade 2 x 2 do mesmo tamanho, sem buraco.
+   - ficha: a etiqueta da situação desce pra linha de baixo em vez de partir o nome do serviço; os quatro botões do topo
+     com o desenho na mesma altura.
+   - etiquetas do Resumo e de Leads a resolver com o mesmo espaçamento das outras (a data não parte no meio), e quebra de
+     linha equilibrada (sem palavra sozinha na linha; Android novo entende, aparelho velho ignora).
+   - barra de baixo em 13 (era a única letra abaixo do piso) e espaço no fim da página pro "+" não cobrir o último item.
+   - lista por cima na tela toda no celular (decisão pedida ao Diego; voltar pelo Voltar, pelo botão do Android ou
+     puxando): nos 92% a letra maior custava um card por tela e a faixa de tocar fora tinha só 29 de largura. */
+.card-acoes-botoes.linha{grid-template-columns:1fr 1fr 44px;gap:6px}
+.card-acoes-botoes.linha:not(:has(> :nth-child(4))){grid-template-columns:1fr 1fr}
+.card-acoes-botoes.linha button{font-size:14px;padding:0 8px}
+.card-acoes-botoes.linha button:first-child{grid-column:1/-1;min-height:48px;font-size:15px}
+.rotina-item .agenda-acoes:has(> :nth-child(4)){display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rotina-item .agenda-acoes:has(> :nth-child(4)) button{width:100%}
+.ficha-servico-topo{flex-wrap:wrap;row-gap:6px}
+.ficha-botao{justify-content:flex-start;padding-top:10px}
+.resumo-card .resumo-topo .kicker,.leads-resolver .kicker{letter-spacing:1px}
+.kicker{text-wrap:balance}
+.resumo-card .resumo-topo .kicker{text-wrap:wrap}
+.ficha-note,.contador-agua .agua-txt small{text-wrap:pretty}
+.pend-linha i,.lista-lateral-aviso{font-size:13px}
+@media (max-width:850px){
+  .mobile-nav button{font-size:13px}
+  .workspace{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
+}
+@media (max-width:1023px){
+  .lista-lateral,.lista-lateral-aviso{width:100vw;border-right:0}
+}
 </style>
 </head>
 <body>
@@ -10398,7 +10429,7 @@ function ResumoManhaCard({ avisos, customers, today, db, demo, notify, onOpenFic
     return <li className={it.clienteId && onOpenFicha ? "com-ficha" : ""} onClick={it.clienteId && onOpenFicha ? () => onOpenFicha(it.clienteId) : undefined}>{it.texto}{it.clienteId && onOpenFicha && <i>›</i>}</li>;
   };
   return <section className="content-card resumo-card">
-    <div className="resumo-topo"><div><p className="kicker">RESUMO DA MANHÃ · {compactDate(resumo.expira_em || today)}</p><h3>Bom dia, Diego</h3></div>
+    <div className="resumo-topo"><div><p className="kicker">RESUMO DA MANHÃ{"\u00a0·"} {String(compactDate(resumo.expira_em || today)).replace(/ /g, "\u00a0")}</p><h3>Bom dia, Diego</h3></div>
       <button type="button" className="ghost" disabled={busy} onClick={entendi}>{busy ? "…" : "Entendi"}</button></div>
     {soltas.length > 0 && <p className="resumo-livre">{soltas.map((it) => it.texto).join("\n")}</p>}
     {blocos.map((b, i) => <div key={i} className={`resumo-bloco${/priorid/i.test(b.titulo) ? " prioridades" : ""}`}><b>{b.titulo}</b><ul>{b.itens.map((it, j) => <Item key={j} it={it} />)}</ul></div>)}
