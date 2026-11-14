@@ -1384,6 +1384,28 @@ button.responsavel-badge,a.responsavel-badge,.ficha-servico-pills .responsavel-b
 @media (max-width:1023px){
   .lista-lateral,.lista-lateral-aviso{width:100vw;border-right:0}
 }
+/* Depois da crítica técnica (14/11/2026), nas telas que a prévia não cobria.
+   A pagar / Compras / Profissionais: valor e botões descem pra linha de baixo em vez de esmagar a descrição */
+.finance-row:has(>.agenda-acoes){flex-wrap:wrap;align-items:center;row-gap:8px}
+.finance-row:has(>.agenda-acoes)>div:first-child{flex:1 1 170px;min-width:0;overflow-wrap:anywhere}
+.finance-row>.agenda-acoes{flex:0 1 auto;max-width:100%;margin-left:auto;justify-content:flex-end;align-items:center}
+/* título da aba por baixo do botão fixo "Ajuste no app" */
+@media (max-width:850px){.workspace-header{padding-top:18px}}
+/* WhatsApp do profissional */
+.prof-contato,.vale-fornecedor-head{flex-wrap:wrap;row-gap:6px}
+.btn-wpp.prof-wpp{max-width:100%;padding:0 12px;margin-left:auto}
+/* WhatsApp do fornecedor */
+.customer-list article>div{min-width:0;overflow-wrap:anywhere}
+.customer-list .btn-wpp.zap-linha{min-width:max-content}
+@media (max-width:560px){
+  .customer-list article:has(>.btn-wpp.zap-linha){grid-template-columns:38px minmax(0,1fr)}
+  .customer-list article>.btn-wpp.zap-linha{grid-column:2;justify-self:start}
+}
+/* Agenda: "compromisso(s)" por cima da cidade */
+.agenda-dia-meta{min-width:max-content}
+@media (max-width:560px){.agenda-dia-head{column-gap:10px;padding:14px 12px}}
+/* Compras: motivo em código não passa por baixo do x */
+.compra-item-motivo{overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -8050,7 +8072,10 @@ function CompromissoCard({ a, svc, cliente, today, materiais, fornecedores, prof
   // e o quadradinho da hora esticava o card). A data inteira continua no card aberto.
   // CRÍTICA VISUAL 14/11/2026 (Diego escolheu "Do 1 ao 6"): faixa vermelha só no que está atrasado (dias ou hora
   // passada); o de hoje que ainda vem fica neutro (cor-hoje). Amanhã e depois seguem amarelo e verde.
-  const corCard = diasAtraso > 0 || passouDaHora ? "alta" : a.data === today ? "hoje" : corCompromisso(a.data, today);
+  // Quem não manda `passouDaHora` (a aba Agenda) também pinta de vermelho o de hoje que já passou da hora. Muda só a cor:
+  // "atrasado" e "Adiar 1h" continuam presos à prop.
+  const passouAgora = passouDaHora || (a.data === today && !!a.hora && String(a.hora).slice(0, 5) < new Date().toTimeString().slice(0, 5));
+  const corCard = diasAtraso > 0 || passouAgora ? "alta" : a.data === today ? "hoje" : corCompromisso(a.data, today);
   // A data embaixo da hora some no card de hoje (lista de um dia só repetia "14 de nov." em todo card); em Próximos fica.
   const dataNoCard = a.data === today ? null : <span>{compactDate(a.data)}</span>;
   const idadeAtraso = diasAtraso > 0
