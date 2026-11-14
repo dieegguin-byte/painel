@@ -83,7 +83,12 @@ a da Toqi é a trava dela. Não junte.
 
 Procure pelo nome (as linhas mudam). Ordem no arquivo:
 
-1. `<style>` até ~1250: CSS. Blocos comentados por data e pedido do Diego.
+1. `<style>` até ~1400: CSS. Blocos comentados por data e pedido do Diego. **Cor no CSS é sempre `var(--c-<hex>)`**
+   (desde 14/11/2026): o `:root` das cores define cada uma com o próprio valor, e o tema "azul e dourado" troca os valores
+   em `html[data-tema="marca"]` (escolha no menu "⋯", guardada em `localStorage` `tb-tema`, aplicada por um script no
+   `<head>` antes de desenhar). Cor nova: escreva `var(--c-<hex>)`, ponha `--c-<hex>:#<hex>` no `:root` das cores e, se
+   ela for marrom ou cobre, o valor azul ou dourado no bloco do tema. Fonte: `var(--fonte-titulo)` / `var(--fonte-texto)`
+   (no tema da marca viram Bricolage Grotesque e Manrope, de `fonts/`). `tests/tema.test.cjs` confere;
 2. `<script>` de boot: `TB.carregarTudo` (supabase, React, ReactDOM) e `TB.carregarBabel` (só quando o `montar()`
    vai compilar). Três tentativas por biblioteca: jsdelivr, jsdelivr furando o cache, unpkg.
 3. `<script type="text/plain" id="app-source">`: o app. Dentro dele, nesta ordem:

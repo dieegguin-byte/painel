@@ -68,3 +68,4 @@ jobs:
           tests/ficha-sem-manu.test.cjs
           tests/avisos-envio-falha.test.cjs
           tests/leads-a-resolver.test.cjs
+          tests/tema.test.cjs
