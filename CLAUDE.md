@@ -88,7 +88,8 @@ Procure pelo nome (as linhas mudam). Ordem no arquivo:
    em `html[data-tema="marca"]` (escolha no menu "⋯", guardada em `localStorage` `tb-tema`, aplicada por um script no
    `<head>` antes de desenhar). Cor nova: escreva `var(--c-<hex>)`, ponha `--c-<hex>:#<hex>` no `:root` das cores e, se
    ela for marrom ou cobre, o valor azul ou dourado no bloco do tema. Fonte: `var(--fonte-titulo)` / `var(--fonte-texto)`
-   (no tema da marca viram Bricolage Grotesque e Manrope, de `fonts/`). `tests/tema.test.cjs` confere;
+   (no tema da marca viram Bricolage Grotesque e Manrope, de `fonts/`). O `estoque.html` (iframe da aba Estoque) tem o
+   mesmo script e um bloco `html[data-tema="marca"]` próprio: cor nova lá entra nos dois. `tests/tema.test.cjs` confere.
 2. `<script>` de boot: `TB.carregarTudo` (supabase, React, ReactDOM) e `TB.carregarBabel` (só quando o `montar()`
    vai compilar). Três tentativas por biblioteca: jsdelivr, jsdelivr furando o cache, unpkg.
 3. `<script type="text/plain" id="app-source">`: o app. Dentro dele, nesta ordem:

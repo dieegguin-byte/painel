@@ -54,3 +54,27 @@ test('as letras do site existem no repositório', () => {
     assert.match(css, new RegExp(`url\\(fonts/${f.replace('.', '\\.')}\\)`));
   }
 });
+
+test('no azul e dourado, letra clara em fundo que vira dourado entra na regra da letra escura', () => {
+  const nomeadas = Object.fromEntries([...css.match(/:root\{--bg:[^}]*\}/)[0].matchAll(/(--[\w-]+):(#[0-9a-f]{3,8})/gi)].map((m) => [m[1], m[2]]));
+  const marrom = { ...nomeadas, ...Object.fromEntries([...padrao[0].matchAll(/(--c-[0-9a-f]+):(#[0-9a-f]{3,8})/g)].map((m) => [m[1], m[2]])) };
+  const azul = { ...marrom, ...Object.fromEntries([...tema[1].matchAll(/(--[\w-]+):(#[0-9a-f]{3,8})/gi)].map((m) => [m[1], m[2]])) };
+  const rgb = (h) => { h = h.slice(1); if (h.length < 6) h = [...h.slice(0, 3)].map((c) => c + c).join('') + (h[3] ? h[3] + h[3] : ''); return [0, 2, 4, 6].map((i) => (i < 6 ? parseInt(h.slice(i, i + 2), 16) : h.length > 6 ? parseInt(h.slice(6, 8), 16) / 255 : 1)); };
+  const cores = (v, mapa) => [...v.matchAll(/var\((--[\w-]+)\)|\bwhite\b/g)].map((m) => (m[1] ? mapa[m[1]] : '#fff')).filter(Boolean).map(rgb);
+  const sobre = (c, f) => [0, 1, 2].map((i) => c[i] * c[3] + f[i] * (1 - c[3]));
+  const lum = (c) => c.map((v) => (v /= 255) <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4).reduce((s, v, i) => s + v * [0.2126, 0.7152, 0.0722][i], 0);
+  const contraste = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  const medir = (letra, fundo, mapa) => { const l = cores(letra, mapa)[0], fs = cores(fundo, mapa); if (!l || !fs.length) return null; const m = fs.reduce((s, c) => s.map((v, i) => v + c[i] / fs.length), [0, 0, 0, 0]); const f = sobre(m, rgb(mapa['--c-181412'])); return contraste(sobre(l, f), f); };
+  const ouro = (css.match(/((?:html\[data-tema="marca"\] [^,{]+,?)+)\{color:#0a1f33/) || [, ''])[1].split(',').map((s) => s.replace('html[data-tema="marca"] ', '').trim());
+  const coberto = (sel) => ouro.includes(sel) || (/\.primary\b/.test(sel) && !/confirmando/.test(sel) && ouro.includes('.primary:not(.confirmando)'));
+  const ilegiveis = [];
+  for (const [, sel, corpo] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (/data-tema|^\s*[@:]/.test(sel)) continue;
+    const letra = (corpo.match(/(?:^|;)color:([^;]+)/) || [])[1], fundo = (corpo.match(/(?:^|;)background(?:-color)?:([^;]+)/) || [])[1];
+    if (!letra || !fundo) continue;
+    const m = medir(letra, fundo, marrom), a = medir(letra, fundo, azul);
+    if (m == null || a == null || m < 3 || a >= 3) continue;
+    for (const s of sel.split(',').map((x) => x.trim())) if (!coberto(s)) ilegiveis.push(`${s} (${a.toFixed(2)}:1)`);
+  }
+  assert.deepEqual(ilegiveis, [], 'ponha estes seletores na regra "No dourado a letra fica azul-escura"');
+});

@@ -130,11 +130,11 @@ window.TB = window.TB || {};
     alvo.innerHTML =
       '<div class="loading-screen"><div class="login-card">' +
         '<div class="brand-seal">TB</div>' +
-        '<h1 style="font:500 26px Georgia,serif;margin:0 0 10px">O app não conseguiu abrir</h1>' +
+        '<h1 style="font:500 26px var(--fonte-titulo,Georgia,serif);margin:0 0 10px">O app não conseguiu abrir</h1>' +
         '<p>Quase sempre é o celular servindo uma cópia velha e quebrada do app. O botão abaixo apaga essa cópia e baixa tudo de novo. Seus dados estão no servidor, não se perde nada.</p>' +
         '<button class="primary wide" id="tb-limpar">Limpar e abrir de novo</button>' +
         '<button class="ghost wide" id="tb-tentar" style="margin-top:10px">Só tentar de novo</button>' +
-        '<p style="font-size:13px;color:#81736a;margin:16px 0 0;word-break:break-word">' + String(detalhe).replace(/[<>]/g, '') + '</p>' +
+        '<p style="font-size:13px;color:var(--dim,#81736a);margin:16px 0 0;word-break:break-word">' + String(detalhe).replace(/[<>]/g, '') + '</p>' +
       '</div></div>';
     document.getElementById('tb-limpar').onclick = TB.limparTudo;
     document.getElementById('tb-tentar').onclick = () => location.reload();
@@ -157,7 +157,7 @@ window.TB = window.TB || {};
 html[data-tema="marca"]{--bg:#080e15;--surface:#0c1621;--surface2:#0e1d2d;--surface3:#12243a;--line:#183250;--line2:#1c3f68;--text:#f1f4f7;--muted:#9aaabb;--dim:#5e758d;--orange:#e6bf65;--orange2:#eed396;--cream:#d9dfe5;--c-000:#000000;--c-0000002e:#0000002e;--c-00000030:#00000030;--c-00000040:#00000040;--c-0000004d:#0000004d;--c-000000a6:#000000a6;--c-000000b3:#000000b3;--c-000000cc:#000000cc;--c-0003:#00000033;--c-0006:#00000066;--c-0007:#00000077;--c-0008:#00000088;--c-0009:#00000099;--c-000c:#000000cc;--c-050404:#030507;--c-0a0807cc:#05090ecc;--c-0b0a09:#060a0f;--c-0d0b09:#060b12;--c-0d0b0a:#070c12;--c-0e0c0a44:#070d1344;--c-0e0c0a66:#070d1366;--c-0f0d0c:#080e15;--c-0f0d0ccc:#080e15cc;--c-0f0d0ce6:#080e15e6;--c-12100e:#0a1119;--c-14110f:#0a121b;--c-14110fcc:#0a121bcc;--c-14110fee:#0a121bee;--c-141110:#0b131c;--c-141110f0:#0b131cf0;--c-141210:#0b131c;--c-15100d:#08121d;--c-15110f:#0a131d;--c-151210:#0b131d;--c-161210:#0b141e;--c-170a0b:#07111d;--c-17120f:#091420;--c-171210:#0b1420;--c-17130a:#07111d;--c-171310:#0b1420;--c-181412:#0c1621;--c-181412ee:#0c1621ee;--c-1a120c:#081421;--c-1a1210:#091624;--c-1a1512:#0c1724;--c-1b1613:#0d1825;--c-1c1613:#0c1927;--c-1d1613:#0c1928;--c-1d1714:#0d1a28;--c-1d1714f2:#0d1a28f2;--c-1e1714:#0d1a29;--c-1f1714:#0c1b2b;--c-201813:#0b1a2c;--c-201915:#0d1c2c;--c-201c14:#0c1b2c;--c-211915:#0d1c2e;--c-241812:#0b1c2f;--c-241a14:#0b1d31;--c-281a13:#0c1f34;--c-2a1715:#0d2137;--c-2a1812:#0c1f34;--c-2a211c:#12243a;--c-2a2210:#0c1e33;--c-2a2416:#0d2138;--c-2a2418:#0e223a;--c-2e1213:#0d2138;--c-3a1c0f:#0f2640;--c-3a2314:#102844;--c-3a2d2650:#18325050;--c-3b291e:#122e4e;--c-3b2f16:#112a47;--c-48220f:#122d4c;--c-48221e:#153559;--c-48221e55:#15355955;--c-4a1f1a:#153457;--c-4a2211:#132f50;--c-4b392f:#1c3f68;--c-543b2f:#1b4473;--c-5a3b2b:#1b4574;--c-5a524a33:#42516233;--c-66301655:#19406c55;--c-694630:#dba424;--c-6a625a66:#4e617666;--c-6b5424:#1d4a7d;--c-74503a:#465668;--c-75573e:#48596b;--c-756153:#506378;--c-895136:#dba424;--c-8a3a12:#dba424;--c-8a5a3e:#dca629;--c-8a7a6a26:#62799226;--c-8a7a6a66:#62799266;--c-8e391e38:#dba42438;--c-8e391e4d:#dba4244d;--c-8f4d44:#54697f;--c-987665:#657e98;--c-9f4621:#dba424;--c-9f4b29:#dca629;--c-a99:#8fa1b4;--c-ad4d24:#ddaa31;--c-b8b0a8:#a0b0c0;--c-baa99b:#9aaabb;--c-bd794b66:#e5bd6066;--c-c2581f00:#e0af3f00;--c-c2581f2e:#e0af3f2e;--c-c2581f66:#e0af3f66;--c-c8551f:#e1b144;--c-c95f2e:#e3b751;--c-d37742:#e7c26b;--c-d86d36:#e6bf65;--c-d86d3600:#e6bf6500;--c-d86d3608:#e6bf6508;--c-d86d3612:#e6bf6512;--c-d86d3617:#e6bf6517;--c-d86d3618:#e6bf6518;--c-d86d3619:#e6bf6519;--c-d86d361a:#e6bf651a;--c-d86d361f:#e6bf651f;--c-d86d3622:#e6bf6522;--c-d86d3626:#e6bf6526;--c-d86d3633:#e6bf6533;--c-d86d3638:#e6bf6538;--c-d86d363b:#e6bf653b;--c-d86d3640:#e6bf6540;--c-d86d3655:#e6bf6555;--c-d86d3660:#e6bf6560;--c-d86d3666:#e6bf6566;--c-d86d3680:#e6bf6580;--c-d86d3699:#e6bf6599;--c-d86d36cc:#e6bf65cc;--c-d9cfc4:#c5ced8;--c-db7542:#e8c572;--c-e0a24a:#eac97d;--c-e0a458:#ecce89;--c-e0cbb8:#eed396;--c-e17a42:#e9c777;--c-e17a4222:#e9c77722;--c-e17a4266:#e9c77766;--c-e6d4c5:#eed396;--c-ed9057:#eed394;--c-ed905700:#eed39400;--c-ed905740:#eed39440;--c-ed905755:#eed39455;--c-ed905766:#eed39466;--c-ef9864:#eed396;--c-f09a5c:#eed396;--c-f09a5ccc:#eed396cc;--c-f0a06f:#eed396;--c-f0a48a:#eed396;--c-f0b48a:#eed396;--c-f0b48a12:#eed39612;--c-f1a06d:#eed396;--c-f1c09d:#eed396;--c-f3dfc9:#d7dee5;--c-f3dfc9b8:#d7dee5b8;--c-f3ece4:#e6ecf1;--c-fbf3e2:#eaeef3;--c-ff9a5c:#eed396;--c-ffad78:#eed396;--c-ffb07a:#eed396;--c-ffb07a00:#eed39600;--c-ffb07a14:#eed39614;--c-ffb07a59:#eed39659;--c-ffb07a66:#eed39666;--c-ffb36b:#eed396;--c-ffb98a:#eed396;--c-ffc099:#eed396;--c-ffc6a0:#eed396;--c-ffcfac:#eed396;--c-ffd2b0:#eed396;--c-ffd8d2:#e2e8ef;--c-ffe0c7:#dde3e9;--c-fff0ee:#f4f6f9;--c-fff3e4:#edf2f6;--c-fff6f4:#f8fafb;--c-fff8f0:#f5f8fa;--c-fff9f1:#f6f8fa;--fonte-titulo:"Bricolage Grotesque",Georgia,serif;--fonte-texto:Manrope,Inter,system-ui,sans-serif;--fonte-corpo:Manrope,Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 html[data-tema="marca"] h1,html[data-tema="marca"] h2,html[data-tema="marca"] h3{letter-spacing:-.01em}
 /* No dourado a letra fica azul-escura (branco no dourado quase não se lê). */
-html[data-tema="marca"] .primary:not(.confirmando),html[data-tema="marca"] .anotar-fab,html[data-tema="marca"] .nav-contagem,html[data-tema="marca"] .brand-seal,html[data-tema="marca"] .alarme-compromisso,html[data-tema="marca"] .resumo-bloco.prioridades li::before,html[data-tema="marca"] .ficha-servico-pills.principal-pronto .prontidao-acao>.ghost:first-child,html[data-tema="marca"] .ficha-servico-pills.principal-pronto .prontidao-acao>.ghost:nth-child(2),html[data-tema="marca"] .duvida-opcoes button.ativo,html[data-tema="marca"] .tom-laranja .selo-num b{color:#0a1f33;text-shadow:none}
+html[data-tema="marca"] .primary:not(.confirmando),html[data-tema="marca"] .anotar-fab,html[data-tema="marca"] .nav-contagem,html[data-tema="marca"] .brand-seal,html[data-tema="marca"] .alarme-compromisso,html[data-tema="marca"] .resumo-bloco.prioridades li::before,html[data-tema="marca"] .ficha-servico-pills.principal-pronto .prontidao-acao>.ghost:first-child,html[data-tema="marca"] .ficha-servico-pills.principal-pronto .prontidao-acao>.ghost:nth-child(2),html[data-tema="marca"] .duvida-opcoes button.ativo,html[data-tema="marca"] .tom-laranja .selo-num b,html[data-tema="marca"] .mais-grade button b,html[data-tema="marca"] .contas-card .conta-prazo.hoje,html[data-tema="marca"] .proposta-versao,html[data-tema="marca"] .proposta-selo.laranja,html[data-tema="marca"] .classify button.active,html[data-tema="marca"] .fornecedor-chips button.active,html[data-tema="marca"] .bubble.diego{color:#0a1f33;text-shadow:none}
 
 
 *{box-sizing:border-box}html,/* Par do meta viewport: sem pinça e sem duplo-toque, mesmo onde user-scalable=no é ignorado.
@@ -1462,7 +1462,7 @@ document.addEventListener("pointerdown", (e) => {
 function comemorar() {
   if (semMovimento()) return;
   try {
-    const cores = ["#ed9057", "#ffc6a0", "#fff3e4", "#d86d36", "#9acaaa"];
+    const cores = ["var(--c-ed9057)", "var(--c-ffc6a0)", "var(--c-fff3e4)", "var(--c-d86d36)", "var(--c-9acaaa)"]; // seguem o tema
     const caixa = document.createElement("div"); caixa.className = "confete"; caixa.setAttribute("aria-hidden", "true");
     for (let k = 0; k < 36; k++) {
       const i = document.createElement("i");
@@ -15201,11 +15201,11 @@ class Barreira extends React.Component {
     if (!this.state.erro) return this.props.children;
     return <div className="loading-screen"><div className="login-card">
       <div className="brand-seal">TB</div>
-      <h1 style={{ font: "500 26px Georgia,serif", margin: "0 0 10px" }}>O app quebrou nesta tela</h1>
+      <h1 style={{ font: "500 26px var(--fonte-titulo)", margin: "0 0 10px" }}>O app quebrou nesta tela</h1>
       <p>Não foi você e não se perdeu nada: os dados estão no servidor. Recarregar resolve na maioria das vezes. Se voltar a acontecer, me mande esta mensagem de erro.</p>
       <button className="primary wide" onClick={() => location.reload()}>Recarregar o app</button>
       <button className="ghost wide" style={{ marginTop: 10 }} onClick={() => { location.href = "./socorro.html"; }}>Abrir a página de socorro</button>
-      <p style={{ fontSize: 13, color: "#81736a", margin: "16px 0 0", wordBreak: "break-word" }}>{String((this.state.erro && this.state.erro.message) || this.state.erro)}</p>
+      <p style={{ fontSize: 13, color: "var(--dim)", margin: "16px 0 0", wordBreak: "break-word" }}>{String((this.state.erro && this.state.erro.message) || this.state.erro)}</p>
     </div></div>;
   }
 }
@@ -15231,7 +15231,7 @@ class BarreiraDaAba extends React.Component {
         <button className="primary" onClick={() => this.setState({ erro: null })}>Tentar de novo</button>
         {onFechar && <button className="ghost" onClick={onFechar}>Fechar</button>}
       </div>
-      <p style={{ fontSize: 13, color: "#81736a", margin: "12px 0 0", wordBreak: "break-word" }}>{String((this.state.erro && this.state.erro.message) || this.state.erro)}</p>
+      <p style={{ fontSize: 13, color: "var(--dim)", margin: "12px 0 0", wordBreak: "break-word" }}>{String((this.state.erro && this.state.erro.message) || this.state.erro)}</p>
     </>;
     return onFechar
       ? <div className="modal-overlay barreira-aba"><div className="modal-card small">{corpo}</div></div>
