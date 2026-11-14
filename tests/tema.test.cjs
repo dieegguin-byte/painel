@@ -31,9 +31,9 @@ test('não sobrou cor solta no CSS (ela não trocaria de tema)', () => {
   assert.deepEqual(soltas, [], 'escreva var(--c-<hex>) e ponha a variável no :root das cores');
 });
 
-test('o tema azul e dourado mantém WhatsApp, Remoto, Quente, atrasado e cards ligados', () => {
+test('o tema azul e dourado mantém WhatsApp, Remoto, Quente, atrasado, aviso de erro e cards ligados', () => {
   assert.ok(tema, 'bloco do tema sumiu');
-  for (const fica of ['147a40', '1e9a55', '0b562c', '7fd6c9', 'ffb454', 'f0921f', 'e0b04a', '5cc3b5', 'b48ee6', 'e48aa7', '6aa9e9', 'df6a5d']) {
+  for (const fica of ['147a40', '1e9a55', '0b562c', '7fd6c9', 'ffb454', 'f0921f', 'e0b04a', '5cc3b5', 'b48ee6', 'e48aa7', '6aa9e9', 'df6a5d', '48221e', '8f4d44', 'ffd8d2', '2e1213', '170a0b']) {
     assert.doesNotMatch(tema[1], new RegExp(`--c-${fica}[0-9a-f]*:`), `#${fica} tem que ficar igual nos dois temas`);
   }
   assert.match(tema[1], /--orange:#/, 'o laranja vira dourado');
