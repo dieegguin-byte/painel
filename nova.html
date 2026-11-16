@@ -1098,6 +1098,18 @@ body:has(.modal-overlay){overscroll-behavior-y:contain}
 .pessoal-txt strong{display:block;font-size:15px;line-height:1.3;color:var(--cream)}
 .pessoal-txt>span{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:14px;color:var(--muted);margin-top:4px}
 .pessoal-txt em{display:block;font-style:normal;font-size:13px;color:var(--dim);margin-top:3px;line-height:1.35}
+/* Descrição longa recolhida (15/11/2026): o texto inteiro é o botão; fechada mostra 2 linhas. */
+.pessoal-desc{display:block;width:100%;margin:3px 0 0;padding:0;border:0;background:none;box-shadow:none;text-align:left;min-height:0;color:inherit;font:inherit;cursor:pointer}
+.pessoal-desc>em{margin-top:0}
+.pessoal-desc:not(.aberta)>em{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pessoal-desc>b{display:block;margin-top:2px;font-size:13px;font-weight:700;color:var(--orange)}
+/* Crítica visual (15/11): toque com retorno na cor do app; aberta, só o "recolher" é botão (o texto se seleciona e
+   um toque na leitura não fecha); texto que já cabe nas 2 linhas (tela larga) não mostra "ver tudo". */
+.pessoal-desc{-webkit-tap-highlight-color:transparent}
+.pessoal-desc:active>b{opacity:.55}
+.pessoal-desc.aberta{margin:0;padding:6px 0 8px}
+.pessoal-desc:disabled{cursor:default}
+.pessoal-desc:disabled>b{display:none}
 .pessoal-tag{font-style:normal;font-size:12px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;padding:3px 8px;border-radius:999px;background:var(--c-8fb8dc22);border:1px solid var(--c-8fb8dc44);color:var(--c-bcd9ef)}
 .pessoal-tag.vermelha{background:var(--red);border-color:var(--red);color:var(--c-fff)}
 .pessoais-card .funil-filtros{margin-bottom:10px}
@@ -2121,7 +2133,8 @@ const demoPessoais = [
   // SEM HORA e sem bloqueio na agenda (a trava AGENDA_PLANEJADA_EXIGE_HORA impediu, e com razão). Sem este
   // fixture a demo não exercita o defeito — p1 tem hora e p2 já tem bloqueio, então nenhum dos dois prova
   // que o item invisível voltou pra fila. Mesma razão do caso Fabrício logo abaixo.
-  { id: "p4", titulo: "Viagem com minha mãe para Goiânia — hospedagem", data_alvo: "2026-09-19", hora: null, cidade: "Goiânia", status: "PENDENTE", impacto_operacao: "A_CONFIRMAR", origem: "classic", remarcacoes: 0 },
+  { id: "p4", titulo: "Viagem com minha mãe para Goiânia — hospedagem", data_alvo: "2026-09-19", hora: null, cidade: "Goiânia", status: "PENDENTE", impacto_operacao: "A_CONFIRMAR", origem: "classic", remarcacoes: 0,
+    descricao: "Ver hotel perto do hospital e perguntar se tem estacionamento. Levar os exames, a carteirinha do plano e o documento dela. Combinar com a irmã quem vai junto e a que horas sai. Levar lanche pra estrada e o carregador do celular." },
 ];
 // CAIXA DE AVISOS — mesmo formato do aviso real da Fátima, que é o caso de aceitação do item
 // AGENDA-CAIXA-AVISOS-20260831-001. Aponta pro `a6`, a retirada PROVISÓRIA de Valparaíso que já existia
@@ -9076,11 +9089,17 @@ function pessoalAtrasado(p, hoje) { return p.status === "PENDENTE" && !!p.data_a
 const PESSOAL_ASSINATURA_GPT = "PAINEL — ABRIR COMPROMISSO PESSOAL";
 const PESSOAL_INSTRUCAO_GPT = "Localize o compromisso pessoal atual pelo identificador acima antes de responder. Se qualquer ação puder alterar a disponibilidade da Operação Bahia, considere também o bloqueio operacional vinculado. Não trate este texto compartilhado como prova de estado atual e não invente detalhes pessoais ausentes.";
 
+const DESCRICAO_PESSOAL_CURTA = 90; // até aqui a descrição cabe em 2 linhas e aparece inteira
 function PessoaisCard({ pessoais, bloqueios = [], hoje, db, demo, notify, onChanged }) {
   const [verConcluidos, setVerConcluidos] = useState(false);
   const [remarcandoId, setRemarcandoId] = useState(null); // Remarcar na hora (02/11/2026): pergunta o dia aqui mesmo
   const [busy, setBusy] = useState(null);
   const [avisoGPT, setAvisoGPT] = useState("");
+  const [descAberta, setDescAberta] = useState({}); // descrição longa recolhida (Diego, 15/11/2026)
+  // Tela larga (notebook): texto de 100 letras cabe nas 2 linhas; aí não tem o que "ver tudo" e o botão some.
+  const [descCabe, setDescCabe] = useState({});
+  const medirDesc = (id) => (em) => { if (!em) return; const cabe = em.scrollHeight <= em.clientHeight + 1; if (cabe !== !!descCabe[id]) setDescCabe((m) => ({ ...m, [id]: cabe })); };
+  useEffect(() => { const medirDeNovo = () => setDescCabe({}); window.addEventListener("resize", medirDeNovo); return () => window.removeEventListener("resize", medirDeNovo); }, []);
   const acoes = React.useContext(AcoesAgendaCtx);
   // A DATA QUE VALE É A DA AGENDA (Diego, 16/10/2026, print 08h03: o registro pessoal dizia 15/10 e "atrasado há 1 dia",
   // o bloqueio da agenda já estava em 20/10 — a Manu moveu um lado só). Com bloqueio planejado, a lista mostra a
@@ -9137,7 +9156,15 @@ function PessoaisCard({ pessoais, bloqueios = [], hoje, db, demo, notify, onChan
         <strong>{p.titulo}</strong>
         {/* Horário só aparece quando existe. Compromisso sem hora marcada não ganha hora inventada. */}
         <span>{atrasado ? <i className="pessoal-tag vermelha">atrasado há {diasAtraso(p)} dia(s)</i> : null}{p.hora ? String(p.hora).slice(0, 5) : "sem horário"}{p.cidade ? " · " + p.cidade : ""}{p.status !== "PENDENTE" ? " · " + String(p.status).toLowerCase() : ""}</span>
-        {p.descricao && <em>{p.descricao}</em>}
+        {/* DESCRIÇÃO RECOLHIDA (Diego, 15/11/2026: "pessoais a descrição não está recolhível, já está aberta e não
+            recolhe"). As descrições reais passam de 500 letras e a lista virava um paredão. Longa nasce em 2 linhas;
+            o toque abre inteira (aí só o "recolher" é botão, pra o texto poder ser selecionado). Curta, ou que já cabe nas 2
+            linhas, aparece inteira, sem botão. */}
+        {p.descricao && (String(p.descricao).length > DESCRICAO_PESSOAL_CURTA
+          ? (descAberta[p.id]
+            ? <><em>{p.descricao}</em><button type="button" className="pessoal-desc aberta" aria-expanded="true" onClick={() => { vibrar(6); setDescAberta((m) => ({ ...m, [p.id]: false })); }}><b>recolher ▴</b></button></>
+            : <button type="button" className="pessoal-desc" aria-expanded="false" disabled={!!descCabe[p.id]} onClick={() => { vibrar(6); setDescAberta((m) => ({ ...m, [p.id]: true })); }}><em ref={medirDesc(p.id)}>{p.descricao}</em><b>ver tudo ▾</b></button>)
+          : <em>{p.descricao}</em>)}
         {p.remarcacoes > 0 && <em>Já remarcado {p.remarcacoes}x{p.remarcado_de ? " · antes era " + compactDate(p.remarcado_de) : ""}</em>}
         {p.impacto_operacao === "BLOQUEIA_DISPONIBILIDADE" && <span><i className="pessoal-tag">⛔ bloqueia a agenda</i></span>}
       </div>
