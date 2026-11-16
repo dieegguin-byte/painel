@@ -112,7 +112,7 @@ Procure pelo nome (as linhas mudam). Ordem no arquivo:
    - `// ===== A CAIXA VOLTA COMO FILA` (`CaixaCard`, `CaixaView`, `CaixaForm*`);
    - cards do Painel: `RetornosVencidosCard`, `CapacidadeCard`, `MateriaisCard`, `GrupoRecolhivel`,
      `AgenteCard` ("O que a Toqi fez", lê `historico`), `ResumoManhaCard`, `DuvidasAgenteCard`,
-     `ManuCard` (grupo no fim do Painel), `MudancasDaManu` (cards com `nota_claude_conferida = false`);
+     `ManuCard` (grupo "Toqi" no fim do Painel, guardado atrás de `TOQI_NO_PAINEL` desde 14/11/2026; a faixa "recados do Claude no Mural" fica atrás de `AVISO_MURAL`, `tests/toqi-fora-do-painel.test.cjs`), `MudancasDaManu` (cards com `nota_claude_conferida = false`);
    - `function Dashboard(`: o Painel (Atrasados / Hoje / Próximos, cobranças, pendências). O card "Agenda de hoje"
      fechado lista a hora e o nome do que ainda vem (`linhasDeHojeFechado`, `tests/hoje-fechado.test.cjs`);
    - `// ===== CALCULADORA RÁPIDA`, `LeadsView`, `AgendaView` + `AddAgendaModal` + `ConcluirModal` +
