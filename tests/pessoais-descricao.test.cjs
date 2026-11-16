@@ -9,11 +9,18 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'nova.html'), 'utf8');
 const source = html.match(/<script type="text\/plain" id="app-source">([\s\S]*?)<\/script>/)[1];
 const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
 
-test('descrição longa vira botão que abre e recolhe; curta fica inteira', () => {
+test('descrição longa: fechada é botão "ver tudo"; aberta, o texto fica solto e só o "recolher" é botão', () => {
   assert.match(source, /const DESCRICAO_PESSOAL_CURTA = \d+;/);
-  assert.match(source, /\{p\.descricao && \(String\(p\.descricao\)\.length > DESCRICAO_PESSOAL_CURTA\s*\? <button type="button" className=\{`pessoal-desc\$\{descAberta\[p\.id\] \? " aberta" : ""\}`\} aria-expanded=\{!!descAberta\[p\.id\]\} onClick=\{\(\) => \{ vibrar\(6\); setDescAberta\(\(m\) => \(\{ \.\.\.m, \[p\.id\]: !m\[p\.id\] \}\)\); \}\}><em>\{p\.descricao\}<\/em><b>\{descAberta\[p\.id\] \? "recolher ▴" : "ver tudo ▾"\}<\/b><\/button>\s*: <em>\{p\.descricao\}<\/em>\)\}/);
+  assert.match(source, /\{p\.descricao && \(String\(p\.descricao\)\.length > DESCRICAO_PESSOAL_CURTA\s*\? \(descAberta\[p\.id\]/);
+  assert.match(source, /\? <><em>\{p\.descricao\}<\/em><button type="button" className="pessoal-desc aberta" aria-expanded="true"[\s\S]*?><b>recolher ▴<\/b><\/button><\/>/);
+  assert.match(source, /: <button type="button" className="pessoal-desc" aria-expanded="false" disabled=\{!!descCabe\[p\.id\]\}[\s\S]*?><em ref=\{medirDesc\(p\.id\)\}>\{p\.descricao\}<\/em><b>ver tudo ▾<\/b><\/button>\)/);
   const soltas = source.match(/\{p\.descricao && <em>\{p\.descricao\}<\/em>\}/g);
   assert.equal(soltas, null, 'sobrou descrição sem recolher');
+});
+
+test('texto que já cabe nas 2 linhas não promete "ver tudo"', () => {
+  assert.match(source, /const medirDesc = \(id\) => \(em\) => \{ if \(!em\) return; const cabe = em\.scrollHeight <= em\.clientHeight \+ 1;/);
+  assert.match(css, /\.pessoal-desc:disabled>b\{display:none\}/);
 });
 
 test('fechada mostra 2 linhas e o botão não tem cara de botão', () => {
