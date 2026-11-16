@@ -70,3 +70,4 @@ jobs:
           tests/leads-a-resolver.test.cjs
           tests/tema.test.cjs
           tests/toqi-fora-do-painel.test.cjs
+          tests/pessoais-descricao.test.cjs
